@@ -25,21 +25,22 @@ import {
   type Project,
   type Time,
 } from '@video-ultra/core';
-import { assetFromProbe, createEngine, itemIndexAt, type Engine } from '@video-ultra/core/internal';
+import {
+  assetFromProbe,
+  attachAutosave,
+  createEngine,
+  createMediaAnalyzer,
+  createProjectStorage,
+  itemIndexAt,
+  StorageFullError,
+  type Engine,
+  type MediaAnalyzer,
+  type ProjectStorage,
+} from '@video-ultra/core/internal';
 import { produce } from 'immer';
 import { audioItem, visualItem } from './items';
 import type { Labels } from './labels';
-import {
-  attachAutosave,
-  createMediaAnalyzer,
-  createProjectStorage,
-  StorageFullError,
-  type ExportOptions,
-  type ExportProgress,
-  type ExportResult,
-  type MediaAnalyzer,
-  type ProjectStorage,
-} from './pending';
+import type { ExportOptions, ExportProgress, ExportResult } from './pending';
 import { createUiStore, Playhead, type LayoutMode, type PanelId, type ToolId } from './state';
 
 /** Options the `<VideoEditor />` passes to its controller. */
@@ -132,13 +133,22 @@ export class EditorController {
     const storage = await createProjectStorage();
     if (generation !== this.#generation) return;
     this.storage = storage;
-    this.analyzer = createMediaAnalyzer({ tier: caps.tier });
+    // Waveforms are cached next to the project's media, so reopening doesn't decode audio again.
+    this.analyzer = createMediaAnalyzer({ tier: caps.tier, waveformCache: storage });
     let project = initial;
     if (!project && this.options.autosave !== false) {
       const latest = (await this.storage.listProjects())[0];
-      const loaded = latest ? await this.storage.loadProject(latest.id) : null;
+      const loaded = latest
+        ? await this.storage.loadProject(latest.id).catch((error: unknown) => {
+            this.toast(error instanceof Error ? error.message : String(error), 'error');
+            return null;
+          })
+        : null;
       if (generation !== this.#generation) return;
-      if (loaded) project = loaded.project;
+      if (loaded) {
+        project = loaded.project;
+        for (const warning of loaded.warnings) this.toast(warning, 'info');
+      }
     }
     if (project) this.editor.load(project);
     if (this.options.autosave !== false || this.options.onSave) {
@@ -171,7 +181,9 @@ export class EditorController {
         const blob =
           (await this.options.resolveMedia?.(asset).catch(() => null)) ??
           (await this.storage!.getMedia(asset).catch(() => null));
-        if (blob && generation === this.#generation) this.#registerMedia(asset, blob);
+        if (generation !== this.#generation) return;
+        if (blob) this.#registerMedia(asset, blob);
+        else this.toast(this.labels.mediaMissing(asset.name), 'error');
       }),
     );
   }
@@ -220,6 +232,10 @@ export class EditorController {
     this.engine = null;
     this.analyzer?.destroy();
     this.analyzer = null;
+    // Close after the autosave flush above has been handed its writes.
+    const storage = this.storage;
+    this.storage = null;
+    setTimeout(() => storage?.close(), 1000);
     this.media.clear();
   }
 
@@ -414,7 +430,12 @@ export class EditorController {
 
   #registerMedia(asset: Asset, blob: Blob): void {
     this.media.set(asset.id, blob);
-    this.analyzer?.addMedia(asset.id, blob, asset.kind);
+    this.analyzer?.addMedia(
+      asset.id,
+      blob,
+      asset.kind,
+      asset.audioTrack !== undefined ? { audioTrack: asset.audioTrack } : {},
+    );
     void this.engine?.addMedia(asset.id, blob).catch(() => {});
   }
 

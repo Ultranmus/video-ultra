@@ -1112,7 +1112,10 @@ export class TimelineView {
       const i1 = Math.min(wave.peaks.length, Math.max(i0 + 1, Math.ceil(t1 * wave.peaksPerSecond)));
       let peak = 0;
       for (let i = i0; i < i1; i++) peak = Math.max(peak, wave.peaks[i]!);
-      const hgt = Math.max(1, Math.min(1, peak * gain) * amp);
+      // Decibel scale (−48 dB … 0 dB): quiet audio stays visible, like it sounds.
+      const level = peak * gain;
+      const db = level > 0 ? 1 + (20 * Math.log10(Math.min(1, level))) / 48 : 0;
+      const hgt = Math.max(1, Math.max(0, db) * amp);
       ctx.fillRect(x, mid - hgt, bar, hgt * 2);
     }
   }

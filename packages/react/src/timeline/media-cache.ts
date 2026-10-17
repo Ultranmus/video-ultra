@@ -1,5 +1,5 @@
 import type { DeviceTier } from '@video-ultra/core';
-import type { MediaAnalyzer, Waveform } from '../pending';
+import type { MediaAnalyzer, Waveform } from '@video-ultra/core/internal';
 
 /** Byte budget for timeline thumbnails per device tier. */
 const THUMB_BUDGET: Record<DeviceTier, number> = {

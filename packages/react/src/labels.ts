@@ -147,6 +147,8 @@ export const DEFAULT_LABELS = {
   saved: 'Saved',
   saving: 'Saving…',
   dismiss: 'Dismiss',
+  mediaMissing: (name: string) =>
+    `"${name}" isn't stored on this device any more. Add the file again to keep editing with it.`,
   splitOutside: 'Move the playhead inside the clip to split it.',
   nothingSelected: 'Select a clip to edit it.',
 } as const;
