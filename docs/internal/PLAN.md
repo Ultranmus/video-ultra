@@ -1,9 +1,11 @@
 # video-ultra — Plan
 
 Start: 2026-10-17. v0.1 (production quality) in one week; full scope in about a month.
-Each day ends with an **owner checkpoint** — stop, show the result, wait for feedback.
-The owner tests on an **iPhone every evening** and on **Android on Day 3 and Day 6** (in between:
-Chrome with CPU throttling + low tier + forced WebGL2).
+Work runs in long stretches; the owner reviews at milestones. **Device checks are batched:** one
+iPhone check after every 3–4 completed tasks (owner, 2026-10-17), via a Vercel preview of the
+playground (shareable link; videos picked from the phone's gallery — test media is never
+uploaded). Android when available (in between: Chrome with CPU throttling + low tier + forced
+WebGL2).
 
 ## Releases
 

@@ -9,11 +9,9 @@ Where the last session stopped and what comes next. Update before ending every s
 
 **Waiting on the owner (Day 1 checkpoint):**
 
-1. **Run the bench on the iPhone.** Needs HTTPS (WebCodecs/WebGPU/OPFS require a secure
-   context). Owner to choose: Vercel preview deploy of the playground, a tunnel
-   (`cloudflared`), or a trusted local certificate (mkcert + install the CA on the phone).
-2. **3–4 iPhone files** into `test-media/private/`: HDR video (default camera), portrait video,
-   slow-motion clip, HEIC photo.
+1. **iPhone bench run — batched** after the next 3–4 tasks (owner). Path: Vercel preview of the
+   playground with a shareable link; exclude test media from the upload.
+2. iPhone files: done (8 files). Still wanted: one **HEIC photo** (+ optional slow-mo clip).
 3. ~~Rust toolchain~~ — installed. ~~GitHub repo~~ — `Ultranmus/video-ultra` (private) pushed.
    Owner's iPhone files linked in `test-media/private/` (no HEIC or slow-mo yet).
 
