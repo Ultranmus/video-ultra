@@ -51,7 +51,10 @@ async function open(handle: SyncFileHandle): Promise<SyncAccessHandle> {
       return await handle.createSyncAccessHandle();
     } catch (error) {
       const name = (error as { name?: string }).name;
-      if (attempt >= 4 || name !== 'NoModificationAllowedError') throw error;
+      // Chrome/Safari say NoModificationAllowedError for a file another handle holds; Firefox
+      // may say InvalidStateError.
+      const locked = name === 'NoModificationAllowedError' || name === 'InvalidStateError';
+      if (attempt >= 4 || !locked) throw error;
       await new Promise((resolve) => setTimeout(resolve, 25 * 2 ** attempt));
     }
   }
@@ -117,9 +120,11 @@ async function copy(id: number, root: string, path: string, blob: Blob): Promise
   }
 }
 
-async function probe(root: string): Promise<number> {
-  const size = await write(root, '.probe', 'ok', false);
-  await (await directory(root, [])).removeEntry('.probe').catch(() => undefined);
+/** A name per probe: two storages starting at once (another tab, strict mode) mustn't collide. */
+async function probe(root: string, id: number): Promise<number> {
+  const name = `.probe-${id}-${Math.random().toString(36).slice(2)}`;
+  const size = await write(root, name, 'ok', false);
+  await (await directory(root, [])).removeEntry(name).catch(() => undefined);
   return size;
 }
 
@@ -144,11 +149,11 @@ self.onmessage = (event: MessageEvent<StorageRequest>) => {
   }
   const task =
     request.op === 'probe'
-      ? () => probe(request.root)
+      ? () => probe(request.root, request.id)
       : request.op === 'write'
         ? () => write(request.root, request.path, request.data, request.append)
         : () => copy(request.id, request.root, request.path, request.blob);
-  const key = request.op === 'probe' ? `${request.root}/.probe` : `${request.root}/${request.path}`;
+  const key = request.op === 'probe' ? `probe-${request.id}` : `${request.root}/${request.path}`;
   serial(key, task).then(
     (size) => self.postMessage({ id: request.id, ok: true, size }),
     (error: unknown) =>

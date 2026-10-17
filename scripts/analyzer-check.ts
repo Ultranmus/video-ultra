@@ -74,7 +74,12 @@ for (const name of names) {
   console.log(`\n===== ${name} (tier ${tier})`);
 
   // Warm up (first worker start + codec init) so the numbers below are steady-state.
-  await page.evaluate(() => window.analyzerLab!.strip('avc-720p30.mp4', 'keyframe', 4, 64));
+  const cold = await page.evaluate(() =>
+    window.analyzerLab!.strip('avc-720p30.mp4', 'keyframe', 4, 64),
+  );
+  console.log(
+    `  cold start (new worker, first file): probe ${cold.probeMs.toFixed(0)} ms, first thumbnail ${cold.firstMs.toFixed(0)} ms`,
+  );
   await page.evaluate(() => window.analyzerLab!.resetLongTasks());
 
   console.log(

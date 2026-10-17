@@ -58,8 +58,15 @@ export class OpfsFileStore implements FileStore {
       await withTimeout(store.send({ id: 0, op: 'probe', root: namespace }), 30_000);
       return store;
     } catch {
-      worker.terminate();
-      return null;
+      // One more try: falling back to memory loses work on reload, so be sure first.
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        await withTimeout(store.send({ id: 0, op: 'probe', root: namespace }), 30_000);
+        return store;
+      } catch {
+        worker.terminate();
+        return null;
+      }
     }
   }
 

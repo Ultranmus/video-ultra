@@ -159,9 +159,10 @@ export function attachAutosave(
     sinceSnapshot++;
     scheduleFlush();
     scheduleSave();
-    if (sinceSnapshot >= snapshotEvery || next.name !== snapshotName)
-      runIdle(() => void writeSnapshot());
-    else scheduleIdleSnapshot();
+    if (sinceSnapshot >= snapshotEvery) runIdle(() => void writeSnapshot());
+    // A rename shows in the project list only after a snapshot: write one soon (debounced, so
+    // typing a name doesn't snapshot per keystroke).
+    else scheduleIdleSnapshot(next.name !== snapshotName);
   });
 
   // `editor.load()` replaces the project without a commit: save the new one from a fresh base.
