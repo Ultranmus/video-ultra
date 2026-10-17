@@ -15,3 +15,6 @@ test-media/files
 test-media/private
 # Local Claude Code settings (owner's own permissions)
 .claude/settings.local.json
+# Links to test-media/files, created by `pnpm media`
+apps/playground/public/media
+apps/examples/vite/public/media

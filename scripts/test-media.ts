@@ -17,7 +17,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', 'test-media');
@@ -522,6 +522,14 @@ if (existsSync(privateDir)) {
 }
 
 writeFileSync(join(out, 'manifest.json'), JSON.stringify(entries, null, 2) + '\n');
+
+// Apps serve the library at /media (links are git-ignored: in CI the library doesn't exist).
+for (const app of ['apps/playground', 'apps/examples/vite']) {
+  const publicDir = join(root, '..', app, 'public');
+  mkdirSync(publicDir, { recursive: true });
+  const link = join(publicDir, 'media');
+  if (!lstatExists(link)) symlinkSync(relative(publicDir, out), link);
+}
 console.log(`Done: ${entries.length} files, manifest.json written.`);
 
 function lstatExists(path: string): boolean {
