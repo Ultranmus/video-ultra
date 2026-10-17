@@ -1,10 +1,13 @@
-# Every push to main and every pull request: the same checks as locally.
+# The same checks as `pnpm verify`. Manual-only until v0.1 (owner, 2026-10-17): run it from the
+# Actions tab ("Run workflow"). Before v0.1, restore the push/pull_request triggers:
+#   on:
+#     push:
+#       branches: [main]
+#     pull_request:
 name: CI
 
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}

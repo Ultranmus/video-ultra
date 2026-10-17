@@ -123,3 +123,6 @@ reason; when one changes, edit the entry and note the date.
 31. **Worker packaging:** the worker ships as its own file next to the code that loads it
     (`new Worker(new URL('./x.worker.js', import.meta.url), { type: 'module' })`). Verified in
     Next.js 16 (Turbopack dev + build) and Vite 8 (dev + build) across Chrome, WebKit, Firefox.
+32. **CI runs manually until v0.1** (owner, 2026-10-17). The GitHub Actions workflow only runs
+    from the Actions tab ("Run workflow"); `pnpm verify` runs locally before every commit instead.
+    Restore the push / pull-request triggers before the v0.1 release (PLAN Day 7).
