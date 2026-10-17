@@ -29,9 +29,8 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       worker (Day 7 packaging).
 - [ ] Turbopack also copies `lab.worker.js` as an unused static asset — harmless, check again
       with the real engine worker.
-- [ ] **HDR (HLG/PQ) looks washed out in Chrome/WebGPU** (seen on the owner's iPhone videos) —
-      top of Day 3. `importExternalTexture` converts colours itself, so tone-mapping may need the
-      raw planes (`VideoFrame.copyTo`) or a different import path — research first.
+- [ ] **HDR (HLG/PQ) looks washed out** — researched (research/HDR.md, DECISIONS #33): correction
+      shader + per-device self-calibration on Day 3. Verify on iPhone + Android.
 - [ ] Playwright WebKit drops 30% of frames on iPhone 4K60 HDR — check real Safari on the iPhone
       and Mac; if real, low tier must use a proxy for 4K60.
 - [ ] HEIC photo still missing from the owner's samples (needed to test HEIC import).

@@ -33,3 +33,14 @@ save; v0.1 production quality in one week.
   log replay, save/reopen) found 2 real bugs on its first runs — `structuredClone` on Immer drafts
   (split/duplicate/freeze would crash in the app) and lane reordering on reopen — both fixed.
   30,000 random sequences pass.
+
+## 2026-10-17 · Owner's iPhone footage + HDR research
+
+- Repo pushed (`Ultranmus/video-ultra`, private); CI made manual-only until v0.1 (DECISIONS #32).
+- Rust + naga installed. Owner's 8 iPhone/social files linked into `test-media/private`.
+- Bench on real iPhone footage: Chrome plays 4K60 HDR at 600/600, scrub p95 ≤ 110 ms; engine
+  picks the AAC track over Apple's spatial-audio (APAC) track. WebKit (Playwright) drops frames on
+  4K60; Firefox can't decode HEVC.
+- HDR research (research/HDR.md): frames are opaque, browsers tone-map themselves (too bright);
+  a fitted LUT + matrix brings every path to Apple's look on unseen frames (MAE 30–72 → 11).
+  Decision #33: correction shader + startup self-calibration, zero-copy kept.

@@ -126,3 +126,10 @@ reason; when one changes, edit the entry and note the date.
 32. **CI runs manually until v0.1** (owner, 2026-10-17). The GitHub Actions workflow only runs
     from the Actions tab ("Run workflow"); `pnpm verify` runs locally before every commit instead.
     Restore the push / pull-request triggers before the v0.1 release (PLAN Day 7).
+33. **HDR: correct the browser's own conversion, keep zero-copy** (2026-10-17, research in
+    `research/HDR.md`). Hardware-decoded frames are opaque (no raw 10-bit access), and every
+    browser converts HDR → SDR itself, too bright. A per-path correction (tone-curve LUT + 3×3
+    matrix) in the shader brings every path to Apple's look (held-out error 30–72 → 11 / 255).
+    The editor self-calibrates per device at startup with a synthetic HLG test frame; the shipped
+    calibration is the fallback. Rejected: raw-plane tone mapping (impossible with hardware decode),
+    software decoding for HDR (too slow for 4K60 on phones).
