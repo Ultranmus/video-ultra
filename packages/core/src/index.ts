@@ -40,15 +40,30 @@ export type {
   LogEntry,
 } from './edit/history';
 
-// Effects catalogues (filters, transitions, adjustments, stickers, text styles)
+// Effects catalogues (filters, transitions, animations, adjustments, stickers, text styles)
 export {
   FILTER_PRESETS,
+  FILTER_CATEGORIES,
   TRANSITION_PRESETS,
+  TRANSITION_CATEGORIES,
+  findTransitionPreset,
+  ANIMATION_PRESETS,
+  ANIMATION_CATEGORIES,
+  findAnimationPreset,
   ADJUST_KEYS,
   STICKER_EMOJI,
   FONT_PRESETS,
 } from './effects/presets';
-export type { FilterPreset, TransitionPreset, AdjustKey, FontPreset } from './effects/presets';
+export type {
+  FilterPreset,
+  FilterCategory,
+  TransitionPreset,
+  TransitionCategory,
+  AnimationPreset,
+  AnimationSlot,
+  AdjustKey,
+  FontPreset,
+} from './effects/presets';
 
 // Export settings
 export { maxExportHeight, exportLimits, exportSize, EXPORT_HEIGHTS } from './engine/export-plan';

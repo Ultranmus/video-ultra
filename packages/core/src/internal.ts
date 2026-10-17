@@ -27,11 +27,37 @@ export {
 export type { ActiveLayer, VisualItem, LayerTransition, UpcomingItem } from './engine/timeline';
 export { measureTextBox, textFont, textFontPx } from './engine/text';
 export type { MeasureText } from './engine/text';
-export { colourParams, identityColour, FILTER_PARAMS, writeEffects } from './effects/colour';
+export {
+  colourParams,
+  identityColour,
+  FILTER_PARAMS,
+  writeEffects,
+  noFx,
+  EFFECT_FLOATS,
+  BlurMode,
+  MaskShape,
+  WarpKind,
+} from './effects/colour';
 export type { ColourParams, LayerFx } from './effects/colour';
-export { transitionLook, fadeOverlay } from './effects/transitions';
-export type { TransitionLook } from './effects/transitions';
-export { placedGeometry, shiftGeometry, fullCanvasGeometry } from './render/layout';
+export {
+  transitionLook,
+  transitionOverlay,
+  fadeOverlay,
+  easeAt,
+  plainLook,
+  noOverlay,
+} from './effects/transitions';
+export type { TransitionLook, TransitionOverlay, TransitionOptions } from './effects/transitions';
+export { animationState, animationSpans, restingState } from './effects/animations';
+export type { AnimationState } from './effects/animations';
+export {
+  placedGeometry,
+  shiftGeometry,
+  fullCanvasGeometry,
+  moveOnCanvas,
+  moveInBox,
+} from './render/layout';
+export type { GeometryMove } from './render/layout';
 export { probeMedia, assetFromProbe, sniffImage, unsupportedVideoMessage } from './media/probe';
 export type {
   ProbeResult,

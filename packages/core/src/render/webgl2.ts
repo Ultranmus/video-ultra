@@ -168,6 +168,9 @@ export function createWebGL2Renderer(
     return false;
   };
 
+  // Size of the target being drawn into (canvas, or the blurred background's small target).
+  let targetW = 1;
+  let targetH = 1;
   const drawQuad = (
     geometry: Float32Array,
     opacity: number,
@@ -176,7 +179,19 @@ export function createWebGL2Renderer(
     texelW: number,
     texelH: number,
   ) => {
-    writeLayerUniforms(uniforms, 0, geometry, opacity, hdr, calibration, effects, texelW, texelH);
+    writeLayerUniforms(
+      uniforms,
+      0,
+      geometry,
+      opacity,
+      hdr,
+      calibration,
+      effects,
+      texelW,
+      texelH,
+      targetW,
+      targetH,
+    );
     gl.bufferSubData(gl.UNIFORM_BUFFER, 0, uniforms);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   };
@@ -209,6 +224,8 @@ export function createWebGL2Renderer(
     // Pass 1: the picture, small, with a blur the size of one small texel (anti-aliased downscale).
     gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo);
     gl.viewport(0, 0, target.w, target.h);
+    targetW = target.w;
+    targetH = target.h;
     gl.clearColor(0, 0, 0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.activeTexture(gl.TEXTURE0);
@@ -218,9 +235,12 @@ export function createWebGL2Renderer(
     fx[24] = radius[0] * 0.75;
     fx[25] = radius[1] * 0.75;
     fx[11] = 0; // no sharpening on a blurred picture
+    fx[28] = 0; // nor grain
     drawQuad(backdrop.geometry, 1, correct && hdr, fx, 0, 0);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, canvas.width, canvas.height);
+    targetW = canvas.width;
+    targetH = canvas.height;
     // Pass 2: scaled up over the canvas with a second soft blur.
     gl.bindTexture(gl.TEXTURE_2D, target.texture);
     fx.set(IDENTITY_EFFECTS);
@@ -246,6 +266,8 @@ export function createWebGL2Renderer(
     render(layers, background = [0, 0, 0], backdrop = null) {
       usedCount = 0;
       gl.viewport(0, 0, canvas.width, canvas.height);
+      targetW = canvas.width;
+      targetH = canvas.height;
       gl.clearColor(background[0], background[1], background[2], 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.activeTexture(gl.TEXTURE0);

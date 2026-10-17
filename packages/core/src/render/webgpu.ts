@@ -10,11 +10,15 @@ import {
 import { EFFECT_FLOATS, IDENTITY_EFFECTS } from '../effects/colour';
 import { backdropSize, footprintRadius, UPSCALE_BLUR_TEXELS } from './backdrop';
 import { layerGeometry } from './layout';
+import { externalVariant } from './shaders/external';
 import { SHADERS } from './shaders/generated';
 import type { FramePlacement, LayerDraw, LayerSource, Renderer, RendererOptions } from './types';
 
-/** Uniform slots are 256-byte aligned (WebGPU's minUniformBufferOffsetAlignment). */
-const SLOT_BYTES = 256;
+/**
+ * One layer's uniforms (LAYER_FLOATS × 4 = 416 bytes), rounded up to a multiple of 256 (WebGPU's
+ * minUniformBufferOffsetAlignment).
+ */
+const SLOT_BYTES = 512;
 
 /**
  * WebGPU compositor. Video frames are imported with `importExternalTexture` — handed to the GPU
@@ -40,7 +44,9 @@ export async function createWebGPURenderer(
     color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
     alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' },
   };
-  const videoModule = device.createShaderModule({ code: SHADERS.composite.wgsl });
+  const videoModule = device.createShaderModule({
+    code: externalVariant(SHADERS.composite.wgsl2d),
+  });
   const imageModule = device.createShaderModule({ code: SHADERS.composite.wgsl2d });
   const makePipeline = (module: GPUShaderModule, target: GPUTextureFormat) =>
     device.createRenderPipeline({
@@ -236,11 +242,36 @@ export async function createWebGPURenderer(
         fx[24] = radius[0] * 0.75;
         fx[25] = radius[1] * 0.75;
         fx[11] = 0;
-        writeLayerUniforms(uniforms, 0, backdrop.geometry, 1, hdr, calibration, fx, 0, 0);
+        fx[28] = 0;
+        writeLayerUniforms(
+          uniforms,
+          0,
+          backdrop.geometry,
+          1,
+          hdr,
+          calibration,
+          fx,
+          0,
+          0,
+          target.w,
+          target.h,
+        );
         fx.set(IDENTITY_EFFECTS);
         fx[24] = UPSCALE_BLUR_TEXELS / target.w;
         fx[25] = UPSCALE_BLUR_TEXELS / target.h;
-        writeLayerUniforms(uniforms, floatsPerSlot, fullscreen, 1, false, calibration, fx, 0, 0);
+        writeLayerUniforms(
+          uniforms,
+          floatsPerSlot,
+          fullscreen,
+          1,
+          false,
+          calibration,
+          fx,
+          0,
+          0,
+          canvas.width,
+          canvas.height,
+        );
       }
       layers.forEach((layer, i) => {
         const hdr =
@@ -257,6 +288,8 @@ export async function createWebGPURenderer(
           layer.effects ?? null,
           texelOf(layer.source, 0),
           texelOf(layer.source, 1),
+          canvas.width,
+          canvas.height,
         );
       });
       const used = layers.length + extra;

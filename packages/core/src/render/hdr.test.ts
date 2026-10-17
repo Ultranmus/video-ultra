@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { SHADERS } from './shaders/generated';
 import { HDR_CALIBRATIONS } from './hdr-calibration';
 import {
   browserEngine,
@@ -100,7 +101,27 @@ describe('HDR calibration', () => {
     expect(Array.from(u.slice(o + 28, o + 32))).toEqual([1, 1, 1, 1]);
     expect(u[o + 28 + 7]).toBe(1); // saturation
     expect([u[o + 28 + 26], u[o + 28 + 27]]).toEqual([0.25, 0.5]);
-    expect(LAYER_FLOATS * 4).toBeLessThanOrEqual(256); // fits a WebGPU uniform slot
+    expect(LAYER_FLOATS * 4).toBeLessThanOrEqual(512); // fits a WebGPU uniform slot (webgpu.ts)
     expect(u[0]).toBe(0); // the first slot is untouched
+  });
+
+  it('writes the inverse position map and the target size (warps, local masks)', () => {
+    const u = new Float32Array(LAYER_FLOATS);
+    const calibration = HDR_CALIBRATIONS['chromium-webgl2'];
+    // A 400×100 px box on an 800×400 canvas: P = diag(0.5, −0.25).
+    const geometry = Float32Array.from([0.5, 0, 0, -0.25, 0.1, 0.2, 0.5, 0, 0, 0.5, 0.5, 0.5]);
+    writeLayerUniforms(u, 0, geometry, 1, false, calibration, null, 0, 0, 800, 400);
+    const e = 28 + 68;
+    expect(Array.from(u.slice(e, e + 4)).map((v) => v + 0)).toEqual([2, 0, 0, -4]);
+    expect(u[e + 4]).toBe(2); // canvas aspect
+    expect(u[e + 5]).toBe(4); // box aspect: 400 px / 100 px
+    expect([u[e + 6], u[e + 7]]).toEqual([800, 400]);
+  });
+
+  it('matches the uniform struct of the shader, field for field', () => {
+    const wgsl = SHADERS.composite.wgsl2d;
+    const struct = /struct Uniforms \{([\s\S]*?)\};/.exec(wgsl)![1]!;
+    const fields = struct.match(/^\s*\w+: vec4f,/gm)!;
+    expect(fields.length * 4).toBe(LAYER_FLOATS);
   });
 });

@@ -87,6 +87,153 @@ export interface TextRaster {
   /** Box size in raster px. */
   boxWidth: number;
   boxHeight: number;
+  /** Where each character and word sits (asked for with `withLayout`, for typewriter reveals). */
+  layout?: TextRevealLayout;
+}
+
+/** Positions of a raster's characters and words, for typewriter / word-by-word reveals. */
+export interface TextRevealLayout {
+  /** Raster size, px. */
+  width: number;
+  height: number;
+  /** Top of the first line and the line height, px. */
+  top: number;
+  lineHeight: number;
+  /** Right-to-left text: lines fill from their right end. */
+  rtl: boolean;
+  lines: {
+    /** Left and right end of the line's text, px. */
+    left: number;
+    right: number;
+    /** Characters: start / end x (px from `left`, reading order) of each. */
+    charStart: Float64Array;
+    charEnd: Float64Array;
+    /** Words: start / end x of each (spaces between words belong to neither). */
+    wordStart: Float64Array;
+    wordEnd: Float64Array;
+  }[];
+  chars: number;
+  words: number;
+}
+
+/** Where a reveal is: shown up to `cutA` on `line`, `fadeB` opacity up to `cutB` (fractions). */
+export interface RevealCuts {
+  line: number;
+  cutA: number;
+  cutB: number;
+  fadeB: number;
+}
+
+/**
+ * The cut positions of a reveal `fraction` (0…1) of a text's characters or words, as fractions
+ * of the raster width (mirrored for right-to-left text), into `out`. Words fade in one after
+ * another; characters appear whole.
+ */
+export function revealCuts(
+  layout: TextRevealLayout,
+  fraction: number,
+  by: 'char' | 'word',
+  out: RevealCuts,
+): RevealCuts {
+  const units = by === 'char' ? layout.chars : layout.words;
+  const f = Math.max(0, Math.min(1, fraction)) * units;
+  // Characters: the next one appears as soon as its turn starts (the last just before the end).
+  // Words: whole ones show, the next fades in over its turn.
+  let next = by === 'char' ? Math.ceil(f - 1e-9) : Math.floor(f + 1e-9);
+  const partial = by === 'word' ? f - next : 0;
+  out.fadeB = 0;
+  if (next >= units) {
+    out.line = layout.lines.length;
+    out.cutA = out.cutB = 1;
+    return out;
+  }
+  for (let l = 0; l < layout.lines.length; l++) {
+    const line = layout.lines[l]!;
+    const starts = by === 'char' ? line.charStart : line.wordStart;
+    const ends = by === 'char' ? line.charEnd : line.wordEnd;
+    if (next >= starts.length) {
+      next -= starts.length;
+      continue;
+    }
+    const x0 = starts[next]!;
+    const x1 = ends[next]!;
+    const w = layout.width;
+    if (layout.rtl) {
+      out.cutA = (w - line.right + x0) / w;
+      out.cutB = (w - line.right + x1) / w;
+    } else {
+      out.cutA = (line.left + x0) / w;
+      out.cutB = (line.left + x1) / w;
+    }
+    out.line = l;
+    out.fadeB = partial;
+    return out;
+  }
+  out.line = layout.lines.length;
+  out.cutA = out.cutB = 1;
+  return out;
+}
+
+/** Splits text into user-perceived characters (grapheme clusters where the engine can). */
+function graphemes(text: string): string[] {
+  const Seg = (Intl as { Segmenter?: typeof Intl.Segmenter }).Segmenter;
+  if (Seg)
+    return Array.from(
+      new Seg(undefined, { granularity: 'grapheme' }).segment(text),
+      (s) => s.segment,
+    );
+  return Array.from(text);
+}
+
+/**
+ * Measures where each character and word of the lines of a text block sits (px), with the same
+ * maths as the rasteriser: the line's measured prefix widths plus letter spacing.
+ */
+export function measureReveal(
+  lines: readonly string[],
+  lefts: readonly number[],
+  widths: readonly number[],
+  font: string,
+  spacingPx: number,
+  measure: MeasureText,
+  size: { width: number; height: number; top: number; lineHeight: number; rtl: boolean },
+): TextRevealLayout {
+  let chars = 0;
+  let words = 0;
+  const out = lines.map((text, i) => {
+    const g = graphemes(text);
+    const charStart = new Float64Array(g.length);
+    const charEnd = new Float64Array(g.length);
+    let prefix = '';
+    let x = 0;
+    g.forEach((ch, k) => {
+      charStart[k] = x;
+      prefix += ch;
+      x = measure(font, prefix) + spacingPx * (k + 1);
+      charEnd[k] = x;
+    });
+    const ws: number[] = [];
+    const we: number[] = [];
+    let inWord = false;
+    g.forEach((ch, k) => {
+      const space = /^\s+$/.test(ch);
+      if (!space && !inWord) ws.push(charStart[k]!);
+      if (space && inWord) we.push(charEnd[k - 1]!);
+      inWord = !space;
+    });
+    if (inWord) we.push(charEnd[g.length - 1]!);
+    chars += g.length;
+    words += ws.length;
+    return {
+      left: lefts[i]!,
+      right: lefts[i]! + widths[i]!,
+      charStart,
+      charEnd,
+      wordStart: Float64Array.from(ws),
+      wordEnd: Float64Array.from(we),
+    };
+  });
+  return { ...size, lines: out, chars, words };
 }
 
 const RTL = /[\u0590-\u08ff\ufb1d-\ufdff\ufe70-\ufefe]/;
@@ -102,6 +249,7 @@ export function rasterizeText(
   fontPx: number,
   canvasH: number,
   displayScale: number,
+  withLayout = false,
 ): TextRaster {
   const style = item.style;
   const probe = new OffscreenCanvas(1, 1).getContext('2d')!;
@@ -140,6 +288,14 @@ export function rasterizeText(
   }
 
   const contentW = block.width - 2 * block.padding;
+  const lineLeft = (i: number) => {
+    const free = contentW - block.widths[i]!;
+    return (
+      margin +
+      block.padding +
+      (style.align === 'left' ? 0 : style.align === 'right' ? free : free / 2)
+    );
+  };
   const drawLine = (line: string, x: number, y: number, stroke: boolean) => {
     if (nativeSpacing || spacingPx === 0) {
       if (stroke) ctx.strokeText(line, x, y);
@@ -169,12 +325,7 @@ export function rasterizeText(
   };
 
   block.lines.forEach((line, i) => {
-    const lineW = block.widths[i]!;
-    const free = contentW - lineW;
-    const x =
-      margin +
-      block.padding +
-      (style.align === 'left' ? 0 : style.align === 'right' ? free : free / 2);
+    const x = lineLeft(i);
     const y = margin + block.padding + (i + 0.5) * block.lineHeightPx;
     // The background box carries no shadow; the glyphs (outline first) do.
     if (style.outline && outline > 0) {
@@ -191,7 +342,25 @@ export function rasterizeText(
     drawLine(line, x, y, false);
     setShadow(false);
   });
-  return { canvas, margin, boxWidth: block.width, boxHeight: block.height };
+  const raster: TextRaster = { canvas, margin, boxWidth: block.width, boxHeight: block.height };
+  if (withLayout) {
+    raster.layout = measureReveal(
+      block.lines,
+      block.lines.map((_, i) => lineLeft(i)),
+      block.widths,
+      textFont(style, fontPx),
+      spacingPx,
+      measure,
+      {
+        width: w,
+        height: h,
+        top: margin + block.padding,
+        lineHeight: block.lineHeightPx,
+        rtl: RTL.test(item.text),
+      },
+    );
+  }
+  return raster;
 }
 
 /** Square emoji raster `sizePx` wide (the system's colour emoji font). */
