@@ -40,5 +40,25 @@ export type {
   LogEntry,
 } from './edit/history';
 
+// Effects catalogues (filters, transitions, adjustments, stickers, text styles)
+export {
+  FILTER_PRESETS,
+  TRANSITION_PRESETS,
+  ADJUST_KEYS,
+  STICKER_EMOJI,
+  FONT_PRESETS,
+} from './effects/presets';
+export type { FilterPreset, TransitionPreset, AdjustKey, FontPreset } from './effects/presets';
+
+// Export settings
+export { maxExportHeight, exportLimits, exportSize, EXPORT_HEIGHTS } from './engine/export-plan';
+export type {
+  ExportOptions,
+  ExportProgress,
+  ExportResult,
+  ExportHeight,
+  ExportLimits,
+} from './engine/export-plan';
+
 /** The package version. */
 export const VERSION = '0.0.0';

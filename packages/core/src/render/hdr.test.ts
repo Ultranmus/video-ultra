@@ -86,13 +86,21 @@ describe('HDR calibration', () => {
     const u = new Float32Array(LAYER_FLOATS * 2);
     const calibration = HDR_CALIBRATIONS['chromium-webgl2'];
     const geometry = Float32Array.from({ length: 12 }, (_, i) => i + 1);
-    writeLayerUniforms(u, LAYER_FLOATS, geometry, 0.5, true, calibration);
-    expect(Array.from(u.slice(28, 34))).toEqual([1, 2, 3, 4, 5, 6]); // pos + posT.xy
-    expect(u[34]).toBe(0.5); // opacity
-    expect(u[35]).toBe(1); // hdr
-    expect(Array.from(u.slice(36, 42))).toEqual([7, 8, 9, 10, 11, 12]); // uv + uvT.xy
-    expect(Array.from(u.slice(44, 47))).toEqual(calibration.matrix[0].map((v) => Math.fround(v)));
-    expect(u[47]).toBe(0);
+    writeLayerUniforms(u, LAYER_FLOATS, geometry, 0.5, true, calibration, null, 0.25, 0.5);
+    const o = LAYER_FLOATS;
+    expect(Array.from(u.slice(o, o + 6))).toEqual([1, 2, 3, 4, 5, 6]); // pos + posT.xy
+    expect(u[o + 6]).toBe(0.5); // opacity
+    expect(u[o + 7]).toBe(1); // hdr
+    expect(Array.from(u.slice(o + 8, o + 14))).toEqual([7, 8, 9, 10, 11, 12]); // uv + uvT.xy
+    expect(Array.from(u.slice(o + 16, o + 19))).toEqual(
+      calibration.matrix[0].map((v) => Math.fround(v)),
+    );
+    expect(u[o + 19]).toBe(0);
+    // Effect block (identity): gain 1 1 1, contrast 1 … texel size from the renderer.
+    expect(Array.from(u.slice(o + 28, o + 32))).toEqual([1, 1, 1, 1]);
+    expect(u[o + 28 + 7]).toBe(1); // saturation
+    expect([u[o + 28 + 26], u[o + 28 + 27]]).toEqual([0.25, 0.5]);
+    expect(LAYER_FLOATS * 4).toBeLessThanOrEqual(256); // fits a WebGPU uniform slot
     expect(u[0]).toBe(0); // the first slot is untouched
   });
 });

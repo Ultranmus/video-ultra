@@ -26,7 +26,7 @@ import type {
   BackendChoice,
   Distribution,
   HdrCheckResult,
-  ExportResult,
+  LabExportResult,
   LabMessage,
   LabRequest,
   LabResponseData,
@@ -392,7 +392,7 @@ async function ensureAacEncoder(): Promise<void> {
 
 async function exportVideo(
   options: Extract<LabRequest, { type: 'export' }>,
-): Promise<ExportResult> {
+): Promise<LabExportResult> {
   const { renderer: preview, video } = requireLoaded();
   cancelled = false;
   const { width, height, fps, container } = options;

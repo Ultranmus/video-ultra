@@ -44,6 +44,26 @@ export interface LayerDraw {
   opacity: number;
   /** Apply the HDR correction (track is HLG). */
   hdr: boolean;
+  /**
+   * Colour pipeline + extras, `EFFECT_FLOATS` floats from `writeEffects`
+   * (effects/colour.ts). Omitted / null = unchanged picture.
+   */
+  effects?: Float32Array | null;
+}
+
+/**
+ * A blurred, enlarged copy of a picture behind every layer (the "blur" background). The renderer
+ * draws `source` small (cheap: a few hundred pixels wide), then scales it up with a soft blur.
+ */
+export interface Backdrop {
+  source: LayerSource;
+  /** Geometry that covers the canvas (from `layerGeometry` with fit 'fill'). */
+  geometry: Float32Array;
+  hdr: boolean;
+  /** Blur strength 0…1. */
+  amount: number;
+  /** The clip's own colour (filter / adjustments), applied before the blur. */
+  effects?: Float32Array | null;
 }
 
 /** Composites layers onto an `OffscreenCanvas` (WebGPU or WebGL2; same output). */
@@ -51,8 +71,15 @@ export interface Renderer {
   readonly backend: RenderBackend;
   /** Changes the drawing-buffer size in device pixels. */
   resize(width: number, height: number): void;
-  /** Draws one frame: clears to `background` (RGB 0…1) and draws `layers` in order. */
-  render(layers: readonly LayerDraw[], background?: readonly [number, number, number]): void;
+  /**
+   * Draws one frame: clears to `background` (RGB 0…1), draws the blurred `backdrop` if given, then
+   * `layers` in order.
+   */
+  render(
+    layers: readonly LayerDraw[],
+    background?: readonly [number, number, number],
+    backdrop?: Backdrop | null,
+  ): void;
   /**
    * Convenience for a single video frame, contain-fitted (the lab and bench). Does not close
    * `frame`.
