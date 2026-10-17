@@ -1850,6 +1850,20 @@
     animation: vu-dock-in var(--vu-duration-base) var(--vu-ease);
   }
 
+  .vu-dock .vu-textstyle-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  /* Library docks grow upward over the transport bar (still one box, anchored to the bottom). */
+  .vu-dock[data-tall] {
+    top: auto;
+    height: var(--vu-size-dock-tall);
+    max-height: calc(100cqh - var(--vu-size-topbar) - var(--vu-size-toolbar) - var(--vu-space-8));
+    border-top: 1px solid var(--vu-border-strong);
+    border-radius: var(--vu-radius-lg) var(--vu-radius-lg) 0 0;
+    box-shadow: var(--vu-shadow-popover);
+  }
+
   @keyframes vu-dock-in {
     from {
       opacity: 0;

@@ -641,7 +641,14 @@ export function Dock(): ReactElement | null {
   const entry = RAIL.find((r) => r.id === panel);
   const title = tool ? l[TOOL_TITLE[tool]] : entry ? l[entry.key] : l.canvas;
   return (
-    <section className="vu-dock" aria-label={title}>
+    <section
+      className="vu-dock"
+      aria-label={title}
+      // Libraries (text styles, stickers, filters…) need room; quick tools fit the timeline's box.
+      data-tall={
+        !tool || tool === 'filter' || tool === 'transition' || tool === 'text-style' || undefined
+      }
+    >
       <div className="vu-dock-head">
         <h2 className="vu-dock-title">{title}</h2>
         <button type="button" className="vu-done" onClick={close}>
