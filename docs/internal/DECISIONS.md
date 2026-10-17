@@ -133,3 +133,8 @@ reason; when one changes, edit the entry and note the date.
     The editor self-calibrates per device at startup with a synthetic HLG test frame; the shipped
     calibration is the fallback. Rejected: raw-plane tone mapping (impossible with hardware decode),
     software decoding for HDR (too slow for 4K60 on phones).
+34. **Preview decoding goes through Mediabunny's iterators, not a hand-driven `VideoDecoder`**
+    (2026-10-17). A direct-decoder version was fast in Chrome but produced no frames for iPhone
+    HEVC in Safari: Mediabunny carries per-browser/codec workarounds (HEVC RASL pictures, Chromium
+    packet fixes, WebKit timestamps). `FrameSource` adds continuation, latest-wins, previews,
+    watchdog and pooling on top of `VideoSampleSink.samples()`.

@@ -105,6 +105,21 @@ long-GOP files. Firefox can't decode any of the iPhone HEVC files.
 **HDR looks washed out in the Chrome/WebGPU export** (HLG clipped, not tone-mapped); WebKit's
 WebGL2 output looks natural. Tone-mapping is now top of Day 3.
 
+**Scrubbing with `FrameSource` (2026-10-17, Chrome / WebKit):** forward steps continue one
+decoder, jumps restart from the keyframe, latest request wins. "Drag" = 45 seeks 16 ms apart.
+
+| File                               | Frames shown during drag | Final frame after release | Random jump p95 |
+| ---------------------------------- | ------------------------ | ------------------------- | --------------- |
+| iPhone 1080p30 HDR                 | 45 / 44                  | 0 / 0 ms                  | 31 / 35 ms      |
+| H.264 1080p                        | 43 / 43                  | 0 / 0 ms                  | 96 / 112 ms     |
+| VP9 1080p                          | 42 / 42                  | 0 / 0 ms                  | 162 / 175 ms    |
+| VFR 720p                           | 45 / 44                  | 0 / 0 ms                  | 39 / 106 ms     |
+| iPhone 4K60 HDR                    | **1 / 1**                | 81 / 102 ms               | 104 / 121 ms    |
+| 4K long-GOP (synthetic worst case) | 26 / **2**               | 0 / **1325 ms**           | 500 / 805 ms    |
+
+Before (one `getSample` per seek): final frame after a drag 160–500 ms. Fast drags on 4K can't
+keep up with exact frames → thumbnails during fast drags (BACKLOG).
+
 **What this tells us**
 
 - Playback, decoding and export are comfortably fast on desktop in every browser; the main thread

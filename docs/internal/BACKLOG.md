@@ -11,9 +11,12 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [ ] **Phone access over HTTPS.** WebCodecs, WebGPU and OPFS need a secure context; the phone
       opening `http://<LAN IP>:3200` isn't one. Options: Vercel preview, a tunnel, or a trusted
       local certificate — owner decision.
-- [ ] **Scrubbing long-GOP media is slow** (4K p95 0.5 s, VP9 0.15 s, Firefox 0.36 s). Phase 2:
-      nearest-keyframe preview first, then exact frame; warm forward decoder; proxies for
-      long-GOP 4K on low tier.
+- [x] Scrubbing: `FrameSource` (continue forward, latest wins, keyframe preview, watchdog,
+      pool) — final frame after a drag 0–100 ms on real footage (PERF.md).
+- [ ] **Fast drags on 4K show almost no frames until release** (decoder can't keep pace). Show
+      timeline thumbnails (Day 4) while the drag is fast, exact frames when it slows/stops.
+      Long-GOP 4K on WebKit settles in 1.3 s — proxies on low tier.
+- [ ] Keyframe-preview decoder isn't counted by `DecoderPool`; previews are off on the low tier.
 - [ ] **WebGPU export ~2× slower than WebGL2 export** (WebGPU canvas capture). Phase 2: measure
       capture paths (copyExternalImageToTexture / readback / VideoFrame from GPUTexture); export
       with WebGL2 until WebGPU wins.

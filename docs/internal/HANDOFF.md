@@ -15,13 +15,15 @@ Where the last session stopped and what comes next. Update before ending every s
 3. ~~Rust toolchain~~ — installed. ~~GitHub repo~~ — `Ultranmus/video-ultra` (private) pushed.
    Owner's iPhone files linked in `test-media/private/` (no HEIC or slow-mo yet).
 
-**Next (Day 2 rest → Day 3):**
+**Batch before the next iPhone check (owner: check after 3–4 tasks):**
 
-- 1.5 Media probing module (`media/probe.ts`) from the lab's `load()`: codec, rotation, VFR,
-  HDR, audio layout, decodability, truncated-file detection → `Asset`.
-- 2.1 Decoder pool: per-tier decoder budget, LRU close, cancellation, watchdog; keyframe-first
-  scrubbing (fixes the long-GOP scrub misses in PERF.md).
-- Then Day 3: real compositor (WGSL → GLSL), HDR tone-mapping, audio engine, device tiers.
+1. ✅ HDR research (research/HDR.md, DECISIONS #33)
+2. ✅ Media probing (`media/probe.ts`, `scripts/probe-check.ts` — all pass in 3 browsers)
+3. ✅ Decoder pool + scrubbing (`engine/frames.ts`, DECISIONS #34; numbers in PERF.md)
+4. ⏳ **Next:** HDR correction shader + startup self-calibration (WGSL → GLSL via naga), then
+   deploy the playground as a Vercel preview (ask the owner first) for the batched iPhone check.
+
+Then Day 3 proper: compositor (layers, transforms), audio engine + A/V sync, device tiers.
 
 ## How to run things
 

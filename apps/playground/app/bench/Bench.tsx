@@ -263,6 +263,16 @@ export function Bench() {
       title: `Scrub · ${r.backend}`,
       rows: [
         ['Seek → frame (ms)', fmtDist(r.latencyMs)],
+        [
+          'Decoders / previews / continued / restarts',
+          `${r.sessions} / ${r.previews} / ${r.continued} / ${r.restarts}`,
+        ],
+        [
+          'Drag (45 seeks, 16 ms apart)',
+          r.drag
+            ? `${r.drag.framesShown} frames shown, final frame ${r.drag.settleMs} ms after release, ${r.drag.skipped} requests skipped`
+            : '-',
+        ],
         ['Open frames after', String(r.openFramesAfter)],
         ...main,
       ],

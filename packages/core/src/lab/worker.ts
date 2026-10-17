@@ -17,6 +17,7 @@ import {
   type StreamTargetChunk,
   type VideoSample,
 } from 'mediabunny';
+import { DecoderPool, FrameSource } from '../engine/frames';
 import type { FramePlacement, Renderer } from '../render/types';
 import { createWebGL2Renderer } from '../render/webgl2';
 import { createWebGPURenderer } from '../render/webgpu';
@@ -108,6 +109,8 @@ function requireLoaded(): { renderer: Renderer; video: InputVideoTrack } {
 }
 
 async function load(file: File): Promise<MediaInfo> {
+  frames?.destroy();
+  frames = null;
   input?.dispose();
   input = new Input({ formats: ALL_FORMATS, source: new BlobSource(file) });
   const format = await input.getFormat();
@@ -235,10 +238,26 @@ async function play(seconds: number): Promise<PlayResult> {
   };
 }
 
+const pool = new DecoderPool(4);
+let frames: FrameSource | null = null;
+
+function frameSource(video: InputVideoTrack): FrameSource {
+  frames ??= new FrameSource(video, pool);
+  return frames;
+}
+
+function draw(r: Renderer, sample: VideoSample): void {
+  const frame = frameOf(sample);
+  r.draw(frame, placement);
+  closeFrame(frame);
+  sample.close();
+}
+
+/** Random seeks, one after another (each waits for its frame). */
 async function scrub(count: number): Promise<ScrubResult> {
   const { renderer: r, video } = requireLoaded();
   cancelled = false;
-  const sink = new VideoSampleSink(video);
+  const source = frameSource(video);
   const latencies: number[] = [];
   // Deterministic pseudo-random seek points so runs are comparable across devices.
   let seed = 42;
@@ -246,16 +265,51 @@ async function scrub(count: number): Promise<ScrubResult> {
   for (let i = 0; i < count && !cancelled; i++) {
     const t = random() * durationS * 0.98;
     const t0 = performance.now();
-    const sample = await sink.getSample(t);
-    if (sample) {
-      const frame = frameOf(sample);
-      r.draw(frame, placement);
-      closeFrame(frame);
-      sample.close();
-    }
+    const sample = await source.frameAt(t, { onPreview: (preview) => draw(r, preview) });
+    if (sample) draw(r, sample);
     latencies.push(performance.now() - t0);
   }
-  return { backend: r.backend, latencyMs: distribution(latencies), openFramesAfter: openFrames };
+  return {
+    backend: r.backend,
+    latencyMs: distribution(latencies),
+    openFramesAfter: openFrames,
+    drag: await drag(r, source),
+    sessions: source.stats.restarts,
+    previews: source.stats.previews,
+    continued: source.stats.continued,
+    restarts: source.stats.restarts,
+  };
+}
+
+/**
+ * A finger dragging the playhead: a seek every 16 ms across the clip, never waiting. Measures how
+ * many frames reach the screen during the drag and how long the final frame takes after the
+ * finger stops — the number users feel.
+ */
+async function drag(r: Renderer, source: FrameSource): Promise<NonNullable<ScrubResult['drag']>> {
+  const steps = 45;
+  const span = Math.min(durationS * 0.9, 9);
+  const startAt = durationS * 0.05;
+  let shown = 0;
+  let last: Promise<VideoSample | null> = Promise.resolve(null);
+  const show = (sample: VideoSample | null) => {
+    if (sample) {
+      draw(r, sample);
+      shown++;
+    }
+  };
+  for (let i = 0; i < steps; i++) {
+    last = source.frameAt(startAt + (span * i) / (steps - 1), { onPreview: show });
+    void last.then(show);
+    await sleep(16);
+  }
+  const stopped = performance.now();
+  await last;
+  return {
+    framesShown: shown,
+    settleMs: Math.round(performance.now() - stopped),
+    skipped: source.stats.skipped,
+  };
 }
 
 /** WritableStream that writes Mediabunny's positioned chunks into an OPFS file (constant memory). */

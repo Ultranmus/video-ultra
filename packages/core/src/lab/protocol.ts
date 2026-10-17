@@ -59,6 +59,15 @@ export interface ScrubResult {
   /** Seek → frame drawn (ms). */
   latencyMs: Distribution;
   openFramesAfter: number;
+  /** Decode sessions created (1 = one decoder reused for every seek). */
+  sessions: number;
+  /** Keyframe previews shown before exact frames. */
+  previews: number;
+  /** Seeks that continued decoding forward vs restarted from a keyframe. */
+  continued: number;
+  restarts: number;
+  /** Simulated finger drag of the playhead. */
+  drag: { framesShown: number; settleMs: number; skipped: number } | null;
 }
 
 export interface ExportResult {
