@@ -114,3 +114,43 @@ Deferred to v0.2+: speed curves, reverse, text animations, templates, keyframes,
 - [ ] 6.0 (before v0.3) Command registry — every action as a command with id, label, shortcut,
       `enabled()` + reason, `run()`; toolbar, shortcuts, accessible layer and tests use it
       (DECISIONS #91)
+
+## Proposed roadmap after v0.1 (competitor review, 2026-10-18 — owner to confirm)
+
+From the public feature lists of three browser editors (one commercial embeddable SDK, two MIT
+apps). Features only; no code, assets or names come into this repo. Grouped by our order:
+InShot-simple first, Canva second, pro third. Effort: S / M / L for our worker-based engine.
+
+**v0.2 — everyday gaps (high value, mostly S–M)**
+
+- [ ] Captions: SRT / VTT import, caption style presets, burn-in; subtitle sidecar export (S–M)
+- [ ] Word-by-word / per-character text animation (karaoke captions) (M)
+- [ ] Audio ducking: music dips under voice, in the AudioWorklet (S–M)
+- [ ] Green screen (chroma key) and blend modes — one shader each, both backends (S)
+- [ ] LUT import (`.cube`) for looks (S–M)
+- [ ] Blur / pixelate a region (redaction) (S)
+- [ ] Export extras: audio-only, a frame as an image, export a range, social presets (S each)
+- [ ] Music / sound-effect library as a pluggable asset source (S for the API; content is the host's)
+- [ ] Record from the camera inside the editor (S–M)
+
+**v0.3 — Canva tier**
+
+- [ ] Templates with placeholders and text variables (M)
+- [ ] Auto-captions with on-device speech-to-text — lazy model in a worker, inside memory budgets (L)
+- [ ] Background removal — lazy segmentation model in a worker (L)
+- [ ] Lottie / GIF / SVG stickers (M)
+- [ ] Shape masks (M)
+- [ ] Embedding API: show / hide / reorder tools, custom panels and buttons, asset-source plugins,
+      events, custom labels — builds on the command registry (6.0) (M)
+- [ ] High-contrast themes and a touch-aware density setting (S)
+
+**v0.4+ — pro layer (behind progressive disclosure)**
+
+- [ ] Keyframes on any property, then a curve editor (M, then L)
+- [ ] Ripple / roll / slip / slide trims, markers, track lock (M)
+- [ ] Proxies for heavy 4K clips (also helps budget phones) (M)
+- [ ] More codecs and containers: H.265 / AV1, MOV / MKV, transparent video (S–M each, where the
+      device can encode)
+- [ ] Audio EQ, compressor, pitch shift, meters (M); scopes (M); scene detection + auto-split (M)
+- [ ] Text-to-speech voiceover (L); multiple sequences / compound clips (L)
+- [ ] Optional AI editing plugin (bring-your-own endpoint) driving the op-based Project (M)
