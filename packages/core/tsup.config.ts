@@ -8,6 +8,8 @@ export default defineConfig({
     internal: 'src/internal.ts',
     'lab.worker': 'src/lab/worker.ts',
     'engine.worker': 'src/engine/worker.ts',
+    'analyzer.worker': 'src/media/analyzer-worker.ts',
+    'storage.worker': 'src/storage/worker.ts',
     // AudioWorklet module: loaded with addModule(), copied as-is by bundlers (no imports inside).
     'audio.worklet': 'src/audio/worklet.ts',
   },

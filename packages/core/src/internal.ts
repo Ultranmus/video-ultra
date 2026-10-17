@@ -33,3 +33,32 @@ export type { Engine, EngineOptions } from './engine/client';
 export type { EngineStats } from './engine/protocol';
 export { Mixer } from './audio/mixer';
 export type { AudioTrackSource } from './audio/mixer';
+
+// Media analysis (import probing, thumbnails, waveforms) — runs in its own worker.
+export { createMediaAnalyzer } from './media/analyzer';
+export type {
+  MediaAnalyzer,
+  MediaAnalyzerOptions,
+  WaveformCache,
+  AnalyzerStats,
+  ThumbnailMode,
+} from './media/analyzer';
+export type { Waveform } from './media/peaks';
+export { accumulatePeaks, peaksPerSecondFor, MAX_PEAKS } from './media/peaks';
+
+// Persistence: media storage, autosave via the op log, crash recovery.
+export { createProjectStorage, createProjectStorageOn } from './storage/project-storage';
+export type {
+  ProjectStorage,
+  ProjectStorageOptions,
+  ProjectWriter,
+  StoredProjectInfo,
+  StoredLogEntry,
+  StorageStatus,
+  LoadedProject,
+} from './storage/project-storage';
+export { StorageFullError, MemoryFileStore } from './storage/files';
+export type { FileStore } from './storage/files';
+export type { HandleStore } from './storage/handles';
+export { attachAutosave } from './storage/autosave';
+export type { Autosave, AutosaveOptions } from './storage/autosave';
