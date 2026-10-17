@@ -13,7 +13,7 @@ import {
 } from '@video-ultra/core';
 import { useEffect, useRef, type ReactElement } from 'react';
 import { useController, useHistory, useLabels, useProject, useUi } from './context';
-import { Button, IconButton, Section, ToolButton } from './controls';
+import { Button, IconButton, Ruler, Section, ToolButton } from './controls';
 import { formatClock } from './format';
 import { Icon, type IconName } from './icons';
 import { itemTitle, ratioOf } from './items';
@@ -354,27 +354,22 @@ export function TimelineBar(): ReactElement {
         />
         <div className="vu-zoom">
           <IconButton icon="zoomOut" label={l.zoomOut} onClick={() => ctl.zoom(1 / 1.5)} />
-          <input
-            className="vu-slider vu-zoom-slider"
-            type="range"
-            min={0}
-            max={1}
-            step={0.001}
-            aria-label={l.tipZoom}
-            data-tooltip={l.tipZoom}
-            value={zoom}
-            style={{
-              ['--vu-fill-from' as string]: '0%',
-              ['--vu-fill-to' as string]: `${zoom * 100}%`,
-            }}
-            onChange={(e) =>
-              ctl.ui.setState({
-                pxPerSecond: clampPps(
-                  MIN_PPS * Math.pow(MAX_PPS / MIN_PPS, Number(e.currentTarget.value)),
-                ),
-              })
-            }
-          />
+          <div className="vu-zoom-ruler">
+            <Ruler
+              label={l.tipZoom}
+              compact
+              value={zoom}
+              min={0}
+              max={1}
+              step={0.005}
+              format={(v) => `${Math.round(MIN_PPS * Math.pow(MAX_PPS / MIN_PPS, v))} px/s`}
+              onChange={(v) =>
+                ctl.ui.setState({
+                  pxPerSecond: clampPps(MIN_PPS * Math.pow(MAX_PPS / MIN_PPS, v)),
+                })
+              }
+            />
+          </div>
           <IconButton icon="zoomIn" label={l.zoomIn} onClick={() => ctl.zoom(1.5)} />
         </div>
       </div>

@@ -557,79 +557,6 @@
     font-weight: var(--vu-weight-semibold);
   }
 
-  /* Slider: a thin track filled from its zero point, a round thumb with room for its ring. */
-  .vu-slider {
-    appearance: none;
-    width: 100%;
-    height: var(--vu-size-choice);
-    margin: 0;
-    padding: 0 var(--vu-space-1);
-    border-radius: var(--vu-radius-sm);
-    background: transparent;
-    cursor: pointer;
-    touch-action: pan-y;
-  }
-
-  .vu-slider::-webkit-slider-runnable-track {
-    height: var(--vu-size-slider-track);
-    border-radius: var(--vu-radius-full);
-    background: linear-gradient(
-      to right,
-      var(--vu-slider-rail) var(--vu-fill-from),
-      var(--vu-accent) var(--vu-fill-from),
-      var(--vu-accent) var(--vu-fill-to),
-      var(--vu-slider-rail) var(--vu-fill-to)
-    );
-  }
-
-  .vu-slider::-moz-range-track {
-    height: var(--vu-size-slider-track);
-    border-radius: var(--vu-radius-full);
-    background: linear-gradient(
-      to right,
-      var(--vu-slider-rail) var(--vu-fill-from),
-      var(--vu-accent) var(--vu-fill-from),
-      var(--vu-accent) var(--vu-fill-to),
-      var(--vu-slider-rail) var(--vu-fill-to)
-    );
-  }
-
-  .vu-slider::-webkit-slider-thumb {
-    appearance: none;
-    width: var(--vu-size-slider-thumb);
-    height: var(--vu-size-slider-thumb);
-    margin-top: calc((var(--vu-size-slider-track) - var(--vu-size-slider-thumb)) / 2);
-    border-radius: var(--vu-radius-full);
-    background: var(--vu-handle-fill);
-    box-shadow: var(--vu-shadow-thumb);
-    transition: transform var(--vu-duration-fast) var(--vu-ease);
-  }
-
-  .vu-slider:active::-webkit-slider-thumb {
-    transform: scale(1.12);
-  }
-
-  .vu-slider::-moz-range-thumb {
-    width: var(--vu-size-slider-thumb);
-    height: var(--vu-size-slider-thumb);
-    border: 0;
-    border-radius: var(--vu-radius-full);
-    background: var(--vu-handle-fill);
-    box-shadow: var(--vu-shadow-thumb);
-  }
-
-  .vu-slider:focus-visible {
-    box-shadow: none;
-  }
-
-  .vu-slider:focus-visible::-webkit-slider-thumb {
-    box-shadow: var(--vu-focus-ring);
-  }
-
-  .vu-slider:focus-visible::-moz-range-thumb {
-    box-shadow: var(--vu-focus-ring);
-  }
-
   /* Ruler slider: the tick scale slides under a fixed centre marker. */
   .vu-ruler {
     position: relative;
@@ -2259,14 +2186,18 @@
     gap: var(--vu-space-1);
   }
 
-  .vu-zoom-slider {
+  .vu-zoom-ruler {
     width: var(--vu-size-zoom);
   }
 
   @container vu (max-width: 1100px) {
-    .vu-zoom-slider {
+    .vu-zoom-ruler {
       display: none;
     }
+  }
+
+  .vu-ruler[data-compact] {
+    height: var(--vu-size-choice);
   }
 
   .vu-timeline-area {

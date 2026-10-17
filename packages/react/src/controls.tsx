@@ -104,10 +104,154 @@ const TICK_PX = 8;
 const SNAP_PX = 6;
 
 /**
- * The ruler slider: a tick scale that slides under a fixed centre marker, the value above it.
- * Drag it (touch or mouse), use the arrow keys (Shift = ×10), or double-click to reset; it snaps
- * to the default. While dragging it previews live (no store writes, no undo steps) and commits
- * one edit on release; key presses commit, merged into one undo step.
+ * The ruler: a tick scale that slides under a fixed centre marker (image-ultra's slider). Drag it
+ * (touch or mouse), use the arrow keys (Shift = ×10), or double-click to reset; it snaps to the
+ * default. `onChange(value, final)`: `final` is false while dragging, true on release / key press.
+ * Presentational — {@link EditSlider} adds the label row and the edit plumbing.
+ */
+export function Ruler({
+  label,
+  labelledBy,
+  value,
+  min,
+  max,
+  step,
+  format,
+  defaultValue,
+  origin,
+  compact,
+  onChange,
+  onCancel,
+}: {
+  /** Accessible name (or use `labelledBy`). */
+  label?: string;
+  labelledBy?: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  format?: (value: number) => string;
+  defaultValue?: number;
+  /** Where the fill starts: `min` (default), or the zero point of a two-sided ruler. */
+  origin?: number;
+  /** Smaller, for toolbars. */
+  compact?: boolean;
+  onChange: (value: number, final: boolean) => void;
+  onCancel?: () => void;
+}): ReactElement {
+  const drag = useRef<{
+    id: number;
+    x: number;
+    start: number;
+    moved: boolean;
+    last: number;
+  } | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const tick = niceTick(max - min);
+  const pxPerUnit = TICK_PX / tick;
+  const clamp = (v: number) => Math.min(max, Math.max(min, Math.round(v / step) * step));
+
+  // Ticks: one element per tick (≤ ~45), majors every 5; the track moves, the marker stays.
+  const ticks: ReactElement[] = [];
+  const count = Math.round((max - min) / tick);
+  for (let i = 0; i <= count; i++) {
+    const v = min + i * tick;
+    const major = Math.abs(Math.round(v / tick) % 5) === 0;
+    const isDefault = defaultValue !== undefined && Math.abs(v - defaultValue) < tick / 2;
+    ticks.push(
+      <span
+        key={i}
+        className="vu-ruler-tick"
+        data-major={major || undefined}
+        data-default={isDefault || undefined}
+        style={{ left: `${i * TICK_PX}px` }}
+      />,
+    );
+  }
+  const offset = (value - min) * pxPerUnit;
+  const from = ((origin ?? min) - min) * pxPerUnit;
+
+  return (
+    <div
+      className="vu-ruler"
+      data-compact={compact || undefined}
+      role="slider"
+      tabIndex={0}
+      aria-label={label}
+      aria-labelledby={labelledBy}
+      aria-valuemin={min}
+      aria-valuemax={max}
+      aria-valuenow={value}
+      aria-valuetext={format ? format(value) : String(value)}
+      data-tooltip={compact ? label : undefined}
+      data-dragging={dragging || undefined}
+      onPointerDown={(e) => {
+        if (e.button > 0) return;
+        e.currentTarget.setPointerCapture(e.pointerId);
+        drag.current = { id: e.pointerId, x: e.clientX, start: value, moved: false, last: value };
+      }}
+      onPointerMove={(e) => {
+        const d = drag.current;
+        if (!d || d.id !== e.pointerId) return;
+        const dx = e.clientX - d.x;
+        if (!d.moved && Math.abs(dx) < 3) return;
+        if (!d.moved) setDragging(true);
+        d.moved = true;
+        // Dragging the scale left brings higher values under the marker.
+        let v = clamp(d.start - dx / pxPerUnit);
+        if (defaultValue !== undefined && Math.abs(v - defaultValue) * pxPerUnit < SNAP_PX)
+          v = defaultValue;
+        d.last = v;
+        onChange(v, false);
+      }}
+      onPointerUp={(e) => {
+        const d = drag.current;
+        drag.current = null;
+        setDragging(false);
+        if (!d || d.id !== e.pointerId) return;
+        if (d.moved) onChange(d.last, true);
+      }}
+      onPointerCancel={() => {
+        drag.current = null;
+        setDragging(false);
+        onCancel?.();
+      }}
+      onDoubleClick={() => {
+        if (defaultValue !== undefined) onChange(defaultValue, true);
+      }}
+      onKeyDown={(e) => {
+        const big = e.shiftKey ? 10 : 1;
+        let next: number | null = null;
+        if (e.key === 'ArrowRight' || e.key === 'ArrowUp') next = clamp(value + tick * big);
+        else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') next = clamp(value - tick * big);
+        else if (e.key === 'Home') next = min;
+        else if (e.key === 'End') next = max;
+        else if ((e.key === 'Enter' || e.key === 'Delete') && defaultValue !== undefined)
+          next = defaultValue;
+        if (next === null) return;
+        e.preventDefault();
+        e.stopPropagation();
+        onChange(next, true);
+      }}
+    >
+      <div className="vu-ruler-viewport">
+        <div className="vu-ruler-track" style={{ transform: `translateX(${-offset}px)` }}>
+          {ticks}
+          <span
+            className="vu-ruler-fill"
+            style={{ left: `${Math.min(from, offset)}px`, width: `${Math.abs(offset - from)}px` }}
+          />
+        </div>
+      </div>
+      <span className="vu-ruler-marker" aria-hidden="true" />
+    </div>
+  );
+}
+
+/**
+ * An edit slider: label, value and a {@link Ruler}. While dragging it previews live (no store
+ * writes, no undo steps) and commits one edit on release; key presses commit, merged into one
+ * undo step.
  */
 export function EditSlider({
   label,
@@ -145,44 +289,8 @@ export function EditSlider({
   useEffect(() => {
     recipeRef.current = recipe;
   });
-  const drag = useRef<{ id: number; x: number; start: number; moved: boolean } | null>(null);
-  const [dragging, setDragging] = useState(false);
   const shown = live ?? value;
   const changed = defaultValue !== undefined && Math.abs(shown - defaultValue) > step / 2;
-  const tick = niceTick(max - min);
-  const pxPerUnit = TICK_PX / tick;
-  const clamp = (v: number) => Math.min(max, Math.max(min, Math.round(v / step) * step));
-
-  const commit = (v: number) => {
-    setLive(null);
-    ctl.run(commitLabel, (d, ctx) => recipeRef.current(d, v, ctx), { coalesceKey });
-  };
-  const show = (v: number) => {
-    setLive(v);
-    onLive?.(v);
-    ctl.preview((d, ctx) => recipeRef.current(d, v, ctx));
-  };
-
-  // Ticks: one element per tick (≤ ~45), majors every 5; the track moves, the marker stays.
-  const ticks: ReactElement[] = [];
-  const count = Math.round((max - min) / tick);
-  for (let i = 0; i <= count; i++) {
-    const v = min + i * tick;
-    const major = Math.abs(Math.round(v / tick) % 5) === 0;
-    const isDefault = defaultValue !== undefined && Math.abs(v - defaultValue) < tick / 2;
-    ticks.push(
-      <span
-        key={i}
-        className="vu-ruler-tick"
-        data-major={major || undefined}
-        data-default={isDefault || undefined}
-        style={{ left: `${i * TICK_PX}px` }}
-      />,
-    );
-  }
-  const offset = (shown - min) * pxPerUnit;
-  const from = ((origin ?? min) - min) * pxPerUnit;
-
   return (
     <div className="vu-field">
       <div className="vu-field-row">
@@ -191,77 +299,30 @@ export function EditSlider({
           {format ? format(shown) : String(shown)}
         </output>
       </div>
-      <div
-        className="vu-ruler"
-        role="slider"
-        tabIndex={0}
-        aria-labelledby={id}
-        aria-valuemin={min}
-        aria-valuemax={max}
-        aria-valuenow={shown}
-        aria-valuetext={format ? format(shown) : String(shown)}
-        data-dragging={dragging || undefined}
-        onPointerDown={(e) => {
-          if (e.button > 0) return;
-          e.currentTarget.setPointerCapture(e.pointerId);
-          drag.current = { id: e.pointerId, x: e.clientX, start: shown, moved: false };
+      <Ruler
+        labelledBy={id}
+        value={shown}
+        min={min}
+        max={max}
+        step={step}
+        {...(format ? { format } : {})}
+        {...(defaultValue !== undefined ? { defaultValue } : {})}
+        {...(origin !== undefined ? { origin } : {})}
+        onChange={(v, final) => {
+          if (final) {
+            setLive(null);
+            ctl.run(commitLabel, (d, ctx) => recipeRef.current(d, v, ctx), { coalesceKey });
+          } else {
+            setLive(v);
+            onLive?.(v);
+            ctl.preview((d, ctx) => recipeRef.current(d, v, ctx));
+          }
         }}
-        onPointerMove={(e) => {
-          const d = drag.current;
-          if (!d || d.id !== e.pointerId) return;
-          const dx = e.clientX - d.x;
-          if (!d.moved && Math.abs(dx) < 3) return;
-          if (!d.moved) setDragging(true);
-          d.moved = true;
-          // Dragging the scale left brings higher values under the marker.
-          let v = clamp(d.start - dx / pxPerUnit);
-          if (defaultValue !== undefined && Math.abs(v - defaultValue) * pxPerUnit < SNAP_PX)
-            v = defaultValue;
-          show(v);
-        }}
-        onPointerUp={(e) => {
-          const d = drag.current;
-          drag.current = null;
-          setDragging(false);
-          if (!d || d.id !== e.pointerId) return;
-          if (d.moved && live !== null) commit(live);
-          else setLive(null);
-        }}
-        onPointerCancel={() => {
-          drag.current = null;
-          setDragging(false);
+        onCancel={() => {
           setLive(null);
           ctl.preview(null);
         }}
-        onDoubleClick={() => {
-          if (defaultValue !== undefined) commit(defaultValue);
-        }}
-        onKeyDown={(e) => {
-          const big = e.shiftKey ? 10 : 1;
-          let next: number | null = null;
-          if (e.key === 'ArrowRight' || e.key === 'ArrowUp') next = clamp(shown + tick * big);
-          else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') next = clamp(shown - tick * big);
-          else if (e.key === 'Home') next = min;
-          else if (e.key === 'End') next = max;
-          else if ((e.key === 'Enter' || e.key === 'Delete') && defaultValue !== undefined)
-            next = defaultValue;
-          if (next === null) return;
-          e.preventDefault();
-          e.stopPropagation();
-          commit(next);
-        }}
-      >
-        <div className="vu-ruler-viewport">
-          <div className="vu-ruler-track" style={{ transform: `translateX(${-offset}px)` }}>
-            {ticks}
-            <span
-              className="vu-ruler-fill"
-              style={{ left: `${Math.min(from, offset)}px`, width: `${Math.abs(offset - from)}px` }}
-            />
-          </div>
-        </div>
-        <span className="vu-ruler-marker" aria-hidden="true" />
-      </div>
+      />
     </div>
   );
 }
