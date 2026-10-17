@@ -168,3 +168,13 @@ reason; when one changes, edit the entry and note the date.
 42. **Frames are borrowed only synchronously** (2026-10-17). Temporary `VideoFrame`s for drawing
     are created right before `render()` with no `await` in between; a late frame arriving during
     gathering could otherwise close the picture underneath (seen as "detached" in WebKit).
+43. **Audio path: worker mixer → MessagePort → AudioWorklet; audio is the master clock**
+    (2026-10-17). The engine worker mixes (`audio/mixer.ts`: per-clip readers, seamless linear
+    resampling, click-free gain ramps, soft limiter) and sends 2048-frame stereo blocks straight to
+    the AudioWorklet over a transferred MessagePort (no SharedArrayBuffer, main thread untouched).
+    The worklet reports frames played every ~21 ms; video shows what's audible (played − output
+    latency, extrapolated, never past what's queued). The same mixer will produce export audio.
+44. **The AudioContext is created while the engine loads, resumed inside the Play tap**
+    (2026-10-17). Creating it + loading the worklet took 110–139 ms of main-thread time in Chrome
+    when done inside the tap; a context created without a gesture starts suspended, and `resume()`
+    in the tap is cheap and satisfies iOS Safari's gesture rule.

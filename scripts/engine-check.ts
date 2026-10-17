@@ -12,7 +12,8 @@ const arg = (name: string) =>
 const names = (arg('browsers') ?? 'chrome,webkit').split(',');
 const shots = arg('shots');
 const launch = {
-  chrome: () => chromium.launch({ channel: 'chrome' }),
+  chrome: () =>
+    chromium.launch({ channel: 'chrome', args: ['--autoplay-policy=no-user-gesture-required'] }),
   webkit: () => webkit.launch(),
 };
 
@@ -52,7 +53,9 @@ for (const name of names) {
         }).observe({ type: 'longtask' });
       })
       .catch(() => undefined);
-    await page.evaluate(() => window.engineLab!.seek(0).then(() => window.engineLab!.play()));
+    await page.evaluate(() => window.engineLab!.seek(0));
+    // Play with a real click: sound may only start inside a user gesture (as on phones).
+    await page.getByRole('button', { name: 'Play' }).click();
     const duration = await page.evaluate(() => window.engineLab!.duration);
     const t0 = Date.now();
     await page.waitForFunction(() => window.engineLab!.ended, null, {
@@ -69,6 +72,9 @@ for (const name of names) {
     );
     console.log(
       `  last frame: gather ${stats.gatherMs.toFixed(1)} ms, draw ${stats.drawMs.toFixed(2)} ms · decoders ${stats.decoders}/${stats.decoderBudget} · held frames ${stats.openFrames} · preview ${stats.previewWidth}×${stats.previewHeight}`,
+    );
+    console.log(
+      `  audio: ${stats.audio ? `on · underruns ${stats.underruns} · A/V offset p50 ${stats.avOffsetMs?.p50 ?? '-'} / p95 ${stats.avOffsetMs?.p95 ?? '-'} / max ${stats.avOffsetMs?.max ?? '-'} ms` : 'off'}`,
     );
     console.log(
       `  main thread long tasks: ${longTasks.length}${longTasks.length ? ` (max ${Math.round(Math.max(...longTasks))} ms)` : ''}${errors.length ? `\n  errors: ${errors.slice(0, 5).join(' | ')}` : ''}`,

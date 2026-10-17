@@ -29,6 +29,11 @@ export interface EngineStats {
   /** Preview canvas size in pixels. */
   previewWidth: number;
   previewHeight: number;
+  /** Audio is connected; times the worklet ran out of sound since play started. */
+  audio: boolean;
+  underruns: number;
+  /** |picture time − audible time| at each drawn frame while playing (ms). */
+  avOffsetMs: { p50: number; p95: number; max: number } | null;
 }
 
 export type EngineRequest =
@@ -47,7 +52,9 @@ export type EngineRequest =
   | { type: 'seek'; time: number }
   | { type: 'play' }
   | { type: 'pause' }
-  | { type: 'stats' };
+  | { type: 'stats' }
+  /** Audio output: the port to the AudioWorklet, its sample rate and output latency (s). */
+  | { type: 'audio'; port: MessagePort; sampleRate: number; latency: number };
 
 export type EngineResponseData =
   { type: 'init'; backend: RenderBackend } | { type: 'ok' } | { type: 'stats'; stats: EngineStats };

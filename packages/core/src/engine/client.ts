@@ -34,6 +34,8 @@ export interface Engine {
 export interface EngineOptions {
   backend?: BackendChoice;
   tier: DeviceTier;
+  /** Play sound (default true). Without it the clock is the wall clock. */
+  audio?: boolean;
 }
 
 /**
@@ -102,6 +104,51 @@ export async function createEngine(
   );
   if (init.type !== 'init') throw new Error('Unexpected engine response');
 
+  // Sound: an AudioWorklet on the main thread's AudioContext, fed directly by the worker over a
+  // MessagePort. Created on the first play() — browsers (iOS Safari especially) only allow audio to
+  // start inside a user gesture, so the context is created and resumed synchronously there.
+  let audio: { context: AudioContext; ready: Promise<void> } | null = null;
+  // Building the AudioContext and loading the worklet costs ~100 ms of main-thread time in Chrome, so
+  // it happens now (while loading, in idle time) instead of inside the user's Play tap. A context
+  // created without a gesture starts suspended; play() resumes it inside the tap (cheap), which is
+  // what iOS Safari requires.
+  const prepareAudio = () => {
+    if (audio || options.audio === false || typeof AudioContext === 'undefined') return;
+    const context = new AudioContext({ latencyHint: 'interactive' });
+    const ready = (async () => {
+      await context.audioWorklet.addModule(new URL('./audio.worklet.js', import.meta.url));
+      const node = new AudioWorkletNode(context, 'video-ultra-player', {
+        numberOfInputs: 0,
+        outputChannelCount: [2],
+      });
+      node.connect(context.destination);
+      const channel = new MessageChannel();
+      node.port.postMessage({ type: 'port', port: channel.port1 }, [channel.port1]);
+      const latency = (context.outputLatency || 0) + (context.baseLatency || 0);
+      await send({ type: 'audio', port: channel.port2, sampleRate: context.sampleRate, latency }, [
+        channel.port2,
+      ]);
+    })().catch((error: unknown) => {
+      // No sound is better than no playback: keep going on the wall clock.
+      handlers.onError?.(
+        `Audio unavailable: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    });
+    audio = { context, ready };
+  };
+  const idle = (
+    globalThis as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }
+  ).requestIdleCallback;
+  if (idle) idle(prepareAudio, { timeout: 2000 });
+  else setTimeout(prepareAudio, 0);
+
+  const startAudio = (): Promise<void> => {
+    prepareAudio(); // in case play() comes before idle time
+    if (!audio) return Promise.resolve();
+    void audio.context.resume(); // synchronously inside the user's gesture
+    return audio.ready;
+  };
+
   return Object.assign(handlers, {
     backend: init.backend,
     async setProject(project: Project) {
@@ -117,6 +164,7 @@ export async function createEngine(
       await send({ type: 'seek', time });
     },
     async play() {
+      await startAudio();
       await send({ type: 'play' });
     },
     async pause() {
@@ -128,6 +176,7 @@ export async function createEngine(
       return data.stats;
     },
     destroy() {
+      void audio?.context.close();
       worker.terminate();
       for (const entry of pending.values()) entry.reject(new Error('Engine destroyed'));
       pending.clear();

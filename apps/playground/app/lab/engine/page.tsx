@@ -132,6 +132,7 @@ declare global {
   interface Window {
     engineLab?: {
       play(): Promise<void>;
+      pause(): Promise<void>;
       seek(s: number): Promise<void>;
       stats(): Promise<EngineStats>;
       duration: number;
@@ -193,6 +194,7 @@ export default function EngineLab() {
           return e.play();
         },
         seek: (s: number) => e.seek(fromSeconds(s)),
+        pause: () => e.pause(),
         stats: () => e.stats(),
       });
       setStatus(`Ready · ${engine.backend} · tier ${caps.tier} · ${lab.duration.toFixed(1)} s`);
@@ -212,6 +214,7 @@ export default function EngineLab() {
       <p>{time.toFixed(2)} s</p>
       <div className="row">
         <button onClick={() => void window.engineLab?.play()}>Play</button>
+        <button onClick={() => void window.engineLab?.pause()}>Pause</button>
         <button onClick={() => void window.engineLab?.seek(0)}>Start</button>
       </div>
       <div ref={stageRef} style={{ width: 360, height: 640, background: '#000' }} />

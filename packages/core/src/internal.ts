@@ -31,3 +31,5 @@ export type { BrowserEngine } from './render/hdr';
 export { createEngine } from './engine/client';
 export type { Engine, EngineOptions } from './engine/client';
 export type { EngineStats } from './engine/protocol';
+export { Mixer } from './audio/mixer';
+export type { AudioTrackSource } from './audio/mixer';

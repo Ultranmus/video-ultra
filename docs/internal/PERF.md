@@ -57,6 +57,18 @@ real footage) + PIP video + transparent PNG, played start to end by the engine w
 | Chrome · WebGL2              | 510 / 510 | 0    | 0       | 0.3 ms                   | 0                      |
 | WebKit (Playwright) · WebGL2 | 509 / 510 | 0    | 0       | 9 ms (test-build upload) | 0                      |
 
+With audio (AudioWorklet, audio-driven clock), same demo:
+
+| Browser · path               | Underruns | A/V offset p50 / p95 / max                           | Main-thread long tasks |
+| ---------------------------- | --------- | ---------------------------------------------------- | ---------------------- |
+| Chrome · WebGPU              | 0         | 0.5 / 1.2 / 16 ms                                    | 0                      |
+| Chrome · WebGL2              | 0         | 0.8 / 1.5 / 24 ms                                    | 0                      |
+| WebKit (Playwright) · WebGL2 | 0         | 8 / 13 / 76 ms (late frames at the 2 s and 7 s cuts) | 0                      |
+
+Lip-sync errors become noticeable around 40 ms. `scripts/audio-check.ts` verifies the mixer's
+output: tone levels, volume 0.5 = half level (0.472), linear 1 s fade-in, MP3 44.1 → 48 kHz, clip
+end, no clipping.
+
 At the end: 1 decoder and 1 held frame (idle clips give theirs back). Paused seek → first draw
 42–110 ms, all layers 42–184 ms (Chrome); the slowest is the first seek (cold PIP decoder).
 

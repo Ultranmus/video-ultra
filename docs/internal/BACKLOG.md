@@ -50,3 +50,8 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       creating the engine (strict mode runs effects twice; the lab page leaked a zombie engine).
 - [ ] Engine: blur background, text and sticker layers (Day 5), transitions (Day 5).
 - [ ] Engine: count project frames lost to display timing (60 Hz tick vs 30 fps) separately.
+- [ ] Speed changes shift pitch (plain resampling). Pitch-preserving time-stretch (Rust → WASM,
+      DECISIONS #13) for v0.2 speed curves.
+- [ ] WebKit (Playwright) has late frames at cuts where a new video starts (2 s, 7 s in the demo):
+      check on the iPhone; widen prefetch (1 s → 1.5 s) if real.
+- [ ] Next iPhone batch: audio plays, A/V offset, underruns on a real phone (engine lab page).

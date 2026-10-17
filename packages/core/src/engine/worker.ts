@@ -7,6 +7,8 @@ import { layerGeometry, type LayerMedia } from '../render/layout';
 import type { LayerDraw, Renderer } from '../render/types';
 import { createWebGL2Renderer } from '../render/webgl2';
 import { createWebGPURenderer } from '../render/webgpu';
+import { Mixer, type AudioTrackSource } from '../audio/mixer';
+import { AudioOutput } from './audio-output';
 import { DecoderPool, FrameSource } from './frames';
 import type { EngineMessage, EngineRequest, EngineResponseData, EngineStats } from './protocol';
 import { activeLayers, upcomingVideoItems, type ActiveLayer } from './timeline';
@@ -46,6 +48,9 @@ let project: Project | null = null;
 let viewW = 1280;
 let viewH = 720;
 const videos = new Map<string, Promise<VideoMedia>>();
+/** Audio tracks by asset (videos with sound and audio files), once loaded. */
+const audioTracks = new Map<string, AudioTrackSource>();
+let audioOut: AudioOutput | null = null;
 const images = new Map<string, Promise<ImageBitmap>>();
 /** One frame source per timeline item (each needs its own decode position). */
 const sources = new Map<string, FrameSource>();
@@ -59,6 +64,14 @@ let busy = false;
 let wantedTime: Time | null = null;
 /** Project frame drawn last while playing — the display may tick faster than the project's rate. */
 let lastFrameIndex = -1;
+const avOffsets: number[] = [];
+
+function summarize(values: number[]): { p50: number; p95: number; max: number } {
+  const sorted = values.map(Math.abs).sort((a, b) => a - b);
+  const at = (q: number) =>
+    Math.round(sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))]! * 10) / 10;
+  return { p50: at(0.5), p95: at(0.95), max: at(1) };
+}
 
 const stats: EngineStats = {
   presented: 0,
@@ -74,6 +87,9 @@ const stats: EngineStats = {
   previewHeight: 0,
   lastRendered: -1,
   lastLayers: 0,
+  audio: false,
+  underruns: 0,
+  avOffsetMs: null,
 };
 
 function post(message: EngineMessage): void {
@@ -106,9 +122,25 @@ function loadVideo(assetId: string, blob: Blob): void {
         flip: await track.getFlip(),
       };
       const hdr = ((await track.getColorSpace()).transfer as string | undefined) === 'hlg';
+      await loadAudioTrack(assetId, input);
       return { input, track, media, hdr };
     })(),
   );
+}
+
+/** The asset's chosen audio track (the probe's pick, e.g. AAC rather than iPhone spatial audio). */
+async function loadAudioTrack(assetId: string, input: Input): Promise<void> {
+  const tracks = await input.getAudioTracks();
+  const index = project?.assets[assetId]?.audioTrack ?? 0;
+  const track = tracks[index] ?? tracks[0];
+  if (track && (await track.canDecode())) {
+    audioTracks.set(assetId, { track, sampleRate: await track.getSampleRate() });
+  }
+}
+
+function loadAudio(assetId: string, blob: Blob): void {
+  const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(blob) });
+  void loadAudioTrack(assetId, input).catch(reportError);
 }
 
 function loadImage(assetId: string, blob: Blob): void {
@@ -324,6 +356,10 @@ function prefetch(t: Time): void {
 
 function currentTime(): Time {
   if (!playing || clockStart === 0) return playheadAt;
+  // Sound leads: video shows what is audible now. Without audio, the wall clock.
+  const audible = audioOut?.clock();
+  if (audible != null) return audible;
+  if (audioOut) return playheadAt; // audio is starting: hold the first frame until it plays
   return playheadAt + fromSeconds((performance.now() - clockStart) / 1000);
 }
 
@@ -391,6 +427,7 @@ function tick(): void {
   const end = projectDuration(project);
   if (t >= end) {
     playing = false;
+    audioOut?.stop();
     playheadAt = end;
     emitTime(end);
     post({ id: -1, event: { type: 'ended' } });
@@ -415,6 +452,12 @@ function tick(): void {
     void renderAt(t, performance.now() + frameMs * 0.8, true)
       .then(() => {
         stats.presented++;
+        // How far the picture now on screen is from the sound now audible (ms).
+        const audible = audioOut?.clock();
+        if (audible != null) {
+          if (avOffsets.length < 2000) avOffsets.push(((audible - t) / FLICKS_PER_SECOND) * 1000);
+          stats.avOffsetMs = summarize(avOffsets);
+        }
       })
       .catch(reportError)
       .finally(() => {
@@ -460,6 +503,7 @@ async function handle(request: EngineRequest): Promise<EngineResponseData> {
     case 'media': {
       const asset = project?.assets[request.assetId];
       if (asset?.kind === 'image') loadImage(request.assetId, request.blob);
+      else if (asset?.kind === 'audio') loadAudio(request.assetId, request.blob);
       else loadVideo(request.assetId, request.blob);
       if (!playing) void showAt(playheadAt);
       return { type: 'ok' };
@@ -473,6 +517,7 @@ async function handle(request: EngineRequest): Promise<EngineResponseData> {
       const t = Math.max(0, Math.round(request.time));
       playheadAt = t;
       clockStart = performance.now();
+      if (playing && audioOut) void audioOut.start(t).catch(reportError);
       if (!playing) void showAt(t);
       emitTime(t);
       return { type: 'ok' };
@@ -505,8 +550,11 @@ async function handle(request: EngineRequest): Promise<EngineResponseData> {
           busy = false;
         }
         if (!playing) return { type: 'ok' }; // paused during pre-roll
+        if (audioOut) await audioOut.start(playheadAt);
+        if (!playing) return { type: 'ok' };
         clockStart = performance.now();
-        Object.assign(stats, { presented: 0, late: 0, skipped: 0, lateAt: [] });
+        Object.assign(stats, { presented: 0, late: 0, skipped: 0, lateAt: [], avOffsetMs: null });
+        avOffsets.length = 0;
         lastFrameIndex = frameIndex(playheadAt, project.settings.frameRate); // drawn by the pre-roll
         scheduleTick(0);
       }
@@ -515,12 +563,28 @@ async function handle(request: EngineRequest): Promise<EngineResponseData> {
       if (playing) {
         playheadAt = currentTime();
         playing = false;
+        audioOut?.stop();
         void showAt(playheadAt);
         emitTime(playheadAt);
       }
       return { type: 'ok' };
+    case 'audio': {
+      const mixer = new Mixer(request.sampleRate, (assetId) => audioTracks.get(assetId) ?? null);
+      audioOut = new AudioOutput(
+        request.port,
+        request.sampleRate,
+        request.latency,
+        mixer,
+        () => project,
+        reportError,
+      );
+      return { type: 'ok' };
+    }
     case 'stats':
-      return { type: 'stats', stats: { ...stats } };
+      return {
+        type: 'stats',
+        stats: { ...stats, underruns: audioOut?.underruns ?? 0, audio: audioOut !== null },
+      };
   }
 }
 
