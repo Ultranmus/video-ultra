@@ -398,6 +398,27 @@ make(
       p,
     ]),
 );
+// One minute of 1080p with phone-like keyframes (1 s apart): timeline thumbnail strips.
+make(
+  {
+    file: 'avc-1080p30-60s.mp4',
+    label: 'H.264 1080p30 + AAC (60 s, keyframe every 1 s) — thumbnails / waveform',
+    kind: 'video',
+    expect: { codec: 'avc', durationS: 60 },
+  },
+  (p) =>
+    ffmpeg([
+      ...picture('1920x1080', 30, 60),
+      ...tone(60),
+      ...x264,
+      '-g',
+      '30',
+      ...aac,
+      ...faststart,
+      '-shortest',
+      p,
+    ]),
+);
 make(
   {
     file: 'broken-truncated.mp4',
@@ -421,6 +442,22 @@ make({ file: 'music.mp3', label: 'MP3 stereo 44.1 kHz (30 s)', kind: 'audio' }, 
     'lavfi',
     '-i',
     'sine=frequency=330:sample_rate=44100:duration=30',
+    '-ac',
+    '2',
+    '-c:a',
+    'libmp3lame',
+    '-b:a',
+    '192k',
+    p,
+  ]),
+);
+// Long music for waveform timing (analyzer check).
+make({ file: 'music-3min.mp3', label: 'MP3 stereo 44.1 kHz (3 min)', kind: 'audio' }, (p) =>
+  ffmpeg([
+    '-f',
+    'lavfi',
+    '-i',
+    'sine=frequency=330:sample_rate=44100:duration=180,volume=eval=frame:volume=0.5+0.5*sin(t)',
     '-ac',
     '2',
     '-c:a',
