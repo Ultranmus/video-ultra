@@ -1494,6 +1494,7 @@
   }
 
   .vu-transition-tile {
+    gap: var(--vu-space-2);
     padding: var(--vu-space-2) var(--vu-space-1);
     border: 1px solid var(--vu-border);
     border-radius: var(--vu-radius-md);
@@ -1508,6 +1509,463 @@
     border-color: var(--vu-accent);
     background: var(--vu-accent-soft);
     color: var(--vu-accent-text);
+  }
+
+  /* Transition tiles: clip A gives way to clip B, by family; plays on hover/focus and while chosen. */
+  .vu-trx {
+    position: relative;
+    width: var(--vu-size-trx-w);
+    height: var(--vu-size-trx-h);
+    overflow: hidden;
+    border-radius: var(--vu-radius-sm);
+    perspective: 120px;
+  }
+
+  .vu-trx-a,
+  .vu-trx-b {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+  }
+
+  .vu-trx-a {
+    background: var(--vu-glyph-a);
+  }
+
+  /* At rest: A and B side by side; while playing, B covers the tile the family's way. */
+  .vu-trx-b {
+    background: var(--vu-glyph-b);
+    clip-path: inset(0 0 0 52%);
+  }
+
+  .vu-trx-a {
+    clip-path: inset(0 52% 0 0);
+  }
+
+  .vu-transition-tile:is(:hover, :focus-visible, [aria-checked='true'])
+    .vu-trx:not([data-family='cut'])
+    :is(.vu-trx-a, .vu-trx-b) {
+    clip-path: none;
+  }
+
+  .vu-transition-tile:is(:hover, :focus-visible, [aria-checked='true'])
+    .vu-trx:not([data-family='cut'])
+    .vu-trx-b,
+  .vu-transition-tile:is(:hover, :focus-visible, [aria-checked='true'])
+    .vu-trx:not([data-family='cut'])
+    .vu-trx-a {
+    animation-duration: var(--vu-trx-duration);
+    animation-timing-function: var(--vu-ease);
+    animation-iteration-count: infinite;
+  }
+
+  .vu-transition-tile:is(:hover, :focus-visible, [aria-checked='true']) .vu-trx .vu-trx-b {
+    animation-name: vu-trx-fade;
+  }
+
+  .vu-transition-tile:is(:hover, :focus-visible, [aria-checked='true'])
+    .vu-trx[data-family='slide']
+    .vu-trx-b {
+    animation-name: vu-trx-slide;
+  }
+
+  .vu-transition-tile:is(:hover, :focus-visible, [aria-checked='true'])
+    .vu-trx[data-family='wipe']
+    .vu-trx-b {
+    animation-name: vu-trx-wipe;
+  }
+
+  .vu-transition-tile:is(:hover, :focus-visible, [aria-checked='true'])
+    .vu-trx[data-family='zoom']
+    .vu-trx-b {
+    animation-name: vu-trx-zoom;
+  }
+
+  .vu-transition-tile:is(:hover, :focus-visible, [aria-checked='true'])
+    .vu-trx[data-family='blur']
+    .vu-trx-b {
+    animation-name: vu-trx-blur;
+  }
+
+  .vu-transition-tile:is(:hover, :focus-visible, [aria-checked='true'])
+    .vu-trx[data-family='light']
+    .vu-trx-b {
+    animation-name: vu-trx-light;
+  }
+
+  .vu-transition-tile:is(:hover, :focus-visible, [aria-checked='true'])
+    .vu-trx[data-family='glitch']
+    .vu-trx-b {
+    animation-name: vu-trx-glitch;
+    animation-timing-function: steps(6);
+  }
+
+  .vu-transition-tile:is(:hover, :focus-visible, [aria-checked='true'])
+    .vu-trx[data-family='shape']
+    .vu-trx-b {
+    animation-name: vu-trx-shape;
+  }
+
+  .vu-transition-tile:is(:hover, :focus-visible, [aria-checked='true'])
+    .vu-trx[data-family='distort']
+    .vu-trx-b {
+    animation-name: vu-trx-distort;
+  }
+
+  .vu-transition-tile:is(:hover, :focus-visible, [aria-checked='true'])
+    .vu-trx[data-family='3d']
+    .vu-trx-b {
+    animation-name: vu-trx-turn;
+  }
+
+  /* Direction: the slide/wipe/turn start side. */
+  .vu-trx[data-dir='left'] {
+    --vu-trx-x: 100%;
+    --vu-trx-y: 0%;
+    --vu-trx-clip: inset(0 0 0 100%);
+    --vu-trx-turn: rotateY(90deg);
+  }
+  .vu-trx[data-dir='right'] {
+    --vu-trx-x: -100%;
+    --vu-trx-y: 0%;
+    --vu-trx-clip: inset(0 100% 0 0);
+    --vu-trx-turn: rotateY(-90deg);
+  }
+  .vu-trx[data-dir='up'] {
+    --vu-trx-x: 0%;
+    --vu-trx-y: 100%;
+    --vu-trx-clip: inset(100% 0 0 0);
+    --vu-trx-turn: rotateX(-90deg);
+  }
+  .vu-trx[data-dir='down'] {
+    --vu-trx-x: 0%;
+    --vu-trx-y: -100%;
+    --vu-trx-clip: inset(0 0 100% 0);
+    --vu-trx-turn: rotateX(90deg);
+  }
+
+  @keyframes vu-trx-fade {
+    0%,
+    20% {
+      opacity: 0;
+    }
+    60%,
+    100% {
+      opacity: 1;
+    }
+  }
+  @keyframes vu-trx-slide {
+    0%,
+    20% {
+      opacity: 1;
+      transform: translate(var(--vu-trx-x), var(--vu-trx-y));
+    }
+    60%,
+    100% {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes vu-trx-wipe {
+    0%,
+    20% {
+      opacity: 1;
+      clip-path: var(--vu-trx-clip);
+    }
+    60%,
+    100% {
+      opacity: 1;
+      clip-path: inset(0);
+    }
+  }
+  @keyframes vu-trx-zoom {
+    0%,
+    20% {
+      opacity: 0;
+      transform: scale(0.2);
+    }
+    60%,
+    100% {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes vu-trx-blur {
+    0%,
+    20% {
+      opacity: 0;
+      filter: blur(6px);
+    }
+    60%,
+    100% {
+      opacity: 1;
+      filter: none;
+    }
+  }
+  @keyframes vu-trx-light {
+    0%,
+    20% {
+      opacity: 0;
+      filter: brightness(1);
+    }
+    40% {
+      opacity: 1;
+      filter: brightness(3);
+    }
+    70%,
+    100% {
+      opacity: 1;
+      filter: none;
+    }
+  }
+  @keyframes vu-trx-glitch {
+    0%,
+    20% {
+      opacity: 0;
+      transform: none;
+    }
+    30% {
+      opacity: 1;
+      transform: translateX(-12%);
+    }
+    40% {
+      opacity: 0.4;
+      transform: translateX(10%);
+    }
+    50% {
+      opacity: 1;
+      transform: translateX(-4%);
+    }
+    60%,
+    100% {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes vu-trx-shape {
+    0%,
+    20% {
+      opacity: 1;
+      clip-path: circle(0% at 50% 50%);
+    }
+    60%,
+    100% {
+      opacity: 1;
+      clip-path: circle(75% at 50% 50%);
+    }
+  }
+  @keyframes vu-trx-distort {
+    0%,
+    20% {
+      opacity: 0;
+      transform: skewX(30deg) scaleX(1.4);
+    }
+    60%,
+    100% {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes vu-trx-turn {
+    0%,
+    20% {
+      opacity: 1;
+      transform: var(--vu-trx-turn);
+    }
+    60%,
+    100% {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* Animation tiles: a dot (or "Aa") moving the way the animation does. */
+  .vu-anx {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--vu-size-trx-w);
+    height: var(--vu-size-trx-h);
+    overflow: hidden;
+    border-radius: var(--vu-radius-sm);
+    background: var(--vu-glyph-a);
+  }
+
+  .vu-anx-dot {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 3px;
+    border-radius: var(--vu-radius-sm);
+    background: var(--vu-glyph-b);
+    color: var(--vu-glyph-ink);
+    font-size: var(--vu-text-xs);
+    font-weight: var(--vu-weight-semibold);
+  }
+
+  .vu-transition-tile:is(:hover, :focus-visible, [aria-checked='true'])
+    .vu-anx:not([data-family='none'])
+    .vu-anx-dot {
+    animation: vu-anx-fade var(--vu-trx-duration) var(--vu-ease) infinite;
+  }
+  .vu-transition-tile:is(:hover, :focus-visible, [aria-checked='true'])
+    .vu-anx[data-family='move']
+    .vu-anx-dot {
+    animation-name: vu-anx-move;
+  }
+  .vu-transition-tile:is(:hover, :focus-visible, [aria-checked='true'])
+    .vu-anx[data-family='scale']
+    .vu-anx-dot {
+    animation-name: vu-anx-scale;
+  }
+  .vu-transition-tile:is(:hover, :focus-visible, [aria-checked='true'])
+    .vu-anx[data-family='rotate']
+    .vu-anx-dot,
+  .vu-transition-tile:is(:hover, :focus-visible, [aria-checked='true'])
+    .vu-anx[data-family='spin']
+    .vu-anx-dot {
+    animation-name: vu-anx-rotate;
+  }
+  .vu-transition-tile:is(:hover, :focus-visible, [aria-checked='true'])
+    .vu-anx[data-family='reveal']
+    .vu-anx-dot,
+  .vu-transition-tile:is(:hover, :focus-visible, [aria-checked='true'])
+    .vu-anx[data-family='text']
+    .vu-anx-dot {
+    animation-name: vu-anx-reveal;
+  }
+  .vu-transition-tile:is(:hover, :focus-visible, [aria-checked='true'])
+    .vu-anx[data-family='fun']
+    .vu-anx-dot {
+    animation-name: vu-anx-bounce;
+  }
+  .vu-transition-tile:is(:hover, :focus-visible, [aria-checked='true'])
+    .vu-anx[data-family='pulse']
+    .vu-anx-dot {
+    animation-name: vu-anx-pulse;
+  }
+  .vu-transition-tile:is(:hover, :focus-visible, [aria-checked='true'])
+    .vu-anx[data-family='motion']
+    .vu-anx-dot {
+    animation-name: vu-anx-wiggle;
+  }
+  /* Exits play the entrance backwards. */
+  .vu-transition-tile:is(:hover, :focus-visible, [aria-checked='true'])
+    .vu-anx[data-slot='out']
+    .vu-anx-dot {
+    animation-direction: reverse;
+  }
+
+  @keyframes vu-anx-fade {
+    0%,
+    15% {
+      opacity: 0;
+    }
+    55%,
+    100% {
+      opacity: 1;
+    }
+  }
+  @keyframes vu-anx-move {
+    0%,
+    15% {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    55%,
+    100% {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes vu-anx-scale {
+    0%,
+    15% {
+      opacity: 0;
+      transform: scale(0.2);
+    }
+    45% {
+      transform: scale(1.15);
+    }
+    60%,
+    100% {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes vu-anx-rotate {
+    0%,
+    15% {
+      opacity: 0;
+      transform: rotate(-180deg) scale(0.5);
+    }
+    60%,
+    100% {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes vu-anx-reveal {
+    0%,
+    15% {
+      clip-path: inset(0 100% 0 0);
+    }
+    60%,
+    100% {
+      clip-path: inset(0);
+    }
+  }
+  @keyframes vu-anx-bounce {
+    0%,
+    15% {
+      opacity: 0;
+      transform: translateY(-16px);
+    }
+    40% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-6px);
+    }
+    60%,
+    100% {
+      transform: none;
+    }
+  }
+  @keyframes vu-anx-pulse {
+    0%,
+    100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.25);
+    }
+  }
+  @keyframes vu-anx-wiggle {
+    0%,
+    100% {
+      transform: rotate(0);
+    }
+    25% {
+      transform: rotate(-12deg);
+    }
+    75% {
+      transform: rotate(12deg);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .vu-trx *,
+    .vu-anx * {
+      animation: none !important;
+    }
+    .vu-trx .vu-trx-b {
+      opacity: 1;
+    }
   }
 
   /* ── stage ───────────────────────────────────────────────────────────── */
@@ -1912,7 +2370,8 @@
   }
 
   .vu-dock-body > .vu-looks,
-  .vu-dock-body > .vu-panel-body {
+  .vu-dock-body > .vu-panel-body,
+  .vu-section-body > .vu-looks {
     padding: 0;
   }
 

@@ -603,7 +603,8 @@ type TitleKey =
   | 'text'
   | 'stickers'
   | 'audio'
-  | 'media';
+  | 'media'
+  | 'animate';
 
 const TOOL_TITLE: Record<ToolId, TitleKey> = {
   speed: 'speed',
@@ -623,6 +624,7 @@ const TOOL_TITLE: Record<ToolId, TitleKey> = {
   'add-sticker': 'stickers',
   'add-audio': 'audio',
   'add-media': 'media',
+  animate: 'animate',
 };
 
 /**
@@ -646,7 +648,12 @@ export function Dock(): ReactElement | null {
       aria-label={title}
       // Libraries (text styles, stickers, filters…) need room; quick tools fit the timeline's box.
       data-tall={
-        !tool || tool === 'filter' || tool === 'transition' || tool === 'text-style' || undefined
+        !tool ||
+        tool === 'filter' ||
+        tool === 'transition' ||
+        tool === 'text-style' ||
+        tool === 'animate' ||
+        undefined
       }
     >
       <div className="vu-dock-head">

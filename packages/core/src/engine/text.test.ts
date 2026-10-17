@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_TEXT_STYLE } from '../model/project';
 import { textItem } from '../test/fixtures';
-import { measureTextBox, rasterSize, textFont, textFontPx } from './text';
+import {
+  measureReveal,
+  measureTextBox,
+  rasterSize,
+  revealCuts,
+  textFont,
+  textFontPx,
+  type RevealCuts,
+} from './text';
 
 // A fake monospace font: every character is 0.5 em wide.
 const measure = (font: string, text: string) => {
@@ -47,5 +55,58 @@ describe('text box', () => {
     expect(r / 100).toBeGreaterThan(0.9);
     expect(r / 100).toBeLessThan(1.1);
     expect(rasterSize(101, false)).toBe(r);
+  });
+});
+
+describe('typewriter / word reveal', () => {
+  // Two lines, 10 px per character, raster 200 px wide; line 2 is centred.
+  const layout = measureReveal(
+    ['ab cd', 'efg'],
+    [0, 35],
+    [50, 30],
+    '10px x',
+    0,
+    (_font, text) => [...text].length * 10,
+    { width: 200, height: 100, top: 10, lineHeight: 40, rtl: false },
+  );
+  const cuts = (f: number, by: 'char' | 'word'): RevealCuts =>
+    revealCuts(layout, f, by, { line: 0, cutA: 0, cutB: 0, fadeB: 0 });
+
+  it('measures characters and words per line', () => {
+    expect(layout.chars).toBe(8);
+    expect(layout.words).toBe(3);
+    expect([...layout.lines[0]!.charEnd]).toEqual([10, 20, 30, 40, 50]);
+    expect([...layout.lines[0]!.wordStart]).toEqual([0, 30]);
+    expect([...layout.lines[0]!.wordEnd]).toEqual([20, 50]);
+    expect([...layout.lines[1]!.wordEnd]).toEqual([30]);
+  });
+
+  it('shows characters one by one, line after line (last one just before the end)', () => {
+    expect(cuts(0, 'char')).toEqual({ line: 0, cutA: 0, cutB: 0.05, fadeB: 0 });
+    // 3 of 8 characters: "ab " shown, cut after 30 px on line 0.
+    expect(cuts(3 / 8, 'char')).toMatchObject({ line: 0, cutA: 0.15 });
+    // 6 of 8: line 0 done, "e" on line 1 (starts at 35 px).
+    expect(cuts(6 / 8, 'char')).toMatchObject({ line: 1, cutA: 45 / 200 });
+    expect(cuts(0.8, 'char')).toMatchObject({ line: 1, cutA: 55 / 200 });
+    expect(cuts(0.99, 'char').line).toBe(2);
+    expect(cuts(1, 'char').line).toBe(2);
+  });
+
+  it('fades words in one after another', () => {
+    // 1.5 of 3 words: "ab" shown, "cd" half faded in.
+    expect(cuts(0.5, 'word')).toEqual({
+      line: 0,
+      cutA: 0.15,
+      cutB: 0.25,
+      fadeB: expect.closeTo(0.5) as number,
+    });
+    expect(cuts(0.8, 'word')).toMatchObject({ line: 1, cutA: 35 / 200, cutB: 65 / 200 });
+  });
+
+  it('mirrors cuts for right-to-left text', () => {
+    const rtl = { ...layout, rtl: true };
+    const c = revealCuts(rtl, 1 / 8, 'char', { line: 0, cutA: 0, cutB: 0, fadeB: 0 });
+    // Line 0 ends at 50 px: the first character sits at its right end.
+    expect(c.cutA).toBeCloseTo((200 - 50 + 10) / 200);
   });
 });

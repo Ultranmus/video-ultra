@@ -155,3 +155,26 @@ one-axis wheel, neutral lane clips, phone dock + Back/Done, Preview mode, keyboa
 area, no iOS callout/selection, tenths timecode. `scripts/ui-review.ts` walks desktop + phone and
 saves screenshots; all were reviewed (dark + light). Interaction (Chrome, WebKit, Firefox),
 recovery and axe checks pass; `pnpm verify` green.
+
+## 2026-10-17 · Effects library (transitions, element animations, filters).** 76 transition
+
+presets / 161 styles with direction + ease, built from parameterised families in the one
+compositor shader (masks, warps, blurs, RGB split, colour mix, 3D turn) plus a full-canvas
+overlay; 70 element animations (in / out / loop) for text, stickers and PIP incl. a typewriter
+and word-by-word reveal; 115 filters in 15 categories with vibrance, hue and grain stages.
+Schema stays version 1 (optional `direction`, `ease`, `animation`); new op `setAnimation`.
+Transitions apply only to the main track (owner's zoom report) — proven by golden frames.
+Low-tier preview halves blur taps. Checks: unit tests (372), golden frames for 30 transition
+families + animations on both backends in Chrome / WebKit / Firefox, engine playback in three
+browsers, export = preview frame comparisons, new `scripts/effects-bench.ts` (heaviest:
+spin blur 2.1 ms WebGL2 / 1.9 ms WebGPU per 1080 × 1920 frame on an M4) and
+`scripts/wgsl-check.ts` (compiles the WGSL with Chrome's Tint, stricter than naga).
+
+## 2026-10-17 · UI round 3 (owner feedback): libraries, ruler sliders, picker, animate
+
+Ruler sliders (image-ultra style); adjust / crop as chips + one ruler; rotate / flip icon row;
+146 text styles; sticker library (3D, emoji, shapes, upload); HSV colour picker; themed
+scrollbars; Saved chip; full-screen icon; filters and transitions by category with engine-rendered
+previews and animated tiles, direction / feel / length options, play-once previews; Animate panel
+(In / Out / Loop) for lane items; panels select their target; lane drops into existing or new
+lanes. Checks: verify (373 + 10 tests), interaction 3 browsers, axe 0, composite golden.

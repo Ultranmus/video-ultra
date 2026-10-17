@@ -360,10 +360,15 @@ export class EditorController {
     this.editor.redo();
   }
 
-  select(itemId: string | null): void {
+  /**
+   * Selects an item (closing any open tool, since tools belong to the selection). `keepPanel`
+   * keeps the open panel/tool — used when a panel selects the clip it is about to act on.
+   */
+  select(itemId: string | null, options: { keepPanel?: boolean } = {}): void {
     const state = this.ui.getState();
     if (state.selectedId === itemId) return;
-    this.ui.setState({ selectedId: itemId, tool: null, sheetPanel: false });
+    if (options.keepPanel) this.ui.setState({ selectedId: itemId });
+    else this.ui.setState({ selectedId: itemId, tool: null, sheetPanel: false });
   }
 
   selectedItem(): Item | null {

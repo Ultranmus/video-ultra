@@ -8,7 +8,9 @@
  * scripts/export-check.ts drive it.
  *
  * `?golden=1` instead renders fixed golden frames through both GPU backends for
- * scripts/composite-check.ts. `?bg=color` turns the blurred background off.
+ * scripts/composite-check.ts (filters, adjustments, a sample of every transition family with
+ * overlays on lanes, element animations). `?bench=1` measures the GPU draw cost of the heaviest
+ * transitions on both backends. `?bg=color` turns the blurred background off.
  */
 import {
   addAsset,
@@ -21,9 +23,11 @@ import {
   insertMain,
   NO_CROP,
   projectDuration,
+  setAnimation,
   setBackground,
   setTransition,
   toSeconds,
+  type Direction,
   type ExportOptions,
   type ExportResult,
   type ImageItem,
@@ -34,11 +38,26 @@ import {
 } from '@video-ultra/core';
 import {
   assetFromProbe,
+  colourParams,
   createEngine,
+  createWebGL2Renderer,
+  createWebGPURenderer,
+  EFFECT_FLOATS,
+  fullCanvasGeometry,
+  identityColour,
+  layerGeometry,
+  moveOnCanvas,
+  plainLook,
+  noOverlay,
   probeMedia,
+  transitionLook,
+  transitionOverlay,
+  writeEffects,
   type EngineInternal,
   type EngineStats,
   type ExportRunInfo,
+  type LayerDraw,
+  type Renderer,
 } from '@video-ultra/core/internal';
 import { useEffect, useRef, useState } from 'react';
 
@@ -156,8 +175,10 @@ async function buildDemo(
   const third = main[2]!;
   if ('adjust' in third) third.adjust = { warmth: 0.4, vignette: 0.5, contrast: 0.2 };
   setTransition(project, ids[1]!, { type: 'dissolve', duration: fromSeconds(0.6) });
+  setTransition(project, ids[2]!, { type: 'light-leak', duration: fromSeconds(0.8) });
+  // A v0.1 id (now "Push, left") and a 3D one.
   setTransition(project, ids[3]!, { type: 'slide-left', duration: fromSeconds(0.5) });
-  setTransition(project, ids[4]!, { type: 'wipe', duration: fromSeconds(0.5) });
+  setTransition(project, ids[4]!, { type: 'cube', duration: fromSeconds(0.5), direction: 'left' });
   if (blurBackground) setBackground(project, { type: 'blur', amount: 0.5 });
 
   const pipAsset = await loadAsset(project, blobs, 'avc-720p30.mp4');
@@ -178,6 +199,19 @@ async function buildDemo(
   addToLane(project, logo, id);
   addToLane(project, title(id(), 'Made with\nvideo-ultra', 0.5, 9), id);
   addToLane(project, emoji(id(), '🎉', 0.5, 6), id);
+  // Element animations: the title types itself, the sticker pops in, wiggles and spins out, the
+  // logo slides in, the picture-in-picture flips in.
+  const lane = (kind: string) => project.tracks.find((t) => t.items[0]?.kind === kind)!.items[0]!;
+  setAnimation(project, lane('text').id, 'in', {
+    type: 'typewriter-in',
+    duration: fromSeconds(1.5),
+  });
+  const sticker = lane('sticker').id;
+  setAnimation(project, sticker, 'in', { type: 'pop-in', duration: fromSeconds(0.6) });
+  setAnimation(project, sticker, 'loop', { type: 'wiggle' });
+  setAnimation(project, sticker, 'out', { type: 'spin-out', duration: fromSeconds(0.5) });
+  setAnimation(project, logo.id, 'in', { type: 'slide-left-in', duration: fromSeconds(0.6) });
+  setAnimation(project, pip.id, 'in', { type: 'flip-in', duration: fromSeconds(0.6) });
   return { project, blobs };
 }
 
@@ -216,6 +250,127 @@ async function buildGolden(plain: boolean): Promise<{ project: Project; blobs: B
 /** Golden capture times (s): filter, transition midpoint (dissolve), adjustments, wipe midpoint. */
 const GOLDEN_TIMES = [0.6, 2, 3, 4];
 
+/** One transition of every family (golden frames at the midpoint, both backends). */
+const GOLDEN_TRANSITIONS: { type: string; direction?: Direction }[] = [
+  { type: 'dissolve' },
+  { type: 'fade' },
+  { type: 'push', direction: 'left' },
+  { type: 'reveal', direction: 'up' },
+  { type: 'whip', direction: 'right' },
+  { type: 'wipe-diagonal', direction: 'right' },
+  { type: 'circle-open' },
+  { type: 'clock' },
+  { type: 'blinds' },
+  { type: 'checker' },
+  { type: 'zigzag' },
+  { type: 'zoom' },
+  { type: 'zoom-blur' },
+  { type: 'spin-zoom', direction: 'right' },
+  { type: 'swirl' },
+  { type: 'motion-blur', direction: 'left' },
+  { type: 'light-leak' },
+  { type: 'film-burn' },
+  { type: 'rgb-split' },
+  { type: 'pixelate' },
+  { type: 'vhs' },
+  { type: 'noise-dissolve' },
+  { type: 'heart' },
+  { type: 'star' },
+  { type: 'ripple' },
+  { type: 'page-curl', direction: 'left' },
+  { type: 'squeeze', direction: 'left' },
+  { type: 'cube', direction: 'left' },
+  { type: 'flip', direction: 'up' },
+  { type: 'door', direction: 'right' },
+];
+
+/**
+ * Transition golden scene: 640×640, two 720p clips cut at 2 s with a 1 s transition (none when
+ * `type` is null), plus lane overlays that must stay untouched: an opaque magenta title box and an
+ * emoji sticker.
+ */
+async function buildTransitionScene(
+  t: { type: string; direction?: Direction } | null,
+): Promise<{ project: Project; blobs: Blobs }> {
+  const project = createProject({ name: 'Transition', width: 640, height: 640 });
+  const blobs: Blobs = new Map();
+  // Two different pictures: natural footage out, colour bars in.
+  insertMain(project, video('a', await loadAsset(project, blobs, 'bbb-1080p60.mp4'), 2, 3));
+  insertMain(project, video('b', await loadAsset(project, blobs, 'avc-720p30.mp4'), 2, 6));
+  if (t)
+    setTransition(project, 'b', {
+      type: t.type,
+      duration: fromSeconds(1),
+      ...(t.direction ? { direction: t.direction } : {}),
+    });
+  const box = title('t', 'Overlay', 0, 4);
+  box.transform = { ...DEFAULT_TRANSFORM, y: 0.86 };
+  box.style = {
+    ...box.style,
+    color: '#ffffff',
+    outline: null,
+    shadow: null,
+    background: { color: '#ff00ff', padding: 0.4, radius: 0 },
+  };
+  let n = 0;
+  addToLane(project, box, () => `l${++n}`);
+  addToLane(project, emoji('s', '⭐', 0, 4), () => `l${++n}`);
+  return { project, blobs };
+}
+
+/**
+ * Animation golden scene: a title typing itself in (0–1 s), an emoji popping in (0–0.6 s) and
+ * spinning slowly (loop), a photo sliding in from the left (0–0.8 s). `plain` = no animations.
+ */
+async function buildAnimationScene(plain: boolean): Promise<{ project: Project; blobs: Blobs }> {
+  const project = createProject({ name: 'Animation', width: 640, height: 640 });
+  const blobs: Blobs = new Map();
+  const asset = await loadAsset(project, blobs, 'avc-720p30.mp4');
+  insertMain(project, video('a', asset, 4, 1));
+  const text = title('t', 'Typewriter text', 0, 4);
+  text.transform = { ...DEFAULT_TRANSFORM, y: 0.2 };
+  text.style = {
+    ...text.style,
+    size: 0.08,
+    color: '#ffffff',
+    outline: null,
+    shadow: null,
+    background: null,
+  };
+  let n = 0;
+  const ids = () => `l${++n}`;
+  addToLane(project, text, ids);
+  addToLane(
+    project,
+    {
+      ...emoji('s', '⭐', 0, 4),
+      transform: { ...DEFAULT_TRANSFORM, x: 0.5, y: 0.55, scale: 0.35 },
+    },
+    ids,
+  );
+  const photoAsset = await loadAsset(project, blobs, 'photo.jpg');
+  const photo: ImageItem = {
+    id: 'p',
+    kind: 'image',
+    assetId: photoAsset,
+    start: 0,
+    duration: fromSeconds(4),
+    ...look(),
+    transform: { ...DEFAULT_TRANSFORM, x: 0.25, y: 0.85, scale: 0.3 },
+  };
+  addToLane(project, photo, ids);
+  if (!plain) {
+    setAnimation(project, 't', 'in', { type: 'typewriter-in', duration: fromSeconds(1) });
+    setAnimation(project, 's', 'in', { type: 'pop-in', duration: fromSeconds(0.6) });
+    setAnimation(project, 's', 'loop', { type: 'spin', speed: 1 });
+    setAnimation(project, 'p', 'in', { type: 'slide-left-in', duration: fromSeconds(0.8) });
+  }
+  return { project, blobs };
+}
+
+/** Animation golden times (s): mid entrance, end of entrance, mid loop (a quarter turn). */
+const ANIMATION_TIMES = [0.3, 0.5, 1.5, 2.25];
+
 function toBase64(bytes: Uint8Array): string {
   let binary = '';
   for (let i = 0; i < bytes.length; i += 0x8000)
@@ -232,8 +387,57 @@ async function bitmapPixels(bitmap: ImageBitmap): Promise<string> {
   return toBase64(new Uint8Array(data.buffer));
 }
 
+async function captureAll(
+  engine: EngineInternal,
+  build: () => Promise<{ project: Project; blobs: Blobs }>,
+  times: number[],
+  key: (backend: string, t: number) => string,
+  out: Record<string, string>,
+): Promise<void> {
+  const { project, blobs } = await build();
+  await engine.setProject(project);
+  for (const [assetId, blob] of blobs) await engine.addMedia(assetId, blob);
+  for (const backend of ['webgpu', 'webgl2'] as const) {
+    for (const t of times) {
+      const k = key(backend, t);
+      try {
+        const bitmap = await engine.capture(fromSeconds(t), { width: 640, height: 640, backend });
+        out[k] = await bitmapPixels(bitmap);
+      } catch (error) {
+        out[`${k}-error`] = String(error);
+      }
+    }
+  }
+}
+
 async function runGolden(engine: EngineInternal): Promise<Record<string, string>> {
   const out: Record<string, string> = {};
+  // 30 % into the window (1.5 s … 2.5 s): every family shows both clips or its shape.
+  await captureAll(
+    engine,
+    () => buildTransitionScene(null),
+    [1.8],
+    (b) => `tx-none-${b}`,
+    out,
+  );
+  for (const t of GOLDEN_TRANSITIONS) {
+    await captureAll(
+      engine,
+      () => buildTransitionScene(t),
+      [1.8],
+      (b) => `tx-${t.type}-${b}`,
+      out,
+    );
+  }
+  for (const plain of [false, true]) {
+    await captureAll(
+      engine,
+      () => buildAnimationScene(plain),
+      ANIMATION_TIMES,
+      (b, t) => `anim${plain ? 'plain' : ''}-${b}-${t}`,
+      out,
+    );
+  }
   for (const plain of [false, true]) {
     const { project, blobs } = await buildGolden(plain);
     await engine.setProject(project);
@@ -253,6 +457,146 @@ async function runGolden(engine: EngineInternal): Promise<Record<string, string>
   return out;
 }
 
+/** Draw-cost bench cases: the heaviest transitions (and two baselines) at their midpoint. */
+const BENCH_CASES: { type: string; direction?: Direction; cheap?: boolean }[] = [
+  { type: 'none' },
+  { type: 'dissolve' },
+  { type: 'blur' },
+  { type: 'zoom-blur' },
+  { type: 'spin-zoom' },
+  { type: 'spin-blur' },
+  { type: 'motion-blur' },
+  { type: 'whip' },
+  { type: 'stretch' },
+  { type: 'swirl' },
+  { type: 'ripple' },
+  { type: 'lens' },
+  { type: 'vhs' },
+  { type: 'glitch' },
+  { type: 'rgb-split' },
+  { type: 'pixelate' },
+  { type: 'heart' },
+  { type: 'star' },
+  { type: 'checker' },
+  { type: 'noise-dissolve' },
+  { type: 'page-curl' },
+  { type: 'cube' },
+  { type: 'light-leak' },
+  { type: 'film-burn' },
+  { type: 'static' },
+  { type: 'anim-blur' },
+  // Low-tier preview: blurs take half the taps.
+  { type: 'blur', cheap: true },
+  { type: 'spin-blur', cheap: true },
+  { type: 'motion-blur', cheap: true },
+];
+
+/**
+ * GPU cost per frame of each case on a 1080×1920 canvas (two full-screen photo layers + overlay),
+ * per backend: frames are queued in batches and the batch is timed to a forced read-back, minus
+ * nothing (the "none" row is one plain layer). Main thread; lab only.
+ */
+async function runBench(frames: number): Promise<Record<string, Record<string, number>>> {
+  const blob = await (await fetch('/media/photo.jpg')).blob();
+  const a = await createImageBitmap(blob, { premultiplyAlpha: 'none' });
+  const b = await createImageBitmap(blob, { premultiplyAlpha: 'none', imageOrientation: 'flipY' });
+  const solid = new OffscreenCanvas(2, 2);
+  const sctx = solid.getContext('2d')!;
+  sctx.fillStyle = '#fff';
+  sctx.fillRect(0, 0, 2, 2);
+  const W = 1080;
+  const H = 1920;
+  const probe = new OffscreenCanvas(1, 1).getContext('2d')!;
+  const out: Record<string, Record<string, number>> = {};
+  for (const backend of ['webgl2', 'webgpu'] as const) {
+    const canvas = new OffscreenCanvas(W, H);
+    let renderer: Renderer;
+    try {
+      renderer =
+        backend === 'webgpu' ? await createWebGPURenderer(canvas) : createWebGL2Renderer(canvas);
+    } catch {
+      continue;
+    }
+    const sync = () => {
+      const bitmap = canvas.transferToImageBitmap();
+      probe.drawImage(bitmap, 0, 0, 1, 1);
+      probe.getImageData(0, 0, 1, 1);
+      bitmap.close();
+    };
+    const row: Record<string, number> = {};
+    for (const c of BENCH_CASES) {
+      const draws: LayerDraw[] = [];
+      const options = { aspect: W / H, ...(c.direction ? { direction: c.direction } : {}) };
+      const place = (img: ImageBitmap) =>
+        layerGeometry(
+          W,
+          H,
+          { width: img.width, height: img.height, rotation: 0, flip: false },
+          {
+            transform: { ...DEFAULT_TRANSFORM },
+            crop: { ...NO_CROP },
+            fit: 'fill',
+          },
+        );
+      if (c.type === 'none' || c.type === 'anim-blur') {
+        const effects = new Float32Array(EFFECT_FLOATS);
+        const fx = plainLook().fx;
+        if (c.type === 'anim-blur') fx.blurX = fx.blurY = 0.03;
+        writeEffects(effects, 0, identityColour(), fx);
+        draws.push({ source: a, geometry: place(a), opacity: 1, hdr: false, effects });
+      } else {
+        let onTop = false;
+        for (const [role, img] of [
+          ['out', a],
+          ['in', b],
+        ] as const) {
+          const look = transitionLook(c.type, 0.5, role, plainLook(), options);
+          const geometry = place(img);
+          moveOnCanvas(geometry, W, H, look);
+          const effects = new Float32Array(EFFECT_FLOATS);
+          look.fx.cheapBlur = c.cheap ?? false;
+          writeEffects(effects, 0, colourParams(null, {}), look.fx);
+          if (role === 'out') onTop = look.onTop;
+          if (look.visible)
+            draws.push({ source: img, geometry, opacity: look.opacity, hdr: false, effects });
+        }
+        if (onTop && draws.length === 2) draws.reverse();
+        const overlay = transitionOverlay(c.type, 0.5, noOverlay(), options);
+        if (overlay.opacity > 0) {
+          const colour = identityColour();
+          colour.gainR = overlay.r;
+          colour.gainG = overlay.g;
+          colour.gainB = overlay.b;
+          const effects = new Float32Array(EFFECT_FLOATS);
+          writeEffects(effects, 0, colour, overlay.fx);
+          draws.push({
+            source: solid,
+            geometry: fullCanvasGeometry(),
+            opacity: overlay.opacity,
+            hdr: false,
+            effects,
+          });
+        }
+      }
+      for (let i = 0; i < 5; i++) renderer.render(draws);
+      sync();
+      let best = Infinity;
+      for (let run = 0; run < 3; run++) {
+        const t0 = performance.now();
+        for (let i = 0; i < frames; i++) renderer.render(draws);
+        sync();
+        best = Math.min(best, (performance.now() - t0) / frames);
+      }
+      row[c.cheap ? `${c.type} (low tier)` : c.type] = Math.round(best * 1000) / 1000;
+    }
+    renderer.destroy();
+    out[backend] = row;
+  }
+  a.close();
+  b.close();
+  return out;
+}
+
 async function blobBase64(blob: Blob): Promise<string> {
   return toBase64(new Uint8Array(await blob.arrayBuffer()));
 }
@@ -269,12 +613,21 @@ declare global {
         backend?: 'webgpu' | 'webgl2',
       ): Promise<{ result: Omit<ExportResult, 'blob'>; info: ExportRunInfo; base64: string }>;
       cancelAfter(ms: number, options: ExportOptions): Promise<string>;
+      /** One exact frame (the export's compositor path) as base64 RGBA. */
+      captureFrame(
+        s: number,
+        width: number,
+        height: number,
+        backend?: 'webgpu' | 'webgl2',
+      ): Promise<string>;
       duration: number;
       ended: boolean;
       time: number;
     };
     /** `?golden=1`: base64 RGBA images by `fx|plain-backend-time` (composite-check reads it). */
     goldenReport?: Record<string, string>;
+    /** `?bench=1`: ms per frame by backend and case. */
+    benchReport?: Record<string, Record<string, number>>;
   }
 }
 
@@ -315,6 +668,16 @@ export default function EngineLab() {
         console.error(`[engine] ${message}`);
         setStatus(`Engine error: ${message}`);
       };
+      if (params.get('bench')) {
+        setStatus('Measuring draw cost…');
+        created.destroy();
+        engine = null;
+        const report = await runBench(Number(params.get('frames') ?? 60));
+        if (disposed) return;
+        window.benchReport = report;
+        setStatus('Bench done');
+        return;
+      }
       if (params.get('golden')) {
         setStatus('Rendering golden frames…');
         const report = await runGolden(engine);
@@ -362,6 +725,19 @@ export default function EngineLab() {
           );
           const { blob, ...rest } = result;
           return { result: rest, info, base64: await blobBase64(blob) };
+        },
+        async captureFrame(
+          sec: number,
+          width: number,
+          height: number,
+          backend?: 'webgpu' | 'webgl2',
+        ) {
+          const bitmap = await e.capture(fromSeconds(sec), {
+            width,
+            height,
+            backend: backend ?? 'webgl2',
+          });
+          return bitmapPixels(bitmap);
         },
         async cancelAfter(ms: number, options: ExportOptions) {
           const controller = new AbortController();

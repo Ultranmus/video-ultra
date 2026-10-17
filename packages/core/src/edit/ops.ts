@@ -11,12 +11,15 @@ import {
 } from '../model/project';
 import type {
   Adjust,
+  AnimationClip,
+  AnimationLoop,
   Asset,
   Background,
   Crop,
   Filter,
   FreezeItem,
   Item,
+  ItemAnimation,
   Project,
   TextStyle,
   Track,
@@ -85,7 +88,13 @@ function maxDuration(project: Project, item: Item): Time {
   return floorToFrame(project, Math.floor((asset.duration - item.sourceIn) / item.speed));
 }
 
+/** Keeps fades and animation lengths inside the item (after any change of its duration). */
 function clampFades(item: Item): void {
+  if ('animation' in item && item.animation) {
+    const a = item.animation;
+    if (a.in) a.in.duration = Math.min(a.in.duration, item.duration);
+    if (a.out) a.out.duration = Math.min(a.out.duration, item.duration - (a.in?.duration ?? 0));
+  }
   if (!('fadeIn' in item)) return;
   item.fadeIn = Math.min(item.fadeIn, item.duration);
   item.fadeOut = Math.min(item.fadeOut, item.duration - item.fadeIn);
@@ -365,6 +374,11 @@ export function splitItem(project: Project, itemId: string, at: Time, ids: IdFac
     item.fadeOut = 0;
   }
   if ('transitionIn' in second) second.transitionIn = null;
+  // The first part keeps the entrance, the second the exit; both keep the loop.
+  if ('animation' in item && item.animation && 'animation' in second && second.animation) {
+    delete item.animation.out;
+    delete second.animation.in;
+  }
   clampFades(item);
   clampFades(second);
   track.items.splice(index + 1, 0, second);
@@ -548,8 +562,63 @@ export function setTransition(
   );
   if (duration < projectFrame(project))
     throw new EditError('invalid', 'These clips are too short for a transition');
-  item.transitionIn = { type: transition.type, duration };
+  // Direction and ease: given = set; not given and the same preset = kept (a duration slider
+  // doesn't have to repeat them); not given and another preset = the preset's own.
+  const previous = item.transitionIn;
+  const keep = previous !== null && previous.type === transition.type;
+  const next: Transition = { type: transition.type, duration };
+  const direction =
+    'direction' in transition ? transition.direction : keep ? previous.direction : undefined;
+  const ease = 'ease' in transition ? transition.ease : keep ? previous.ease : undefined;
+  if (direction !== undefined) next.direction = direction;
+  if (ease !== undefined) next.ease = ease;
+  item.transitionIn = next;
 }
+
+/**
+ * Sets (or clears, with `null`) one animation of a lane item — text, sticker or
+ * picture-in-picture video / photo: its entrance (`in`), exit (`out`) or repeating `loop`.
+ * Entrance and exit lengths are snapped to frames and clamped to the item (the slot being set
+ * wins: the other one is shortened so they never overlap); loop speed is clamped to 0.25–4.
+ * Unknown preset ids are stored as given (they play as nothing).
+ */
+export function setAnimation<S extends 'in' | 'out' | 'loop'>(
+  project: Project,
+  itemId: string,
+  slot: S,
+  value: (S extends 'loop' ? AnimationLoop : AnimationClip) | null,
+): void {
+  const { track, item } = editable(project, itemId);
+  if (track.kind === 'main' || !ANIMATABLE.includes(item.kind)) {
+    throw new EditError('invalid', 'Animations are for text, stickers and picture-in-picture');
+  }
+  const target = item as Extract<Item, { kind: 'text' | 'sticker' | 'video' | 'image' | 'freeze' }>;
+  const animation: ItemAnimation = target.animation ? copy(target.animation) : {};
+  if (value === null) {
+    if (slot === 'in') delete animation.in;
+    else if (slot === 'out') delete animation.out;
+    else delete animation.loop;
+  } else if (slot === 'loop') {
+    const loop = value as AnimationLoop;
+    const next: AnimationLoop = { type: loop.type };
+    if (loop.speed !== undefined) {
+      if (!Number.isFinite(loop.speed)) throw new EditError('invalid', 'Speed must be a number');
+      next.speed = Math.min(4, Math.max(0.25, loop.speed));
+    }
+    animation.loop = next;
+  } else {
+    const clip = value as AnimationClip;
+    if (!Number.isFinite(clip.duration)) throw new EditError('invalid', 'Length must be a number');
+    const duration = Math.min(Math.max(0, snap(project, clip.duration)), item.duration);
+    animation[slot as 'in' | 'out'] = { type: clip.type, duration };
+    const other = slot === 'in' ? animation.out : animation.in;
+    if (other) other.duration = Math.min(other.duration, item.duration - duration);
+  }
+  if (animation.in || animation.out || animation.loop) target.animation = animation;
+  else delete target.animation;
+}
+
+const ANIMATABLE: readonly Item['kind'][] = ['text', 'sticker', 'video', 'image', 'freeze'];
 
 // ── project & tracks ──────────────────────────────────────────────────────
 

@@ -21,6 +21,7 @@ export type ToolId =
   | 'text-style'
   | 'opacity'
   | 'duration'
+  | 'animate'
   | 'canvas'
   | 'add-text'
   | 'add-sticker'

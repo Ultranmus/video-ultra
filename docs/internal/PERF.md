@@ -46,6 +46,63 @@ Starting targets (2026-10-17), to be confirmed or adjusted with Phase 0 measurem
 
 ## Measurements
 
+**GPU draw cost per frame**, `node scripts/effects-bench.ts` (new; `/lab/engine?bench=1`): each
+case at its midpoint on a 1080 × 1920 canvas — two full-screen photo layers + overlay, 60-frame
+batches timed to a forced read-back, best of 3.
+
+| case                        | Chrome WebGL2 | Chrome WebGPU | WebKit WebGL2 |
+| --------------------------- | ------------: | ------------: | ------------: |
+| one plain layer             |          0.42 |          0.24 |          0.30 |
+| dissolve (2 layers)         |          0.55 |          0.47 |          0.55 |
+| blur (disc, 13 taps × 2)    |          1.76 |          1.41 |          1.75 |
+| zoom-blur (radial)          |          1.60 |          1.32 |          1.60 |
+| spin-zoom                   |          1.98 |          1.77 |          1.98 |
+| **spin-blur (heaviest)**    |      **2.12** |      **1.90** |      **2.12** |
+| motion-blur / whip (line)   |     1.80–1.85 |          1.43 |     1.78–1.80 |
+| swirl / ripple / lens       |     0.68–0.74 |     0.52–0.56 |     0.63–0.70 |
+| vhs / glitch / rgb-split    |     0.33–0.79 |     0.25–0.63 |     0.30–0.75 |
+| heart / star / checker      |     0.71–0.78 |     0.55–0.60 |     0.67–0.73 |
+| noise / page-curl / cube    |     0.58–0.79 |     0.48–0.61 |     0.53–0.73 |
+| light-leak / film-burn      |          0.90 |          0.72 |     0.83–0.87 |
+| static (overlay + noise)    |          1.06 |          0.81 |          1.00 |
+| animation blur, full screen |          0.91 |          0.69 |          0.87 |
+| blur, low tier              |          1.23 |          0.95 |          1.18 |
+| spin-blur, low tier         |          1.43 |          1.22 |          1.38 |
+| motion-blur, low tier       |          1.21 |          0.99 |          1.17 |
+
+(Firefox numbers came out lower than its 'none' baseline for some rows — its read-back doesn't
+seem to wait for the GPU; not used.) The heaviest families are the 13-tap blurs (≈ 3–4 × a
+dissolve); everything else costs ≤ 2 × a dissolve. A budget phone GPU is maybe 10–20 × slower
+than the M4 but previews at ≤ 960 px (¼ of these pixels) with half-tap blurs: est. 5–8 ms for the
+worst frame of a blur transition — **to be confirmed on a real low-end Android** (BACKLOG).
+
+**Preview with the new demo** (`engine-check`, demo now has a light leak, a v0.1 slide, a cube,
+a typewriter title, a popping / wiggling / spinning-out sticker, a sliding logo and a flipping
+PIP): Chrome WebGPU and WebGL2 509/510 frames, 0 late, 0 skipped, draw 0.3 / 0.6 ms, 0 long
+tasks; tier low the same (1 late at 0.03 s on WebGPU); Firefox 509/510, 0–9 late (one run had a
+cluster at 0.5–0.7 s when the title and sticker first appear, the next run had none); Playwright
+WebKit 498–509/510 with 8–9 late at the light-leak and slide cuts (two videos uploading — the
+known test-build upload cost), one run with 22 audio underruns (the next had 0).
+
+**Export** (`export-check`, 720p, same demo): Chrome MP4 3.65–3.72 ×, WebM 9.2 ×; WebKit 2.5 ×;
+Firefox MP4 3.2 ×, WebM 0.74 × (known, BACKLOG). All ffprobe / full-decode / duration / lip-sync
+checks pass. **Export = preview:** frames decoded from the files at a sticker pop-in + typewriter,
+a logo slide-in, the light leak and the cube match the engine's own capture of that moment
+(MP4 1.1–3.0 / 255 in all three browsers, WebM 1.7–7.7 / 255) against 8–44 / 255 for the
+frame 0.25 s later.
+
+**Golden frames** (`composite-check`, 3 browsers): 30 transition families at 30 % of the window
+with lane overlays: overlays untouched on both backends; every transition changes the picture;
+WebGPU vs WebGL2 worst 5.32 / 255 against a 4.18 decode baseline (bbb footage); Chrome vs
+Firefox worst 4.99 / 255. Animations (typewriter, pop-in, spin loop, slide-in) at 0.3 / 0.5 /
+1.5 / 2.25 s: WebGPU = WebGL2 (0.00 above baseline), typewriter monotonic, settled frames equal
+the unanimated ones.
+
+**Bundle:** shader source 22 → 65 KB raw in `generated.ts` (engine worker chunk; 82 KB before
+deriving the WebGPU variant at load time). The catalogues the UI imports (`presets.ts`, minified +
+gzip): 1.0 KB (v0.1) → 4.1 KB (115 filters, 76 transitions, 70 animations; 11 KB before the
+data/engine split, #86).
+
 ### 2026-10-17 · Editor UI (Mac M4, headless; dev server unless noted)
 
 `scripts/editor-interact.ts` (import, seek, split, undo/redo, trim drag, text, stage drag,

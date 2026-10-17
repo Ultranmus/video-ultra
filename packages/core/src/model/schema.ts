@@ -63,11 +63,50 @@ export const AdjustSchema = z.object({
   vignette: z.optional(z.number()),
 });
 
+/** Which way a transition (or a directional animation) moves. */
+export const DirectionSchema = z.enum(['left', 'right', 'up', 'down']);
+
+/** Timing curve of a transition: `smooth` (default), `linear`, `snappy` or `bounce`. */
+export const EaseSchema = z.enum(['linear', 'smooth', 'snappy', 'bounce']);
+
 export const TransitionSchema = z.object({
-  /** Transition preset id, e.g. `'fade'`. */
+  /** Transition preset id (`TRANSITION_PRESETS`), e.g. `'fade'`. */
   type: id,
   /** Centred on the cut: half before, half after. */
   duration: positiveTime,
+  /**
+   * Which way it moves, for presets that list `directions`. Missing = the preset's first
+   * direction. Ignored by presets without directions.
+   */
+  direction: z.optional(DirectionSchema),
+  /** Timing curve. Missing = the preset's own curve. */
+  ease: z.optional(EaseSchema),
+});
+
+/** One entrance or exit animation of a lane item: a preset id and how long it plays. */
+export const AnimationClipSchema = z.object({
+  /** Animation preset id (`ANIMATION_PRESETS`, slot `in` or `out`). */
+  type: id,
+  /** Flicks. Clamped to the item's length when played (in + out never overlap). */
+  duration: time,
+});
+
+/** A repeating animation of a lane item, from its start to its end. */
+export const AnimationLoopSchema = z.object({
+  /** Animation preset id (`ANIMATION_PRESETS`, slot `loop`). */
+  type: id,
+  /** Speed multiplier 0.25–4 (missing = 1). */
+  speed: z.optional(z.number().check(z.gte(0.25), z.lte(4))),
+});
+
+/**
+ * Entrance (`in`), exit (`out`) and repeating (`loop`) animations of a lane item (text, sticker,
+ * picture-in-picture video / photo). Played from the item's own time, in preview and export.
+ */
+export const ItemAnimationSchema = z.object({
+  in: z.optional(AnimationClipSchema),
+  out: z.optional(AnimationClipSchema),
+  loop: z.optional(AnimationLoopSchema),
 });
 
 export const BackgroundSchema = z.discriminatedUnion('type', [
@@ -127,6 +166,8 @@ const visual = {
   adjust: AdjustSchema,
   /** Main track only: transition from the previous item into this one. */
   transitionIn: z.nullable(TransitionSchema),
+  /** Lanes only (picture-in-picture): entrance / exit / loop animations. Ignored on the main track. */
+  animation: z.optional(ItemAnimationSchema),
 };
 
 const audible = {
@@ -180,6 +221,8 @@ export const TextItemSchema = z.object({
   text: z.string(),
   style: TextStyleSchema,
   transform: TransformSchema,
+  /** Entrance / exit / loop animations. */
+  animation: z.optional(ItemAnimationSchema),
 });
 
 export const StickerItemSchema = z.object({
@@ -192,6 +235,8 @@ export const StickerItemSchema = z.object({
   assetId: z.nullable(id),
   emoji: z.nullable(z.string()),
   transform: TransformSchema,
+  /** Entrance / exit / loop animations. */
+  animation: z.optional(ItemAnimationSchema),
 });
 
 export const ItemSchema = z.discriminatedUnion('kind', [
@@ -266,6 +311,16 @@ export type Crop = z.infer<typeof CropSchema>;
 export type Filter = z.infer<typeof FilterSchema>;
 export type Adjust = z.infer<typeof AdjustSchema>;
 export type Transition = z.infer<typeof TransitionSchema>;
+/** Which way a transition moves. */
+export type Direction = z.infer<typeof DirectionSchema>;
+/** A transition's timing curve. */
+export type Ease = z.infer<typeof EaseSchema>;
+/** An entrance or exit animation (`animation.in` / `animation.out`). */
+export type AnimationClip = z.infer<typeof AnimationClipSchema>;
+/** A repeating animation (`animation.loop`). */
+export type AnimationLoop = z.infer<typeof AnimationLoopSchema>;
+/** A lane item's animations. */
+export type ItemAnimation = z.infer<typeof ItemAnimationSchema>;
 export type Background = z.infer<typeof BackgroundSchema>;
 export type TextStyle = z.infer<typeof TextStyleSchema>;
 export type VideoItem = z.infer<typeof VideoItemSchema>;

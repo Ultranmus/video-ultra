@@ -12,7 +12,7 @@ import {
   setCanvasSize,
   setSpeed,
   setTransition,
-  TRANSITION_PRESETS,
+  findTransitionPreset,
   trimItem,
   updateItem,
   type Adjust,
@@ -24,7 +24,7 @@ import { useState, type ReactElement } from 'react';
 import { useController, useLabels, useProject, useUi } from './context';
 import { Button, Chips, ColorField, EditSlider, IconButton, Section, Segmented } from './controls';
 import { RATIOS, ratioOf } from './items';
-import { FilterStrip, TransitionGrid } from './looks';
+import { AnimatePanel, FilterStrip, TransitionGrid } from './looks';
 import type { ToolId } from './state';
 
 const seconds = (t: number) => t / FLICKS_PER_SECOND;
@@ -46,6 +46,7 @@ export function ToolPanel({ tool }: { tool: ToolId }): ReactElement | null {
   if (tool === 'canvas') return <CanvasTool />;
   if (tool === 'filter') return <FilterStrip />;
   if (tool === 'transition') return <TransitionGrid />;
+  if (tool === 'animate') return <AnimatePanel />;
   if (!item) return <p className="vu-hint">{l.nothingSelected}</p>;
   switch (tool) {
     case 'speed':
@@ -89,8 +90,7 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
       : l.none;
   const transitionName =
     'transitionIn' in item && item.transitionIn
-      ? (TRANSITION_PRESETS.find((t) => t.id === item.transitionIn!.type)?.label ??
-        item.transitionIn.type)
+      ? (findTransitionPreset(item.transitionIn.type)?.label ?? item.transitionIn.type)
       : l.none;
   const change = (panel: 'filters' | 'transitions', tip: string) => (
     <Button label={l.change} variant="secondary" tip={tip} onClick={() => ctl.openPanel(panel)} />
@@ -149,6 +149,11 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
           <OpacityTool item={item} />
         </Section>
       )}
+      {onMain ? null : (
+        <Section title={l.animate} collapsible defaultOpen={false}>
+          <AnimatePanel />
+        </Section>
+      )}
     </>
   );
 
@@ -197,6 +202,9 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
           <Section title={l.style}>
             <TextStyleTool item={item} />
           </Section>
+          <Section title={l.animate}>
+            <AnimatePanel />
+          </Section>
           <Section title={l.appearance} collapsible defaultOpen={false}>
             <TransformTool item={item} />
             <OpacityTool item={item} />
@@ -205,10 +213,15 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
       );
     case 'sticker':
       return (
-        <Section title={l.appearance}>
-          <TransformTool item={item} />
-          <OpacityTool item={item} />
-        </Section>
+        <>
+          <Section title={l.animate}>
+            <AnimatePanel />
+          </Section>
+          <Section title={l.appearance}>
+            <TransformTool item={item} />
+            <OpacityTool item={item} />
+          </Section>
+        </>
       );
   }
 }

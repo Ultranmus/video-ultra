@@ -101,6 +101,9 @@ export function toolsFor(
           },
         ]
       : [];
+  const animate: ToolEntry[] = onMain
+    ? []
+    : [{ key: 'animate', icon: 'sparkle', label: l.animate, tip: l.tipAnimate, tool: 'animate' }];
   const opacity: ToolEntry[] = onMain
     ? []
     : [{ key: 'opacity', icon: 'opacity', label: l.opacity, tip: l.tipOpacity, tool: 'opacity' }];
@@ -131,6 +134,7 @@ export function toolsFor(
               } as ToolEntry,
             ]
           : []),
+        ...animate,
         ...opacity,
         duplicate,
         remove,
@@ -142,6 +146,7 @@ export function toolsFor(
         { key: 'duration', icon: 'speed', label: l.duration, tip: l.duration, tool: 'duration' },
         ...look,
         ...transition,
+        ...animate,
         ...opacity,
         duplicate,
         remove,
@@ -165,6 +170,7 @@ export function toolsFor(
       return [
         { key: 'text-edit', icon: 'edit', label: l.edit, tool: 'text-edit' },
         { key: 'text-style', icon: 'style', label: l.style, tool: 'text-style' },
+        ...animate,
         { key: 'transform', icon: 'rotate', label: l.rotate, tip: l.tipRotate, tool: 'transform' },
         { key: 'opacity', icon: 'opacity', label: l.opacity, tip: l.tipOpacity, tool: 'opacity' },
         split,
@@ -173,6 +179,7 @@ export function toolsFor(
       ];
     case 'sticker':
       return [
+        ...animate,
         { key: 'transform', icon: 'rotate', label: l.rotate, tip: l.tipRotate, tool: 'transform' },
         { key: 'opacity', icon: 'opacity', label: l.opacity, tip: l.tipOpacity, tool: 'opacity' },
         split,

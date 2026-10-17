@@ -103,6 +103,9 @@
     --vu-size-dock: 280px;
     --vu-size-filter-tile: 72px;
     --vu-size-bar: 52px;
+    --vu-size-trx-w: 52px;
+    --vu-size-trx-h: 34px;
+    --vu-trx-duration: 1.6s;
     --vu-size-dock-tall: 420px;
     --vu-size-sticker: 64px;
     --vu-size-textstyle: 64px;

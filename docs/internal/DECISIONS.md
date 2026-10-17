@@ -336,3 +336,92 @@ reason; when one changes, edit the entry and note the date.
 74. **Timecode shows tenths (`0:04.2`) with fixed-width digits** (2026-10-17). Hundredths
     flickered while playing; the ruler capsule is sized for the widest digits so it doesn't wobble.
 75. **New stickers start upper right** (2026-10-17) so they don't land on a centred title.
+
+## Effects library (owner request, 2026-10-17)
+
+76. **Transitions are presets over a handful of shader families, all in the one compositor
+    shader** (2026-10-17). A preset is a small TypeScript function from progress to a "look" per
+    clip (`effects/transitions.ts`): geometry moves (scale, per-axis squeeze, rotation, shift
+    around a pivot, outgoing-on-top), and uniform-driven families in `composite.wgsl` — masks
+    (linear, clock, circle, diamond, box, blinds, checker, split, zigzag/wave, polar
+    star/flower/hexagon/triangle, implicit heart, noise cells, luma, fan), warps (ripple, wave,
+    swirl, pixelate, row glitch, bulge), blurs (disc, line, radial, spin — 13 taps), RGB split,
+    a colour mix (dips, flashes, 3D shading) and a 3D turn (perspective in the vertex shader,
+    perspective-correct varyings). Plus one optional full-canvas overlay layer above the main
+    track and below every lane (dips, light leaks, film burn, flares, static). One pipeline per
+    backend, no per-preset shaders, no extra render targets, nothing allocated per frame.
+    Rejected: rendering both clips into two full-size targets and mixing them in a transition
+    shader (2 × canvas-size textures = +16 MB at 1080p on phones and two extra passes); one shader
+    per preset (pipeline count × 2 backends, compile stalls). Cost: the uniform block grew from 60
+    to 104 floats (WebGPU slot 256 → 512 bytes) and the shader is longer; identity layers pay a few
+    uniform compares.
+77. **Transition options: `direction` and `ease` are optional, the file stays version 1**
+    (2026-10-17). Old projects are valid as they are; a missing value = the preset's own default
+    (its first `directions` entry / its `ease`). v0.1 ids `slide-left` / `slide-up` became the
+    `push` preset with that direction (alias, still stored as written). `setTransition` keeps the
+    existing direction/ease when the same preset is set again without them (a duration slider
+    needn't repeat them), drops them when the preset changes, and clears them when passed
+    `undefined` explicitly.
+78. **Every transition starts on the untouched outgoing clip and ends on the untouched incoming
+    one** (2026-10-17), tested for every preset and direction (no pop at the window edges), and no
+    overlay is visible at either end. Pairs whose motion hides the switch swap with a short
+    crossfade around the cut.
+79. **Element animations are a state evaluated from the item's own time** (2026-10-17):
+    `animationState(animation, localTime, duration, isText)` returns a move in the item's own box
+    (scale / squash around a box pivot, rotation, shift), opacity, blur, local masks (wipe,
+    circle), colour mix, RGB split and 3D turns, applied by the compositor in preview, capture and
+    export alike. Exits are entrances played backwards (each exit names the entrance it mirrors),
+    so they always match. Loops run from the item's start at `speed` 0.25–4 and stack under
+    entrances/exits. Lane items only (main-track clips have transitions). Animated scale is
+    geometry, never `transform.scale`, so text/emoji are not re-rasterised per frame.
+80. **Entrance and exit lengths are clamped to the item; the slot being set wins** (2026-10-17).
+    `setAnimation` snaps to frames, clamps to the item and shortens the other slot so they never
+    overlap; trims and speed changes re-clamp (`clampFades`), and a split keeps the entrance on
+    the first part and the exit on the second (both keep the loop). Playback clamps again
+    defensively (`animationSpans`). Preset ids are unique across slots (`fade-in`, `fade-out`,
+    `pulse`).
+81. **Typewriter / word-by-word reveal is a mask over one raster** (2026-10-17). The text is
+    rasterised once with a reveal layout (each character's and word's x per line, measured with
+    the rasteriser's own maths); per frame the compositor turns the reveal fraction into "lines
+    above L, and on line L everything left of cut A (+ the next word fading in up to cut B)"
+    uniforms. Right-to-left text fills from the right. No per-frame rasterising; the background
+    box reveals with the text.
+82. **Filters: 115 parameter sets, 15 categories, three new pipeline stages** (2026-10-17):
+    vibrance, hue rotation (YIQ) and film grain (per-pixel integer hash seeded by the frame
+    number, so export grain matches preview). Same rules as #61 (identity skipped, intensity
+    blends linearly). The 16 v0.1 filters keep their exact parameters.
+83. **GPU hashing uses integers, not `sin`** (2026-10-17): noise masks, glitch bands and grain use
+    a u32 hash so WebGPU and WebGL2 (and every GPU) produce the same pixels. Tint (Chrome WebGPU)
+    is stricter than naga: e.g. `a * b ^ c` needs parentheses — naga validation alone isn't
+    enough; the golden check catches it (WebGPU frames render black).
+84. **The WebGPU video variant is derived at load time** (2026-10-17): `generated.ts` ships the
+    WGSL once plus naga's GLSL; `render/shaders/external.ts` swaps in `texture_external` (two
+    lines). Saves ~17 KB of the four-variant 82 KB.
+85. **Low-tier preview blurs take half the taps** (2026-10-17): `Composer.cheapEffects` (preview
+    composer on `tier: 'low'`) makes disc blurs use the outer ring (7 taps) and line / radial /
+    spin blurs every other tap. ~30–35 % cheaper; export and capture always draw full quality
+    (degrade quality, never smoothness).
+86. **Catalogues are data only; the engine's tables are keyed by id** (2026-10-17). `presets.ts`
+    holds ids, labels, categories, directions and default curves (what the UI needs); the filter
+    numbers (`filters.ts`), transition looks (`transitions.ts`) and animation motion
+    (`animations.ts`) live in engine-side modules keyed by those ids, with tests that every
+    catalogue id has an implementation and vice versa (same order). Keeps the UI bundle's share at
+    4.1 KB gzip instead of 11 KB.
+
+87. **Libraries the owner asked for, and where they come from** (2026-10-17): 146 text styles
+    generated from the system font families × colour / outline / shadow / glow / box treatments
+    (`library/textStyles.ts`, no font downloads); stickers = 1,852 3D stickers (MIT,
+    `@lobehub/fluent-emoji-3d@1.1.0` from a pinned CDN, `stickerLibrary` prop to self-host or turn
+    off — the same choice the owner made for image-ultra), all 1,923 Unicode emoji
+    (emojibase-data, MIT, trimmed into a lazy chunk by `scripts/gen-emoji.ts`), 32 shape stickers
+    drawn for video-ultra, and uploads. Placed 3D / shape stickers are stored in the project as
+    image assets, so exports never depend on the CDN.
+88. **Ruler sliders everywhere; one ruler per group** (2026-10-17): like image-ultra, a tick scale
+    slides under a fixed marker. Adjust and Crop pick the setting with chips and show one ruler,
+    instead of stacking nine sliders.
+89. **Panels select their target, and keep themselves open while doing it** (2026-10-17):
+    Filters / Transitions / Animate show "For …" and select the clip they change
+    (`select(id, { keepPanel: true })`); picking a transition or an animation plays it once.
+90. **A dropped lane clip never bounces back** (2026-10-17): it lands in the lane under it when
+    that lane takes its kind and has room, else in a new lane right there (`moveItemToNewLane`),
+    shown as a "New lane" band while dragging.

@@ -129,3 +129,26 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [ ] Inspector: "Appearance" buttons stack one per row in a narrow inspector; consider an icon
       row (rotate / flip H / flip V) like image-ultra's adjust bar.
 - [ ] Ruler labels under the playhead capsule are hidden; a nicer approach would fade them.
+- [ ] Real-device pass of the effects library: iPhone (WebGPU) and a low-end Android (WebGL2):
+      play the blur family (spin-blur, motion-blur, zoom-blur), the 3D family and a typewriter
+      title; watch late frames and preview-quality drops. Tune `cheapEffects` / tap counts.
+- [ ] The UI asks `filterPreviews` for every filter id (now 115 + none): ask per visible
+      category / scroll position instead (each tile is one render + a bitmap).
+- [ ] Owner's "Zoom zoomed my stickers" didn't reproduce in core at HEAD (golden check proves
+      lanes are untouched); get a screen recording if it persists.
+- [ ] Transitions over a letterboxed clip only warp/blur inside the clip's own box (a ripple
+      doesn't spill into the letterbox; overlays like light leaks cover the whole canvas).
+- [ ] Typewriter reveals the text's background box with the text; a "box first" option could be
+      added if users want it.
+- [ ] Animations are ignored on main-track clips (they have transitions). If the UI ever offers
+      "animate the clip itself", decide how it combines with transitions.
+- [ ] Glow loop is a pulsing light mix, not a halo outside the item's box.
+- [ ] Spin blur computes cos/sin per tap (heaviest family): rotate incrementally if a device
+      shows it.
+- [ ] `TransitionPreset.ease` is a new required field (the preset's default curve) — the UI may
+      show it as the default in an ease picker.
+- [ ] Owner reported a transition "zoom" affecting stickers too; not reproduced in the engine
+      (golden check proves lanes are untouched across 30 families). Ask for a screen recording if
+      it shows up again on the new build.
+- [ ] A few emoji draw as boxes where the OS font lacks them (headless Chrome on macOS); the 3D
+      tab doesn't have this. Consider hiding emoji the platform can't draw.

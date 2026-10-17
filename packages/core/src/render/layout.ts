@@ -173,6 +173,112 @@ export function shiftGeometry(g: Float32Array, scale: number, dx: number, dy: nu
   g[5] = g[5]! * scale - 2 * dy;
 }
 
+/** A 2D move of a layer: scale, per-axis scale, clockwise rotation and shift. */
+export interface GeometryMove {
+  scale: number;
+  scaleX: number;
+  scaleY: number;
+  /** Clockwise degrees. */
+  rotate: number;
+  /** Canvas widths / heights (y down). */
+  dx: number;
+  dy: number;
+  /** Pivot: canvas fractions for {@link moveOnCanvas}, the layer's box (−1…1) for {@link moveInBox}. */
+  pivotX: number;
+  pivotY: number;
+}
+
+/**
+ * Rotation + scale in screen pixels, as a matrix on clip coordinates: S⁻¹ · R · Σ · S with
+ * S = diag(W/2, −H/2). Writes [m00, m01, m10, m11] into `m`.
+ */
+function screenMatrix(
+  canvasW: number,
+  canvasH: number,
+  rotate: number,
+  sx: number,
+  sy: number,
+  m: Float64Array,
+): void {
+  const rad = (rotate * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const kx = canvasW / 2;
+  const ky = -canvasH / 2;
+  // R·Σ = [cos·sx, −sin·sy; sin·sx, cos·sy]; conjugated by S.
+  m[0] = cos * sx;
+  m[1] = (-sin * sy * ky) / kx;
+  m[2] = (sin * sx * kx) / ky;
+  m[3] = cos * sy;
+}
+
+const scratch = new Float64Array(4);
+
+/**
+ * Moves a computed geometry on the canvas (transitions): scales it along the screen axes and
+ * rotates it around a canvas pivot, then shifts it. In place.
+ */
+export function moveOnCanvas(
+  g: Float32Array,
+  canvasW: number,
+  canvasH: number,
+  move: Readonly<GeometryMove>,
+): void {
+  const m = scratch;
+  screenMatrix(
+    canvasW,
+    canvasH,
+    move.rotate,
+    move.scale * move.scaleX,
+    move.scale * move.scaleY,
+    m,
+  );
+  const cx = 2 * move.pivotX - 1;
+  const cy = 1 - 2 * move.pivotY;
+  const [a, b, c, d] = [g[0]!, g[1]!, g[2]!, g[3]!];
+  g[0] = m[0]! * a + m[1]! * c;
+  g[1] = m[0]! * b + m[1]! * d;
+  g[2] = m[2]! * a + m[3]! * c;
+  g[3] = m[2]! * b + m[3]! * d;
+  const px = g[4]! - cx;
+  const py = g[5]! - cy;
+  g[4] = m[0]! * px + m[1]! * py + cx + 2 * move.dx;
+  g[5] = m[2]! * px + m[3]! * py + cy - 2 * move.dy;
+}
+
+/**
+ * Moves a computed geometry within its own box (animations): scales along the layer's own axes
+ * and rotates on screen around a pivot in the box (−1…1), then shifts it. In place.
+ */
+export function moveInBox(
+  g: Float32Array,
+  canvasW: number,
+  canvasH: number,
+  move: Readonly<GeometryMove>,
+): void {
+  const m = scratch;
+  screenMatrix(canvasW, canvasH, move.rotate, 1, 1, m);
+  const sx = move.scale * move.scaleX;
+  const sy = move.scale * move.scaleY;
+  const [a, b, c, d] = [g[0]!, g[1]!, g[2]!, g[3]!];
+  // Pivot point on the canvas (stays put).
+  const qx = move.pivotX;
+  const qy = move.pivotY;
+  const px = a * qx + b * qy + g[4]!;
+  const py = c * qx + d * qy + g[5]!;
+  // P' = R · P · diag(sx, sy)
+  const n0 = (m[0]! * a + m[1]! * c) * sx;
+  const n1 = (m[0]! * b + m[1]! * d) * sy;
+  const n2 = (m[2]! * a + m[3]! * c) * sx;
+  const n3 = (m[2]! * b + m[3]! * d) * sy;
+  g[0] = n0;
+  g[1] = n1;
+  g[2] = n2;
+  g[3] = n3;
+  g[4] = px - (n0 * qx + n1 * qy) + 2 * move.dx;
+  g[5] = py - (n2 * qx + n3 * qy) - 2 * move.dy;
+}
+
 /** Geometry covering the whole canvas with the whole texture (solid overlays). */
 export function fullCanvasGeometry(
   out: Float32Array = new Float32Array(GEOMETRY_FLOATS),

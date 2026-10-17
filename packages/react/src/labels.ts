@@ -90,6 +90,28 @@ export const DEFAULT_LABELS = {
   trim: 'Trim',
   move: 'Move',
   newLane: 'New lane',
+  direction: 'Direction',
+  directionName: (d: string) =>
+    (({ left: 'Left', right: 'Right', up: 'Up', down: 'Down' }) as Record<string, string>)[d] ?? d,
+  feel: 'Feel',
+  easeName: (e: string) =>
+    (
+      ({ linear: 'Even', smooth: 'Smooth', snappy: 'Snappy', bounce: 'Bounce' }) as Record<
+        string,
+        string
+      >
+    )[e] ?? e,
+  playPreview: 'Play preview',
+  animate: 'Animate',
+  tipAnimate: 'Make it move in, out or keep moving',
+  animateHint: 'Select a text, sticker or picture-in-picture to animate it.',
+  animateFor: (name: string) => `Animating ${name}`,
+  animIn: 'In',
+  animOut: 'Out',
+  animLoop: 'Loop',
+  animInTip: 'How it appears',
+  animOutTip: 'How it leaves',
+  animLoopTip: 'Keeps moving while on screen',
   delete: 'Delete',
   duplicate: 'Duplicate',
   speed: 'Speed',

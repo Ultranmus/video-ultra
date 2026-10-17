@@ -1,34 +1,49 @@
 import type { Input, InputVideoTrack, VideoSample } from 'mediabunny';
+import { animationState, restingState, type AnimationState } from '../effects/animations';
 import {
   colourParams,
   EFFECT_FLOATS,
   identityColour,
   isIdentityColour,
+  isNoFx,
+  MaskShape,
   noFx,
+  resetFx,
   writeEffects,
   type ColourParams,
   type LayerFx,
 } from '../effects/colour';
 import {
-  fadeOverlay,
+  noOverlay,
   plainLook,
   transitionLook,
+  transitionOverlay,
   type TransitionLook,
+  type TransitionOptions,
 } from '../effects/transitions';
-import { DEFAULT_TRANSFORM, NO_CROP } from '../model/project';
-import type { Project, TextStyle, Transform } from '../model/schema';
-import { FLICKS_PER_SECOND, type Time } from '../model/time';
+import { NO_CROP } from '../model/project';
+import type { Adjust, Item, ItemAnimation, Project, TextStyle, Transform } from '../model/schema';
+import { FLICKS_PER_SECOND, frameIndex, type Time } from '../model/time';
 import {
   fullCanvasGeometry,
   layerGeometry,
+  moveInBox,
+  moveOnCanvas,
   placedGeometry,
-  shiftGeometry,
   type LayerMedia,
 } from '../render/layout';
 import type { Backdrop, LayerDraw, LayerSource, Renderer } from '../render/types';
 import { FrameSource, type DecoderPool } from './frames';
 import { RasterCache } from './rasters';
-import { rasterizeEmoji, rasterizeText, rasterSize, textFontPx } from './text';
+import {
+  rasterizeEmoji,
+  rasterizeText,
+  rasterSize,
+  revealCuts,
+  textFontPx,
+  type RevealCuts,
+  type TextRevealLayout,
+} from './text';
 import { activeLayers, type ActiveLayer } from './timeline';
 
 /**
@@ -68,20 +83,18 @@ export interface ComposeResult {
   layers: number;
 }
 
-/** Blur transition: radius at full strength, in texture uv. */
-const TRANSITION_BLUR_UV = 0.02;
 /** The blurred background is enlarged a little so its soft edges stay outside the canvas. */
-const BACKDROP_TRANSFORM: Transform = Object.freeze({ ...DEFAULT_TRANSFORM, scale: 1.08 });
-
-const BLACK_EFFECTS: Float32Array = (() => {
-  const block = new Float32Array(EFFECT_FLOATS);
-  const black = identityColour();
-  black.gainR = black.gainG = black.gainB = 0;
-  black.contrast = 0;
-  black.liftR = black.liftG = black.liftB = -0.5; // (c − .5)·0 + .5 − .5 = 0
-  writeEffects(block, 0, black, noFx());
-  return block;
-})();
+const BACKDROP_TRANSFORM: Transform = Object.freeze({
+  x: 0.5,
+  y: 0.5,
+  scale: 1.08,
+  rotation: 0,
+  opacity: 1,
+  flipX: false,
+  flipY: false,
+});
+/** Animation blur at full strength: radius as a fraction of the picture's shorter side. */
+const ANIMATION_BLUR = 0.12;
 
 const styleKeys = new WeakMap<TextStyle, string>();
 function styleKey(style: TextStyle): string {
@@ -100,6 +113,7 @@ interface Slot {
   colour: ColourParams;
   fx: LayerFx;
   look: TransitionLook;
+  anim: AnimationState;
 }
 
 type Draft =
@@ -143,8 +157,31 @@ export class Composer {
     hdr: false,
     amount: 0,
   };
-  private readonly scaleOne: Transform = { ...DEFAULT_TRANSFORM };
+  private readonly scaleOne: Transform = { ...BACKDROP_TRANSFORM, scale: 1 };
   private solid: OffscreenCanvas | null = null;
+  /** Transition overlay (dips, light leaks): one reused draw. */
+  private readonly overlay = noOverlay();
+  private readonly overlayColour = identityColour();
+  private readonly overlayEffects = new Float32Array(EFFECT_FLOATS);
+  private readonly overlayDraw: LayerDraw = {
+    source: null as unknown as VideoFrame,
+    geometry: this.overlayGeometry,
+    opacity: 0,
+    hdr: false,
+    effects: this.overlayEffects,
+  };
+  private readonly transitionOptions: TransitionOptions = { aspect: 1, colour: [0, 0, 0] };
+  private readonly dipColour: [number, number, number] = [0, 0, 0];
+  /** Character / word positions of text rasters (typewriter reveals). */
+  private readonly textLayouts = new WeakMap<OffscreenCanvas, TextRevealLayout>();
+  private readonly cuts: RevealCuts = { line: 0, cutA: 1, cutB: 1, fadeB: 0 };
+  /** Grain changes every frame (seeded by the frame number, so export matches preview). */
+  private grainSeed = 0;
+  /**
+   * Low-tier preview: blurs take half the taps (quality before smoothness). Never for export or
+   * capture, which always draw full quality.
+   */
+  cheapEffects = false;
   private destroyed = false;
 
   constructor(
@@ -226,6 +263,7 @@ export class Composer {
       colour: identityColour(),
       fx: noFx(),
       look: plainLook(),
+      anim: restingState(),
     });
   }
 
@@ -240,26 +278,85 @@ export class Composer {
   }
 
   /**
-   * Colour + transition extras for a media layer into its slot; returns the effect block, or null
-   * when the picture is unchanged.
+   * Colour + transition / animation extras for a layer into its slot; returns the effect block,
+   * or null when the picture is unchanged. `texW × texH` is the source's size (blur radii).
    */
   private effectsFor(
     layer: ActiveLayer,
     slot: Slot,
     look: TransitionLook | null,
+    anim: AnimationState | null,
+    texW: number,
+    texH: number,
+    textLayout: TextRevealLayout | null,
   ): Float32Array | null {
     const item = layer.item;
-    if (item.kind !== 'video' && item.kind !== 'image' && item.kind !== 'freeze') return null;
-    colourParams(item.filter, item.adjust, slot.colour);
+    if (item.kind === 'video' || item.kind === 'image' || item.kind === 'freeze')
+      colourParams(item.filter, item.adjust, slot.colour);
+    else colourParams(null, NO_ADJUST, slot.colour);
     const fx = slot.fx;
-    fx.blurX = fx.blurY = look ? look.blur * TRANSITION_BLUR_UV : 0;
-    fx.wipe = look?.wipe ?? false;
-    fx.wipeEdge = look?.wipeEdge ?? 0;
-    fx.wipeSoft = look?.wipeSoft ?? 0;
-    if (!fx.wipe && fx.blurX === 0 && isIdentityColour(slot.colour)) return null;
+    if (look) Object.assign(fx, look.fx);
+    else resetFx(fx);
+    if (anim) {
+      const a = anim.fx;
+      if (a.mask) {
+        fx.mask = a.mask;
+        fx.maskLocal = a.maskLocal;
+        fx.maskProgress = a.maskProgress;
+        fx.maskSoft = a.maskSoft;
+        fx.maskInvert = a.maskInvert;
+        fx.maskDirX = a.maskDirX;
+        fx.maskDirY = a.maskDirY;
+        fx.maskCX = a.maskCX;
+        fx.maskCY = a.maskCY;
+      }
+      if (a.flash > fx.flash) {
+        fx.flash = a.flash;
+        fx.flashR = a.flashR;
+        fx.flashG = a.flashG;
+        fx.flashB = a.flashB;
+      }
+      if (a.split) fx.split = a.split;
+      if (a.rotAxis) {
+        // The turn's pivot: a point of the box, on screen (after the move).
+        const g = slot.geometry;
+        const cx = g[0]! * a.pivotX + g[1]! * a.pivotY + g[4]!;
+        const cy = g[2]! * a.pivotX + g[3]! * a.pivotY + g[5]!;
+        fx.rotAxis = a.rotAxis;
+        fx.rotAngle = a.rotAngle;
+        fx.rotDistance = a.rotDistance;
+        fx.pivotX = cx * this.aspect;
+        fx.pivotY = -cy;
+        fx.pivotZ = 0;
+      }
+      if (anim.blur > 0) {
+        const r = anim.blur * ANIMATION_BLUR * Math.min(texW, texH);
+        fx.blurMode = 0;
+        fx.blurX = Math.max(fx.blurX, r / texW);
+        fx.blurY = Math.max(fx.blurY, r / texH);
+      }
+      if (anim.revealBy && textLayout) {
+        const cuts = revealCuts(textLayout, anim.reveal, anim.revealBy, this.cuts);
+        fx.mask = MaskShape.text;
+        fx.textTop = textLayout.top / textLayout.height;
+        fx.textLineH = textLayout.lineHeight / textLayout.height;
+        fx.textLines = textLayout.lines.length;
+        fx.textLine = cuts.line;
+        fx.textCutA = cuts.cutA;
+        fx.textCutB = cuts.cutB;
+        fx.textFadeB = cuts.fadeB;
+        fx.textRtl = textLayout.rtl;
+      }
+    }
+    fx.grainSeed = this.grainSeed;
+    fx.cheapBlur = this.cheapEffects;
+    if (isNoFx(fx) && isIdentityColour(slot.colour)) return null;
     writeEffects(slot.effects, 0, slot.colour, fx);
     return slot.effects;
   }
+
+  /** Canvas aspect of the frame being drawn. */
+  private aspect = 1;
 
   /**
    * Draws the frame at timeline time `t` on a `width × height` target. Preview: waits for decoded
@@ -281,6 +378,18 @@ export class Composer {
       layers: 0,
     };
     const t0 = performance.now();
+    this.aspect = width / height;
+    this.grainSeed = frameIndex(t, project.settings.frameRate) % 997;
+    const options = this.transitionOptions;
+    options.aspect = this.aspect;
+    const bg0 = project.settings.background;
+    if (bg0.type === 'color') {
+      const [r, g, b] = backgroundColor(project);
+      this.dipColour[0] = r;
+      this.dipColour[1] = g;
+      this.dipColour[2] = b;
+    } else this.dipColour[0] = this.dipColour[1] = this.dipColour[2] = 0;
+    options.colour = this.dipColour;
     activeLayers(project, t, this.active);
     const jobs = this.active.map((layer, index) =>
       this.gather(project, layer, index, width, height, deadlineMs, result),
@@ -303,6 +412,9 @@ export class Composer {
     draws.length = 0;
     let backdropDraft: Draft | null = null;
     let backdropSource: LayerSource | null = null;
+    /** Index in `draws` of the outgoing clip of a transition (it may go on top). */
+    let outIndex = -1;
+    let outOnTop = false;
     for (const draft of drafts) {
       if (!draft) continue;
       let draw: LayerDraw;
@@ -322,8 +434,19 @@ export class Composer {
       } else {
         draw = draft.draw;
       }
-      if (draft.visible) draws.push(draw);
       const transition = draft.layer.transition;
+      if (draft.visible) {
+        draws.push(draw);
+        if (transition?.role === 'out') {
+          outIndex = draws.length - 1;
+          outOnTop = draft.slot.look.onTop;
+        } else if (transition?.role === 'in' && outOnTop && outIndex === draws.length - 2) {
+          // Covers, page turns, doors: the outgoing clip is drawn above the incoming one.
+          const last = draws.length - 1;
+          draws[last] = draws[outIndex]!;
+          draws[outIndex] = draw;
+        }
+      }
       if (draft.layer.track.kind === 'main') {
         // The blurred background follows the clip that is mostly on screen.
         const leading = !transition || (transition.role === 'in') === transition.progress >= 0.5;
@@ -332,15 +455,24 @@ export class Composer {
           backdropSource = draw.source;
         }
         if (transition?.role === 'in') {
-          const black = fadeOverlay(transition.type, transition.progress);
-          if (black > 0) {
-            draws.push({
-              source: this.solidSource(),
-              geometry: this.overlayGeometry,
-              opacity: black,
-              hdr: false,
-              effects: BLACK_EFFECTS,
-            });
+          // Dips, flashes, light leaks: one full-canvas layer above the main track, below lanes.
+          const overlay = transitionOverlay(
+            transition.type,
+            transition.progress,
+            this.overlay,
+            this.optionsFor(transition),
+          );
+          if (overlay.opacity > 0) {
+            const colour = this.overlayColour;
+            colour.gainR = overlay.r;
+            colour.gainG = overlay.g;
+            colour.gainB = overlay.b;
+            overlay.fx.grainSeed = this.grainSeed;
+            writeEffects(this.overlayEffects, 0, colour, overlay.fx);
+            const od = this.overlayDraw;
+            od.source = this.solidSource();
+            od.opacity = overlay.opacity;
+            draws.push(od);
           }
         }
       }
@@ -382,6 +514,14 @@ export class Composer {
     return result;
   }
 
+  /** Transition options of a layer's transition (reused object). */
+  private optionsFor(transition: NonNullable<ActiveLayer['transition']>): TransitionOptions {
+    const options = this.transitionOptions;
+    options.direction = transition.direction;
+    options.ease = transition.ease;
+    return options;
+  }
+
   private async gather(
     project: Project,
     layer: ActiveLayer,
@@ -393,18 +533,27 @@ export class Composer {
   ): Promise<Draft | null> {
     const item = layer.item;
     const slot = this.slot(index);
-    const look = layer.transition
+    // Transitions move only the two main-track clips at a cut; lanes are never touched by them.
+    const transition = layer.track.kind === 'main' ? layer.transition : null;
+    const look = transition
       ? transitionLook(
-          layer.transition.type,
-          layer.transition.progress,
-          layer.transition.role,
+          transition.type,
+          transition.progress,
+          transition.role,
           slot.look,
+          this.optionsFor(transition),
         )
       : null;
-    const hidden = look !== null && !look.visible;
-    const finish = (media: LayerMedia) => {
-      if (look) shiftGeometry(slot.geometry, look.scale, look.dx, look.dy);
-      return media;
+    // Animations play on lane items only (main-track clips have transitions instead).
+    const animation = layer.track.kind !== 'main' ? itemAnimation(item) : undefined;
+    const anim = animation
+      ? animationState(animation, layer.localTime, item.duration, item.kind === 'text', slot.anim)
+      : null;
+    const hidden = (look !== null && !look.visible) || (anim !== null && anim.opacity <= 0);
+    const opacity = (look?.opacity ?? 1) * (anim?.opacity ?? 1);
+    const finish = () => {
+      if (look) moveOnCanvas(slot.geometry, width, height, look);
+      if (anim) moveInBox(slot.geometry, width, height, anim);
     };
 
     switch (item.kind) {
@@ -418,12 +567,12 @@ export class Composer {
           flip: false,
         };
         layerGeometry(width, height, media, item, slot.geometry);
-        finish(media);
-        const effects = this.effectsFor(layer, slot, look);
+        finish();
+        const effects = this.effectsFor(layer, slot, look, anim, bitmap.width, bitmap.height, null);
         const draw: LayerDraw = {
           source: bitmap,
           geometry: slot.geometry,
-          opacity: item.transform.opacity * (look?.opacity ?? 1),
+          opacity: item.transform.opacity * opacity,
           hdr: false,
           effects,
         };
@@ -434,16 +583,20 @@ export class Composer {
         if (!(fontPx > 0.5) || item.text.length === 0) return null;
         const rasterPx = rasterSize(fontPx, this.exact);
         const k = fontPx / rasterPx;
-        const key = `${rasterPx}|${height}|${item.text}|${styleKey(item.style)}`;
-        const canvas = this.rasters.get(
-          item.id,
-          key,
-          () => rasterizeText(item, rasterPx, height, k).canvas,
-        );
+        const withLayout = anim?.revealBy != null;
+        const key = `${rasterPx}|${height}|${withLayout ? 'L' : ''}|${item.text}|${styleKey(item.style)}`;
+        const canvas = this.rasters.get(item.id, key, () => {
+          const raster = rasterizeText(item, rasterPx, height, k, withLayout);
+          if (raster.layout) this.textLayouts.set(raster.canvas, raster.layout);
+          return raster.canvas;
+        });
+        // The raster's size follows the item's own scale; animation scales are geometry only, so
+        // an animated title is never re-rasterised per frame.
         const tf = this.scaleOne;
         Object.assign(tf, item.transform);
         tf.scale = 1;
         placedGeometry(width, height, canvas.width * k, canvas.height * k, tf, slot.geometry);
+        finish();
         const media: LayerMedia = {
           width: canvas.width,
           height: canvas.height,
@@ -453,10 +606,19 @@ export class Composer {
         const draw: LayerDraw = {
           source: canvas,
           geometry: slot.geometry,
-          opacity: item.transform.opacity,
+          opacity: item.transform.opacity * opacity,
           hdr: false,
+          effects: this.effectsFor(
+            layer,
+            slot,
+            look,
+            anim,
+            canvas.width,
+            canvas.height,
+            this.textLayouts.get(canvas) ?? null,
+          ),
         };
-        return { kind: 'still', layer, draw, media, slot, visible: true };
+        return { kind: 'still', layer, draw, media, slot, visible: !hidden };
       }
       case 'sticker': {
         let source: ImageBitmap | OffscreenCanvas;
@@ -486,13 +648,15 @@ export class Composer {
           { transform: item.transform, crop: NO_CROP, fit: 'fit' },
           slot.geometry,
         );
+        finish();
         const draw: LayerDraw = {
           source,
           geometry: slot.geometry,
-          opacity: item.transform.opacity,
+          opacity: item.transform.opacity * opacity,
           hdr: false,
+          effects: this.effectsFor(layer, slot, look, anim, source.width, source.height, null),
         };
-        return { kind: 'still', layer, draw, media, slot, visible: true };
+        return { kind: 'still', layer, draw, media, slot, visible: !hidden };
       }
       case 'video':
       case 'freeze': {
@@ -525,7 +689,7 @@ export class Composer {
         }
         const media = found.video.media;
         layerGeometry(width, height, media, item, slot.geometry);
-        finish(media);
+        finish();
         // The picture itself is looked up after all layers are gathered (render), not here: a
         // late frame arriving while other layers are still decoding may replace and close it.
         return {
@@ -533,15 +697,21 @@ export class Composer {
           layer,
           itemId: item.id,
           slot,
-          opacity: item.transform.opacity * (look?.opacity ?? 1),
+          opacity: item.transform.opacity * opacity,
           hdr: found.video.hdr,
-          effects: this.effectsFor(layer, slot, look),
+          effects: this.effectsFor(layer, slot, look, anim, media.width, media.height, null),
           media,
           visible: !hidden,
         };
       }
     }
   }
+}
+
+const NO_ADJUST: Adjust = Object.freeze({});
+
+function itemAnimation(item: Item): ItemAnimation | undefined {
+  return 'animation' in item ? item.animation : undefined;
 }
 
 /** The project's background colour as RGB 0…1 (black under a blurred background). */

@@ -73,14 +73,15 @@ export function curvePixels(calibration: HdrCalibration): Uint8Array<ArrayBuffer
 
 /**
  * Floats per layer in the uniform block: 7 × vec4 (pos, posT, uv, uvT, c0, c1, c2) + the effect
- * block (8 × vec4, effects/colour.ts).
+ * block (19 × vec4, effects/colour.ts).
  */
 export const LAYER_FLOATS = 28 + EFFECT_FLOATS;
 
 /**
  * Writes one layer's uniforms at `offset` (floats) — same layout as `Uniforms` in composite.wgsl
  * (std140 / WGSL, vec4-aligned): geometry from render/layout.ts, opacity, HDR flag + matrix, then
- * the effect block (identity when `effects` is null) with the source's texel size.
+ * the effect block (identity when `effects` is null) with the source's texel size, the inverse of
+ * the position map and the target size (`canvasW × canvasH` px).
  */
 export function writeLayerUniforms(
   out: Float32Array,
@@ -92,6 +93,8 @@ export function writeLayerUniforms(
   effects: Readonly<Float32Array> | null = null,
   texelW = 0,
   texelH = 0,
+  canvasW = 1,
+  canvasH = 1,
 ): void {
   out[offset] = geometry[0]!;
   out[offset + 1] = geometry[1]!;
@@ -126,4 +129,23 @@ export function writeLayerUniforms(
   // Texel size of the source (sharpen taps) — only the renderer knows it.
   out[offset + 28 + 26] = texelW;
   out[offset + 28 + 27] = texelH;
+  // Inverse of the 2×2 position map (clip offset → quad offset) and the layer box's aspect, for
+  // warps, screen-space blurs and local masks.
+  const a = geometry[0]!;
+  const b = geometry[1]!;
+  const c = geometry[2]!;
+  const d = geometry[3]!;
+  const det = a * d - b * c;
+  const k = Math.abs(det) > 1e-12 ? 1 / det : 0;
+  const e = offset + 28 + 68;
+  out[e] = d * k;
+  out[e + 1] = -b * k;
+  out[e + 2] = -c * k;
+  out[e + 3] = a * k;
+  out[e + 4] = canvasW / canvasH;
+  const boxW = Math.hypot(a * canvasW, c * canvasH);
+  const boxH = Math.hypot(b * canvasW, d * canvasH);
+  out[e + 5] = boxH > 0 ? boxW / boxH : 1;
+  out[e + 6] = canvasW;
+  out[e + 7] = canvasH;
 }

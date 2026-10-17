@@ -572,6 +572,7 @@ async function handle(
       }
       renderer ??= createWebGL2Renderer(canvas);
       composer = new Composer(renderer, pool, media, false, RASTER_BUDGET[tier]);
+      composer.cheapEffects = tier === 'low';
       return { type: 'init', backend: renderer.backend };
     }
     case 'project':

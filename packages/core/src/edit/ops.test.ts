@@ -20,6 +20,7 @@ import {
   moveItem,
   moveItemToNewLane,
   reorderMain,
+  setAnimation,
   setSpeed,
   setTrackFlags,
   setTransition,
@@ -232,5 +233,104 @@ describe('moveItemToNewLane', () => {
     expect(p.tracks[1]!.items.map((i) => i.id)).toEqual(['tb']);
     expect(p.tracks.length).toBe(before + 1);
     expect(checkInvariants(p)).toEqual([]);
+  });
+});
+
+describe('transition options', () => {
+  it('stores direction and ease, keeps them when only the length changes', () => {
+    const { project } = setup();
+    setTransition(project, 'b', { type: 'push', duration: s(1), direction: 'up', ease: 'bounce' });
+    const b = findItem(project, 'b')!.item;
+    const tr = () => ('transitionIn' in b ? b.transitionIn : null);
+    expect(tr()).toEqual({ type: 'push', duration: s(1), direction: 'up', ease: 'bounce' });
+    // A duration slider sends only type + duration: the options stay.
+    setTransition(project, 'b', { type: 'push', duration: s(0.5) });
+    expect(tr()).toEqual({ type: 'push', duration: s(0.5), direction: 'up', ease: 'bounce' });
+    // Explicitly unset.
+    setTransition(project, 'b', { type: 'push', duration: s(0.5), direction: undefined });
+    expect(tr()).toEqual({ type: 'push', duration: s(0.5), ease: 'bounce' });
+    // Another preset starts from its own defaults.
+    setTransition(project, 'b', { type: 'wipe', duration: s(0.5) });
+    expect(tr()).toEqual({ type: 'wipe', duration: s(0.5) });
+    expect(checkInvariants(project)).toEqual([]);
+  });
+});
+
+describe('setAnimation', () => {
+  function lanes() {
+    const { project, ids } = setup();
+    addToLane(project, textItem('t', 1, 3), ids);
+    addToLane(project, stickerItem('st', 0, 2), ids);
+    return { project, ids };
+  }
+  const anim = (project: ReturnType<typeof lanes>['project'], id: string) => {
+    const item = findItem(project, id)!.item;
+    return 'animation' in item ? item.animation : undefined;
+  };
+
+  it('sets, replaces and clears each slot', () => {
+    const { project } = lanes();
+    setAnimation(project, 't', 'in', { type: 'typewriter-in', duration: s(1.5) });
+    setAnimation(project, 't', 'loop', { type: 'pulse', speed: 2 });
+    setAnimation(project, 't', 'out', { type: 'fade-out', duration: s(0.5) });
+    expect(anim(project, 't')).toEqual({
+      in: { type: 'typewriter-in', duration: s(1.5) },
+      loop: { type: 'pulse', speed: 2 },
+      out: { type: 'fade-out', duration: s(0.5) },
+    });
+    setAnimation(project, 't', 'in', null);
+    setAnimation(project, 't', 'loop', null);
+    setAnimation(project, 't', 'out', null);
+    expect(anim(project, 't')).toBeUndefined();
+    expect(checkInvariants(project)).toEqual([]);
+  });
+
+  it('snaps to frames and clamps to the item; the slot being set wins', () => {
+    const { project } = lanes();
+    setAnimation(project, 'st', 'in', { type: 'pop-in', duration: s(5) });
+    expect(anim(project, 'st')?.in?.duration).toBe(s(2));
+    setAnimation(project, 'st', 'out', { type: 'fade-out', duration: s(1) });
+    expect(anim(project, 'st')?.out?.duration).toBe(s(1));
+    expect(anim(project, 'st')?.in?.duration).toBe(s(1));
+    setAnimation(project, 'st', 'in', { type: 'pop-in', duration: s(0.5) + 7 });
+    expect(anim(project, 'st')?.in?.duration).toBe(s(0.5));
+    setAnimation(project, 'st', 'out', { type: 'fade-out', duration: s(1) });
+    setAnimation(project, 'st', 'in', { type: 'pop-in', duration: s(1.5) });
+    expect(anim(project, 'st')?.out?.duration).toBe(s(0.5));
+    setAnimation(project, 'st', 'loop', { type: 'spin', speed: 50 });
+    expect(anim(project, 'st')?.loop?.speed).toBe(4);
+  });
+
+  it('works on picture-in-picture, not on the main track or audio', () => {
+    const { project, ids } = lanes();
+    const pip = videoItem('pip', 'vidB', 2);
+    addToLane(project, pip, ids);
+    setAnimation(project, 'pip', 'in', { type: 'flip-in', duration: s(0.5) });
+    expect(anim(project, 'pip')?.in?.type).toBe('flip-in');
+    expect(() => setAnimation(project, 'a', 'in', { type: 'fade-in', duration: s(1) })).toThrow(
+      EditError,
+    );
+    addToLane(project, audioItem('m', 0, 5), ids);
+    expect(() => setAnimation(project, 'm', 'loop', { type: 'pulse' })).toThrow(EditError);
+    expect(() => setAnimation(project, 'nope', 'loop', { type: 'pulse' })).toThrow(EditError);
+  });
+
+  it('trims shorten animations; a split keeps the entrance on the first part, the exit on the second', () => {
+    const { project, ids } = lanes();
+    setAnimation(project, 't', 'in', { type: 'rise-in', duration: s(1) });
+    setAnimation(project, 't', 'out', { type: 'drop-out', duration: s(1) });
+    setAnimation(project, 't', 'loop', { type: 'float' });
+    trimItem(project, 't', 'end', -s(1.5)); // 3 s → 1.5 s
+    expect(anim(project, 't')).toMatchObject({ in: { duration: s(1) }, out: { duration: s(0.5) } });
+    const second = splitItem(project, 't', s(2), ids);
+    expect(anim(project, 't')).toEqual({
+      in: { type: 'rise-in', duration: s(1) },
+      loop: { type: 'float' },
+    });
+    expect(anim(project, second)).toEqual({
+      out: { type: 'drop-out', duration: s(0.5) },
+      loop: { type: 'float' },
+    });
+    expect(checkInvariants(project)).toEqual([]);
   });
 });
