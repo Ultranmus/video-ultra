@@ -257,3 +257,59 @@ reason; when one changes, edit the entry and note the date.
     1 s after a rename, and calls `onSave` 1 s after the last edit. `listProjects` reads names
     from `meta.json` (written after each snapshot) and only lists projects whose first snapshot
     completed.
+
+## Effects & export (Day 5 · 3.8–3.10, Day 6 · 4.1)
+
+61. **One colour pipeline for every filter and adjustment** (2026-10-17). The shader runs a fixed
+    chain — sharpen → HDR correction → gain → highlights/shadows → contrast → lift → saturation →
+    split toning → mono tint → output levels → vignette — from 8 vec4 uniforms per layer
+    (`effects/colour.ts`, `writeEffects`). Filters are parameter tables (`FILTER_PARAMS`), blended
+    from identity by intensity; adjustments stack on top. No per-filter shaders, no LUT textures,
+    nothing allocated per frame. Identity parameters return the picture unchanged (the layer's
+    effect block is skipped when identity). Rejected: one shader per filter (pipeline count × 2
+    backends), 3D LUTs for v0.1 (texture uploads; LUTs come with the pro layer).
+62. **Transitions are centred on the cut and drawn by the compositor** (2026-10-17).
+    `activeLayers` returns both main-track clips inside the window with
+    `transition: { type, progress, role }`; the outgoing clip keeps playing past its end and the
+    incoming one starts early, clamped to the media that exists (edge frame held). Each preset is a
+    small table of numbers per role (`effects/transitions.ts`: opacity, scale, shift, blur, wipe
+    edge); "fade" goes through black with a full-canvas black layer above the main track. Lanes
+    (text, stickers, PIP) are never affected. Transition length is clamped defensively to both
+    neighbours. Audio is not crossfaded (cuts stay hard) — revisit if users ask.
+63. **Blurred background = two cheap passes through a small render target** (2026-10-17). The
+    main clip is drawn cover-fitted (×1.08) into a texture 1/8 (amount 0) … 1/32 (amount 1) of the
+    canvas with a footprint-sized 13-tap blur (anti-aliased downscale), then scaled up over the
+    canvas with a 1.4-texel 13-tap blur. Same maths on both backends (`render/backdrop.ts`). The
+    background follows the clip that is mostly on screen during a transition and carries that
+    clip's filter.
+64. **Text and emoji are rasterised in the worker with OffscreenCanvas 2D** (2026-10-17), cached
+    per item by (text, style, raster size) in a per-renderer `RasterCache` with a tier byte budget
+    (24 / 48 / 96 MB); old rasters' GPU copies are released immediately. Preview rounds raster sizes
+    to quarter-octave steps (re-rasterise only every ~19 % of zoom); export is exact. Canvas sources
+    are uploaded un-premultiplied (straight alpha, #39). Units (agreed with the UI): font px =
+    `size × canvasH × scale`; `letterSpacing` em; `lineHeight`, `outline.width`,
+    `background.padding/radius` × font size; shadow blur/x/y in px at a 1080-px-tall canvas. Emoji
+    stickers are a square that contain-fits the canvas at scale 1 (new stickers use 0.3); image
+    stickers place like images. `measureTextBox` (core internal) is shared with the UI.
+65. **Export renders offline through the same compositor, exact frames** (2026-10-17). A separate
+    `Composer` (own decoders, own renderer on its own OffscreenCanvas) waits for every decoded frame
+    (no "late" reuse), `CanvasSource` encodes with encoder backpressure, audio from the same
+    `Mixer` at 48 kHz stereo is interleaved frame by frame and trimmed to exactly
+    `frames / fps`. Clips that are done give back decoders and frames every 15 frames (flat memory).
+    Preview pauses during export; `play()` is refused. Output: OPFS file (deleted when the next
+    export starts or on cancel) or, without OPFS, fragmented MP4 in Blob parts / WebM in memory.
+66. **Audio encoder priming is measured and compensated** (2026-10-17). Mediabunny writes no edit
+    list, so AAC's priming (2112 samples on Apple/Chrome-mac, 1024 for the WASM fallback) made the
+    sound ~44 ms late. Once per session the worker encodes a tone that starts at a known sample,
+    decodes it back and measures the offset; the export then feeds the mixer from that many
+    samples in. Measured: Chrome 2113, WebKit 2113, Firefox (WASM AAC) 1025 → sound lands on the
+    cut within 0–3 ms in ffmpeg. Opus needs none (pre-skip 312 is in the OpusHead).
+67. **Export resolution is named by the shorter side** (2026-10-17): `height: 720` gives 720 × 1280
+    for 9:16 and 1280 × 720 for 16:9; the long side follows the project's aspect, even pixels.
+    Tier caps: low 1080, mid 1440, high 2160 (`maxExportHeight`); `exportLimits(tier)` also asks the
+    encoders (plain WebCodecs, main-thread safe) which heights work per format.
+68. **Export renders with WebGL2 by default** (2026-10-17). With the real engine WebGPU and WebGL2
+    export now run at the same speed on Chrome (mp4 1080p 2.5–2.8× vs 2.6–2.8×; webm 8.8–9.2× vs
+    8.0–8.2×), so the Phase-0 "WebGPU capture 2× slower" gap is gone; WebGL2 stays the default
+    because it is the path every device has (one encoder-capture path to tune). Switch with the
+    internal `exportWithInfo(..., backend)` if a device proves otherwise.

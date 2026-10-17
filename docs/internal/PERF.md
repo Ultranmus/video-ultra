@@ -46,6 +46,72 @@ Starting targets (2026-10-17), to be confirmed or adjusted with Phase 0 measurem
 
 ## Measurements
 
+### 2026-10-17 · Editor UI (Mac M4, headless; dev server unless noted)
+
+`scripts/editor-interact.ts` (import, seek, split, undo/redo, trim drag, text, stage drag,
+delete, export 480p, play 2 s) and `editor-check.ts` (phone / tablet / desktop):
+
+| Browser | Ready after mount | Long tasks while editing / playing | Startup long tasks       | Play 2 s      |
+| ------- | ----------------- | ---------------------------------- | ------------------------ | ------------- |
+| Chrome  | 350–590 ms        | **0**                              | 2 × 70–170 ms (prod too) | 60/60, 0 late |
+| WebKit  | 245–272 ms        | **0**                              | 0                        | 60/60, 0 late |
+| Firefox | 288–300 ms        | **0**                              | 0                        | 61, 0–7 late  |
+
+Chrome's two startup tasks happen in the first ~0.5 s (before any input) — suspected AudioContext +
+worklet setup (#44) and the capability probe (BACKLOG). Fast 4K scrub: the thumbnail stand-in
+covered 37 of 40 drag steps (was ~1 exact frame). Export through the dialog, ~13 s project at
+480p MP4: 2.9–4.4 s. Timeline thumbnails byte budget 6 / 16 / 32 MB per tier (UI cache, on screen + scroll room) on
+top of the analyzer's own 8 / 24 / 48 MB cache.
+
+### 2026-10-17 · Effects + export
+
+**Preview with effects** (`scripts/engine-check.ts`, demo now: 5 main clips with a filter, an
+adjustment, dissolve + slide + wipe, PIP video, PNG, title with outline/box, emoji, blurred bg):
+
+| Browser · path               | Frames    | Late | Skipped | Draw / frame (6–8 layers + blur bg) | Long tasks |
+| ---------------------------- | --------- | ---- | ------- | ----------------------------------- | ---------- |
+| Chrome · WebGPU              | 509 / 510 | 0    | 0       | 0.3 ms                              | 0          |
+| Chrome · WebGL2              | 509 / 510 | 0    | 0       | 0.6 ms                              | 0          |
+| Chrome · WebGL2, tier low    | 509 / 510 | 0    | 0       | 0.3 ms (2 decoders)                 | 0          |
+| Firefox · WebGL2             | 510 / 510 | 1    | 2       | 3 ms                                | 0          |
+| WebKit (Playwright) · WebGL2 | 510 / 510 | 9    | 10      | 7 ms (test-build upload cost)       | 0          |
+
+A/V p95 1.5–1.7 ms Chrome, 6 ms Firefox, 15 ms WebKit. WebKit's late frames sit at the slide-left
+transition (two videos uploading in the test build at ~8 ms each) and the known PIP cuts; tier
+low in WebKit dropped preview quality to 0.5 and had one 242 ms A/V spike. CPU throttling via CDP
+only slows the page, not the engine worker, so it doesn't imitate a budget phone (use `?tier=low`
+plus a real device).
+
+**Export** (`scripts/export-check.ts`, the 17 s demo, × real time = media seconds / wall seconds):
+
+| Browser         | MP4 720p | WebM 720p | MP4 1080p                    | WebM 1080p | Storage |
+| --------------- | -------- | --------- | ---------------------------- | ---------- | ------- |
+| Chrome (WebGL2) | 3.5–3.7× | 8.6–9.4×  | 2.6–2.9× (first), 5.7× (2nd) | 7.9–8.2×   | OPFS    |
+| Chrome (WebGPU) | 3.5×     | 12.8×     | 2.5–2.7×                     | 8.8–9.2×   | OPFS    |
+| WebKit (PW)     | 2.5×     | 2.6×      | –                            | –          | memory  |
+| Firefox         | 2.7×     | **0.71×** | –                            | –          | OPFS    |
+
+The first H.264 export in a page session composes at ~6 ms/frame, later ones at ~0.5 ms (decoder
+warm-up with the H.264 encoder running) — 136 s at 1080p: 4.4–5.5× real time. Per frame (1080p
+Chrome): compose 0.5–6 ms, encoder wait 3–6 ms, audio mix 0.1 ms.
+
+**Memory during export** (`--repeat 8 --memory`: 136 s, 4080 frames at 1080p, RSS of every process
+of that Chrome): first export in a session +105–148 MB (warm-up), later exports flat (+15–19 MB
+first → last third; −13 / −21 MB for WebM). 0 open VideoFrames after every export, 0 missing
+layers. Before releasing finished clips during export (fixed) every clip kept its last 1080p frame.
+
+**Every export verified** with ffprobe (`-count_frames`) + a full ffmpeg decode: 510 frames
+(4080 for the long one), 720 × 1280 / 1080 × 1920, H.264 + AAC 48 kHz stereo or VP9 + Opus,
+audio within one codec frame of the video (AAC 17.003–17.024 s, Opus 17.014–17.027 s for 17.000 s),
+lip sync at the 14 s cut: MP4 0.0 ms (Chrome, Firefox) / 2.6 ms (WebKit); WebM 0–9 ms
+(WebKit: 30 ms, see BACKLOG). Cancel → `AbortError` and no file left in OPFS.
+
+**Golden frames** (`scripts/composite-check.ts`, `/lab/engine?golden=1` through `engine.capture`):
+warm filter, contrast + saturation + vignette, dissolve midpoint, wipe midpoint, title text, blur
+background — checked per backend; WebGPU vs WebGL2 differ by ≤ the browser's own decode
+difference (Chrome: 1.1–2.5 / 255 vs a 2.1 baseline on the plain video; text 0.0–0.2), Chrome vs
+WebKit 0.5 / 255. Passes in Chrome (both), WebKit and Firefox (WebGL2).
+
 ### 2026-10-17 · Media analyzer (Mac M4, headless, `scripts/analyzer-check.ts`, tier mid)
 
 20 thumbnails 96 px high requested at once (as a timeline strip), fresh analyzer each:

@@ -4,8 +4,11 @@ export default function Home() {
   return (
     <main className="page">
       <h1>video-ultra playground</h1>
-      <p>Phase 0. The editor itself arrives on Day 4.</p>
       <ul>
+        <li>
+          <Link href="/editor">Editor</Link> — the full editor (add <code>?theme=light</code>,{' '}
+          <code>?backend=webgl2</code>).
+        </li>
         <li>
           <Link href="/bench">Bench</Link> — decode, play, scrub and export measurements on this
           device.

@@ -17,10 +17,10 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       timeline thumbnails (Day 4) while the drag is fast, exact frames when it slows/stops.
       Long-GOP 4K on WebKit settles in 1.3 s — proxies on low tier.
 - [ ] Keyframe-preview decoder isn't counted by `DecoderPool`; previews are off on the low tier.
-- [ ] **WebGPU export ~2× slower than WebGL2 export** (WebGPU canvas capture). Phase 2: measure
+- [x] (fixed: no longer with the real engine, #68) **WebGPU export ~2× slower than WebGL2 export** (WebGPU canvas capture). Phase 2: measure
       capture paths (copyExternalImageToTexture / readback / VideoFrame from GPUTexture); export
       with WebGL2 until WebGPU wins.
-- [ ] Exported audio is ~0.05–0.1 s longer than video (AAC padding). Trim to video length.
+- [x] Exported audio is ~0.05–0.1 s longer than video (AAC padding) — trimmed + priming compensated (#66).
 - [ ] WebKit's encoder makes ~3× smaller files at the same quality setting — compare visual
       quality; set explicit bitrates per resolution if needed.
 - [x] Truncated files: probe finds the playable length and warns "incomplete" (2026-10-17).
@@ -48,7 +48,7 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [ ] Create the `@video-ultra` npm org (owner) before Day 7.
 - [x] React component (Day 4): async setup in effects must check it wasn't cleaned up before
       creating the engine (strict mode runs effects twice; the lab page leaked a zombie engine).
-- [ ] Engine: blur background, text and sticker layers (Day 5), transitions (Day 5).
+- [x] Engine: blur background, text and sticker layers (Day 5), transitions (Day 5).
 - [ ] Engine: count project frames lost to display timing (60 Hz tick vs 30 fps) separately.
 - [ ] Speed changes shift pitch (plain resampling). Pitch-preserving time-stretch (Rust → WASM,
       DECISIONS #13) for v0.2 speed curves.
@@ -85,3 +85,39 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [ ] File handles (Chromium desktop): import still copies into OPFS; use `showOpenFilePicker` +
       `putMediaHandle` and a re-link flow.
 - [x] Timeline: lane header icons toggle mute (main/audio) / hide (visual lanes), with buttons in the accessible layer. Lock: not exposed yet.
+- [x] ~~Exported audio is ~0.05–0.1 s longer than video (AAC padding)~~ — audio trimmed to the
+      video length and encoder priming compensated (DECISIONS #66).
+- [ ] **Firefox WebM export is slower than real time** (VP9 software encoder, 0.71× at 720p;
+      encoder wait 39 ms/frame). Try VP8 on Firefox, or steer Firefox users to MP4 (2.7×).
+- [ ] WebM/Opus lip sync in Playwright WebKit is 30 ms late in ffmpeg: WebKit's Opus chunk
+      timestamps jitter (0, 33, 53, 67 ms … instead of 20 ms steps) and the muxer keeps them. Check
+      in real Safari; if real, rewrite audio packet timestamps from the sample count.
+- [ ] Chrome WebM: sound 9 ms late in ffmpeg (below the ~40 ms threshold) — the Opus pre-skip is in
+      the header; find the remaining 6–9 ms.
+- [ ] First H.264 export in a page session composes ~10× slower per frame than later ones (still
+      2.6× real time at 1080p). Find out why (decoder warm-up with the encoder active?); maybe
+      warm up with a 1-frame encode when the export sheet opens.
+- [ ] WebKit (Playwright) late frames inside slide transitions (two video uploads per frame in the
+      test build). Check on the iPhone.
+- [ ] Export memory: first export in a session grows ~100–150 MB before it plateaus. Check on a
+      phone that this warm-up fits (low tier).
+- [ ] Export in a background tab: not tested (workers keep running, but some browsers throttle
+      them); the export sheet now takes a screen Wake Lock and says "keep this tab open".
+- [ ] Export when the WebM memory fallback is used keeps the whole file in memory (BufferTarget)
+      — only Safari Private Browsing / Playwright WebKit. MP4's fallback is append-only Blob parts.
+- [ ] OPFS export files are deleted only when the next export starts (or on cancel). If the host
+      never exports again the last file stays; add `engine.clearExports()` or delete on startup
+      (needs care: the host may still hold the Blob).
+- [ ] MP4 is written with moov at the end when streaming to OPFS (fast start needs the whole file
+      in memory or `fastStart: 'reserve'` with packet counts). Fine for downloads/sharing; check
+      upload targets that need fast start.
+- [ ] Same `quality: 'medium'`, very different file sizes: the 17 s 720p MP4 is 2.9 MB (Chrome),
+      3.2 MB (WebKit), 13.4 MB (Firefox). Set explicit bitrates per resolution × quality instead
+      of Mediabunny's relative quality (joins the existing WebKit file-size item).
+- [ ] Text wraps only at explicit line breaks (no automatic width/wrap box yet).
+- [ ] Sharpen is an unsharp mask at 1.5 source texels — mostly invisible when the source is much
+      larger than the preview; scale the tap distance with the on-screen size if users notice.
+- [ ] Blur transition uses a 13-tap disc on the full-size frame: at full strength rings can show
+      on high-contrast edges. Use the backdrop's downscale path if it looks bad on real footage.
+- [ ] Transitions are not crossfaded in audio.
+- [ ] Image stickers that are animated GIFs show the first frame only.

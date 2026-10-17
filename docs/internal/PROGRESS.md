@@ -88,3 +88,54 @@ save; v0.1 production quality in one week.
 - Browser checks: `scripts/analyzer-check.ts` (`/lab/analyzer`) and `scripts/storage-check.ts`
   (`/lab/storage`) — all pass in Chrome, WebKit, Firefox, 0 main-thread long tasks.
 - Test media: `avc-1080p30-60s.mp4` (60 s, keyframe every 1 s) and `music-3min.mp3` (`pnpm media`).
+
+## 2026-10-17 · Engine effects + export (Day 5 · 3.8–3.10 engine side, Day 6 · 4.1)
+
+- Colour pipeline in the one WGSL shader (both backends via naga): 16 filters, 9 adjustments,
+  vignette, sharpen; disc blur + wipe mask for transitions; blurred background through a small
+  render target.
+- Public catalogues: `FILTER_PRESETS`, `TRANSITION_PRESETS`, `ADJUST_KEYS`, `STICKER_EMOJI`,
+  `FONT_PRESETS`; export helpers `maxExportHeight`, `exportLimits`, `exportSize`,
+  `EXPORT_HEIGHTS`; types `ExportOptions`, `ExportProgress`, `ExportResult`, `ExportHeight`,
+  `ExportLimits`.
+- Timeline transitions (centred windows, out/in roles, extended media, prefetch spans) + tests.
+- `Composer` (engine/compose.ts) shared by preview, `engine.capture` and export: filters,
+  transitions, fade through black, blur background, text and emoji/image stickers with a raster
+  cache; `measureTextBox` shared with the UI.
+- `engine.export(options, onProgress, signal)`: offline exact render, MP4 (H.264 + AAC, WASM AAC
+  fallback) / WebM (VP9→VP8 + Opus), 48 kHz stereo mixer audio trimmed to the video, encoder
+  priming compensated, OPFS streaming + memory fallback, backpressure, cancel, ~4 Hz progress,
+  preview paused.
+- Lab: demo has a filter, an adjustment, dissolve / slide / wipe, a title, an emoji, blurred
+  background, an Export button; `?golden=1`, `?tier=low`, `?repeat=N`, `?bg=color`.
+- Checks: composite-check covers effects on both backends (Chrome, WebKit, Firefox);
+  new `scripts/export-check.ts` (ffprobe + ffmpeg decode, lip sync, cancel, memory with
+  `--memory`); engine-check takes `--tier` and Firefox; `PLAYGROUND=` env sets the URL.
+
+## 2026-10-17 · Days 4–6 — editor UI, integration, production pass
+
+Three parallel tracks (UI here; engine effects + export and analyzer + storage in agent
+worktrees, merged and integrated).
+
+- **Day 4 · 3.1–3.5:** `<VideoEditor />` (packages/react) — phone / tablet / desktop layouts by
+  container queries; `EditorController` (plain TS: editor, engine, analyzer, storage, UI store,
+  playhead) so React never renders per frame (#45); canvas timeline with film-strip thumbnails,
+  dB waveforms, scrub / pan with a fixed centre playhead on phones, pinch + Ctrl/⌘-wheel zoom,
+  snapping with a haptic tick, trim handles, move, long-press reorder (#48), transition markers,
+  lane mute/hide, accessible DOM layer; stage selection with move / scale / rotate / pinch and
+  centre guides; contextual toolbar, sheet (phone/tablet) and inspector (desktop); import with
+  per-file errors and drag-drop; i18n labels; tokens + editor.css.
+- **Day 5 · 3.6–3.10:** split, trim, delete, duplicate, reorder, freeze, speed, volume, mute,
+  fades, extract audio, crop, rotate/flip, fit/fill, canvas ratios, colour / blur background,
+  16 filters + intensity, 9 adjustments, 7 transitions, text (8 styles, colour, size, bold,
+  italic, align, outline, shadow, background box), 48 emoji stickers, music + SFX import,
+  voiceover recording. Drags and sliders preview without store writes and commit once (#47).
+- **Day 6:** export dialog (resolution limited by the device's encoders, fps, quality, format,
+  progress, cancel, Wake Lock, download) on `engine.export`; autosave + crash recovery of the last
+  project, load warnings, missing-media notice, persistence request; `onReady(controller)`.
+- **Checks:** `scripts/editor-check.ts` (layouts + real media), `editor-interact.ts` (15 steps
+  incl. export → ffprobe; pass in Chrome, WebKit, Firefox), `editor-recovery.ts` (reload →
+  same project, media, preview; Chrome + Firefox OPFS), `a11y-check.ts` (axe WCAG 2.2 AA: 0
+  violations, dark + light, phone + desktop). Fixed on the way: strict-mode double mount killed
+  the engine (#46), shortcuts lost after clicking the canvas (#51), element resets outranking
+  component classes, a banner covering the controls (#50), quiet audio drawing flat.

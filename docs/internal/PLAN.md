@@ -78,28 +78,28 @@ Deferred to v0.2+: speed curves, reverse, text animations, templates, keyframes,
 
 ### Day 4 — Editor UI shell (Phase 3a)
 
-- [ ] 3.1 `--vu-*` tokens, dark/light/auto, `@layer` CSS, typed `themeOverrides`
-- [ ] 3.2 Layouts: phone (InShot), tablet, desktop (panel + stage + inspector + timeline), container queries
-- [ ] 3.3 Media import (picker, drag-drop, file handles), media panel, per-file errors, HEIC/HEVC handling
-- [ ] 3.4 Canvas timeline: main track + lanes, playhead, zoom, snapping, thumbnails, waveforms, accessible layer
-- [ ] 3.5 Selection, contextual toolbar, direct manipulation on the stage (move / scale / rotate)
+- [x] 3.1 `--vu-*` tokens, dark/light/auto, `@layer` CSS, typed `themeOverrides`
+- [x] 3.2 Layouts: phone (InShot), tablet, desktop (panel + stage + inspector + timeline), container queries
+- [x] 3.3 Media import (picker, drag-drop), media panel, per-file errors, HEVC message — file handles + HEIC WASM decoder → BACKLOG
+- [x] 3.4 Canvas timeline: main track + lanes, playhead, zoom, snapping, thumbnails, waveforms, accessible layer
+- [x] 3.5 Selection, contextual toolbar, direct manipulation on the stage (move / scale / rotate)
 - [ ] **Checkpoint:** layout + feel on iPhone and Mac
 
 ### Day 5 — Editing tools (Phase 3b)
 
-- [ ] 3.6 Split, trim, delete, duplicate, reorder, freeze frame
-- [ ] 3.7 Speed, volume, mute, fades, extract audio
-- [ ] 3.8 Crop, rotate, flip, canvas ratio, background colour / blur, fit/fill
-- [ ] 3.9 Filters + adjustments, transitions
-- [ ] 3.10 Text, stickers / emoji, picture-in-picture, music + SFX tracks, voiceover
+- [x] 3.6 Split, trim, delete, duplicate, reorder, freeze frame
+- [x] 3.7 Speed, volume, mute, fades, extract audio
+- [x] 3.8 Crop, rotate, flip, canvas ratio, background colour / blur, fit/fill
+- [x] 3.9 Filters + adjustments, transitions
+- [x] 3.10 Text, stickers / emoji, picture-in-picture, music + SFX tracks, voiceover
 - [ ] **Checkpoint:** owner edits a real video end to end
 
 ### Day 6 — Export, saving, production pass (Phase 4)
 
-- [ ] 4.1 Export MP4/WebM: resolution / fps / quality, progress, cancel, streaming to disk, tier limits, background-tab handling
-- [ ] 4.2 Autosave via op log, crash recovery, `storage.persist()`, `initialProject` / `onSave` / `onExport`
-- [ ] 4.3 Cross-browser e2e (Chromium, WebKit, Firefox), perf fixes on low tier, error screens, storage-full handling
-- [ ] 4.4 Accessibility audit (axe + keyboard + VoiceOver), i18n labels
+- [x] 4.1 Export MP4/WebM: resolution / fps / quality, progress, cancel, streaming to disk, tier limits, background-tab handling
+- [x] 4.2 Autosave via op log, crash recovery, `storage.persist()`, `initialProject` / `onSave` / `onExport`
+- [x] 4.3 Cross-browser e2e (Chromium, WebKit, Firefox), error screens, storage-full handling — real low-end devices at the checkpoint
+- [x] 4.4 Accessibility audit (axe + keyboard), i18n labels — VoiceOver on the owner's iPhone at the checkpoint
 - [ ] **Checkpoint (iPhone + Android):** create → export → reopen on every device
 
 ### Day 7 — Release v0.1

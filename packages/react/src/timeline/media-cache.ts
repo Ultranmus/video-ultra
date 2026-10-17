@@ -2,10 +2,12 @@ import type { DeviceTier } from '@video-ultra/core';
 import type { MediaAnalyzer, Waveform } from '@video-ultra/core/internal';
 
 /** Byte budget for timeline thumbnails per device tier. */
+// Small on purpose: the analyzer worker keeps its own byte-budgeted cache and re-serves a cached
+// strip in 1–7 ms, so this only needs what's on screen plus a little scroll room.
 const THUMB_BUDGET: Record<DeviceTier, number> = {
-  low: 12 * 1024 * 1024,
-  mid: 32 * 1024 * 1024,
-  high: 64 * 1024 * 1024,
+  low: 6 * 1024 * 1024,
+  mid: 16 * 1024 * 1024,
+  high: 32 * 1024 * 1024,
 };
 const MAX_IN_FLIGHT = 3;
 
