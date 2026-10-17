@@ -105,12 +105,14 @@ if (only !== 'phone') {
     return { pps };
   });
   await page.mouse.move(
-    canvas.x + 56 + 4.5 * lane.pps,
-    // Ruler, gap, new-layer slot; the sticker is the top layer.
-    canvas.y + 24 + 6 + 36 + 22,
+    canvas.x + 100 + 4.5 * lane.pps,
+    // Ruler, gap, main video, gap, new-layer slot; the sticker is the first layer.
+    canvas.y + 24 + 6 + 56 + 6 + 36 + 22,
   );
   await page.mouse.down();
-  await page.mouse.move(canvas.x + 56 + 6 * lane.pps, canvas.y + 40, { steps: 6 });
+  await page.mouse.move(canvas.x + 100 + 6 * lane.pps, canvas.y + 24 + 6 + 56 + 6 + 15, {
+    steps: 6,
+  });
   await snap(page, 'd12-dragging');
   await page.mouse.up();
   await page.locator('.vu-topbar .vu-btn', { hasText: 'Export' }).click();

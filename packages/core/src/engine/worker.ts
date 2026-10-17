@@ -554,6 +554,17 @@ async function filterPreviews(
   return { data: { type: 'filter-previews', bitmaps }, transfer: bitmaps };
 }
 
+/**
+ * Picker previews share one small renderer and canvas, so they run one at a time: two at once
+ * would draw over each other's frames (or one would resize the renderer under the other).
+ */
+let looksQueue: Promise<unknown> = Promise.resolve();
+function inLooksQueue<T>(job: () => Promise<T>): Promise<T> {
+  const run = looksQueue.then(job, job);
+  looksQueue = run.catch(() => undefined);
+  return run;
+}
+
 /** The warm looks renderer at `width × height` (shared by the picker previews). */
 async function looksRenderer(width: number, height: number) {
   clearTimeout(looksIdle);
@@ -644,7 +655,8 @@ async function transitionPreview(
 ): Promise<{ data: EngineResponseData; transfer: Transferable[] }> {
   const empty = { data: { type: 'transition-preview' as const, bitmaps: [] }, transfer: [] };
   if (!project) throw new Error('No project');
-  const track = project.tracks.find((t) => t.kind === 'main');
+  // The cut's own track: the main track, or a picture layer where two clips touch.
+  const track = findItem(project, request.itemId)?.track;
   const index = track ? track.items.findIndex((i) => i.id === request.itemId) : -1;
   if (!track || index < 1) return empty;
   const prev = track.items[index - 1]!;
@@ -671,7 +683,33 @@ async function transitionPreview(
   const mini: Project = {
     ...project,
     settings: { ...project.settings, width, height },
-    tracks: [{ ...track, muted: true, hidden: false, items: [prev, next] }],
+    tracks:
+      track.kind === 'main'
+        ? [{ ...track, muted: true, hidden: false, items: [prev, next] }]
+        : [
+            // A layer cut is shown on its own, centred and large, like the main track's.
+            {
+              id: 'looks-main',
+              kind: 'main',
+              muted: true,
+              hidden: false,
+              locked: false,
+              items: [],
+            },
+            {
+              ...track,
+              muted: true,
+              hidden: false,
+              items: [prev, next].map((i) =>
+                'transform' in i
+                  ? ({
+                      ...i,
+                      transform: { ...i.transform, x: 0.5, y: 0.5, scale: 1, rotation: 0 },
+                    } as Item)
+                  : i,
+              ),
+            },
+          ],
   };
   await mediaReady(mini);
   const half = Math.min(transition.duration, prev.duration, item.duration) / 2;
@@ -820,11 +858,11 @@ async function handle(
     case 'capture':
       return capture(request);
     case 'filter-previews':
-      return filterPreviews(request);
+      return inLooksQueue(() => filterPreviews(request));
     case 'transition-preview':
-      return transitionPreview(request);
+      return inLooksQueue(() => transitionPreview(request));
     case 'item-preview':
-      return itemPreview(request);
+      return inLooksQueue(() => itemPreview(request));
   }
 }
 

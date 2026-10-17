@@ -2,6 +2,12 @@
 
 Where the last session stopped and what comes next. Update before ending every session.
 
+## 2026-10-18 (round 4 follow-up)
+
+Owner feedback fixed: grouped, named rows (video first — owner's choice), layer transitions
+between touching clips, chip highlight while scrolling, filter previews reliable, panels follow
+the selected element. Waiting on the owner to retry the two-videos-on-a-layer case.
+
 ## 2026-10-18 (UI round 4)
 
 Done from the owner's fourth list: scroll-by-category libraries, real engine previews for

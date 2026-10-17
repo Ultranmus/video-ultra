@@ -24,6 +24,7 @@ import { useState, type ReactElement } from 'react';
 import { useController, useLabels, useProject, useUi } from './context';
 import { Button, ColorField, EditSlider, IconButton, Section, Segmented } from './controls';
 import { Icon } from './icons';
+import { hasCutInto } from './targets';
 import { RATIOS, ratioOf } from './items';
 import { AnimatePanel, FilterStrip, TransitionGrid } from './looks';
 import type { ToolId } from './state';
@@ -85,6 +86,7 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
   const ctl = useController();
   const index = useProject((p) => mainTrack(p).items.findIndex((i) => i.id === item.id));
   const onMain = index !== -1;
+  const cutInto = useProject((p) => hasCutInto(p, item.id));
   const filterName =
     'filter' in item && item.filter
       ? (FILTER_PRESETS.find((f) => f.id === item.filter!.id)?.label ?? item.filter.id)
@@ -124,7 +126,7 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
       </Section>
     ) : null;
   const transition =
-    index > 0 && 'transitionIn' in item ? (
+    cutInto && 'transitionIn' in item ? (
       <Section title={l.transition}>
         <div className="vu-current">
           <span className="vu-current-label">{l.transitionShort}</span>

@@ -51,41 +51,45 @@ export interface Row {
   height: number;
 }
 
-/** Picture and text layers sit above the main track; sound sits below it. */
+/** Picture and text layers (everything drawn over the main video except sound). */
 export function isLayerTrack(track: Track): boolean {
   return track.kind === 'overlay' || track.kind === 'text';
 }
 
+/** Row group order: main video, picture layers, text, sound. */
+export const GROUP_ORDER: Record<Track['kind'], number> = {
+  main: 0,
+  overlay: 1,
+  text: 2,
+  audio: 3,
+};
+
 /**
- * Rows top to bottom, shifted up by `scrollY`: the layers in front-to-back order (the last track is
- * drawn on top of the picture, so it is the top row — higher means in front), then the main track,
- * then sound lanes in track order. The "new layer" slot sits above them all.
+ * Rows top to bottom, shifted up by `scrollY`, grouped by kind so the timeline always reads the
+ * same way: the main video, the "new layer" slot, picture layers, text, then sound (owner choice,
+ * 2026-10-18). Within a group, track order (a lower row draws in front).
  */
 export function layoutRows(project: Project, m: TimelineMetrics, scrollY = 0): Row[] {
-  const order: number[] = [];
-  project.tracks.forEach((t, i) => {
-    if (isLayerTrack(t)) order.unshift(i);
-  });
-  project.tracks.forEach((t, i) => {
-    if (t.kind === 'main') order.push(i);
-  });
-  project.tracks.forEach((t, i) => {
-    if (t.kind === 'audio') order.push(i);
-  });
+  const order = project.tracks
+    .map((track, index) => ({ track, index }))
+    .sort((a, b) => GROUP_ORDER[a.track.kind] - GROUP_ORDER[b.track.kind] || a.index - b.index);
   const rows: Row[] = [];
-  let y = m.ruler + m.gap + m.slot;
-  for (const index of order) {
-    const track = project.tracks[index]!;
+  let y = m.ruler + m.gap;
+  for (const { track, index } of order) {
     const height = track.kind === 'main' ? m.mainTrack : m.track;
     rows.push({ track, index, top: y - scrollY, height });
     y += height + m.gap;
+    if (track.kind === 'main') y += m.slot;
   }
   return rows;
 }
 
-/** The "new layer" slot above the rows (where a clip is dropped to put it on top). */
+/** The "new layer" slot, right under the main video (drop a clip there to layer it over). */
 export function slotRect(m: TimelineMetrics, scrollY = 0): { top: number; height: number } {
-  return { top: m.ruler + m.gap - scrollY, height: Math.max(0, m.slot - m.gap) };
+  return {
+    top: m.ruler + m.gap + m.mainTrack + m.gap - scrollY,
+    height: Math.max(0, m.slot - m.gap),
+  };
 }
 
 /** Total height of all rows (for vertical scrolling). */
@@ -157,6 +161,16 @@ export function snapCandidates(project: Project, playhead: Time, excludeId?: str
   return out;
 }
 
+/**
+ * Whether items `i - 1` and `i` form a cut a transition can go on: two pictures that touch (on
+ * the main track they always do).
+ */
+export function isCut(items: readonly Item[], i: number): boolean {
+  const a = items[i - 1];
+  const b = items[i];
+  return !!a && !!b && 'transitionIn' in a && 'transitionIn' in b && itemEnd(a) === b.start;
+}
+
 /** What a pointer is over. */
 export type Hit =
   | { type: 'ruler'; time: Time }
@@ -203,10 +217,12 @@ export function hitTest(
       if (x >= right - slop && x <= right + w + slop)
         return { type: 'trim', item: selected, row, edge: 'end' };
     }
-    // Transition markers sit on the cuts of the main track.
-    if (row.track.kind === 'main') {
+    // Transition markers sit on the cuts: every cut of the main track, and where two pictures
+    // touch on a layer.
+    if (row.track.kind === 'main' || row.track.kind === 'overlay') {
       const r = touch ? 14 : 10;
       for (let i = 1; i < items.length; i++) {
+        if (!isCut(items, i)) continue;
         const cx = timeToX(scale, items[i]!.start);
         const cy = row.top + row.height / 2;
         if (
@@ -216,10 +232,12 @@ export function hitTest(
         )
           return { type: 'transition', item: items[i]!, row };
       }
-      const last = items[items.length - 1];
-      const add = addButtonRect(row, scale, last ? itemEnd(last) : 0);
-      if (x >= add.x && x <= add.x + add.size && y >= add.y && y <= add.y + add.size)
-        return { type: 'add', row };
+      if (row.track.kind === 'main') {
+        const last = items[items.length - 1];
+        const add = addButtonRect(row, scale, last ? itemEnd(last) : 0);
+        if (x >= add.x && x <= add.x + add.size && y >= add.y && y <= add.y + add.size)
+          return { type: 'add', row };
+      }
     }
     for (const item of items) {
       const left = timeToX(scale, item.start);

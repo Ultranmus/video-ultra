@@ -101,7 +101,8 @@ for (const name of browsers) {
   // Seek: click the ruler at 2 s.
   const canvas = page.locator('.vu-timeline-canvas canvas');
   const box = (await canvas.boundingBox())!;
-  const x0 = box.x + 40 + 16;
+  // Row names column (84 px) + 16 px lead-in.
+  const x0 = box.x + 84 + 16;
   await page.mouse.click(x0 + 2 * s.pps, box.y + 10);
   await page.waitForTimeout(100);
   s = await state(page);
@@ -118,8 +119,8 @@ for (const name of browsers) {
   await check('redo split', s.main.length === 3);
 
   // Select the first clip and drag its end trim handle 40 px to the left.
-  // Ruler, gap, the new-layer slot, then the main track (no layers yet): its middle.
-  const rowY = box.y + 24 + 6 + 36 + 28;
+  // Ruler, gap, then the main video row: its middle.
+  const rowY = box.y + 24 + 6 + 28;
   await page.mouse.click(x0 + 1 * s.pps, rowY);
   s = await state(page);
   await check('click selects clip', s.selected === s.main[0]!.id);

@@ -87,6 +87,8 @@ export function sourceTimeAt(item: VisualItem, t: Time, project?: Project): Time
 /** The transition's length, clamped to both neighbours (edits keep it so; this is defensive). */
 export function transitionLength(previous: Item, item: Item): Time {
   if (!('transitionIn' in item) || !item.transitionIn) return 0;
+  // On a layer, only clips that touch transition (the main track always touches).
+  if (itemEnd(previous) !== item.start) return 0;
   return Math.max(0, Math.min(item.transitionIn.duration, previous.duration, item.duration));
 }
 
@@ -95,15 +97,20 @@ export function transitionLead(length: Time): Time {
   return Math.floor(length / 2);
 }
 
+/** Tracks whose touching pictures can transition: the main track and picture layers. */
+function hasTransitions(track: Track): boolean {
+  return track.kind === 'main' || track.kind === 'overlay';
+}
+
 /**
- * When the item at `index` of `track` is on screen: its own span, widened on the main track by
- * the transitions into it and out of it.
+ * When the item at `index` of `track` is on screen: its own span, widened by the transitions into
+ * it and out of it.
  */
 export function visibleSpan(track: Track, index: number): { start: Time; end: Time } {
   const item = track.items[index]!;
   let start = item.start;
   let end = itemEnd(item);
-  if (track.kind === 'main') {
+  if (hasTransitions(track)) {
     const previous = track.items[index - 1];
     if (previous) start -= transitionLead(transitionLength(previous, item));
     const next = track.items[index + 1];
@@ -131,8 +138,11 @@ function layer(
   };
 }
 
-/** Pushes the main track's layer(s) at `t`: one clip, or the two clips of a transition. */
-function mainLayers(project: Project, track: Track, t: Time, out: ActiveLayer[]): void {
+/**
+ * Pushes a track's layer(s) at `t`: one clip, or the two clips of a transition (main track, and
+ * touching pictures on a layer).
+ */
+function trackLayers(project: Project, track: Track, t: Time, out: ActiveLayer[]): void {
   const items = track.items;
   const index = itemIndexAt(items, t);
   if (index === -1) return;
@@ -176,8 +186,8 @@ export function activeLayers(project: Project, t: Time, out: ActiveLayer[] = [])
   out.length = 0;
   for (const track of project.tracks) {
     if (track.hidden || track.kind === 'audio') continue;
-    if (track.kind === 'main') {
-      mainLayers(project, track, t, out);
+    if (hasTransitions(track)) {
+      trackLayers(project, track, t, out);
       continue;
     }
     const index = itemIndexAt(track.items, t);

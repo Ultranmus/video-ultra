@@ -881,7 +881,7 @@
     background: var(--vu-surface-2);
   }
 
-  .vu-root .vu-chip[aria-checked='true'] {
+  .vu-root .vu-chip:is([aria-checked='true'], [aria-selected='true']) {
     border-color: transparent;
     background: var(--vu-accent-soft);
     color: var(--vu-accent-text);

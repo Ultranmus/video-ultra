@@ -30,10 +30,20 @@ export interface Targets {
   freeze: { item: Item | null; reason: string | null };
   /** Delete / duplicate act on the selection only. */
   selection: { item: Item | null; reason: string | null };
-  /** Filters and adjustments: the selected visual clip, else the main clip under the playhead. */
+  /**
+   * Filters and adjustments: the selected picture; else the main clip under the playhead (or the
+   * first one).
+   */
   look: LookItem | null;
-  /** Transitions: the clip after the cut — selected main clip, else the cut nearest the playhead. */
+  /** Set when the selection can't take a filter, so the panel says why it shows another clip. */
+  lookNote: string | null;
+  /**
+   * Transitions: the clip after the cut. The selected picture's own cut (main track, or touching
+   * pictures on its layer); else the main-track cut nearest the playhead.
+   */
   transition: Item | null;
+  /** Why there is no transition target (or why it's not the selection's). */
+  transitionNote: string | null;
   hasClips: boolean;
 }
 
@@ -44,6 +54,17 @@ function mainAt(project: Project, t: Time): Item | null {
   if (index !== -1) return items[index]!;
   const last = items[items.length - 1];
   return last && t >= itemEnd(last) ? last : null;
+}
+
+/** Whether a transition can go into this item: it touches the picture before it (main or layer). */
+export function hasCutInto(project: Project, itemId: string): boolean {
+  const found = findItem(project, itemId);
+  if (!found || (found.track.kind !== 'main' && found.track.kind !== 'overlay')) return false;
+  const list = found.track.items;
+  const i = list.indexOf(found.item);
+  const a = list[i - 1];
+  const b = found.item;
+  return !!a && 'transitionIn' in a && 'transitionIn' in b && itemEnd(a) === b.start;
 }
 
 /** Computes {@link Targets} for a project, selection and playhead. Pure. */
@@ -85,18 +106,41 @@ export function computeTargets(
         ? l.freezeVideoOnly
         : l.playheadOutsideClips;
 
-  const look: LookItem | null =
-    selected && 'filter' in selected ? selected : under && 'filter' in under ? under : null;
+  const picture = (i: Item | null | undefined): i is LookItem => !!i && 'filter' in i;
+  const fallback = under ?? items[0] ?? null;
+  const look: LookItem | null = picture(selected) ? selected : picture(fallback) ? fallback : null;
+  const lookNote = selected && !picture(selected) && look ? l.filtersForPictures : null;
 
-  let transition: Item | null = null;
-  const selIndex = selected ? items.indexOf(selected) : -1;
-  if (selIndex > 0) transition = selected;
-  else if (items.length > 1) {
-    // The cut nearest the playhead.
+  const nearestMainCut = () => {
+    if (items.length < 2) return null;
     let best = 1;
     for (let i = 1; i < items.length; i++)
       if (Math.abs(items[i]!.start - t) < Math.abs(items[best]!.start - t)) best = i;
-    transition = items[best]!;
+    return items[best]!;
+  };
+  let transition: Item | null = null;
+  let transitionNote: string | null = null;
+  const found = selected ? findItem(project, selected.id) : null;
+  if (
+    found &&
+    'transitionIn' in found.item &&
+    (found.track.kind === 'main' || found.track.kind === 'overlay')
+  ) {
+    // The selected picture's own cut: into it, else out of it into the next one.
+    const list = found.track.items;
+    const i = list.indexOf(found.item);
+    const touches = (j: number) => {
+      const a = list[j - 1];
+      const b = list[j];
+      return !!a && !!b && 'transitionIn' in a && 'transitionIn' in b && itemEnd(a) === b.start;
+    };
+    if (touches(i)) transition = found.item;
+    else if (touches(i + 1)) transition = list[i + 1]!;
+    else
+      transitionNote = found.track.kind === 'main' ? l.transitionsNeedTwo : l.transitionsLayerTouch;
+  } else {
+    transition = nearestMainCut();
+    if (selected && transition) transitionNote = l.transitionsForPictures;
   }
 
   return {
@@ -105,7 +149,9 @@ export function computeTargets(
     freeze: { item: freezeItem, reason: freezeReason },
     selection: { item: selected, reason: selected ? null : hasClips ? l.selectFirst : l.needClips },
     look,
+    lookNote,
     transition,
+    transitionNote,
     hasClips,
   };
 }
@@ -119,7 +165,9 @@ function key(t: Targets): string {
     t.freeze.reason,
     t.selection.item?.id,
     t.look?.id,
+    t.lookNote,
     t.transition?.id,
+    t.transitionNote,
     t.hasClips,
   ].join('|');
 }

@@ -62,10 +62,13 @@ export function checkInvariants(project: Project): string[] {
 
       // Transitions
       if ('transitionIn' in item && item.transitionIn) {
-        if (track.kind !== 'main') problems.push(`${where}: transitions only on the main track`);
-        else if (index === 0) problems.push(`${where}: first item can't have a transition in`);
+        const previous = track.items[index - 1];
+        if (track.kind !== 'main' && track.kind !== 'overlay')
+          problems.push(`${where}: transitions only between pictures`);
+        else if (!previous) problems.push(`${where}: first item can't have a transition in`);
+        else if (track.kind === 'overlay' && itemEnd(previous) !== item.start)
+          problems.push(`${where}: layer transition between clips that don't touch`);
         else {
-          const previous = track.items[index - 1]!;
           if (item.transitionIn.duration > Math.min(previous.duration, item.duration)) {
             problems.push(`${where}: transition longer than its neighbours`);
           }

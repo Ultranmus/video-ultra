@@ -206,3 +206,14 @@ OPFS recovery, WebCodecs first, ranged reads.
   renderer (warm-up draw).
 - Checks: verify (386 core + 11 React tests), interaction 15 steps × Chrome / Firefox / WebKit,
   axe 0 (phone + desktop), recovery, composite golden; ui-review desktop + phone, dark + light.
+
+## 2026-10-18 · Owner follow-up on round 4
+
+- Rows grouped video-first and named (owner picked it): Video, slot, Layer, Text, Audio.
+- Transitions between touching pictures on a layer (core ops, invariants, timeline, compositor,
+  previews, markers, inspector, phone toolbar) + tests.
+- Category chip row now lights up while scrolling (the active state was never styled).
+- Filter previews: picker previews run one at a time in the worker (they shared one renderer and
+  could draw over each other) and retry while the engine / media are still starting.
+- Panels follow the selected element, with notes when it can't take the effect.
+- Checks: verify (389 + 11), interaction × 3 browsers, axe 0, composite golden, ui-review.

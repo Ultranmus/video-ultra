@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { addToLane, insertMain, setSpeed, setTrackFlags, setTransition } from '../edit/ops';
+import {
+  addToLane,
+  insertMain,
+  moveMainToLane,
+  setSpeed,
+  setTrackFlags,
+  setTransition,
+} from '../edit/ops';
 import { sequentialIds } from '../model/project';
 import { fromSeconds as s } from '../model/time';
 import {
@@ -160,5 +167,30 @@ describe('timeline transitions', () => {
     expect(activeLayers(project, s(2)).map((l) => l.item.id)).toEqual(['a', 'c']);
     expect(activeLayers(project, s(5.99)).map((l) => l.item.id)).toEqual(['a', 'c']);
     expect(activeLayers(project, s(6)).map((l) => l.item.id)).toEqual(['c']);
+  });
+});
+
+describe('layer transitions', () => {
+  it('two touching pictures on a layer cross over; the main track is untouched', () => {
+    const project = fixtureProject();
+    const ids = sequentialIds('n');
+    insertMain(project, videoItem('main', 'vidA', 10));
+    insertMain(project, imageItem('a', 3));
+    const lane = moveMainToLane(project, 'a', s(1), ids, 1);
+    const b = imageItem('b', 3);
+    b.start = s(4);
+    addToLane(project, b, ids, lane);
+    setTransition(project, 'b', { type: 'fade', duration: s(1) });
+    const at = (t: number) =>
+      activeLayers(project, s(t)).map((l) => [l.item.id, l.transition?.role ?? null]);
+    expect(at(3.7)).toEqual([
+      ['main', null],
+      ['a', 'out'],
+      ['b', 'in'],
+    ]);
+    expect(at(2)).toEqual([
+      ['main', null],
+      ['a', null],
+    ]);
   });
 });

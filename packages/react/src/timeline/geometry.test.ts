@@ -102,7 +102,7 @@ describe('timeline geometry', () => {
     expect(hitTest(rows, m, scale, 200, rows[0]!.top + 28, null, false).type).toBe('transition');
   });
 
-  it('puts layers above the main track (front-most on top) and sound below it', () => {
+  it('groups rows: main video, picture layers, text, then sound', () => {
     const p = project();
     const lane = (id: string, kind: 'overlay' | 'text' | 'audio') =>
       ({
@@ -115,8 +115,8 @@ describe('timeline geometry', () => {
       }) as (typeof p.tracks)[number];
     p.tracks.push(lane('o1', 'overlay'), lane('s1', 'audio'), lane('t1', 'text'));
     const rows = layoutRows(p, { ...m, slot: 30 });
-    expect(rows.map((r) => r.track.id)).toEqual(['t1', 'o1', p.tracks[0]!.id, 's1']);
-    expect(rows[0]!.top).toBe(m.ruler + m.gap + 30);
+    expect(rows.map((r) => r.track.id)).toEqual([p.tracks[0]!.id, 'o1', 't1', 's1']);
+    expect(rows[1]!.top).toBe(m.ruler + m.gap + m.mainTrack + m.gap + 30);
   });
 
   it('finds the reorder slot from the drag position', () => {

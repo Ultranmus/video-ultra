@@ -151,6 +151,7 @@ function placeInLane(
     lanes.find((t) => fits(t, item.start, end));
   if (target) {
     insertSorted(target, item);
+    tidyLaneTransitions(project);
     return;
   }
   const lane: Track = {
@@ -168,7 +169,32 @@ function placeInLane(
   project.tracks.splice(lastOfKind === -1 ? project.tracks.length : lastOfKind + 1, 0, lane);
 }
 
+/**
+ * Layer transitions play only where two pictures touch on the same lane (one ends exactly where
+ * the next starts). After any lane edit: a transition whose clips no longer touch is removed, and
+ * one longer than either clip is shortened (the main track has `layoutMain` for this).
+ */
+function tidyLaneTransitions(project: Project): void {
+  const frame = projectFrame(project);
+  for (const track of project.tracks) {
+    if (track.kind !== 'overlay') continue;
+    track.items.forEach((item, index) => {
+      if (!('transitionIn' in item) || !item.transitionIn) return;
+      const previous = track.items[index - 1];
+      if (!previous || !('transitionIn' in previous) || itemEnd(previous) !== item.start) {
+        item.transitionIn = null;
+        return;
+      }
+      const limit = Math.min(previous.duration, item.duration);
+      if (limit < frame) item.transitionIn = null;
+      else if (item.transitionIn.duration > limit)
+        item.transitionIn.duration = floorToFrame(project, limit);
+    });
+  }
+}
+
 function removeEmptyLanes(project: Project): void {
+  tidyLaneTransitions(project);
   project.tracks = project.tracks.filter((t) => t.kind === 'main' || t.items.length > 0);
 }
 
@@ -410,6 +436,7 @@ export function trimItem(
   }
   clampFades(item);
   if (isMain) layoutMain(project);
+  else tidyLaneTransitions(project);
 }
 
 /** Splits an item in two at `at`. Returns the id of the second part. */
@@ -442,6 +469,7 @@ export function splitItem(project: Project, itemId: string, at: Time, ids: IdFac
   clampFades(second);
   track.items.splice(index + 1, 0, second);
   if (track.kind === 'main') layoutMain(project);
+  else tidyLaneTransitions(project);
   return second.id;
 }
 
@@ -488,7 +516,10 @@ export function setSpeed(project: Project, itemId: string, speed: number, ids: I
   );
   clampFades(item);
   if (track.kind === 'main') layoutMain(project);
-  else resolveLaneOverlap(project, track, item, ids);
+  else {
+    resolveLaneOverlap(project, track, item, ids);
+    tidyLaneTransitions(project);
+  }
 }
 
 /**
@@ -599,21 +630,27 @@ export function updateItem(project: Project, itemId: string, patch: ItemPatch): 
   clampFades(item);
 }
 
-/** Sets (or clears, with `null`) the transition into a main-track item from the one before it. */
+/**
+ * Sets (or clears, with `null`) the transition into an item from the one before it: on the main
+ * track, or on a layer where the two pictures touch.
+ */
 export function setTransition(
   project: Project,
   itemId: string,
   transition: Transition | null,
 ): void {
   const { track, item, index } = editable(project, itemId);
-  if (track.kind !== 'main' || !('transitionIn' in item)) {
-    throw new EditError('invalid', 'Transitions go between clips on the main track');
+  if ((track.kind !== 'main' && track.kind !== 'overlay') || !('transitionIn' in item)) {
+    throw new EditError('invalid', 'Transitions go between video or photo clips');
   }
   if (transition === null) {
     item.transitionIn = null;
     return;
   }
   if (index === 0) throw new EditError('invalid', 'The first clip has nothing to transition from');
+  const before = track.items[index - 1]!;
+  if (track.kind === 'overlay' && (!('transitionIn' in before) || itemEnd(before) !== item.start))
+    throw new EditError('invalid', 'Put the two clips right next to each other first');
   const limit = Math.min(track.items[index - 1]!.duration, item.duration);
   const duration = Math.min(
     floorToFrame(project, transition.duration),

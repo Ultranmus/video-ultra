@@ -445,7 +445,7 @@ reason; when one changes, edit the entry and note the date.
 
 ## Editor UI, round 4 (owner review, 2026-10-18)
 
-94. **Layers sit above the main track; sound below it** (2026-10-18). The timeline shows picture
+94. ~~**Layers sit above the main track; sound below it**~~ — replaced by #100 (2026-10-18). The timeline shows picture
     and text lanes on top in front-to-back order (the top row is drawn in front), then the main
     track, then sound lanes. "Higher = in front" is how people picture layers. Track order in the
     project is unchanged (display only). A dashed "new layer" slot stays above every row, so
@@ -472,3 +472,18 @@ reason; when one changes, edit the entry and note the date.
 99. **Waveforms are filled envelopes scaled to the file's own peak** (2026-10-18), mirrored on
     sound clips and rising along the bottom of video clips that have sound. Replaces the dB bar
     chart that turned loud music into a solid block.
+100.  **Rows are grouped, video first, and named** (owner choice, 2026-10-18, replaces #94): the
+      main video, the "new layer" slot right under it, picture layers, text, then sound — the same
+      order every time. Every row is named in the left column ("Video", "Layer", "Text", "Audio",
+      numbered when there are several); on phones the name sits faintly at the row's left. With
+      layers above the video the owner found the order confusing ("video in between").
+101.  **Transitions also work between touching pictures on a layer** (2026-10-18). Two videos or
+      photos on one layer that touch (one ends where the next starts — snapping makes it easy)
+      can have a transition; it plays inside the clips' own box, so a picture-in-picture stays an
+      element. Edits that pull them apart remove it (`tidyLaneTransitions`); the invariants allow
+      it only where the clips touch. Text and stickers have entrance/exit animations instead.
+102.  **Library panels follow the selection and say when it can't take the effect** (2026-10-18).
+      Filters: the selected picture, else the main clip under the playhead, with a note when a
+      text or sticker is selected. Transitions: the selected picture's own cut (main or layer),
+      with "drag another clip right up against this one" when a layer clip has no neighbour.
+      Picking a look selects the clip it changed.

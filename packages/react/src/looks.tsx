@@ -52,7 +52,7 @@ function useAutoSelect(id: string | null) {
 export function FilterStrip(): ReactElement {
   const ctl = useController();
   const l = useLabels();
-  const { look, hasClips } = useTargets();
+  const { look, lookNote, hasClips } = useTargets();
   useAutoSelect(look?.id ?? null);
   if (!look) {
     return (
@@ -72,10 +72,10 @@ export function FilterStrip(): ReactElement {
       />
     );
   }
-  return <FilterGrid item={look} />;
+  return <FilterGrid item={look} note={lookNote} />;
 }
 
-function FilterGrid({ item }: { item: LookItem }) {
+function FilterGrid({ item, note }: { item: LookItem; note: string | null }) {
   const ctl = useController();
   const l = useLabels();
   const current = item.filter?.id ?? null;
@@ -105,6 +105,7 @@ function FilterGrid({ item }: { item: LookItem }) {
       <p className="vu-target" data-active="">
         {l.filtersFor(itemTitle(item, ctl.project.assets))}
       </p>
+      {note ? <p className="vu-hint">{note}</p> : null}
       {item.filter ? (
         <EditSlider
           label={l.intensity}
@@ -171,23 +172,32 @@ function FilterSection({
     };
   }, []);
   const ref = useNearView<HTMLDivElement>(() => {
-    const engine = ctl.engine;
-    if (!engine) return;
-    const t = ctl.playhead.time;
-    const at =
-      t >= item.start && t < itemEnd(item) ? t : item.start + Math.floor(item.duration / 3);
-    const dpr = Math.min(devicePixelRatio || 1, 2);
-    engine
-      .filterPreviews(item.id, at, Math.round(TILE * dpr), ids)
-      .then((bitmaps) => {
-        if (!live.current) {
-          for (const b of bitmaps) b.close();
-          return;
-        }
-        tilesRef.current = bitmaps;
-        setTiles(bitmaps);
-      })
-      .catch(() => {});
+    // The engine may still be starting, or the clip's media still opening: try a few times.
+    const request = (attempt: number) => {
+      if (!live.current) return;
+      const retry = () => {
+        if (attempt < 5) setTimeout(() => request(attempt + 1), 400 * (attempt + 1));
+      };
+      const engine = ctl.engine;
+      if (!engine) return retry();
+      const t = ctl.playhead.time;
+      const at =
+        t >= item.start && t < itemEnd(item) ? t : item.start + Math.floor(item.duration / 3);
+      const dpr = Math.min(devicePixelRatio || 1, 2);
+      engine
+        .filterPreviews(item.id, at, Math.round(TILE * dpr), ids)
+        .then((bitmaps) => {
+          if (!live.current) {
+            for (const b of bitmaps) b.close();
+            return;
+          }
+          if (bitmaps.length === 0) return retry();
+          tilesRef.current = bitmaps;
+          setTiles(bitmaps);
+        })
+        .catch(retry);
+    };
+    request(0);
   });
   return (
     <div ref={ref} className="vu-filter-grid" role="radiogroup" aria-label={l.filter}>
@@ -198,7 +208,11 @@ function FilterSection({
           role="radio"
           aria-checked={current === id}
           className="vu-filter-tile"
-          onClick={() => ctl.applyFilter(item, id)}
+          onClick={() => {
+            ctl.applyFilter(item, id);
+            // Picking a look for a clip makes that clip the selection, so it's clear what changed.
+            ctl.select(item.id, { keepPanel: true });
+          }}
         >
           <TileImage bitmap={tiles?.[i] ?? null} />
           <span className="vu-filter-name">
@@ -309,7 +323,7 @@ type Flipbooks = {
 function useFlipbooks(item: Extract<Item, { transitionIn: unknown }>): Flipbooks {
   const ctl = useController();
   const prevId = useProject((p) => {
-    const items = mainTrack(p).items;
+    const items = findItem(p, item.id)?.track.items ?? [];
     const i = items.findIndex((x) => x.id === item.id);
     return i > 0 ? items[i - 1]!.id : null;
   });
@@ -526,13 +540,13 @@ function TransitionTile({
 export function TransitionGrid(): ReactElement {
   const ctl = useController();
   const l = useLabels();
-  const { transition, hasClips } = useTargets();
+  const { transition, transitionNote, hasClips } = useTargets();
   useAutoSelect(transition?.id ?? null);
   if (!transition || !('transitionIn' in transition)) {
     return (
       <EmptyState
         icon="transition"
-        title={l.transitionsNeedTwo}
+        title={transitionNote ?? l.transitionsNeedTwo}
         action={
           <Button
             icon="plus"
@@ -544,10 +558,16 @@ export function TransitionGrid(): ReactElement {
       />
     );
   }
-  return <TransitionChoices item={transition} />;
+  return <TransitionChoices item={transition} note={transitionNote} />;
 }
 
-function TransitionChoices({ item }: { item: Extract<Item, { transitionIn: unknown }> }) {
+function TransitionChoices({
+  item,
+  note,
+}: {
+  item: Extract<Item, { transitionIn: unknown }>;
+  note: string | null;
+}) {
   const ctl = useController();
   const l = useLabels();
   const current = item.transitionIn;
@@ -573,6 +593,7 @@ function TransitionChoices({ item }: { item: Extract<Item, { transitionIn: unkno
           : null,
       ),
     );
+    ctl.select(item.id, { keepPanel: true });
     if (type) preview(duration);
   };
 
@@ -581,6 +602,7 @@ function TransitionChoices({ item }: { item: Extract<Item, { transitionIn: unkno
       <p className="vu-target" data-active="">
         {l.transitionsFor(itemTitle(item, ctl.project.assets))}
       </p>
+      {note ? <p className="vu-hint">{note}</p> : null}
       {current && preset ? (
         <>
           {preset.directions?.length ? (

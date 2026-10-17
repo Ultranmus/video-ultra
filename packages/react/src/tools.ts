@@ -3,7 +3,7 @@ import type { EditorController } from './controller';
 import type { IconName } from './icons';
 import type { Labels } from './labels';
 import type { PanelId, ToolId } from './state';
-import type { Targets } from './targets';
+import { hasCutInto, type Targets } from './targets';
 
 /** One entry of the phone/tablet contextual toolbar. */
 export interface ToolEntry {
@@ -89,18 +89,17 @@ export function toolsFor(
     { key: 'crop', icon: 'crop', label: l.crop, tip: l.tipCrop, tool: 'crop' },
     { key: 'transform', icon: 'rotate', label: l.rotate, tip: l.tipRotate, tool: 'transform' },
   ];
-  const transition: ToolEntry[] =
-    index > 0
-      ? [
-          {
-            key: 'transition',
-            icon: 'transition',
-            label: l.transition,
-            tip: l.tipTransition,
-            tool: 'transition',
-          },
-        ]
-      : [];
+  const transition: ToolEntry[] = hasCutInto(project, item.id)
+    ? [
+        {
+          key: 'transition',
+          icon: 'transition',
+          label: l.transition,
+          tip: l.tipTransition,
+          tool: 'transition',
+        },
+      ]
+    : [];
   const animate: ToolEntry[] = onMain
     ? []
     : [{ key: 'animate', icon: 'sparkle', label: l.animate, tip: l.tipAnimate, tool: 'animate' }];

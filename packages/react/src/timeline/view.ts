@@ -23,7 +23,9 @@ import {
   addButtonRect,
   clampPps,
   contentHeight,
+  GROUP_ORDER,
   hitTest,
+  isCut,
   isLayerTrack,
   layoutRows,
   majorTickSeconds,
@@ -304,7 +306,7 @@ export class TimelineView {
       mainTrack: px('--vu-size-track-main', 56),
       track: px('--vu-size-track', 44),
       gap: px('--vu-space-2', 8) * 0.75,
-      header: this.#phone ? 0 : px('--vu-size-touch', 40),
+      header: this.#phone ? 0 : px('--vu-size-timeline-header', 84),
       trimHandle: px('--vu-size-trim-handle', 12),
       slot: px('--vu-size-timeline-slot', 30) + px('--vu-space-2', 8) * 0.75,
     };
@@ -807,11 +809,11 @@ export class TimelineView {
   }
 
   /**
-   * Where a clip whose centre is at (`centreT`, `centreY`) lands. Pictures and text: over the top
-   * slot (or above every row) → a new top layer; the top or bottom quarter of a layer row → a new
-   * layer just in front of / behind it; the middle of a row of its kind with room → that lane;
-   * over the main track → into the sequence (pictures) or a new layer right above it (text,
-   * stickers). Sound only goes to sound lanes, below the main track.
+   * Where a clip whose centre is at (`centreT`, `centreY`) lands. Over the main video: into the
+   * sequence (pictures) or a new lane of its kind. Over the slot under the main video: a new
+   * picture layer. The top or bottom quarter of a row of its kind: a new lane just above / below
+   * it; the middle with room: that lane. Over a row of another kind: a new lane at the near end
+   * of its own group (rows stay grouped: video, layers, text, sound).
    */
   #dropTarget(item: Item, start: Time, centreY: number, centreT: Time): DropTarget {
     const project = this.#ctl.project;
@@ -828,50 +830,39 @@ export class TimelineView {
       centreY >= row.top - m.gap / 2 && centreY < row.top + row.height + m.gap / 2;
     const above = (row: Row) => row.top - m.gap / 2;
     const below = (row: Row) => row.top + row.height + m.gap / 2;
+    const slot = slotRect(m, this.#scrollY);
+    const slotMid = slot.top + slot.height / 2;
+    const group = rows.filter((r) => r.track.kind === kind);
+    const before = rows.filter((r) => GROUP_ORDER[r.track.kind] < GROUP_ORDER[kind]);
+    const groupStart = (): DropTarget => {
+      if (kind === 'overlay') return { type: 'new', index: group[0]?.index ?? 1, y: slotMid };
+      if (group[0]) return { type: 'new', index: group[0].index, y: above(group[0]) };
+      const last = before[before.length - 1] ?? main;
+      return { type: 'new', index: project.tracks.length, y: below(last) };
+    };
+    const groupEnd = (): DropTarget => {
+      const last = group[group.length - 1];
+      return last ? { type: 'new', index: last.index + 1, y: below(last) } : groupStart();
+    };
 
-    if (kind === 'audio') {
-      const sound = rows.filter((r) => r.track.kind === 'audio');
-      for (const row of sound) {
-        if (!inRow(row)) continue;
-        const f = (centreY - row.top) / row.height;
-        if (f < 0.25) return { type: 'new', index: row.index, y: above(row) };
-        if (f > 0.75) return { type: 'new', index: row.index + 1, y: below(row) };
-        return fits(row)
-          ? { type: 'lane', trackId: row.track.id }
-          : { type: 'new', index: row.index + 1, y: below(row) };
-      }
-      const last = sound[sound.length - 1];
-      if (last && centreY >= below(last))
-        return { type: 'new', index: project.tracks.length, y: below(last) };
-      return { type: 'new', index: sound[0]?.index ?? project.tracks.length, y: below(main) };
+    if (centreY < below(main)) {
+      return ALLOWED_KINDS.main.includes(item.kind)
+        ? { type: 'main', index: reorderIndex(main.track.items, item.id, centreT) }
+        : groupStart();
     }
-
-    const toMain = ALLOWED_KINDS.main.includes(item.kind);
-    const intoMain = (): DropTarget => ({
-      type: 'main',
-      index: reorderIndex(main.track.items, item.id, centreT),
-    });
-    const layers = rows.filter((r) => isLayerTrack(r.track));
-    const top = layers[0] ?? main;
-    if (centreY < above(top)) {
-      const slot = slotRect(m, this.#scrollY);
-      return {
-        type: 'new',
-        index: layers[0] ? layers[0].index + 1 : 1,
-        y: slot.top + slot.height / 2,
-      };
-    }
-    for (const row of layers) {
-      if (!inRow(row)) continue;
+    if (centreY < slot.top + slot.height + m.gap / 2) return groupStart();
+    for (const row of rows) {
+      if (row === main || !inRow(row)) continue;
+      if (row.track.kind !== kind)
+        return GROUP_ORDER[row.track.kind] < GROUP_ORDER[kind] ? groupStart() : groupEnd();
       const f = (centreY - row.top) / row.height;
-      if (f < 0.25) return { type: 'new', index: row.index + 1, y: above(row) };
-      if (f > 0.75) return { type: 'new', index: row.index, y: below(row) };
+      if (f < 0.25) return { type: 'new', index: row.index, y: above(row) };
+      if (f > 0.75) return { type: 'new', index: row.index + 1, y: below(row) };
       return fits(row)
         ? { type: 'lane', trackId: row.track.id }
-        : { type: 'new', index: row.index + 1, y: above(row) };
+        : { type: 'new', index: row.index + 1, y: below(row) };
     }
-    // Over (or below) the main track.
-    return toMain ? intoMain() : { type: 'new', index: 1, y: above(main) };
+    return groupEnd();
   }
 
   #trackOf(itemId: string): string | undefined {
@@ -1089,6 +1080,7 @@ export class TimelineView {
       ctx.fillStyle = row.track.kind === 'main' ? c.track : c.slot;
       this.#roundRect(contentLeft + 4, row.top, w - contentLeft - 8, row.height, this.#radius + 2);
       ctx.fill();
+      if (m.header === 0) this.#drawRowNames([row], rows);
       this.#drawRow(row, scale, project, selectedId);
     }
     if (drag?.type === 'move') this.#drawDrop(drag, scale, rows, project);
@@ -1114,15 +1106,32 @@ export class TimelineView {
     this.#cache.flush();
   }
 
+  /** A row's name: "Video", "Layer", "Text", "Audio" (numbered when a kind has several). */
+  #rowName(row: Row, rows: Row[]): string {
+    const l = this.#ctl.labels;
+    const name =
+      row.track.kind === 'main'
+        ? l.rowVideo
+        : row.track.kind === 'overlay'
+          ? l.rowLayer
+          : row.track.kind === 'text'
+            ? l.rowText
+            : l.rowAudio;
+    const same = rows.filter((r) => r.track.kind === row.track.kind);
+    return same.length > 1 && row.track.kind !== 'main' ? `${name} ${same.indexOf(row) + 1}` : name;
+  }
+
+  /** The row names column: icon + name per row; tapping toggles sound (video, audio) or hiding. */
   #drawHeader(rows: Row[]): void {
     const ctx = this.#ctx;
     const m = this.#m;
-    ctx.fillStyle = this.#c.bg;
+    const c = this.#c;
+    ctx.fillStyle = c.bg;
     ctx.fillRect(0, 0, m.header, this.#height);
     const icons: Record<string, string> = {
       main: 'M3 6.5A2.5 2.5 0 015.5 4h13A2.5 2.5 0 0121 6.5v11a2.5 2.5 0 01-2.5 2.5h-13A2.5 2.5 0 013 17.5zM10 9v6l5-3z',
       text: 'M5 6V4.5h14V6M12 4.5v15M9 19.5h6',
-      overlay: 'M20 12a8 8 0 11-8-8M20 12l-8-8M20 12h-5a3 3 0 01-3-3V4',
+      overlay: 'M4 8.5h11v11H4zM9 4.5h11v11',
       audio: 'M9 18V5.5l11-2V16M9 18a3 3 0 11-6 0 3 3 0 016 0zM20 16a3 3 0 11-6 0 3 3 0 016 0z',
       off: 'M3 3l18 18',
     };
@@ -1130,27 +1139,42 @@ export class TimelineView {
     ctx.beginPath();
     ctx.rect(0, m.ruler, m.header, this.#height - m.ruler);
     ctx.clip();
+    ctx.font = `600 11px ${c.font}`;
+    ctx.textBaseline = 'middle';
     for (const row of rows) {
-      const size = 16;
-      const cx = m.header / 2;
+      const size = 14;
       const cy = row.top + row.height / 2;
       const off = row.track.muted || row.track.hidden;
       if (this.#hoverHeader === row.track.id) {
-        ctx.fillStyle = this.#c.surface;
-        this.#roundRect(cx - 14, cy - 14, 28, 28, 8);
+        ctx.fillStyle = c.surface;
+        this.#roundRect(4, row.top + 2, m.header - 8, row.height - 4, 8);
         ctx.fill();
       }
       ctx.save();
-      ctx.translate(cx - size / 2, cy - size / 2);
+      ctx.translate(12, cy - size / 2);
       ctx.scale(size / 24, size / 24);
-      ctx.strokeStyle = off ? this.#c.subtle : this.#c.muted;
-      ctx.lineWidth = 1.75;
+      ctx.strokeStyle = off ? c.subtle : row.track.kind === 'main' ? c.label : c.muted;
+      ctx.lineWidth = 1.9;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-      ctx.stroke(this.#icon(row.track.kind, icons[row.track.kind]!));
+      ctx.stroke(this.#icon(`row-${row.track.kind}`, icons[row.track.kind]!));
       if (off) ctx.stroke(this.#icon('off', icons.off!));
       ctx.restore();
+      ctx.fillStyle = off ? c.subtle : row.track.kind === 'main' ? c.label : c.muted;
+      ctx.fillText(this.#ellipsize(this.#rowName(row, rows), m.header - 38), 32, cy + 0.5);
     }
+    ctx.restore();
+  }
+
+  /** Phones have no names column: each row's name sits faintly at its left, under the clips. */
+  #drawRowNames(shown: Row[], rows: Row[]): void {
+    const ctx = this.#ctx;
+    const c = this.#c;
+    ctx.save();
+    ctx.font = `600 10px ${c.font}`;
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = c.subtle;
+    for (const row of shown) ctx.fillText(this.#rowName(row, rows), 12, row.top + 4);
     ctx.restore();
   }
 
@@ -1170,9 +1194,10 @@ export class TimelineView {
       const alpha = item.id === lifted ? 0.3 : row.track.hidden ? 0.45 : 1;
       this.#drawItem(item, x1, x2, row, project, item.id === selectedId && !lifted, alpha);
     }
-    if (row.track.kind !== 'main') return;
-    // Transition markers on cuts.
+    if (row.track.kind !== 'main' && row.track.kind !== 'overlay') return;
+    // Transition markers on cuts (main track; touching pictures on a layer).
     for (let i = 1; i < items.length; i++) {
+      if (!isCut(items, i)) continue;
       const item = items[i]!;
       const x = timeToX(scale, item.start);
       if (x < left - 12 || x > this.#width + 12) continue;
@@ -1196,6 +1221,7 @@ export class TimelineView {
       ctx.lineTo(x + 5, y + 3.5);
       ctx.fill();
     }
+    if (row.track.kind !== 'main') return;
     // "+" add media.
     const last = items[items.length - 1];
     const end = last ? itemEnd(last) : 0;
@@ -1248,11 +1274,17 @@ export class TimelineView {
     ctx.fillStyle = active ? c.accentSoft : c.slot;
     this.#roundRect(x + 0.5, slot.top + 0.5, w - 1, slot.height - 1, this.#radius + 2);
     ctx.fill();
-    if (active || drag || !layers) ctx.stroke();
+    ctx.stroke();
     ctx.setLineDash([]);
     // The hint stays at the left edge of the view, whatever the scroll.
     const l = this.#ctl.labels;
-    const text = active ? l.dropNewLayer : drag ? l.newLane : layers ? '' : l.layerSlotHint;
+    const text = active
+      ? l.dropNewLayer
+      : drag
+        ? l.newLane
+        : layers
+          ? l.layerSlotShort
+          : l.layerSlotHint;
     if (text) {
       const cy = slot.top + slot.height / 2;
       const ix = x + 12;

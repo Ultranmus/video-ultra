@@ -294,6 +294,37 @@ describe('main ↔ layers', () => {
   });
 });
 
+describe('layer transitions', () => {
+  const layered = () => {
+    const { project, ids } = setup();
+    const lane = moveMainToLane(project, 'b', s(1), ids, 1);
+    const pic2 = imageItem('pic2', 2);
+    pic2.start = s(4); // touches b (1 s + 3 s)
+    addToLane(project, pic2, ids, lane);
+    return { project, ids, lane };
+  };
+
+  it('plays between two touching pictures on a layer', () => {
+    const { project, lane } = layered();
+    setTransition(project, 'pic2', { type: 'fade', duration: s(1) });
+    const track = project.tracks.find((t) => t.id === lane)!;
+    expect(track.items.map((i) => i.id)).toEqual(['b', 'pic2']);
+    const pic2 = track.items[1]!;
+    expect('transitionIn' in pic2 && pic2.transitionIn?.type).toBe('fade');
+    expect(checkInvariants(project)).toEqual([]);
+  });
+
+  it('is refused across a gap and removed when the clips are moved apart', () => {
+    const { project, ids } = layered();
+    setTransition(project, 'pic2', { type: 'fade', duration: s(1) });
+    moveItem(project, 'pic2', s(6), ids);
+    const pic2 = findItem(project, 'pic2')!.item;
+    expect('transitionIn' in pic2 && pic2.transitionIn).toBe(null);
+    expect(() => setTransition(project, 'pic2', { type: 'fade', duration: s(1) })).toThrow();
+    expect(checkInvariants(project)).toEqual([]);
+  });
+});
+
 describe('transition options', () => {
   it('stores direction and ease, keeps them when only the length changes', () => {
     const { project } = setup();

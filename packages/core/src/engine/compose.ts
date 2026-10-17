@@ -533,8 +533,10 @@ export class Composer {
   ): Promise<Draft | null> {
     const item = layer.item;
     const slot = this.slot(index);
-    // Transitions move only the two main-track clips at a cut; lanes are never touched by them.
-    const transition = layer.track.kind === 'main' ? layer.transition : null;
+    // A transition moves only the two clips of its own cut (main track, or two touching pictures
+    // on one layer); other layers are never touched by it.
+    const transition = layer.transition;
+    const onLayer = layer.track.kind !== 'main';
     const look = transition
       ? transitionLook(
           transition.type,
@@ -552,7 +554,8 @@ export class Composer {
     const hidden = (look !== null && !look.visible) || (anim !== null && anim.opacity <= 0);
     const opacity = (look?.opacity ?? 1) * (anim?.opacity ?? 1);
     const finish = () => {
-      if (look) moveOnCanvas(slot.geometry, width, height, look);
+      // On a layer the clip moves within its own box (a picture-in-picture stays an element).
+      if (look) (onLayer ? moveInBox : moveOnCanvas)(slot.geometry, width, height, look);
       if (anim) moveInBox(slot.geometry, width, height, anim);
     };
 
