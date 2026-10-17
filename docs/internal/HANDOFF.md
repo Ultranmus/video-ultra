@@ -2,6 +2,15 @@
 
 Where the last session stopped and what comes next. Update before ending every session.
 
+## 2026-10-17 (UI round 3 — effects library)
+
+Done from the owner's third list: ruler sliders, icon rows, 146 text styles, sticker library (3D /
+emoji / shapes / upload), colour picker, scrollbars, Saved chip, full-screen icon, transitions
+(76 presets / 161 styles, categories, direction + feel, animated tiles, play-once preview),
+115 filters in 15 categories, Animate (In / Out / Loop), clear targets, lane drops into new
+lanes. Waiting on the owner to try it (desktop, then iPhone). The "zoom also moved stickers"
+report isn't reproducible in the engine — ask for a recording if it recurs.
+
 ## 2026-10-17 (UI second pass)
 
 The owner rejected the first UI after testing it (desktop + phone). It was rebuilt to
