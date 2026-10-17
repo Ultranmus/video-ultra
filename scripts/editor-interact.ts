@@ -132,6 +132,13 @@ for (const name of browsers) {
   const trimmed = (before - s.main[0]!.duration) / 705_600_000;
   await check('trim end handle', trimmed > 0.4 && trimmed < 0.9, `${trimmed.toFixed(2)} s shorter`);
 
+  // Lane header icon toggles the main track's sound.
+  await page.mouse.click(box.x + 20, rowY);
+  const muted = await page.evaluate(() => (window as any).vuEditor.project.tracks[0].muted);
+  await page.mouse.click(box.x + 20, rowY);
+  const unmuted = await page.evaluate(() => !(window as any).vuEditor.project.tracks[0].muted);
+  await check('lane header mute toggle', muted && unmuted);
+
   // Add text and type.
   await page.locator('.vu-rail .vu-tool', { hasText: 'Text' }).click();
   await page.locator('.vu-panel .vu-primary', { hasText: 'Add text' }).click();

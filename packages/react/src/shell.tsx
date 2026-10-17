@@ -351,34 +351,42 @@ function TimelineA11y({ onReveal }: { onReveal: (item: Item) => void }): ReactEl
       aria-label={l.timeline}
       aria-description={l.timelineHelp}
     >
-      {tracks.map((track, ti) => (
-        <div
-          key={track.id}
-          role="listbox"
-          aria-label={
-            ti === 0 ? l.mainTrack : l.lane(l.kind[track.items[0]?.kind ?? 'video'] ?? '', ti)
-          }
-        >
-          {track.items.map((item, index) => {
-            n++;
-            return (
-              <div
-                key={item.id}
-                role="option"
-                tabIndex={selectedId === item.id || (selectedId === null && n === 1) ? 0 : -1}
-                aria-selected={selectedId === item.id}
-                aria-label={`${l.clipLabel(index + 1, l.kind[item.kind] ?? item.kind, formatTime(item.start), formatTime(itemEnd(item)))}: ${itemTitle(item, assets)}`}
-                onFocus={() => {
-                  ctl.select(item.id);
-                  ctl.seek(item.start);
-                  onReveal(item);
-                }}
-                onKeyDown={(e) => onKey(e, item, track.kind, index)}
-              />
-            );
-          })}
-        </div>
-      ))}
+      {tracks.map((track, ti) => {
+        const sound = track.kind === 'main' || track.kind === 'audio';
+        const name =
+          ti === 0 ? l.mainTrack : l.lane(l.kind[track.items[0]?.kind ?? 'video'] ?? '', ti);
+        return (
+          <div key={track.id} role="group" aria-label={name}>
+            <button
+              type="button"
+              aria-pressed={sound ? track.muted : track.hidden}
+              onClick={() => ctl.toggleTrack(track.id)}
+            >
+              {sound ? l.muteTrack(name) : l.hideTrack(name)}
+            </button>
+            <div role="listbox" aria-label={name}>
+              {track.items.map((item, index) => {
+                n++;
+                return (
+                  <div
+                    key={item.id}
+                    role="option"
+                    tabIndex={selectedId === item.id || (selectedId === null && n === 1) ? 0 : -1}
+                    aria-selected={selectedId === item.id}
+                    aria-label={`${l.clipLabel(index + 1, l.kind[item.kind] ?? item.kind, formatTime(item.start), formatTime(itemEnd(item)))}: ${itemTitle(item, assets)}`}
+                    onFocus={() => {
+                      ctl.select(item.id);
+                      ctl.seek(item.start);
+                      onReveal(item);
+                    }}
+                    onKeyDown={(e) => onKey(e, item, track.kind, index)}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

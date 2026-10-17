@@ -84,4 +84,4 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       the project's sound is recorded too. Offer "mute while recording".
 - [ ] File handles (Chromium desktop): import still copies into OPFS; use `showOpenFilePicker` +
       `putMediaHandle` and a re-link flow.
-- [ ] Timeline: lanes have no per-lane mute/hide/lock buttons yet (icons only).
+- [x] Timeline: lane header icons toggle mute (main/audio) / hide (visual lanes), with buttons in the accessible layer. Lock: not exposed yet.

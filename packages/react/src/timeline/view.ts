@@ -348,6 +348,15 @@ export class TimelineView {
     }
     if (this.#pointers.size > 2 || e.button > 0) return;
 
+    // Lane header icons toggle mute (sound) / hide (pictures).
+    if (p.x < this.#m.header && p.y > this.#m.ruler) {
+      const row = layoutRows(this.#ctl.project, this.#m, this.#scrollY).find(
+        (r) => p.y >= r.top && p.y < r.top + r.height,
+      );
+      if (row) this.#ctl.toggleTrack(row.track.id);
+      return;
+    }
+
     const hit = this.#hit(p.x, p.y);
     const ui = this.#ctl.ui.getState();
     if (ui.playing && hit.type !== 'add') this.#ctl.pause();

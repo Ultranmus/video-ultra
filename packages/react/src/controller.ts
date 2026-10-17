@@ -15,6 +15,7 @@ import {
   projectDuration,
   projectFrame,
   randomId,
+  setTrackFlags,
   splitItem,
   updateItem,
   type Asset,
@@ -414,6 +415,17 @@ export class EditorController {
       addToLane(d, audio, ctx.ids);
       updateItem(d, item.id, { muted: true });
     });
+  }
+
+  /** Lane header toggle: mutes the main track and audio lanes, hides visual lanes. */
+  toggleTrack(trackId: string): void {
+    const track = this.project.tracks.find((t) => t.id === trackId);
+    if (!track) return;
+    const sound = track.kind === 'main' || track.kind === 'audio';
+    this.run(
+      sound ? (track.muted ? this.labels.unmute : this.labels.mute) : this.labels.hideLane,
+      (d) => setTrackFlags(d, trackId, sound ? { muted: !track.muted } : { hidden: !track.hidden }),
+    );
   }
 
   /** Adds an overlay/lane item at the playhead and selects it. */
