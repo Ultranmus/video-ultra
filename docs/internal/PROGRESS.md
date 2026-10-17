@@ -139,3 +139,19 @@ worktrees, merged and integrated).
   violations, dark + light, phone + desktop). Fixed on the way: strict-mode double mount killed
   the engine (#46), shortcuts lost after clicking the canvas (#51), element resets outranking
   component classes, a banner covering the controls (#50), quiet audio drawing flat.
+
+## 2026-10-17 · Editor UI second pass (owner review)
+
+The owner tested the first UI on desktop and phone and rejected it (no tooltips or guidance,
+duplicate menus, cramped/overlapping hover states, empty panels, black canvas melting into the
+chrome, no split feedback, dead buttons, glitchy trim and drag, mixed-axis scrolling, filters and
+transitions hard to find; on phones: sheet hard to close, fullscreen did nothing, flickering
+timecode, drags fighting Safari, keyboard cutting the text box, crude selection boxes). Rebuilt to
+UI_VISION §9 with image-ultra as the bar: tooltip layer, disabled-with-reason actions
+(`targets.ts`), one home per control, inspector sections, engine-rendered filter thumbnails,
+transition tiles + apply-to-all, action toasts with Undo and a cut flash, empty states, lighter
+stage with a framed canvas, floating-copy drags with drop outlines, trim that keeps the playhead,
+one-axis wheel, neutral lane clips, phone dock + Back/Done, Preview mode, keyboard-aware bottom
+area, no iOS callout/selection, tenths timecode. `scripts/ui-review.ts` walks desktop + phone and
+saves screenshots; all were reviewed (dark + light). Interaction (Chrome, WebKit, Firefox),
+recovery and axe checks pass; `pnpm verify` green.

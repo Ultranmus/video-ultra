@@ -9,13 +9,13 @@ import {
   findItem,
   freezeFrame,
   insertMain,
-  itemEnd,
   mainTrack,
   parseProject,
   projectDuration,
   projectFrame,
   randomId,
   setTrackFlags,
+  setTransition,
   splitItem,
   updateItem,
   type Asset,
@@ -42,7 +42,8 @@ import {
   type ProjectStorage,
 } from '@video-ultra/core/internal';
 import { produce } from 'immer';
-import { audioItem, visualItem } from './items';
+import { audioItem, itemTitle, visualItem } from './items';
+import { computeTargets, type Targets } from './targets';
 import type { Labels } from './labels';
 import { createUiStore, Playhead, type LayoutMode, type PanelId, type ToolId } from './state';
 
@@ -199,6 +200,8 @@ export class EditorController {
     }
     this.engine = engine;
     engine.onTime = (time, playing) => {
+      // A trim drag shows the edge frame without moving the playhead.
+      if (this.#previewSeeking && !playing) return;
       this.playhead.set(time);
       if (this.ui.getState().playing !== playing) this.ui.setState({ playing });
     };
@@ -267,6 +270,31 @@ export class EditorController {
       const next = this.#pendingSeek;
       this.#pendingSeek = null;
       if (next !== null) void this.engine?.seek(next).catch(() => {});
+    });
+  }
+
+  #previewSeeking = false;
+  #previewSeekScheduled = false;
+  #previewSeekTime = 0;
+
+  /**
+   * Shows the frame at `time` in the preview without moving the playhead (trimming shows the new
+   * edge); `null` returns the preview to the playhead. Coalesced per frame.
+   */
+  previewSeek(time: Time | null): void {
+    if (time === null) {
+      if (!this.#previewSeeking) return;
+      this.#previewSeeking = false;
+      void this.engine?.seek(this.playhead.time).catch(() => {});
+      return;
+    }
+    this.#previewSeeking = true;
+    this.#previewSeekTime = Math.max(0, Math.round(time));
+    if (this.#previewSeekScheduled) return;
+    this.#previewSeekScheduled = true;
+    requestAnimationFrame(() => {
+      this.#previewSeekScheduled = false;
+      if (this.#previewSeeking) void this.engine?.seek(this.#previewSeekTime).catch(() => {});
     });
   }
 
@@ -349,51 +377,126 @@ export class EditorController {
     this.ui.setState({ panel, tool: null });
   }
 
+  /** The ratio button: video settings live in the inspector (desktop) or the dock (phone/tablet). */
+  openCanvasSettings(): void {
+    if (this.ui.getState().layout === 'desktop') this.select(null);
+    else this.ui.setState({ selectedId: null, tool: 'canvas', sheetPanel: false });
+  }
+
+  /** Preview mode: just the video and play controls; real fullscreen where the browser allows. */
+  #root: HTMLElement | null = null;
+  /** The editor's root element (preview mode's fullscreen target). */
+  setRoot(root: HTMLElement | null): void {
+    this.#root = root;
+  }
+
+  setPreviewMode(on: boolean): void {
+    const root = this.#root;
+    this.ui.setState({ previewMode: on, tool: null, sheetPanel: false });
+    if (!on && typeof document !== 'undefined' && document.fullscreenElement)
+      void document.exitFullscreen().catch(() => {});
+    if (on && root?.requestFullscreen && document.fullscreenEnabled)
+      void root.requestFullscreen().catch(() => {});
+  }
+
+  #zoomHandler: ((factor: number) => void) | null = null;
+  /** The timeline registers how to zoom around the playhead. */
+  setZoomHandler(handler: ((factor: number) => void) | null): () => void {
+    this.#zoomHandler = handler;
+    return () => {
+      if (this.#zoomHandler === handler) this.#zoomHandler = null;
+    };
+  }
+  zoom(factor: number): void {
+    this.#zoomHandler?.(factor);
+  }
+
   setLayout(layout: LayoutMode): void {
     if (this.ui.getState().layout !== layout) this.ui.setState({ layout });
   }
 
   /** The item to split/freeze: the selection, or the main clip under the playhead. */
-  #targetAtPlayhead(): Item | null {
-    const selected = this.selectedItem();
-    if (selected) return selected;
-    const items = mainTrack(this.project).items;
-    return items[itemIndexAt(items, this.playhead.time)] ?? null;
+  /** What each action would act on now (shared with the buttons, see targets.ts). */
+  targets(): Targets {
+    return computeTargets(
+      this.project,
+      this.ui.getState().selectedId,
+      this.playhead.time,
+      this.labels,
+    );
   }
 
+  /** Splits the selection (or the main clip under the playhead) at the playhead. */
   split(): void {
-    const item = this.#targetAtPlayhead();
-    if (!item) return;
-    const t = this.playhead.time;
-    const frame = projectFrame(this.project);
-    if (t < item.start + frame || t > itemEnd(item) - frame) {
-      this.toast(this.labels.splitOutside, 'info');
+    const { split } = this.targets();
+    if (!split.item) {
+      if (split.reason) this.toast(split.reason, 'info');
       return;
     }
+    const item = split.item;
+    const t = this.playhead.time;
     const second = this.run(this.labels.split, (d, ctx) => splitItem(d, item.id, t, ctx.ids));
-    if (second && this.ui.getState().selectedId) this.select(second);
+    if (!second) return;
+    // Show what happened: the cut flashes on the timeline and the new right half is selected.
+    this.#emitCut(t);
+    this.select(second);
+    this.toast(this.labels.splitDone, 'success', {
+      label: this.labels.undo,
+      run: () => this.undo(),
+    });
   }
 
   deleteSelected(): void {
     const item = this.selectedItem();
     if (!item) return;
+    const name = itemTitle(item, this.project.assets);
     this.run(this.labels.delete, (d) => deleteItem(d, item.id));
+    if (findItem(this.project, item.id)) return; // refused (e.g. locked track): run() said why
+    this.toast(this.labels.deletedDone(name), 'info', {
+      label: this.labels.undo,
+      run: () => this.undo(),
+    });
   }
 
   duplicateSelected(): void {
     const item = this.selectedItem();
     if (!item) return;
     const id = this.run(this.labels.duplicate, (d, ctx) => duplicateItem(d, item.id, ctx.ids));
-    if (id) this.select(id);
+    if (!id) return;
+    this.select(id);
+    this.toast(this.labels.duplicatedDone, 'success', {
+      label: this.labels.undo,
+      run: () => this.undo(),
+    });
   }
 
   freezeSelected(): void {
-    const item = this.#targetAtPlayhead();
-    if (!item) return;
+    const { freeze } = this.targets();
+    if (!freeze.item) {
+      if (freeze.reason) this.toast(freeze.reason, 'info');
+      return;
+    }
+    const item = freeze.item;
     const id = this.run(this.labels.freeze, (d, ctx) =>
       freezeFrame(d, item.id, this.playhead.time, ctx.ids),
     );
-    if (id) this.select(id);
+    if (!id) return;
+    this.#emitCut(this.playhead.time);
+    this.select(id);
+    this.toast(this.labels.frozenDone, 'success', {
+      label: this.labels.undo,
+      run: () => this.undo(),
+    });
+  }
+
+  /** Timeline listeners for "a cut happened here" (the split flash). */
+  readonly #cutListeners = new Set<(t: Time) => void>();
+  onCut(listener: (t: Time) => void): () => void {
+    this.#cutListeners.add(listener);
+    return () => this.#cutListeners.delete(listener);
+  }
+  #emitCut(t: Time): void {
+    for (const listener of this.#cutListeners) listener(t);
   }
 
   /** Copies a video's sound to an audio lane and mutes the video, so it can be edited alone. */
@@ -410,6 +513,35 @@ export class EditorController {
       audio.volume = item.volume;
       addToLane(d, audio, ctx.ids);
       updateItem(d, item.id, { muted: true });
+    });
+  }
+
+  /** Sets (or clears) a clip's filter; keeps the intensity the user chose. */
+  applyFilter(item: Item, filterId: string | null): void {
+    const intensity = 'filter' in item && item.filter ? item.filter.intensity : 1;
+    this.run(this.labels.filter, (d) =>
+      updateItem(d, item.id, { filter: filterId ? { id: filterId, intensity } : null }),
+    );
+  }
+
+  /** Sets (or clears) the transition into a main-track clip. */
+  applyTransition(item: Item, type: string | null, duration: Time): void {
+    this.run(this.labels.transition, (d) =>
+      setTransition(d, item.id, type ? { type, duration } : null),
+    );
+  }
+
+  /** The same transition between every pair of main-track clips. */
+  applyTransitionToAll(type: string, duration: Time): void {
+    const label = this.labels.transition;
+    this.run(label, (d) => {
+      for (const clip of mainTrack(d).items.slice(1)) {
+        try {
+          setTransition(d, clip.id, { type, duration });
+        } catch {
+          // Clips too short for a transition keep a plain cut.
+        }
+      }
     });
   }
 
@@ -540,9 +672,15 @@ export class EditorController {
 
   // ── feedback ───────────────────────────────────────────────────────────
 
-  toast(message: string, tone: 'info' | 'error' | 'success' = 'info'): void {
+  toast(
+    message: string,
+    tone: 'info' | 'error' | 'success' = 'info',
+    action?: { label: string; run: () => void },
+  ): void {
     const id = ++this.#toastId;
-    this.ui.setState((s) => ({ toasts: [...s.toasts.slice(-2), { id, message, tone }] }));
+    this.ui.setState((s) => ({
+      toasts: [...s.toasts.slice(-2), { id, message, tone, ...(action ? { action } : {}) }],
+    }));
     // Long enough to read: ~60 ms per character, at least 3.5 s (errors 7 s).
     setTimeout(
       () => this.dismissToast(id),

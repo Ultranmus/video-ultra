@@ -88,7 +88,7 @@ for (const name of browsers) {
     await page.locator('[role="option"]').first().focus();
     await page.waitForTimeout(400);
     await shot(page, `${tag}-2-selected`);
-    const tool = page.locator('.vu-tool', { hasText: 'Speed' }).first();
+    const tool = page.locator('.vu-toolbar .vu-btn', { hasText: 'Speed' }).first();
     if (await tool.isVisible()) await tool.click();
     await page.waitForTimeout(400);
     await shot(page, `${tag}-3-tool`);

@@ -3,7 +3,8 @@
   .vu-root {
     /* Colour — dark */
     --vu-bg: #0b0b0d;
-    --vu-stage: #060607;
+    /* The stage is lighter than black footage, so the canvas edge always shows. */
+    --vu-stage: #141418;
     --vu-surface-1: #131316;
     --vu-surface-2: #1c1c21;
     --vu-surface-3: #26262d;
@@ -31,9 +32,15 @@
     --vu-timeline-bg: #0e0e11;
     --vu-track-bg: #16161a;
     --vu-clip-video: #3b3b46;
-    --vu-clip-text: #7a4a14;
-    --vu-clip-sticker: #1f5a4a;
-    --vu-clip-audio: #1e4466;
+    /* Lane clips are one calm neutral; kinds get only a thin accent stripe. */
+    --vu-clip-lane: #2a2a32;
+    --vu-clip-lane-hover: #33333c;
+    --vu-clip-text: #d9a35f;
+    --vu-clip-sticker: #5ec8a6;
+    --vu-clip-audio: #6ea8e0;
+    --vu-glyph-a: #6b6b78;
+    --vu-glyph-b: #9c479c;
+    --vu-glyph-ink: #ffffff;
     --vu-waveform: rgba(255, 255, 255, 0.55);
     /* The playhead spine is the accent (UI_VISION §8). */
     --vu-playhead: var(--vu-accent);
@@ -43,7 +50,8 @@
     /* Text and icons drawn over footage (thumbnails, stage) stay light in both themes. */
     --vu-on-media: #ffffff;
     --vu-stage-canvas: #000000;
-    --vu-shadow-stage: 0 0 0 1px rgba(255, 255, 255, 0.06);
+    --vu-shadow-stage: 0 0 0 1px rgba(255, 255, 255, 0.14), 0 8px 32px rgba(0, 0, 0, 0.45);
+    --vu-shadow-tooltip: 0 4px 14px rgba(0, 0, 0, 0.45);
     --vu-shadow-thumb: 0 1px 3px rgba(0, 0, 0, 0.4);
     --vu-swatch-hue-1: #ff4d6d;
     --vu-swatch-hue-2: #5b8cff;
@@ -90,7 +98,13 @@
     --vu-size-panel: 280px;
     --vu-size-inspector: 280px;
     --vu-size-toolbar: 64px;
-    --vu-size-track: 48px;
+    --vu-size-track: 44px;
+    --vu-size-dock: 280px;
+    --vu-size-filter-tile: 72px;
+    --vu-size-bar: 52px;
+    --vu-slider-rail: rgba(255, 255, 255, 0.16);
+    --vu-size-zoom: 120px;
+    --vu-size-tooltip: 280px;
     --vu-size-track-main: 56px;
     --vu-size-ruler: 24px;
     --vu-size-trim-handle: 12px;
@@ -126,7 +140,7 @@
 
   .vu-root[data-vu-theme='light'] {
     --vu-bg: #f4f4f6;
-    --vu-stage: #e9e9ed;
+    --vu-stage: #e2e2e8;
     --vu-surface-1: #ffffff;
     --vu-surface-2: #f1f1f4;
     --vu-surface-3: #e4e4ea;
@@ -148,11 +162,18 @@
     --vu-timeline-bg: #ececf0;
     --vu-track-bg: #f7f7f9;
     --vu-clip-video: #d9d9e3;
-    --vu-clip-text: #f3d9b5;
-    --vu-clip-sticker: #bfe6d8;
-    --vu-clip-audio: #c4daf0;
+    --vu-clip-lane: #ffffff;
+    --vu-clip-lane-hover: #f4f4f7;
+    --vu-slider-rail: rgba(0, 0, 0, 0.14);
+    --vu-clip-text: #b0742a;
+    --vu-clip-sticker: #23a07c;
+    --vu-clip-audio: #2f78c4;
+    --vu-glyph-a: #b9b9c4;
+    --vu-glyph-b: #4d194d;
+    --vu-glyph-ink: #ffffff;
     --vu-waveform: rgba(0, 0, 0, 0.45);
-    --vu-shadow-stage: 0 0 0 1px rgba(0, 0, 0, 0.08);
+    --vu-shadow-stage: 0 0 0 1px rgba(0, 0, 0, 0.12), 0 8px 28px rgba(0, 0, 0, 0.12);
+    --vu-shadow-tooltip: 0 4px 14px rgba(0, 0, 0, 0.16);
     --vu-trim-handle: #9a5b00;
     color-scheme: light;
   }
@@ -161,7 +182,7 @@
   @media (prefers-color-scheme: light) {
     .vu-root:not([data-vu-theme]) {
       --vu-bg: #f4f4f6;
-      --vu-stage: #e9e9ed;
+      --vu-stage: #e2e2e8;
       --vu-surface-1: #ffffff;
       --vu-surface-2: #f1f1f4;
       --vu-surface-3: #e4e4ea;
@@ -183,11 +204,18 @@
       --vu-timeline-bg: #ececf0;
       --vu-track-bg: #f7f7f9;
       --vu-clip-video: #d9d9e3;
-      --vu-clip-text: #f3d9b5;
-      --vu-clip-sticker: #bfe6d8;
-      --vu-clip-audio: #c4daf0;
+      --vu-clip-lane: #ffffff;
+      --vu-clip-lane-hover: #f4f4f7;
+      --vu-slider-rail: rgba(0, 0, 0, 0.14);
+      --vu-clip-text: #b0742a;
+      --vu-clip-sticker: #23a07c;
+      --vu-clip-audio: #2f78c4;
+      --vu-glyph-a: #b9b9c4;
+      --vu-glyph-b: #4d194d;
+      --vu-glyph-ink: #ffffff;
       --vu-waveform: rgba(0, 0, 0, 0.45);
-      --vu-shadow-stage: 0 0 0 1px rgba(0, 0, 0, 0.08);
+      --vu-shadow-stage: 0 0 0 1px rgba(0, 0, 0, 0.12), 0 8px 28px rgba(0, 0, 0, 0.12);
+      --vu-shadow-tooltip: 0 4px 14px rgba(0, 0, 0, 0.16);
       --vu-trim-handle: #9a5b00;
       color-scheme: light;
     }
@@ -206,7 +234,7 @@
     .vu-root {
       --vu-size-trim-handle: 20px;
       --vu-size-choice: 36px;
-      --vu-size-handle: 18px;
+      --vu-size-handle: 14px;
     }
   }
 }

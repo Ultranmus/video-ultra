@@ -38,6 +38,8 @@ export interface Toast {
   id: number;
   message: string;
   tone: 'info' | 'error' | 'success';
+  /** One follow-up, e.g. Undo. */
+  action?: { label: string; run: () => void };
 }
 
 /** UI-only state (selection, panels, playback flag). The project lives in the core editor store. */
@@ -56,6 +58,9 @@ export interface UiState {
   imports: ImportRow[];
   toasts: Toast[];
   exportOpen: boolean;
+  helpOpen: boolean;
+  /** Only the video and play controls (works everywhere, incl. iPhone). */
+  previewMode: boolean;
   save: 'idle' | 'saving' | 'saved';
   persistent: boolean | null;
   recording: boolean;
@@ -75,6 +80,8 @@ export function createUiStore() {
     imports: [],
     toasts: [],
     exportOpen: false,
+    helpOpen: false,
+    previewMode: false,
     save: 'idle',
     persistent: null,
     recording: false,

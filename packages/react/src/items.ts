@@ -111,7 +111,8 @@ export function stickerItem(
     duration: fromSeconds(OVERLAY_SECONDS),
     assetId: 'assetId' in content ? content.assetId : null,
     emoji: 'emoji' in content ? content.emoji : null,
-    transform: { ...DEFAULT_TRANSFORM, scale: 0.3 },
+    // Upper right, so it doesn't land on a centred title.
+    transform: { ...DEFAULT_TRANSFORM, x: 0.72, y: 0.3, scale: 0.3 },
   };
 }
 

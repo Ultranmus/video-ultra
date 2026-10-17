@@ -85,6 +85,16 @@ export type EngineRequest =
       height?: number;
       backend?: RenderBackend;
     }
+  /** One frame of a visual item with each filter applied (filter strip thumbnails). */
+  | {
+      type: 'filter-previews';
+      itemId: string;
+      /** Timeline time inside the item. */
+      time: number;
+      /** Square tile size in px. */
+      size: number;
+      filters: (string | null)[];
+    }
   /** Audio output: the port to the AudioWorklet, its sample rate and output latency (s). */
   | { type: 'audio'; port: MessagePort; sampleRate: number; latency: number };
 
@@ -93,7 +103,8 @@ export type EngineResponseData =
   | { type: 'ok' }
   | { type: 'stats'; stats: EngineStats }
   | { type: 'export'; result: ExportResult; stats: ExportRunInfo }
-  | { type: 'capture'; bitmap: ImageBitmap; backend: RenderBackend };
+  | { type: 'capture'; bitmap: ImageBitmap; backend: RenderBackend }
+  | { type: 'filter-previews'; bitmaps: ImageBitmap[] };
 
 /** Unsolicited events from the worker. */
 export type EngineEvent =

@@ -1,5 +1,6 @@
 import {
   findItem,
+  FLICKS_PER_SECOND,
   formatTime,
   itemEnd,
   moveItem,
@@ -12,13 +13,16 @@ import {
 } from '@video-ultra/core';
 import { useEffect, useRef, type ReactElement } from 'react';
 import { useController, useHistory, useLabels, useProject, useUi } from './context';
-import { IconButton, ToolButton } from './controls';
-import { Icon } from './icons';
-import { itemTitle, ratioOf, RATIOS } from './items';
+import { Button, IconButton, Section, ToolButton } from './controls';
+import { formatClock } from './format';
+import { Icon, type IconName } from './icons';
+import { itemTitle, ratioOf } from './items';
 import { AddPanel } from './panels';
 import type { PanelId, ToolId } from './state';
+import { useTargets } from './targets';
+import { clampPps, MAX_PPS, MIN_PPS } from './timeline/geometry';
 import { TimelineView } from './timeline/view';
-import { ToolPanel } from './ToolPanel';
+import { CanvasTool, InspectorSections, ToolPanel } from './ToolPanel';
 import { toolsFor } from './tools';
 
 // ── Top bar ─────────────────────────────────────────────────────────────────
@@ -37,68 +41,91 @@ export function TopBar({ onClose }: { onClose?: (() => void) | undefined }): Rea
   const ratio = ratioOf(width, height);
   return (
     <header className="vu-topbar">
-      {onClose ? <IconButton icon="close" label={l.close} onClick={onClose} /> : null}
-      <IconButton
-        icon="undo"
-        label={history.undoLabel ? l.undoWhat(history.undoLabel) : l.undo}
-        disabled={!history.canUndo}
-        onClick={() => ctl.undo()}
-      />
-      <IconButton
-        icon="redo"
-        label={history.redoLabel ? l.redoWhat(history.redoLabel) : l.redo}
-        disabled={!history.canRedo}
-        onClick={() => ctl.redo()}
-      />
-      {layout !== 'phone' ? (
-        <input
-          className="vu-project-name"
-          aria-label={l.projectName}
-          defaultValue={name}
-          key={name}
-          onBlur={(e) => {
-            const value = e.currentTarget.value;
-            if (value !== name) ctl.run(l.projectName, (d) => renameProject(d, value));
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') e.currentTarget.blur();
-          }}
+      <div className="vu-topbar-start">
+        {onClose ? <IconButton icon="close" label={l.close} onClick={onClose} /> : null}
+        {layout !== 'phone' ? (
+          <input
+            className="vu-project-name"
+            aria-label={l.projectName}
+            data-tooltip={l.renameTip}
+            defaultValue={name}
+            key={name}
+            onBlur={(e) => {
+              const value = e.currentTarget.value;
+              if (value !== name) ctl.run(l.projectName, (d) => renameProject(d, value));
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur();
+            }}
+          />
+        ) : null}
+        {save !== 'idle' && layout !== 'phone' ? (
+          <span className="vu-save-state" data-state={save} aria-live="polite">
+            {save === 'saving' ? l.saving : l.saved}
+          </span>
+        ) : null}
+      </div>
+      <div className="vu-topbar-center">
+        <IconButton
+          icon="undo"
+          label={l.undo}
+          tip={history.undoLabel ? l.undoWhat(history.undoLabel) : l.undo}
+          shortcut="⌘Z"
+          disabledReason={history.canUndo ? null : l.nothingToUndo}
+          onClick={() => ctl.undo()}
         />
-      ) : null}
-      <span className="vu-save-state" aria-live="polite">
-        {save === 'saving' ? l.saving : save === 'saved' ? l.saved : ''}
-      </span>
-      <span className="vu-spacer" />
-      <button type="button" className="vu-ratio-button" onClick={() => ctl.openTool('canvas')}>
-        <span>{ratio ?? `${width}×${height}`}</span>
-        <span className="vu-sr-only">{l.aspectRatio}</span>
-        <Icon name="chevronDown" size={16} />
-      </button>
-      <button
-        type="button"
-        className="vu-primary"
-        onClick={() => ctl.ui.setState({ exportOpen: true })}
-      >
-        {l.export}
-      </button>
+        <IconButton
+          icon="redo"
+          label={l.redo}
+          tip={history.redoLabel ? l.redoWhat(history.redoLabel) : l.redo}
+          shortcut="⇧⌘Z"
+          disabledReason={history.canRedo ? null : l.nothingToRedo}
+          onClick={() => ctl.redo()}
+        />
+      </div>
+      <div className="vu-topbar-end">
+        <Button
+          icon="canvas"
+          label={ratio ?? `${width}×${height}`}
+          tip={l.tipCanvas}
+          className="vu-ratio-button"
+          onClick={() => ctl.openCanvasSettings()}
+        />
+        {layout !== 'phone' ? (
+          <IconButton
+            icon="help"
+            label={l.shortcuts}
+            tip={l.tipHelp}
+            shortcut="?"
+            onClick={() => ctl.ui.setState({ helpOpen: true })}
+          />
+        ) : null}
+        <Button
+          icon="download"
+          label={l.export}
+          variant="primary"
+          tip={l.tipExport}
+          onClick={() => ctl.ui.setState({ exportOpen: true })}
+        />
+      </div>
     </header>
   );
 }
 
-// ── Rail + panel (tablet / desktop) ────────────────────────────────────────
+// ── Rail + panel ───────────────────────────────────────────────────────────
 
 const RAIL: {
   id: PanelId;
-  icon: Parameters<typeof Icon>[0]['name'];
-  key: 'media' | 'text' | 'audio' | 'stickers' | 'filters' | 'transitions' | 'canvas';
+  icon: IconName;
+  key: 'media' | 'text' | 'audio' | 'stickers' | 'filters' | 'transitions';
+  tip: 'tipAddMedia' | 'tipText' | 'tipAudio' | 'tipStickers' | 'tipFilter' | 'tipTransitions';
 }[] = [
-  { id: 'media', icon: 'media', key: 'media' },
-  { id: 'text', icon: 'text', key: 'text' },
-  { id: 'audio', icon: 'audio', key: 'audio' },
-  { id: 'stickers', icon: 'sticker', key: 'stickers' },
-  { id: 'filters', icon: 'filter', key: 'filters' },
-  { id: 'transitions', icon: 'transition', key: 'transitions' },
-  { id: 'canvas', icon: 'canvas', key: 'canvas' },
+  { id: 'media', icon: 'media', key: 'media', tip: 'tipAddMedia' },
+  { id: 'text', icon: 'text', key: 'text', tip: 'tipText' },
+  { id: 'audio', icon: 'audio', key: 'audio', tip: 'tipAudio' },
+  { id: 'stickers', icon: 'sticker', key: 'stickers', tip: 'tipStickers' },
+  { id: 'filters', icon: 'filter', key: 'filters', tip: 'tipFilter' },
+  { id: 'transitions', icon: 'transition', key: 'transitions', tip: 'tipTransitions' },
 ];
 
 export function Rail(): ReactElement {
@@ -106,12 +133,13 @@ export function Rail(): ReactElement {
   const l = useLabels();
   const panel = useUi((s) => s.panel);
   return (
-    <nav className="vu-rail" aria-label={l.media}>
+    <nav className="vu-rail" aria-label={l.addContent}>
       {RAIL.map((entry) => (
         <ToolButton
           key={entry.id}
           icon={entry.icon}
           label={l[entry.key]}
+          tip={l[entry.tip]}
           active={panel === entry.id}
           pressed={panel === entry.id}
           onClick={() => ctl.openPanel(panel === entry.id ? null : entry.id)}
@@ -122,88 +150,88 @@ export function Rail(): ReactElement {
 }
 
 export function Panel(): ReactElement | null {
+  const ctl = useController();
   const l = useLabels();
   const panel = useUi((s) => s.panel);
   if (!panel) return null;
-  const title = RAIL.find((r) => r.id === panel)!;
+  const entry = RAIL.find((r) => r.id === panel);
+  const title = entry ? l[entry.key] : l.canvas;
   return (
-    <aside className="vu-panel" aria-label={l[title.key]}>
-      <h2 className="vu-panel-title">{l[title.key]}</h2>
-      <AddPanel panel={panel} />
+    <aside className="vu-panel" aria-label={title}>
+      <div className="vu-panel-head">
+        <h2 className="vu-panel-title">{title}</h2>
+        <IconButton icon="close" label={l.closePanel} onClick={() => ctl.openPanel(null)} />
+      </div>
+      <div className="vu-panel-scroll">
+        <AddPanel panel={panel} />
+      </div>
     </aside>
   );
 }
 
 // ── Inspector (desktop) ────────────────────────────────────────────────────
 
-const TOOL_TITLES: Partial<
-  Record<
-    ToolId,
-    | 'speed'
-    | 'volume'
-    | 'fade'
-    | 'filter'
-    | 'adjust'
-    | 'crop'
-    | 'rotate'
-    | 'transition'
-    | 'edit'
-    | 'style'
-    | 'opacity'
-    | 'duration'
-    | 'canvas'
-  >
-> = {
-  speed: 'speed',
-  volume: 'volume',
-  fade: 'fade',
-  filter: 'filter',
-  adjust: 'adjust',
-  crop: 'crop',
-  transform: 'rotate',
-  transition: 'transition',
-  'text-edit': 'edit',
-  'text-style': 'style',
-  opacity: 'opacity',
-  duration: 'duration',
-  canvas: 'canvas',
+const KIND_ICON: Record<Item['kind'], IconName> = {
+  video: 'media',
+  image: 'image',
+  freeze: 'freeze',
+  audio: 'audio',
+  text: 'text',
+  sticker: 'sticker',
 };
 
-/** Desktop: the selected item's settings, all tools stacked; or the canvas settings. */
+/** Desktop: the selected item's settings; with nothing selected, the video's own settings. */
 export function Inspector(): ReactElement {
   const ctl = useController();
   const l = useLabels();
   const selectedId = useUi((s) => s.selectedId);
-  const tool = useUi((s) => s.tool);
   const item = useProject((p) => (selectedId ? (findItem(p, selectedId)?.item ?? null) : null));
-  const project = ctl.project;
-  const tools = item ? toolsFor(item, project, ctl, l).filter((t) => t.tool) : [];
-  const active: ToolId = tool ?? (item ? (tools[0]?.tool ?? 'canvas') : 'canvas');
-  return (
-    <aside className="vu-inspector" aria-label={item ? itemTitle(item, project.assets) : l.canvas}>
-      <h2 className="vu-panel-title">{item ? itemTitle(item, project.assets) : l.canvas}</h2>
-      {item ? (
-        <div className="vu-tabs" role="tablist">
-          {tools.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              role="tab"
-              aria-selected={t.tool === active}
-              className="vu-tab"
-              onClick={() => ctl.ui.setState({ tool: t.tool! })}
-            >
-              {t.label}
-            </button>
-          ))}
+  const clips = useProject((p) => p.tracks.reduce((n, t) => n + t.items.length, 0));
+  if (!item) {
+    return (
+      <aside className="vu-inspector" aria-label={l.projectSettings}>
+        <div className="vu-panel-head">
+          <h2 className="vu-panel-title">{l.projectSettings}</h2>
         </div>
-      ) : null}
-      <div
-        className="vu-inspector-body"
-        role="tabpanel"
-        aria-label={l[TOOL_TITLES[active] ?? 'canvas']}
-      >
-        <ToolPanel tool={active} />
+        <div className="vu-panel-scroll">
+          <Section>
+            <CanvasTool />
+          </Section>
+          {clips < 3 ? (
+            <Section title={l.howTo}>
+              <ol className="vu-steps">
+                {l.howToSteps.map((step) => (
+                  <li key={step}>{step}</li>
+                ))}
+              </ol>
+            </Section>
+          ) : null}
+        </div>
+      </aside>
+    );
+  }
+  const name = itemTitle(item, ctl.project.assets);
+  return (
+    <aside className="vu-inspector" aria-label={name}>
+      <div className="vu-panel-head">
+        <span className="vu-kind-badge" data-kind={item.kind}>
+          <Icon name={KIND_ICON[item.kind]} size={16} />
+        </span>
+        <div className="vu-inspector-title">
+          <h2 className="vu-panel-title">{name}</h2>
+          <span className="vu-inspector-meta">
+            {l.kindName(item.kind)} · {(item.duration / FLICKS_PER_SECOND).toFixed(1)} s
+          </span>
+        </div>
+        <IconButton
+          icon="close"
+          label={l.deselect}
+          shortcut="Esc"
+          onClick={() => ctl.select(null)}
+        />
+      </div>
+      <div className="vu-panel-scroll" key={item.id}>
+        <InspectorSections item={item} />
       </div>
     </aside>
   );
@@ -211,51 +239,157 @@ export function Inspector(): ReactElement {
 
 // ── Transport ──────────────────────────────────────────────────────────────
 
-/** Play/pause and timecode. The timecode updates through a playhead subscription, not React. */
-export function Transport({
-  stageRef,
-}: {
-  stageRef: React.RefObject<HTMLElement | null>;
-}): ReactElement {
+/** The live timecode: updates through a playhead subscription, never React. */
+function Clock() {
   const ctl = useController();
-  const l = useLabels();
-  const playing = useUi((s) => s.playing);
   const duration = useProject((p) => projectDuration(p));
   const timeRef = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     const el = timeRef.current!;
+    let shown = '';
     const update = (t: number) => {
-      el.textContent = formatTime(t);
+      const text = formatClock(t);
+      if (text !== shown) el.textContent = shown = text;
     };
     update(ctl.playhead.time);
     return ctl.playhead.subscribe(update);
   }, [ctl]);
   return (
-    <div className="vu-transport">
-      <button
-        type="button"
-        className="vu-play"
-        aria-label={playing ? l.pause : l.play}
-        aria-keyshortcuts="Space"
-        disabled={duration === 0}
-        onClick={() => ctl.togglePlay()}
-      >
-        <Icon name={playing ? 'pause' : 'play'} size={22} />
-      </button>
-      <span className="vu-timecode" aria-label={l.timecode('', formatTime(duration))}>
-        <span ref={timeRef} />
-        <span className="vu-timecode-total"> / {formatTime(duration)}</span>
-      </span>
-      <span className="vu-spacer" />
-      <IconButton
-        icon="fullscreen"
-        label={l.fullscreen}
-        onClick={() => {
-          const el = stageRef.current;
-          if (document.fullscreenElement) void document.exitFullscreen();
-          else void el?.requestFullscreen?.().catch(() => {});
-        }}
-      />
+    <span className="vu-timecode">
+      <span ref={timeRef} className="vu-timecode-now" />
+      <span className="vu-timecode-total">{formatClock(duration)}</span>
+    </span>
+  );
+}
+
+function PlayButton() {
+  const ctl = useController();
+  const l = useLabels();
+  const playing = useUi((s) => s.playing);
+  const duration = useProject((p) => projectDuration(p));
+  return (
+    <button
+      type="button"
+      className="vu-play"
+      aria-label={playing ? l.pause : l.play}
+      aria-keyshortcuts="Space"
+      aria-disabled={duration === 0 || undefined}
+      data-tooltip={duration === 0 ? l.needClips : `${playing ? l.pause : l.play}  ·  Space`}
+      onClick={() => {
+        if (duration > 0) ctl.togglePlay();
+      }}
+    >
+      <Icon name={playing ? 'pause' : 'play'} size={22} />
+    </button>
+  );
+}
+
+/** Desktop/tablet bar above the timeline: play, time, clip actions, zoom. */
+export function TimelineBar(): ReactElement {
+  const ctl = useController();
+  const l = useLabels();
+  const targets = useTargets();
+  const pps = useUi((s) => s.pxPerSecond);
+  const desktop = useUi((s) => s.layout === 'desktop');
+  // Zoom slider works on a log scale so both ends feel the same.
+  const zoom = Math.log(pps / MIN_PPS) / Math.log(MAX_PPS / MIN_PPS);
+  return (
+    <div className="vu-timeline-bar">
+      <div className="vu-bar-start">
+        <PlayButton />
+        <Clock />
+      </div>
+      {desktop ? (
+        <div className="vu-bar-actions" role="toolbar" aria-label={l.clipActions}>
+          <Button
+            icon="split"
+            label={l.split}
+            tip={l.tipSplit}
+            shortcut="S"
+            disabledReason={targets.split.reason}
+            onClick={() => ctl.split()}
+          />
+          <Button
+            icon="duplicate"
+            label={l.duplicate}
+            tip={l.tipDuplicate}
+            shortcut="⌘D"
+            disabledReason={targets.selection.reason}
+            onClick={() => ctl.duplicateSelected()}
+          />
+          <Button
+            icon="freeze"
+            label={l.freeze}
+            tip={l.tipFreeze}
+            disabledReason={targets.freeze.reason}
+            onClick={() => ctl.freezeSelected()}
+          />
+          <Button
+            icon="delete"
+            label={l.delete}
+            tip={l.tipDelete}
+            shortcut="Del"
+            variant="danger"
+            disabledReason={targets.selection.reason}
+            onClick={() => ctl.deleteSelected()}
+          />
+        </div>
+      ) : null}
+      <div className="vu-bar-end">
+        <IconButton
+          icon="preview"
+          label={l.previewMode}
+          tip={l.tipPreview}
+          onClick={() => ctl.setPreviewMode(true)}
+        />
+        <div className="vu-zoom">
+          <IconButton icon="zoomOut" label={l.zoomOut} onClick={() => ctl.zoom(1 / 1.5)} />
+          <input
+            className="vu-slider vu-zoom-slider"
+            type="range"
+            min={0}
+            max={1}
+            step={0.001}
+            aria-label={l.tipZoom}
+            data-tooltip={l.tipZoom}
+            value={zoom}
+            style={{
+              ['--vu-fill-from' as string]: '0%',
+              ['--vu-fill-to' as string]: `${zoom * 100}%`,
+            }}
+            onChange={(e) =>
+              ctl.ui.setState({
+                pxPerSecond: clampPps(
+                  MIN_PPS * Math.pow(MAX_PPS / MIN_PPS, Number(e.currentTarget.value)),
+                ),
+              })
+            }
+          />
+          <IconButton icon="zoomIn" label={l.zoomIn} onClick={() => ctl.zoom(1.5)} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Phone: play, time and preview above the timeline. */
+export function PhoneTransport(): ReactElement {
+  const ctl = useController();
+  const l = useLabels();
+  return (
+    <div className="vu-timeline-bar" data-compact="">
+      <div className="vu-bar-start">
+        <PlayButton />
+        <Clock />
+      </div>
+      <div className="vu-bar-end">
+        <Button
+          icon="preview"
+          label={l.previewMode}
+          tip={l.tipPreview}
+          onClick={() => ctl.setPreviewMode(true)}
+        />
+      </div>
     </div>
   );
 }
@@ -268,44 +402,33 @@ export function Timeline({
   rootRef: React.RefObject<HTMLElement | null>;
 }): ReactElement {
   const ctl = useController();
-  const l = useLabels();
-  const hostRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const viewRef = useRef<TimelineView | null>(null);
-  const theme = useUi((s) => s.layout);
   useEffect(() => {
     const view = new TimelineView(rootRef.current!, canvasRef.current!, ctl, {
       onAddMedia: () => ctl.pickFiles(),
     });
     viewRef.current = view;
-    // Theme changes (data attribute or OS setting) re-read the colour tokens.
+    const offZoom = ctl.setZoomHandler((factor) => view.zoomBy(factor));
     const media = matchMedia('(prefers-color-scheme: light)');
     const onTheme = () => view.refreshTheme();
     media.addEventListener('change', onTheme);
     const mo = new MutationObserver(onTheme);
     mo.observe(rootRef.current!, { attributes: true, attributeFilter: ['data-vu-theme', 'style'] });
     return () => {
+      offZoom();
       media.removeEventListener('change', onTheme);
       mo.disconnect();
       view.destroy();
       viewRef.current = null;
     };
   }, [ctl, rootRef]);
-  void theme;
   return (
-    <div className="vu-timeline" ref={hostRef}>
+    <div className="vu-timeline">
       <div className="vu-timeline-canvas">
-        <canvas ref={canvasRef} aria-hidden="true" />
+        <canvas ref={canvasRef} aria-hidden="true" data-tooltip-follow="" />
       </div>
       <TimelineA11y onReveal={(item) => viewRef.current?.reveal(item)} />
-      <div className="vu-zoom">
-        <IconButton
-          icon="zoomOut"
-          label={l.zoomOut}
-          onClick={() => viewRef.current?.zoomBy(1 / 1.5)}
-        />
-        <IconButton icon="zoomIn" label={l.zoomIn} onClick={() => viewRef.current?.zoomBy(1.5)} />
-      </div>
     </div>
   );
 }
@@ -391,52 +514,59 @@ function TimelineA11y({ onReveal }: { onReveal: (item: Item) => void }): ReactEl
   );
 }
 
-// ── Toolbar + sheet (phone / tablet), timeline header tools (desktop) ─────
+// ── Phone / tablet: toolbar + dock ────────────────────────────────────────
 
+/** The contextual toolbar (phone/tablet): add tools, or the selected clip's tools. */
 export function Toolbar(): ReactElement {
   const ctl = useController();
   const l = useLabels();
+  const targets = useTargets();
   const selectedId = useUi((s) => s.selectedId);
   const { tool, panel, sheetPanel } = useUi((s) => ({
     tool: s.tool,
     panel: s.panel,
     sheetPanel: s.sheetPanel,
   }));
-  const layout = useUi((s) => s.layout);
   const item = useProject((p) => (selectedId ? (findItem(p, selectedId)?.item ?? null) : null));
-  const project = ctl.project;
-  const entries = toolsFor(item, project, ctl, l);
-  const phone = layout !== 'desktop';
+  const entries = toolsFor(item, ctl.project, ctl, l, targets);
   return (
     <div
       className="vu-toolbar"
       role="toolbar"
-      aria-label={item ? itemTitle(item, project.assets) : l.addMedia}
+      aria-label={item ? itemTitle(item, ctl.project.assets) : l.addContent}
     >
-      {item && phone ? (
-        <IconButton icon="back" label={l.done} onClick={() => ctl.select(null)} />
+      {item ? (
+        <>
+          <ToolButton
+            icon="back"
+            label={l.back}
+            tip={l.deselect}
+            onClick={() => ctl.select(null)}
+          />
+          <span className="vu-toolbar-divider" aria-hidden="true" />
+        </>
       ) : null}
       {entries.map((entry) => {
         const active = entry.tool
           ? tool === entry.tool
           : entry.panel
-            ? phone && panel === entry.panel && sheetPanel
+            ? sheetPanel && panel === entry.panel
             : false;
         return (
           <ToolButton
             key={entry.key}
             icon={entry.icon}
             label={entry.label}
+            {...(entry.tip ? { tip: entry.tip } : {})}
             active={active}
             danger={entry.danger ?? false}
+            disabledReason={entry.disabledReason ?? null}
             onClick={() => {
               if (entry.run) entry.run();
               else if (entry.tool) ctl.openTool(entry.tool);
               else if (entry.panel) {
-                if (phone) {
-                  const open = sheetPanel && panel === entry.panel;
-                  ctl.ui.setState({ panel: entry.panel, tool: null, sheetPanel: !open });
-                } else ctl.openPanel(entry.panel);
+                const open = sheetPanel && panel === entry.panel;
+                ctl.ui.setState({ panel: entry.panel, tool: null, sheetPanel: !open });
               }
             }}
           />
@@ -446,8 +576,50 @@ export function Toolbar(): ReactElement {
   );
 }
 
-/** Phone / tablet: a tool's controls (or an add panel) above the toolbar. Never a modal. */
-export function Sheet(): ReactElement | null {
+type TitleKey =
+  | 'speed'
+  | 'volume'
+  | 'fade'
+  | 'filter'
+  | 'adjust'
+  | 'crop'
+  | 'rotate'
+  | 'transition'
+  | 'edit'
+  | 'style'
+  | 'opacity'
+  | 'duration'
+  | 'canvas'
+  | 'text'
+  | 'stickers'
+  | 'audio'
+  | 'media';
+
+const TOOL_TITLE: Record<ToolId, TitleKey> = {
+  speed: 'speed',
+  volume: 'volume',
+  fade: 'fade',
+  filter: 'filter',
+  adjust: 'adjust',
+  crop: 'crop',
+  transform: 'rotate',
+  transition: 'transition',
+  'text-edit': 'edit',
+  'text-style': 'style',
+  opacity: 'opacity',
+  duration: 'duration',
+  canvas: 'canvas',
+  'add-text': 'text',
+  'add-sticker': 'stickers',
+  'add-audio': 'audio',
+  'add-media': 'media',
+};
+
+/**
+ * Phone/tablet: a tool's controls (or an add panel) docked exactly over the timeline area — the
+ * same box, never a second floating panel — with an obvious Done.
+ */
+export function Dock(): ReactElement | null {
   const ctl = useController();
   const l = useLabels();
   const tool = useUi((s) => s.tool);
@@ -456,24 +628,25 @@ export function Sheet(): ReactElement | null {
   const showPanel = !tool && sheetPanel && panel;
   if (!tool && !showPanel) return null;
   const close = () => ctl.ui.setState({ tool: null, sheetPanel: false });
-  const title = tool ? l[TOOL_TITLES[tool] ?? 'edit'] : l[RAIL.find((r) => r.id === panel)!.key];
+  const entry = RAIL.find((r) => r.id === panel);
+  const title = tool ? l[TOOL_TITLE[tool]] : entry ? l[entry.key] : l.canvas;
   return (
-    <section className="vu-sheet" aria-label={title}>
-      <div className="vu-sheet-head">
-        <h2 className="vu-panel-title">{title}</h2>
+    <section className="vu-dock" aria-label={title}>
+      <div className="vu-dock-head">
+        <h2 className="vu-dock-title">{title}</h2>
         <button type="button" className="vu-done" onClick={close}>
           <Icon name="check" size={18} />
           <span>{l.done}</span>
         </button>
       </div>
-      <div className="vu-sheet-body">
+      <div className="vu-dock-body">
         {tool ? <ToolPanel tool={tool} /> : <AddPanel panel={panel!} />}
       </div>
     </section>
   );
 }
 
-// ── Toasts ─────────────────────────────────────────────────────────────────
+// ── Toasts, help, preview ─────────────────────────────────────────────────
 
 export function Toasts(): ReactElement {
   const ctl = useController();
@@ -483,9 +656,31 @@ export function Toasts(): ReactElement {
     <div className="vu-toasts" role="status" aria-live="polite">
       {toasts.map((t) => (
         <div key={t.id} className="vu-toast" data-tone={t.tone}>
-          <span>{t.message}</span>
-          <button type="button" className="vu-link" onClick={() => ctl.dismissToast(t.id)}>
-            {l.dismiss}
+          {t.tone === 'success' ? (
+            <Icon name="check" size={16} />
+          ) : t.tone === 'error' ? (
+            <Icon name="warning" size={16} />
+          ) : null}
+          <span className="vu-toast-text">{t.message}</span>
+          {t.action ? (
+            <button
+              type="button"
+              className="vu-toast-action"
+              onClick={() => {
+                t.action!.run();
+                ctl.dismissToast(t.id);
+              }}
+            >
+              {t.action.label}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="vu-toast-close"
+            aria-label={l.dismiss}
+            onClick={() => ctl.dismissToast(t.id)}
+          >
+            <Icon name="close" size={14} />
           </button>
         </div>
       ))}
@@ -493,4 +688,68 @@ export function Toasts(): ReactElement {
   );
 }
 
-export { RATIOS };
+/** Keyboard shortcuts and how-to (the "?" button). */
+export function HelpSheet(): ReactElement | null {
+  const ctl = useController();
+  const l = useLabels();
+  const open = useUi((s) => s.helpOpen);
+  if (!open) return null;
+  const close = () => ctl.ui.setState({ helpOpen: false });
+  return (
+    <div
+      className="vu-modal-backdrop"
+      onPointerDown={(e) => e.target === e.currentTarget && close()}
+    >
+      <div
+        className="vu-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="vu-help-title"
+        onKeyDown={(e) => e.key === 'Escape' && close()}
+      >
+        <div className="vu-modal-head">
+          <h2 id="vu-help-title" className="vu-modal-title">
+            {l.shortcuts}
+          </h2>
+          <IconButton icon="close" label={l.close} onClick={close} />
+        </div>
+        <dl className="vu-shortcuts">
+          {l.shortcutList.map(([keys, what]) => (
+            <div key={keys} className="vu-shortcut">
+              <dt>
+                <kbd>{keys}</kbd>
+              </dt>
+              <dd>{what}</dd>
+            </div>
+          ))}
+        </dl>
+        <Section title={l.howTo}>
+          <ol className="vu-steps">
+            {l.howToSteps.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ol>
+        </Section>
+      </div>
+    </div>
+  );
+}
+
+/** Preview mode: only the video and play controls (iPhone has no element fullscreen). */
+export function PreviewBar(): ReactElement {
+  const ctl = useController();
+  const l = useLabels();
+  return (
+    <div className="vu-preview-bar">
+      <PlayButton />
+      <Clock />
+      <span className="vu-spacer" />
+      <Button
+        icon="close"
+        label={l.exitPreview}
+        variant="secondary"
+        onClick={() => ctl.setPreviewMode(false)}
+      />
+    </div>
+  );
+}

@@ -147,7 +147,8 @@ export function ExportDialog(): ReactElement | null {
           </h2>
           <button
             type="button"
-            className="vu-icon-button"
+            className="vu-btn"
+            data-layout="icon"
             aria-label={l.close}
             onClick={close}
             disabled={busy}
@@ -163,7 +164,13 @@ export function ExportDialog(): ReactElement | null {
               {result.result.width}×{result.result.height} ·{' '}
               {(result.result.blob.size / 1e6).toFixed(1)} MB
             </p>
-            <a className="vu-primary vu-wide" href={result.url} download={fileName}>
+            <a
+              className="vu-btn vu-wide"
+              data-variant="primary"
+              data-layout="row"
+              href={result.url}
+              download={fileName}
+            >
               <Icon name="download" />
               <span>{l.download}</span>
             </a>
@@ -189,7 +196,9 @@ export function ExportDialog(): ReactElement | null {
             <p className="vu-hint">{l.exportKeepOpen}</p>
             <button
               type="button"
-              className="vu-secondary vu-wide"
+              className="vu-btn vu-wide"
+              data-variant="secondary"
+              data-layout="row"
               onClick={() => abort.current?.abort()}
             >
               {l.cancel}
@@ -243,7 +252,9 @@ export function ExportDialog(): ReactElement | null {
             ) : null}
             <button
               type="button"
-              className="vu-primary vu-wide"
+              className="vu-btn vu-wide"
+              data-variant="primary"
+              data-layout="row"
               disabled={duration === 0}
               onClick={() => void start()}
             >

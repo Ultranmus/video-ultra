@@ -9,6 +9,8 @@ const lanAddresses = Object.values(networkInterfaces())
 
 const config: NextConfig = {
   reactStrictMode: true,
+  // The dev badge sits on top of the editor's bottom-left controls (phone toolbar).
+  devIndicators: false,
   // Agent instructions live in the repo-root CLAUDE.md + docs/internal.
   agentRules: false,
   allowedDevOrigins: [...lanAddresses, '*.local', '*.trycloudflare.com'],

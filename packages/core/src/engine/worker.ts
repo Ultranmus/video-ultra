@@ -1,7 +1,7 @@
 import { ALL_FORMATS, BlobSource, Input } from 'mediabunny';
 import type { DeviceTier } from '../capabilities';
-import { projectDuration } from '../model/project';
-import type { Project } from '../model/schema';
+import { DEFAULT_TRANSFORM, findItem, projectDuration } from '../model/project';
+import type { Item, Project } from '../model/schema';
 import { FLICKS_PER_SECOND, fps, frameIndex, fromSeconds, type Time } from '../model/time';
 import type { LayerMedia } from '../render/layout';
 import type { RenderBackend, Renderer } from '../render/types';
@@ -480,6 +480,76 @@ async function capture(
   }
 }
 
+/**
+ * Filter strip thumbnails: one small renderer + composer kept warm between calls (the strip asks
+ * again when the clip or playhead changes) and freed after a few idle seconds.
+ */
+let looks: {
+  canvas: OffscreenCanvas;
+  renderer: Renderer;
+  composer: Composer;
+  size: number;
+} | null = null;
+let looksIdle: ReturnType<typeof setTimeout> | undefined;
+
+async function filterPreviews(
+  request: Extract<EngineRequest, { type: 'filter-previews' }>,
+): Promise<{ data: EngineResponseData; transfer: Transferable[] }> {
+  if (!project) throw new Error('No project');
+  const found = findItem(project, request.itemId);
+  const item = found?.item;
+  if (!item || (item.kind !== 'video' && item.kind !== 'image' && item.kind !== 'freeze'))
+    return { data: { type: 'filter-previews', bitmaps: [] }, transfer: [] };
+  clearTimeout(looksIdle);
+  const size = Math.max(16, Math.min(256, Math.round(request.size)));
+  if (!looks || looks.size !== size) {
+    looks?.composer.destroy();
+    looks?.renderer.destroy();
+    const canvas = new OffscreenCanvas(size, size);
+    const r = await makeRenderer(canvas, renderer?.backend ?? 'webgl2');
+    looks = {
+      canvas,
+      renderer: r,
+      composer: new Composer(r, new DecoderPool(1), media, true, 4 << 20, false),
+      size,
+    };
+  }
+  const local = Math.max(0, Math.min(item.duration - 1, Math.round(request.time) - item.start));
+  // The tile shows the clip's own frame, filling the square, with its own adjustments.
+  const base: Extract<Item, { filter: unknown }> = {
+    ...item,
+    start: 0,
+    transitionIn: null,
+    transform: { ...DEFAULT_TRANSFORM },
+    fit: 'fill',
+  };
+  const mini: Project = {
+    ...project,
+    settings: {
+      ...project.settings,
+      width: size,
+      height: size,
+      background: { type: 'color', color: '#000000' },
+    },
+    tracks: [
+      { id: 'looks', kind: 'main', muted: true, hidden: false, locked: false, items: [base] },
+    ],
+  };
+  await mediaReady(mini);
+  const bitmaps: ImageBitmap[] = [];
+  for (const id of request.filters) {
+    base.filter = id ? { id, intensity: 1 } : null;
+    await looks.composer.render(mini, local, size, size, null);
+    bitmaps.push(looks.canvas.transferToImageBitmap());
+  }
+  looksIdle = setTimeout(() => {
+    looks?.composer.destroy();
+    looks?.renderer.destroy();
+    looks = null;
+  }, 5000);
+  return { data: { type: 'filter-previews', bitmaps }, transfer: bitmaps };
+}
+
 // ── messages ─────────────────────────────────────────────────────────────
 
 async function handle(
@@ -599,6 +669,8 @@ async function handle(
       return { type: 'ok' };
     case 'capture':
       return capture(request);
+    case 'filter-previews':
+      return filterPreviews(request);
   }
 }
 

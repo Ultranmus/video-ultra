@@ -51,12 +51,14 @@ Breakpoints are **container queries on `.vu-root`** (the editor may live in a mo
 └──────────────────────────┘
 ```
 
-Tool controls open in a **bottom sheet** above the toolbar (slider, presets, options), never a
-modal. Minimum usable size: 320 × 480.
+Tool controls open in the **dock**: the same box as the timeline area (it covers the timeline, not
+the video), with the tool's name and a ✓ Done button, never a second floating panel and never a
+modal. While a text field has the on-screen keyboard, the bottom area rises above it (the editor
+stays one box; the page never scrolls). Minimum usable size: 320 × 480.
 
 ### Tablet (768–1023px)
 
-Desktop layout without the permanent Inspector; selected-item controls open in a bottom sheet.
+Desktop layout without the permanent Inspector; selected-item controls open in the dock.
 
 ### Desktop (≥ 1024px) — panel + stage + inspector + timeline
 
@@ -97,7 +99,7 @@ the stage and everything drawn on it don't mirror. Text items in RTL scripts ren
 | Transport | `<Transport/>` | Play/pause, timecode, fullscreen                          |
 | Timeline  | `<Timeline/>`  | Canvas timeline + accessible DOM layer                    |
 | Toolbar   | `<Toolbar/>`   | Contextual tools (phone/tablet; desktop: timeline header) |
-| Sheet     | `<Sheet/>`     | Bottom sheet for a tool's controls (phone/tablet)         |
+| Dock      | `<Dock/>`      | A tool's controls over the timeline area (phone/tablet)   |
 
 ## 5. Timeline rules
 
@@ -177,3 +179,37 @@ distinguished by footage-first contrast (stage darker than chrome), amber reserv
 and the film-strip timeline. Changed from the first draft: dropped a monospace timecode (a generic
 tell) for tabular figures in the host font; dropped all-caps lane labels for icons + sentence case;
 clip radius made smaller than button radius instead of one radius everywhere.
+
+## 9. Owner review rules (2026-10-17, after the first build was rejected)
+
+The first editor build worked but felt bad (no help, duplicated menus, crude states, jumpy drags).
+These rules come from that review; image-ultra is the polish bar — compare side by side.
+
+1. **One home per control.** Rail = add / browse (Media, Text, Audio, Stickers, Filters,
+   Transitions). Inspector (desktop) = settings of the selected item as titled sections, no tabs;
+   with nothing selected it shows the video's settings (ratio, background) and how-to steps.
+   Timeline bar (desktop) = clip actions only (Split, Duplicate, Freeze, Delete) + zoom. The
+   inspector's Look section shows the current filter with _Change_ (opens the Filters panel) —
+   the picker itself lives in one place.
+2. **Every control explains itself.** Hover/focus tooltip on every icon button, tool and clip
+   (with the shortcut); never on touch.
+3. **No dead buttons.** An action that can't run is shown disabled and its tooltip says why
+   ("Move the playhead inside a clip"). Filters and Transitions act on the selected clip, or the
+   clip / cut at the playhead, and say which ("For bbb.mp4").
+4. **Every action answers.** Split flashes the cut, selects the new half and shows "Split into 2
+   clips · Undo"; delete / duplicate / freeze / apply-to-all show a toast with Undo.
+5. **Empty states invite.** The empty stage shows "Start your video" with Add media; empty
+   Filters / Transitions say what's needed.
+6. **Drags never jump.** A dragged clip is a floating copy under the pointer (both axes), the
+   original stays as a faint placeholder, a dashed outline / insertion bar shows the drop. Trim
+   never moves the playhead: the preview shows the edge frame and a label shows the new length.
+   One guide line at a time. A wheel gesture scrolls one axis.
+7. **Calm colour.** Lane clips are one neutral with a thin kind stripe; footage carries colour.
+   The canvas frame has a border on a lighter stage, so black video never melts into the chrome.
+8. **Spacing.** Rhythm 4 / 8 / 12 / 16; rows of controls keep ≥ 4 px gaps so focus rings and
+   hover fills never touch a neighbour; selection rings sit inside padded containers.
+9. **Phones.** Same rules; filters and transitions are one sideways strip in the dock; long-press
+   and drags never trigger the browser's own selection or callout; Preview mode replaces
+   fullscreen (iPhone has no element fullscreen) and in it a tap only plays / pauses.
+10. **Review before shipping UI.** Run `scripts/ui-review.ts` (desktop + phone, dark + light) and
+    look at every screenshot as a first-time user.

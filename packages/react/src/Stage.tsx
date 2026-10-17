@@ -1,6 +1,7 @@
 import { findItem, itemEnd, updateItem, type Item, type Transform } from '@video-ultra/core';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactElement } from 'react';
 import { useController, useLabels, useProject, useUi } from './context';
+import { Button, EmptyState } from './controls';
 import { ScrubPreview } from './stage/ScrubPreview';
 import { hitStage, itemBox, snapCentre, type Box, type MeasureText } from './stage/geometry';
 
@@ -43,6 +44,7 @@ export function Stage(): ReactElement {
   const { pw, ph } = useProject((p) => ({ pw: p.settings.width, ph: p.settings.height }));
   const [frame, setFrame] = useState({ w: 0, h: 0 });
   const status = useUi((s) => s.status);
+  const empty = useProject((p) => p.tracks.every((t) => t.items.length === 0));
 
   // Fit the project's aspect ratio inside the stage.
   useLayoutEffect(() => {
@@ -119,14 +121,19 @@ export function Stage(): ReactElement {
       return;
     }
     el.hidden = false;
-    el.style.width = `${box.width * scale}px`;
-    el.style.height = `${box.height * scale}px`;
-    el.style.transform = `translate(${box.cx * scale - (box.width * scale) / 2}px, ${box.cy * scale - (box.height * scale) / 2}px) rotate(${box.rotation}deg)`;
+    // A little air around the item so handles never sit on top of small text or stickers.
+    const pad = 6;
+    const w = box.width * scale + pad * 2;
+    const h = box.height * scale + pad * 2;
+    el.style.width = `${w}px`;
+    el.style.height = `${h}px`;
+    el.style.transform = `translate(${box.cx * scale - w / 2}px, ${box.cy * scale - h / 2}px) rotate(${box.rotation}deg)`;
   };
 
   // Show the box only while the item is on screen (playhead subscription, no re-render per frame).
+  const previewMode = useUi((s) => s.previewMode);
   useEffect(() => {
-    if (!item) {
+    if (!item || previewMode) {
       placeBox(null);
       return;
     }
@@ -139,7 +146,7 @@ export function Stage(): ReactElement {
     return ctl.playhead.subscribe(update);
     // placeBox reads refs only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ctl, item, pw, ph, scale]);
+  }, [ctl, item, pw, ph, scale, previewMode]);
 
   // ── gestures ─────────────────────────────────────────────────────────
 
@@ -167,6 +174,11 @@ export function Stage(): ReactElement {
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (scale === 0 || e.button > 0) return;
+    // Preview mode is for watching: a tap plays or pauses, nothing moves.
+    if (ctl.ui.getState().previewMode) {
+      ctl.togglePlay();
+      return;
+    }
     const p = toCanvas(e);
     pointers.current.set(e.pointerId, p);
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -332,10 +344,27 @@ export function Stage(): ReactElement {
         ref={frameRef}
         className="vu-stage-frame"
         style={{ width: frame.w, height: frame.h }}
-        role="img"
-        aria-label={l.timeline}
+        role="group"
+        aria-label={l.previewLabel}
       >
         {frame.w > 0 ? <ScrubPreview width={frame.w} height={frame.h} /> : null}
+        {empty ? (
+          <div className="vu-stage-empty" onPointerDown={(e) => e.stopPropagation()}>
+            <EmptyState
+              icon="media"
+              title={l.getStarted}
+              body={l.getStartedBody}
+              action={
+                <Button
+                  icon="plus"
+                  label={l.addMedia}
+                  variant="primary"
+                  onClick={() => ctl.pickFiles()}
+                />
+              }
+            />
+          </div>
+        ) : null}
         <div ref={guideX} className="vu-guide vu-guide-x" hidden />
         <div ref={guideY} className="vu-guide vu-guide-y" hidden />
         <div ref={boxRef} className="vu-selection-box" hidden>
@@ -343,6 +372,7 @@ export function Stage(): ReactElement {
           <span className="vu-handle" data-handle="ne" />
           <span className="vu-handle" data-handle="sw" />
           <span className="vu-handle" data-handle="se" />
+          <span className="vu-rotate-stem" aria-hidden="true" />
           <span className="vu-handle vu-handle-rotate" data-handle="rotate" />
         </div>
       </div>

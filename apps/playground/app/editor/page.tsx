@@ -6,12 +6,24 @@
 import { VideoEditor } from '@video-ultra/react';
 import '@video-ultra/react/styles.css';
 import { useSearchParams } from 'next/navigation';
-import { Suspense } from 'react';
+import { Suspense, useEffect } from 'react';
 
 function Editor() {
   const params = useSearchParams();
   const theme = (params.get('theme') ?? 'dark') as 'dark' | 'light' | 'auto';
   const backend = (params.get('backend') ?? 'auto') as 'auto' | 'webgpu' | 'webgl2';
+  // A full-screen app page: the document itself never scrolls (iOS keyboard, rubber-banding).
+  useEffect(() => {
+    const html = document.documentElement;
+    html.style.overflow = 'hidden';
+    html.style.overscrollBehavior = 'none';
+    document.body.style.overflow = 'hidden';
+    return () => {
+      html.style.overflow = '';
+      html.style.overscrollBehavior = '';
+      document.body.style.overflow = '';
+    };
+  }, []);
   return (
     <div style={{ position: 'fixed', inset: 0 }}>
       <VideoEditor

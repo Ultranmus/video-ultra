@@ -45,6 +45,17 @@ export interface Engine {
     time: Time,
     options?: { width?: number; height?: number; backend?: RenderBackend },
   ): Promise<ImageBitmap>;
+  /**
+   * Square thumbnails of one visual item's frame at timeline `time` (inside the item), one per
+   * filter id (`null` = no filter), with the item's own adjustments — for the filter strip. The
+   * frame is decoded once; the caller closes the bitmaps.
+   */
+  filterPreviews(
+    itemId: string,
+    time: Time,
+    size: number,
+    filters: readonly (string | null)[],
+  ): Promise<ImageBitmap[]>;
   /** Playhead updates (every frame while playing). */
   onTime: ((time: Time, playing: boolean) => void) | null;
   onEnded: (() => void) | null;
@@ -248,6 +259,22 @@ export async function createEngine(
       const data = await send({ type: 'capture', time, ...captureOptions });
       if (data.type !== 'capture') throw new Error('Unexpected engine response');
       return data.bitmap;
+    },
+    async filterPreviews(
+      itemId: string,
+      time: Time,
+      size: number,
+      filters: readonly (string | null)[],
+    ) {
+      const data = await send({
+        type: 'filter-previews',
+        itemId,
+        time,
+        size,
+        filters: [...filters],
+      });
+      if (data.type !== 'filter-previews') throw new Error('Unexpected engine response');
+      return data.bitmaps;
     },
     destroy() {
       void audio?.context.close();

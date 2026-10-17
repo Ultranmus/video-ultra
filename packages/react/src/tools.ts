@@ -3,124 +3,161 @@ import type { EditorController } from './controller';
 import type { IconName } from './icons';
 import type { Labels } from './labels';
 import type { PanelId, ToolId } from './state';
+import type { Targets } from './targets';
 
-/** One entry of the contextual toolbar. */
+/** One entry of the phone/tablet contextual toolbar. */
 export interface ToolEntry {
   key: string;
   icon: IconName;
   label: string;
-  /** Opens this tool's controls (sheet / inspector) … */
+  /** What it does (tooltip). */
+  tip?: string;
+  /** Opens this tool's controls in the dock … */
   tool?: ToolId;
-  /** … or opens an add-content panel … */
+  /** … or an add-content panel … */
   panel?: PanelId;
   /** … or acts at once. */
   run?: () => void;
   danger?: boolean;
-  pressed?: boolean;
+  /** Set when the tool can't act right now (shown disabled, tooltip says why). */
+  disabledReason?: string | null;
 }
 
 /**
- * Selection drives the tools (UI_VISION §2): nothing selected → add tools; a clip selected →
- * that clip's tools, most used first.
+ * Selection drives the tools (UI_VISION §2): nothing selected → add tools (+ Split for the clip
+ * under the playhead); a clip selected → that clip's tools, most used first.
  */
 export function toolsFor(
   item: Item | null,
   project: Project,
   ctl: EditorController,
   l: Labels,
+  targets: Targets,
 ): ToolEntry[] {
+  const split: ToolEntry = {
+    key: 'split',
+    icon: 'split',
+    label: l.split,
+    tip: l.tipSplit,
+    run: () => ctl.split(),
+    disabledReason: targets.split.reason,
+  };
   if (!item) {
     return [
-      { key: 'media', icon: 'media', label: l.media, panel: 'media' },
-      { key: 'text', icon: 'text', label: l.text, panel: 'text' },
-      { key: 'audio', icon: 'audio', label: l.audio, panel: 'audio' },
-      { key: 'stickers', icon: 'sticker', label: l.stickers, panel: 'stickers' },
-      { key: 'canvas', icon: 'canvas', label: l.canvas, tool: 'canvas' },
-      { key: 'split', icon: 'split', label: l.split, run: () => ctl.split() },
+      { key: 'media', icon: 'media', label: l.media, tip: l.tipAddMedia, panel: 'media' },
+      { key: 'text', icon: 'text', label: l.text, tip: l.tipText, panel: 'text' },
+      { key: 'audio', icon: 'audio', label: l.audio, tip: l.tipAudio, panel: 'audio' },
+      {
+        key: 'stickers',
+        icon: 'sticker',
+        label: l.stickers,
+        tip: l.tipStickers,
+        panel: 'stickers',
+      },
+      { key: 'filters', icon: 'filter', label: l.filters, tip: l.tipFilter, tool: 'filter' },
+      {
+        key: 'transitions',
+        icon: 'transition',
+        label: l.transitions,
+        tip: l.tipTransitions,
+        tool: 'transition',
+      },
+      { key: 'canvas', icon: 'canvas', label: l.canvas, tip: l.tipCanvas, tool: 'canvas' },
+      split,
     ];
   }
-  const split: ToolEntry = { key: 'split', icon: 'split', label: l.split, run: () => ctl.split() };
   const duplicate: ToolEntry = {
     key: 'duplicate',
     icon: 'duplicate',
     label: l.duplicate,
+    tip: l.tipDuplicate,
     run: () => ctl.duplicateSelected(),
   };
   const remove: ToolEntry = {
     key: 'delete',
     icon: 'delete',
     label: l.delete,
+    tip: l.tipDelete,
     run: () => ctl.deleteSelected(),
     danger: true,
   };
-  const onMain = project.tracks[0]!.items.some((i) => i.id === item.id);
   const index = project.tracks[0]!.items.findIndex((i) => i.id === item.id);
+  const onMain = index !== -1;
   const look: ToolEntry[] = [
-    { key: 'filter', icon: 'filter', label: l.filter, tool: 'filter' },
-    { key: 'adjust', icon: 'adjust', label: l.adjust, tool: 'adjust' },
-    { key: 'crop', icon: 'crop', label: l.crop, tool: 'crop' },
-    { key: 'transform', icon: 'rotate', label: l.rotate, tool: 'transform' },
+    { key: 'filter', icon: 'filter', label: l.filter, tip: l.tipFilter, tool: 'filter' },
+    { key: 'adjust', icon: 'adjust', label: l.adjust, tip: l.tipAdjust, tool: 'adjust' },
+    { key: 'crop', icon: 'crop', label: l.crop, tip: l.tipCrop, tool: 'crop' },
+    { key: 'transform', icon: 'rotate', label: l.rotate, tip: l.tipRotate, tool: 'transform' },
   ];
   const transition: ToolEntry[] =
-    onMain && index > 0
-      ? [{ key: 'transition', icon: 'transition', label: l.transition, tool: 'transition' }]
+    index > 0
+      ? [
+          {
+            key: 'transition',
+            icon: 'transition',
+            label: l.transition,
+            tip: l.tipTransition,
+            tool: 'transition',
+          },
+        ]
       : [];
+  const opacity: ToolEntry[] = onMain
+    ? []
+    : [{ key: 'opacity', icon: 'opacity', label: l.opacity, tip: l.tipOpacity, tool: 'opacity' }];
   switch (item.kind) {
-    case 'video': {
-      const asset = project.assets[item.assetId];
+    case 'video':
       return [
         split,
-        { key: 'speed', icon: 'speed', label: l.speed, tool: 'speed' },
-        { key: 'volume', icon: item.muted ? 'muted' : 'volume', label: l.volume, tool: 'volume' },
+        { key: 'speed', icon: 'speed', label: l.speed, tip: l.tipSpeed, tool: 'speed' },
+        {
+          key: 'volume',
+          icon: item.muted ? 'muted' : 'volume',
+          label: l.volume,
+          tip: l.tipVolume,
+          tool: 'volume',
+        },
         ...look,
         ...transition,
-        { key: 'fade', icon: 'fade', label: l.fade, tool: 'fade' },
+        { key: 'fade', icon: 'fade', label: l.fade, tip: l.tipFade, tool: 'fade' },
         ...(onMain
           ? [
               {
                 key: 'freeze',
                 icon: 'freeze',
                 label: l.freeze,
+                tip: l.tipFreeze,
                 run: () => ctl.freezeSelected(),
+                disabledReason: targets.freeze.reason,
               } as ToolEntry,
             ]
           : []),
-        ...(asset?.hasAudio && !item.muted
-          ? [
-              {
-                key: 'extract',
-                icon: 'extract',
-                label: l.extractAudio,
-                run: () => ctl.extractAudio(),
-              } as ToolEntry,
-            ]
-          : []),
-        ...(onMain
-          ? []
-          : [{ key: 'opacity', icon: 'opacity', label: l.opacity, tool: 'opacity' } as ToolEntry]),
+        ...opacity,
         duplicate,
         remove,
       ];
-    }
     case 'image':
     case 'freeze':
       return [
         split,
-        { key: 'duration', icon: 'speed', label: l.duration, tool: 'duration' },
+        { key: 'duration', icon: 'speed', label: l.duration, tip: l.duration, tool: 'duration' },
         ...look,
         ...transition,
-        ...(onMain
-          ? []
-          : [{ key: 'opacity', icon: 'opacity', label: l.opacity, tool: 'opacity' } as ToolEntry]),
+        ...opacity,
         duplicate,
         remove,
       ];
     case 'audio':
       return [
         split,
-        { key: 'volume', icon: item.muted ? 'muted' : 'volume', label: l.volume, tool: 'volume' },
-        { key: 'fade', icon: 'fade', label: l.fade, tool: 'fade' },
-        { key: 'speed', icon: 'speed', label: l.speed, tool: 'speed' },
+        {
+          key: 'volume',
+          icon: item.muted ? 'muted' : 'volume',
+          label: l.volume,
+          tip: l.tipVolume,
+          tool: 'volume',
+        },
+        { key: 'fade', icon: 'fade', label: l.fade, tip: l.tipFade, tool: 'fade' },
+        { key: 'speed', icon: 'speed', label: l.speed, tip: l.tipSpeed, tool: 'speed' },
         duplicate,
         remove,
       ];
@@ -128,16 +165,16 @@ export function toolsFor(
       return [
         { key: 'text-edit', icon: 'edit', label: l.edit, tool: 'text-edit' },
         { key: 'text-style', icon: 'style', label: l.style, tool: 'text-style' },
-        { key: 'transform', icon: 'rotate', label: l.rotate, tool: 'transform' },
-        { key: 'opacity', icon: 'opacity', label: l.opacity, tool: 'opacity' },
+        { key: 'transform', icon: 'rotate', label: l.rotate, tip: l.tipRotate, tool: 'transform' },
+        { key: 'opacity', icon: 'opacity', label: l.opacity, tip: l.tipOpacity, tool: 'opacity' },
         split,
         duplicate,
         remove,
       ];
     case 'sticker':
       return [
-        { key: 'transform', icon: 'rotate', label: l.rotate, tool: 'transform' },
-        { key: 'opacity', icon: 'opacity', label: l.opacity, tool: 'opacity' },
+        { key: 'transform', icon: 'rotate', label: l.rotate, tip: l.tipRotate, tool: 'transform' },
+        { key: 'opacity', icon: 'opacity', label: l.opacity, tip: l.tipOpacity, tool: 'opacity' },
         split,
         duplicate,
         remove,

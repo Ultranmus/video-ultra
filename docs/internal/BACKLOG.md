@@ -121,6 +121,11 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       on high-contrast edges. Use the backdrop's downscale path if it looks bad on real footage.
 - [ ] Transitions are not crossfaded in audio.
 - [ ] Image stickers that are animated GIFs show the first frame only.
-- [ ] WebKit (Playwright) logs `AudioEncoder encode failed: InternalAudioEncoderCocoa encoding
-    failed` during `scripts/export-check.ts` (around the cancel step) — the check passes; make
+- [ ] WebKit (Playwright) logs `AudioEncoder encode failed: InternalAudioEncoderCocoa encoding failed` during `scripts/export-check.ts` (around the cancel step) — the check passes; make
       cancel close the encoder without an unhandled error.
+- [ ] Real-iPhone check of the second UI pass: keyboard lift (visualViewport) while editing text,
+      long-press reorder without Safari's callout, dock heights, Preview mode.
+- [ ] Stage view pinch-zoom (nothing selected) — still not built.
+- [ ] Inspector: "Appearance" buttons stack one per row in a narrow inspector; consider an icon
+      row (rotate / flip H / flip V) like image-ultra's adjust bar.
+- [ ] Ruler labels under the playhead capsule are hidden; a nicer approach would fade them.

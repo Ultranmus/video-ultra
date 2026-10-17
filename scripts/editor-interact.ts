@@ -141,8 +141,8 @@ for (const name of browsers) {
   await check('lane header mute toggle', muted && unmuted);
 
   // Add text and type.
-  await page.locator('.vu-rail .vu-tool', { hasText: 'Text' }).click();
-  await page.locator('.vu-panel .vu-primary', { hasText: 'Add text' }).click();
+  await page.locator('.vu-rail .vu-btn', { hasText: 'Text' }).click();
+  await page.locator('.vu-panel .vu-btn', { hasText: 'Add text' }).click();
   await page.waitForTimeout(200);
   s = await state(page);
   const text = s.lanes.find((l) => l.kind === 'text')?.items[0];
@@ -191,10 +191,10 @@ for (const name of browsers) {
   s = await state(page);
   await check('play advances', s.time > 1.5, `${s.time.toFixed(2)} s`);
   // Export through the dialog: 480p MP4, then probe the file.
-  await page.locator('.vu-topbar .vu-primary', { hasText: 'Export' }).click();
-  await page.locator('.vu-modal .vu-chip', { hasText: '480p' }).click();
+  await page.locator('.vu-topbar .vu-btn', { hasText: 'Export' }).click();
+  await page.locator('.vu-modal .vu-segment', { hasText: '480p' }).click();
   const t0 = Date.now();
-  await page.locator('.vu-modal .vu-primary', { hasText: 'Export video' }).click();
+  await page.locator('.vu-modal .vu-btn', { hasText: 'Export video' }).click();
   const link = page.locator('.vu-modal a[download]');
   await link.waitFor({ timeout: 120000 }).catch(() => {});
   if (await link.isVisible()) {
@@ -224,7 +224,7 @@ for (const name of browsers) {
   }
   await page.keyboard.press('Escape');
   await page
-    .locator('.vu-modal-head .vu-icon-button')
+    .locator('.vu-modal-head .vu-btn')
     .click()
     .catch(() => {});
 

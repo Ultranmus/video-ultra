@@ -4,7 +4,8 @@ import { useController, useLabels, useProject, useUi } from './context';
 import { Icon } from './icons';
 import { stickerItem, textItem } from './items';
 import type { PanelId } from './state';
-import { ToolPanel } from './ToolPanel';
+import { FilterStrip, TransitionGrid } from './looks';
+import { CanvasTool } from './ToolPanel';
 
 /** The browse panel for an add-content category (desktop panel, phone sheet). */
 export function AddPanel({ panel }: { panel: PanelId }): ReactElement {
@@ -18,11 +19,11 @@ export function AddPanel({ panel }: { panel: PanelId }): ReactElement {
     case 'audio':
       return <AudioPanel />;
     case 'canvas':
-      return <ToolPanel tool="canvas" />;
+      return <CanvasTool />;
     case 'filters':
-      return <ToolPanel tool="filter" />;
+      return <FilterStrip />;
     case 'transitions':
-      return <ToolPanel tool="transition" />;
+      return <TransitionGrid />;
   }
 }
 
@@ -52,7 +53,11 @@ function ImportRows() {
               : l.importFailed(row.name, row.message ?? '')}
           </span>
           {row.status === 'error' ? (
-            <button type="button" className="vu-link" onClick={() => ctl.dismissImport(row.id)}>
+            <button
+              type="button"
+              className="vu-text-button"
+              onClick={() => ctl.dismissImport(row.id)}
+            >
               {l.dismiss}
             </button>
           ) : null}
@@ -68,20 +73,25 @@ function MediaPanel() {
   const assets = useProject((p) => Object.values(p.assets).filter((a) => a.kind !== 'audio'));
   return (
     <div className="vu-panel-body">
-      <button type="button" className="vu-primary vu-wide" onClick={() => ctl.pickFiles()}>
-        <Icon name="plus" />
-        <span>{l.addMedia}</span>
+      <button type="button" className="vu-dropcard" onClick={() => ctl.pickFiles()}>
+        <span className="vu-dropcard-icon">
+          <Icon name="plus" size={22} />
+        </span>
+        <span className="vu-dropcard-title">{l.addMedia}</span>
+        <span className="vu-dropcard-hint">{l.addMediaHint}</span>
       </button>
-      <p className="vu-hint">{l.addMediaHint}</p>
       <ImportRows />
       {assets.length ? (
-        <ul className="vu-asset-grid">
-          {assets.map((asset) => (
-            <li key={asset.id}>
-              <AssetTile asset={asset} />
-            </li>
-          ))}
-        </ul>
+        <>
+          <p className="vu-hint">{l.tapToAdd}</p>
+          <ul className="vu-asset-grid">
+            {assets.map((asset) => (
+              <li key={asset.id}>
+                <AssetTile asset={asset} />
+              </li>
+            ))}
+          </ul>
+        </>
       ) : null}
     </div>
   );
@@ -138,7 +148,9 @@ function TextPanel() {
     <div className="vu-panel-body">
       <button
         type="button"
-        className="vu-primary vu-wide"
+        className="vu-btn vu-wide"
+        data-variant="primary"
+        data-layout="row"
         onClick={() => {
           ctl.addLaneItem(l.addText, (id, start) => textItem(id, start, l.textPlaceholder));
           ctl.openTool('text-edit');
@@ -147,6 +159,7 @@ function TextPanel() {
         <Icon name="plus" />
         <span>{l.addText}</span>
       </button>
+      <p className="vu-hint">{l.addTextStyled}</p>
       <ul className="vu-style-list">
         {FONT_PRESETS.map((font) => (
           <li key={font.id}>
@@ -202,7 +215,9 @@ function AudioPanel() {
     <div className="vu-panel-body">
       <button
         type="button"
-        className="vu-primary vu-wide"
+        className="vu-btn vu-wide"
+        data-variant="primary"
+        data-layout="row"
         onClick={() => inputRef.current?.click()}
       >
         <Icon name="audio" />
@@ -298,14 +313,22 @@ function Voiceover() {
       {recording ? (
         <button
           type="button"
-          className="vu-danger-button vu-wide"
+          className="vu-btn vu-wide"
+          data-variant="danger-solid"
+          data-layout="row"
           onClick={() => recorder.current?.stop()}
         >
           <Icon name="stop" />
           <span>{l.stopRecording}</span>
         </button>
       ) : (
-        <button type="button" className="vu-secondary vu-wide" onClick={() => void start()}>
+        <button
+          type="button"
+          className="vu-btn vu-wide"
+          data-variant="secondary"
+          data-layout="row"
+          onClick={() => void start()}
+        >
           <Icon name="mic" />
           <span>{l.recordVoiceover}</span>
         </button>

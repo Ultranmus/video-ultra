@@ -46,10 +46,13 @@ for (const [size, viewport] of [
     ]);
   await page.waitForFunction(() => document.querySelectorAll('[role="option"]').length >= 2);
   await page.locator('[role="option"]').first().focus();
-  await page.locator('.vu-tool', { hasText: 'Volume' }).first().click();
+  await page
+    .locator('.vu-toolbar .vu-btn, .vu-inspector .vu-btn', { hasText: /^Mute$|Volume/ })
+    .first()
+    .click();
   await page.waitForTimeout(300);
   await audit('clip selected + volume tool');
-  await page.locator('.vu-primary', { hasText: 'Export' }).first().click();
+  await page.locator('.vu-topbar .vu-btn', { hasText: 'Export' }).first().click();
   await page.waitForTimeout(200);
   await audit('export dialog');
   await page.close();

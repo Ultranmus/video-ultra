@@ -12,16 +12,20 @@ import { ExportDialog } from './ExportDialog';
 import { Icon } from './icons';
 import { DEFAULT_LABELS, type Labels } from './labels';
 import {
+  Dock,
+  HelpSheet,
   Inspector,
   Panel,
+  PhoneTransport,
+  PreviewBar,
   Rail,
-  Sheet,
   Timeline,
+  TimelineBar,
   Toasts,
   Toolbar,
   TopBar,
-  Transport,
 } from './shell';
+import { Tooltips } from './Tooltips';
 import { Stage } from './Stage';
 import type { LayoutMode } from './state';
 import { themeOverridesToStyle, type ThemeMode, type ThemeOverrides } from './theme';
@@ -123,6 +127,34 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [controller]);
 
+  useEffect(() => {
+    controller.setRoot(rootRef.current);
+    return () => controller.setRoot(null);
+  }, [controller]);
+
+  // On-screen keyboard (phones): the visible area shrinks and iOS scrolls the page. Keep the
+  // editor one box: --vu-keyboard is how much of the editor the keyboard covers, and the bottom
+  // area moves up by it while a text field is focused.
+  useEffect(() => {
+    const vv = typeof window !== 'undefined' ? window.visualViewport : null;
+    const root = rootRef.current;
+    if (!vv || !root) return;
+    const update = () => {
+      const rect = root.getBoundingClientRect();
+      const visibleBottom = vv.offsetTop + vv.height;
+      const covered = Math.max(0, Math.round(rect.bottom - visibleBottom));
+      root.style.setProperty('--vu-keyboard', `${covered}px`);
+      root.toggleAttribute('data-keyboard', covered > 80);
+    };
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    update();
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+    };
+  }, []);
+
   // Layout from the editor's own width.
   useEffect(() => {
     const root = rootRef.current!;
@@ -170,8 +202,8 @@ function Shell({
   const status = useUi((s) => s.status);
   const message = useUi((s) => s.statusMessage);
   const layout = useUi((s) => s.layout);
+  const previewMode = useUi((s) => s.previewMode);
   const inputRef = useRef<HTMLInputElement>(null);
-  const stageRef = useRef<HTMLDivElement>(null);
   const [dropping, setDropping] = useState(false);
 
   useEffect(() => ctl.setFilePicker(() => inputRef.current?.click()), [ctl]);
@@ -197,41 +229,46 @@ function Shell({
   }
 
   const desktop = layout === 'desktop';
+  const phone = layout === 'phone';
   return (
     <div
       className="vu-shell"
       data-layout={layout}
+      data-preview={previewMode || undefined}
       onDragOver={(e) => {
         if (![...e.dataTransfer.types].includes('Files')) return;
         e.preventDefault();
         setDropping(true);
       }}
       onDragLeave={(e) => {
-        if (e.currentTarget === e.target) setDropping(false);
+        if (e.currentTarget === e.target || !e.currentTarget.contains(e.relatedTarget as Node))
+          setDropping(false);
       }}
       onDrop={(e) => {
-        if (!e.dataTransfer.files.length) return;
         e.preventDefault();
         setDropping(false);
-        void ctl.importFiles([...e.dataTransfer.files]);
+        if (e.dataTransfer.files.length) void ctl.importFiles([...e.dataTransfer.files]);
       }}
     >
-      <TopBar onClose={onClose} />
-      {layout !== 'phone' ? <Rail /> : null}
-      {layout !== 'phone' ? <Panel /> : null}
-      <div className="vu-stage-area" ref={stageRef}>
+      {previewMode ? null : <TopBar onClose={onClose} />}
+      {!phone && !previewMode ? <Rail /> : null}
+      {!phone && !previewMode ? <Panel /> : null}
+      <div className="vu-stage-area">
         {status === 'loading' ? <div className="vu-loading">{l.loading}</div> : <Stage />}
       </div>
-      {desktop ? <Inspector /> : null}
-      <div className="vu-bottom">
-        <div className="vu-timeline-head">
-          <Transport stageRef={stageRef} />
-          {desktop ? <Toolbar /> : null}
+      {desktop && !previewMode ? <Inspector /> : null}
+      {previewMode ? (
+        <PreviewBar />
+      ) : (
+        <div className="vu-bottom">
+          {phone ? <PhoneTransport /> : <TimelineBar />}
+          <div className="vu-timeline-area">
+            {status === 'ready' ? <Timeline rootRef={rootRef} /> : <div className="vu-timeline" />}
+            {!desktop ? <Dock /> : null}
+          </div>
+          {!desktop ? <Toolbar /> : null}
         </div>
-        {status === 'ready' ? <Timeline rootRef={rootRef} /> : <div className="vu-timeline" />}
-        {!desktop ? <Sheet /> : null}
-        {!desktop ? <Toolbar /> : null}
-      </div>
+      )}
       <input
         ref={inputRef}
         type="file"
@@ -252,6 +289,8 @@ function Shell({
       ) : null}
       <Toasts />
       <ExportDialog />
+      <HelpSheet />
+      <Tooltips root={rootRef} />
     </div>
   );
 }
@@ -299,7 +338,10 @@ function useKeyboard(rootRef: React.RefObject<HTMLDivElement | null>) {
       } else if (e.key === 'End') {
         ctl.seek(Number.MAX_SAFE_INTEGER);
       } else if (e.key === 'Escape') {
-        ctl.select(null);
+        if (ctl.ui.getState().previewMode) ctl.setPreviewMode(false);
+        else ctl.select(null);
+      } else if (e.key === '?') {
+        ctl.ui.setState({ helpOpen: true });
       }
     };
     root.addEventListener('keydown', onKey);

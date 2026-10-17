@@ -313,3 +313,26 @@ reason; when one changes, edit the entry and note the date.
     8.0–8.2×), so the Phase-0 "WebGPU capture 2× slower" gap is gone; WebGL2 stays the default
     because it is the path every device has (one encoder-capture path to tune). Switch with the
     internal `exportWithInfo(..., backend)` if a device proves otherwise.
+
+## Editor UI, second pass (owner review, 2026-10-17)
+
+69. **The first UI was rejected; UI_VISION §9 holds the rules that replaced it** (2026-10-17).
+    Tests passed but the experience failed a first-time user: no help, duplicated menus, actions
+    that silently did nothing, jumpy drags, an empty-looking chrome. The fix is structural (one
+    home per control, §9.1) and is now part of how UI work is checked (`scripts/ui-review.ts`).
+70. **Phones/tablets use a dock over the timeline, not a floating sheet** (2026-10-17). The sheet
+    sat over part of the timeline at a different height ("two boxes"), was hard to close and was
+    cut off by the keyboard. The dock takes exactly the timeline's box and has a ✓ Done.
+71. **Disabled-with-reason instead of hidden or silent** (2026-10-17). Buttons use
+    `aria-disabled` (not `disabled`) so they stay hoverable and focusable and the tooltip can
+    explain; `targets.ts` computes what each action would act on, re-rendering only when the
+    answer changes (not per playhead frame).
+72. **Filter thumbnails are rendered by the engine** (2026-10-17): `engine.filterPreviews()`
+    decodes the clip's frame once and draws it with every filter through a small reused renderer
+    (freed after 5 s idle). CSS filters were rejected — they don't match the real look.
+73. **Preview mode replaces the fullscreen button** (2026-10-17). iPhone Safari has no element
+    fullscreen, so the button did nothing there. Preview hides the editing chrome everywhere and
+    also requests real fullscreen where the browser allows.
+74. **Timecode shows tenths (`0:04.2`) with fixed-width digits** (2026-10-17). Hundredths
+    flickered while playing; the ruler capsule is sized for the widest digits so it doesn't wobble.
+75. **New stickers start upper right** (2026-10-17) so they don't land on a centred title.

@@ -6,7 +6,13 @@ export const metadata: Metadata = {
   description: 'Development playground and performance bench for video-ultra.',
 };
 
-export const viewport: Viewport = { width: 'device-width', initialScale: 1 };
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  // Full-bleed on notched phones; Android shrinks the page (not just the view) for the keyboard.
+  viewportFit: 'cover',
+  interactiveWidget: 'resizes-content',
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
