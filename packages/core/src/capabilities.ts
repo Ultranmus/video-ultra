@@ -173,14 +173,24 @@ export async function detectCapabilities(): Promise<Capabilities> {
   };
   return {
     ...capabilities,
-    tier: suggestTier(capabilities),
+    tier: suggestTier({
+      ...capabilities,
+      ios:
+        /iPhone|iPad|iPod/.test(nav.userAgent) ||
+        (/Macintosh/.test(nav.userAgent) && nav.maxTouchPoints > 1),
+    }),
     supported: webcodecs.video && offscreenCanvas && (webgpu || webgl2) && avc,
   };
 }
 
 /** Tier rules. Deliberately conservative: a wrong "low" costs some sharpness, a wrong "high" costs crashes. */
-function suggestTier(c: Pick<Capabilities, 'deviceMemoryGb' | 'cores' | 'mobile'>): DeviceTier {
+function suggestTier(
+  c: Pick<Capabilities, 'deviceMemoryGb' | 'cores' | 'mobile'> & { ios: boolean },
+): DeviceTier {
   const memory = c.deviceMemoryGb;
+  // Safari on iOS reports a fixed, low core count and no memory size, so those numbers say nothing
+  // there; an iPhone that passes the support checks (iOS 17+) played 4K60 HDR smoothly in tests.
+  if (c.ios) return 'mid';
   if ((memory !== null && memory <= 3) || c.cores <= 4) return 'low';
   if (c.mobile) return 'mid';
   if ((memory === null || memory >= 8) && c.cores >= 8) return 'high';

@@ -31,9 +31,9 @@ export function hdrCalibrationFor(
   let verified = true;
   if (engine === 'chromium') key = backend === 'webgpu' ? 'chromium-webgpu' : 'chromium-webgl2';
   else if (engine === 'webkit') {
+    // Measured on an iPhone (Safari 26, 2026-10-17): its WebGPU and WebGL2 imports both match
+    // the WebKit WebGL2 calibration (error 29 → 6.2 / 27.6 → 6.8).
     key = 'webkit-webgl2';
-    // WebKit's WebGPU import should use the same colour pipeline as its WebGL2 one — measure it.
-    verified = backend === 'webgl2';
   } else {
     // Firefox can't decode HEVC (iPhone) at all; HLG in VP9/AV1 is rare. Closest guess.
     key = 'chromium-webgl2';
@@ -42,7 +42,16 @@ export function hdrCalibrationFor(
   return { key, calibration: HDR_CALIBRATIONS[key], verified };
 }
 
-/** True for frames whose transfer function is HDR (HLG). PQ isn't calibrated yet. */
+/**
+ * True when a frame needs the HDR correction: the track is HLG (`trackHdr`, from the file's
+ * metadata), or the frame itself says HLG. Safari on iOS labels decoded HDR frames as sRGB, so the
+ * track flag is the reliable one. PQ isn't calibrated yet.
+ */
+export function frameIsHdr(colorSpace: VideoColorSpace, trackHdr = false): boolean {
+  return trackHdr || needsHdrCorrection(colorSpace);
+}
+
+/** True for frames whose own colour space says HLG. Prefer {@link frameIsHdr}. */
 export function needsHdrCorrection(colorSpace: VideoColorSpace): boolean {
   // The DOM typings don't list 'hlg' yet, but browsers report it for HLG video.
   return (colorSpace.transfer as string | null) === 'hlg';

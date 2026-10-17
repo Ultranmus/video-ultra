@@ -3,6 +3,7 @@ import { HDR_CALIBRATIONS } from './hdr-calibration';
 import {
   browserEngine,
   curvePixels,
+  frameIsHdr,
   hdrCalibrationFor,
   UNIFORM_FLOATS,
   writeHdrUniforms,
@@ -38,6 +39,16 @@ describe('browserEngine', () => {
   });
 });
 
+describe('frameIsHdr', () => {
+  const srgb = { transfer: 'iec61966-2-1' } as unknown as VideoColorSpace;
+  const hlg = { transfer: 'hlg' } as unknown as VideoColorSpace;
+  it('trusts the track flag when Safari on iOS labels HDR frames as sRGB', () => {
+    expect(frameIsHdr(srgb, true)).toBe(true);
+    expect(frameIsHdr(srgb, false)).toBe(false);
+    expect(frameIsHdr(hlg)).toBe(true);
+  });
+});
+
 describe('HDR calibration', () => {
   it('picks the measured calibration per engine and path', () => {
     expect(hdrCalibrationFor('chromium', 'webgpu')).toMatchObject({
@@ -52,7 +63,10 @@ describe('HDR calibration', () => {
       key: 'webkit-webgl2',
       verified: true,
     });
-    expect(hdrCalibrationFor('webkit', 'webgpu')).toMatchObject({ verified: false });
+    expect(hdrCalibrationFor('webkit', 'webgpu')).toMatchObject({
+      key: 'webkit-webgl2',
+      verified: true,
+    });
   });
 
   it('decodes curves into 256 monotonic RGBA pixels that start near black', () => {

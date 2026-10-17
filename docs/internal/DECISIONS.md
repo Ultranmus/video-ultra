@@ -145,3 +145,9 @@ reason; when one changes, edit the entry and note the date.
     committed so building never needs Rust; `pnpm verify` checks it's fresh when naga is installed.
 36. **WebGL2: HDR frames always upload with `texImage2D`** (2026-10-17). Chrome converts HDR video
     differently in `texSubImage2D`; WebKit doesn't. SDR frames keep the in-place update.
+37. **HDR is decided per track, not per frame** (2026-10-17, owner's iPhone). Safari on iOS labels
+    decoded HLG frames as sRGB (`iec61966-2-1`), so a per-frame check never switched the correction
+    on. The track's colour space from the container decides (`FramePlacement.hdr`); a frame that
+    says HLG is corrected too.
+38. **iOS devices are at least "mid" tier** (2026-10-17). Safari reports a fixed low core count and
+    no memory size; the owner's iPhone plays 4K60 HDR smoothly.

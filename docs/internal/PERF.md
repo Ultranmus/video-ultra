@@ -46,6 +46,21 @@ Starting targets (2026-10-17), to be confirmed or adjusted with Phase 0 measurem
 
 ## Measurements
 
+### 2026-10-17 · First real-device check · owner's iPhone (iOS 18.7, Safari 26.6.1, WebGPU)
+
+| File                                | Play: presented / dropped  | Scrub p95 · drag final frame          | Export (× real time) |
+| ----------------------------------- | -------------------------- | ------------------------------------- | -------------------- |
+| iPhone 1080p29.97 HDR (IMG_2072)    | 300 / 0 (draw 0.26 ms)     | 52 ms · **1 ms** (43/45 frames shown) | 1.54×                |
+| iPhone 4K60 HDR portrait (IMG_9160) | **600 / 0** (draw 0.19 ms) | 343 ms · 370 ms (1/45 shown) ❌       | 1.27× (to 1080p)     |
+
+0 main-thread long tasks, 0 leaked frames in every run. Safari doesn't expose JS heap size.
+**Real Safari has none of Playwright WebKit's upload cost** (draw 0.2 ms vs 9–22 ms), so the 4K60
+drops seen on the Mac were a test-build artifact. Fast drags on 4K60 still show almost nothing
+until release → thumbnails (BACKLOG). First probe took 1082 ms (19 ms after warm-up).
+HDR: Safari iOS labels decoded HDR frames as sRGB, so the correction didn't switch on (fixed:
+track-level flag, DECISIONS #37); the shipped WebKit calibration brings the iPhone's own
+conversion from error 29 → 6.2 (WebGPU) / 27.6 → 6.8 (WebGL2).
+
 ### 2026-10-17 · Phase 0 lab · MacBook (Apple M4, 16 GB, macOS 15.5)
 
 `node scripts/bench.ts` — headless, so these are best-case desktop numbers. Single layer, preview

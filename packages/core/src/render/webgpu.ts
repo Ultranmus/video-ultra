@@ -2,7 +2,7 @@ import {
   browserEngine,
   curvePixels,
   hdrCalibrationFor,
-  needsHdrCorrection,
+  frameIsHdr,
   UNIFORM_FLOATS,
   writeHdrUniforms,
 } from './hdr';
@@ -68,7 +68,11 @@ export async function createWebGPURenderer(
     draw(frame: VideoFrame, placement: FramePlacement) {
       if (destroyed) return;
       placementMatrix(placement, canvas.width, canvas.height, uniforms);
-      writeHdrUniforms(uniforms, calibration, correct && needsHdrCorrection(frame.colorSpace));
+      writeHdrUniforms(
+        uniforms,
+        calibration,
+        correct && frameIsHdr(frame.colorSpace, placement.hdr),
+      );
       device.queue.writeBuffer(uniformBuffer, 0, uniforms);
       // External textures expire at the end of the task, so the bind group is per frame.
       const external = device.importExternalTexture({ source: frame });

@@ -18,7 +18,7 @@ import {
   type VideoSample,
 } from 'mediabunny';
 import { DecoderPool, FrameSource } from '../engine/frames';
-import { browserEngine, needsHdrCorrection } from '../render/hdr';
+import { browserEngine, frameIsHdr } from '../render/hdr';
 import type { FramePlacement, Renderer } from '../render/types';
 import { createWebGL2Renderer } from '../render/webgl2';
 import { createWebGPURenderer } from '../render/webgpu';
@@ -126,7 +126,9 @@ async function load(file: File): Promise<MediaInfo> {
     const flip = await videoTrack.getFlip();
     const width = await videoTrack.getSquarePixelWidth();
     const height = await videoTrack.getSquarePixelHeight();
-    placement = { rotation, flip, width, height };
+    // The DOM typings don't list 'hlg', but the container metadata reports it.
+    const trackHdr = ((await videoTrack.getColorSpace()).transfer as string | undefined) === 'hlg';
+    placement = { rotation, flip, width, height, hdr: trackHdr };
     const metrics = await videoTrack.computeFrameRateMetrics().catch(() => null);
     video = {
       codec: await videoTrack.getCodec(),
@@ -451,7 +453,7 @@ async function exportVideo(
       }
       if (sample) {
         const frame = frameOf(sample);
-        if (needsHdrCorrection(frame.colorSpace)) hdrFrames++;
+        if (frameIsHdr(frame.colorSpace, placement.hdr)) hdrFrames++;
         else transfers.add(String(frame.colorSpace.transfer));
         exportRenderer.draw(frame, placement);
         closeFrame(frame);
@@ -532,6 +534,7 @@ async function hdrCheck(times: number[], width: number): Promise<HdrCheckResult>
   const w = width;
   const h = Math.max(2, Math.round((width * displayH) / displayW / 2) * 2);
   const paths: HdrCheckResult['paths'] = {};
+  const firstDrawBlank: Record<string, boolean> = {};
   for (const backend of ['webgpu', 'webgl2'] as const) {
     const canvas = new OffscreenCanvas(w, h);
     let r: Renderer;
@@ -553,6 +556,18 @@ async function hdrCheck(times: number[], width: number): Promise<HdrCheckResult>
         if (!sample) continue;
         const frame = frameOf(sample);
         r.draw(frame, placement);
+        if (frames.length === 0) {
+          // The first WebGPU draw came back black on an iPhone: record whether it happens, then
+          // draw again so the measurement isn't spoiled.
+          const first = canvas.transferToImageBitmap();
+          readback.drawImage(first, 0, 0);
+          first.close();
+          const px = readback.getImageData(0, 0, w, h).data;
+          let lit = false;
+          for (let i = 0; i < px.length && !lit; i += 4) lit = px[i]! + px[i + 1]! + px[i + 2]! > 0;
+          firstDrawBlank[backend] = !lit;
+          r.draw(frame, placement);
+        }
         closeFrame(frame);
         sample.close();
         const bitmap = canvas.transferToImageBitmap();
@@ -574,7 +589,7 @@ async function hdrCheck(times: number[], width: number): Promise<HdrCheckResult>
       r.destroy();
     }
   }
-  return { engine: browserEngine(), userAgent: navigator.userAgent, paths };
+  return { engine: browserEngine(), userAgent: navigator.userAgent, paths, firstDrawBlank };
 }
 
 function post(message: LabMessage): void {

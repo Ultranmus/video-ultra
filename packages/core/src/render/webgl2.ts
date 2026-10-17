@@ -2,7 +2,7 @@ import {
   browserEngine,
   curvePixels,
   hdrCalibrationFor,
-  needsHdrCorrection,
+  frameIsHdr,
   UNIFORM_FLOATS,
   writeHdrUniforms,
 } from './hdr';
@@ -109,7 +109,7 @@ export function createWebGL2Renderer(
     draw(frame: VideoFrame, placement: FramePlacement) {
       const w = frame.displayWidth;
       const h = frame.displayHeight;
-      const hdr = needsHdrCorrection(frame.colorSpace);
+      const hdr = frameIsHdr(frame.colorSpace, placement.hdr);
       gl.activeTexture(gl.TEXTURE0);
       // Chrome converts HDR frames differently in texSubImage2D than in texImage2D (brighter, part
       // of its HDR → SDR step skipped); WebKit doesn't. The calibration matches texImage2D, so HDR

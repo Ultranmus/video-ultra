@@ -102,6 +102,8 @@ export interface HdrCheckResult {
     string,
     { error: string } | { width: number; height: number; frames: { t: number; rgb: string }[] }
   >;
+  /** Per path: the very first draw after creating the renderer came back blank. */
+  firstDrawBlank: Record<string, boolean>;
 }
 
 export type LabRequest =

@@ -33,14 +33,16 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       with the real engine worker.
 - [x] HDR (HLG) washed out — fixed: correction shader + measured calibrations (Chrome WebGPU 5.5,
       Chrome WebGL2 5.4, WebKit 5.1 / 255 vs Apple). DECISIONS #33, #35, #36.
-- [ ] HDR: measure Safari's WebGPU path (iPhone, iOS 26) and Android Chrome with the bench's HDR
-      check; add PQ (HDR10) calibration (needs a PQ test file); golden-frame HDR test in CI with a
+- [x] HDR on iPhone: Safari labels HDR frames sRGB → track-level flag (#37); WebKit calibration
+      verified on the iPhone (6.2 / 6.8). Re-check on the next batch that frames now get corrected.
+- [ ] **First WebGPU draw came back black on the iPhone** (HDR check, 4K file). Could be a black
+      first frame / flash when a clip first shows. The HDR check now records `firstDrawBlank`.
+- [ ] Tier: iPhone was detected "low" (Safari reports 4 cores, no memory) → iOS is "mid" now;
+      revisit with a real low-end iPhone (e.g. iPhone XS / SE 2).
+- [ ] HDR: measure Android Chrome with the bench's HDR check; add PQ (HDR10) calibration (needs a PQ test file); golden-frame HDR test in CI with a
       shareable (non-private) HLG clip + reference.
-- [ ] **Playwright WebKit spends 9 ms (1080p) / 22 ms (4K) per frame uploading video to WebGL**
-      (SDR too) — the real cause of the 4K60 drops (> 16.7 ms budget). Check real Safari; if real,
-      low tier needs a proxy / lower preview size for 4K60.
-- [ ] Playwright WebKit drops 30% of frames on iPhone 4K60 HDR — check real Safari on the iPhone
-      and Mac; if real, low tier must use a proxy for 4K60.
+- [x] Playwright WebKit's 9–22 ms/frame WebGL upload doesn't happen in real Safari (0.2 ms).
+- [x] WebKit 4K60 drops — a Playwright-WebKit artifact: the real iPhone plays 4K60 HDR 600/600.
 - [ ] HEIC photo still missing from the owner's samples (needed to test HEIC import).
 - [ ] BrowserStack (free for open source) for real budget-Android runs in CI — owner to sign up.
 - [ ] Create the `@video-ultra` npm org (owner) before Day 7.

@@ -19,6 +19,11 @@ export interface FramePlacement {
   /** Width × height of the frame in square pixels, before rotation. */
   width: number;
   height: number;
+  /**
+   * The track is HLG HDR (from the file's metadata). Needed because Safari on iOS labels decoded
+   * HDR frames as sRGB, so the frame's own colour space can't be trusted for this.
+   */
+  hdr?: boolean;
 }
 
 /**

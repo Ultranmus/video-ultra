@@ -22,9 +22,12 @@ Where the last session stopped and what comes next. Update before ending every s
 3. ✅ Decoder pool + scrubbing (`engine/frames.ts`, DECISIONS #34; numbers in PERF.md)
 4. ✅ HDR correction shader (Day 3 · 2.3) — measured calibrations, error ~5 / 255 vs Apple.
 
-**Batch complete → batched iPhone check is due.** Before it: add an "HDR check" to the bench (code
-the owner pastes back, to fit Safari's calibrations), then deploy the playground as a Vercel preview
-— **ask the owner before deploying**; never upload test media.
+**First iPhone check done** (results in `~/Desktop/iphone test result/`, numbers in PERF.md).
+Fixed from it: HDR per track (#37), iOS tier (#38), first-draw diagnostic. The owner deploys the
+playground on Vercel themselves (`apps/playground/vercel.json`); reports come back as files.
+
+**Next: rest of Day 3** — 2.2 compositor (layers, transforms, opacity, multiple clips), 2.4 audio
+engine (AudioWorklet mixer, audio clock, A/V sync), 2.5 tiers in action, 2.6 soak + worker memory.
 
 Then Day 3 proper: compositor (layers, transforms), audio engine + A/V sync, device tiers.
 
