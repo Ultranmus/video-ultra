@@ -2,6 +2,14 @@
 
 Where the last session stopped and what comes next. Update before ending every session.
 
+## 2026-10-17 (UI second pass)
+
+The owner rejected the first UI after testing it (desktop + phone). It was rebuilt to
+UI_VISION §9 (image-ultra is the bar), reviewed screen by screen with `scripts/ui-review.ts`
+(desktop + iPhone-size WebKit, dark + light). Waiting on the owner to try it again — desktop
+first (`localhost:3200/editor`), then the iPhone. Not yet checked on a real phone: keyboard lift,
+long-press drags vs Safari, Preview mode (BACKLOG).
+
 ## 2026-10-17 (end of Days 4–6)
 
 **Done:** Days 4, 5 and 6 of PLAN.md — the whole v0.1 feature set is in the editor, with
