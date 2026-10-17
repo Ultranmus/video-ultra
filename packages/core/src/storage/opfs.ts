@@ -53,7 +53,9 @@ export class OpfsFileStore implements FileStore {
     const worker = new Worker(new URL('./storage.worker.js', import.meta.url), { type: 'module' });
     const store = new OpfsFileStore(root, namespace, worker);
     try {
-      await withTimeout(store.send({ id: 0, op: 'probe', root: namespace }), 5000);
+      // A worker that fails to load or to write reports it (onerror / ok:false); the timeout is only
+      // a safety net — a slow phone on a slow network can take seconds to fetch the worker script.
+      await withTimeout(store.send({ id: 0, op: 'probe', root: namespace }), 30_000);
       return store;
     } catch {
       worker.terminate();

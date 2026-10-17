@@ -59,7 +59,9 @@ export interface MediaAnalyzer {
 
 /** A persistent waveform cache (e.g. {@link ProjectStorage} implements it on OPFS). */
 export interface WaveformCache {
+  /** The stored waveform of an asset, or `null`. */
   getWaveform(assetId: string): Promise<Waveform | null>;
+  /** Stores an asset's waveform (replacing any older one). */
   putWaveform(assetId: string, waveform: Waveform): Promise<void>;
 }
 

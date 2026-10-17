@@ -36,6 +36,7 @@ export interface AnalyzerStats {
   openInputs: number;
 }
 
+/** Main thread → analyzer worker. */
 export type AnalyzerRequest =
   | { type: 'init'; tier: DeviceTier; mode: ThumbnailMode }
   | { type: 'probe'; id: number; file: Blob; name: string }
@@ -52,6 +53,7 @@ export type AnalyzerRequest =
   | { type: 'cancel'; id: number }
   | { type: 'stats'; id: number };
 
+/** Analyzer worker → main thread (`id` matches the request). */
 export type AnalyzerResponse =
   | { id: number; type: 'probe'; result: ProbeResult }
   | { id: number; type: 'thumb'; bitmap: ImageBitmap | null }
