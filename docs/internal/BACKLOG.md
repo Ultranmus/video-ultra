@@ -55,3 +55,5 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [ ] WebKit (Playwright) has late frames at cuts where a new video starts (2 s, 7 s in the demo):
       check on the iPhone; widen prefetch (1 s → 1.5 s) if real.
 - [ ] Next iPhone batch: audio plays, A/V offset, underruns on a real phone (engine lab page).
+- [ ] Soak: ~1 late frame per pass in looped playback (0 in single runs) — find where (`lateAt`
+      in stats); run the full 30-minute soak; confirm RSS stays at the ~1675 MB plateau.

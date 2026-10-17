@@ -125,3 +125,55 @@ the stage and everything drawn on it don't mirror. Text items in RTL scripts ren
 
 One motion curve and three durations (tokens). Motion answers the user's action (sheet opens,
 clip lifts) — no decorative animation. Reduced motion: durations become 0.
+
+## 8. Visual design plan (Day 4 — for owner review)
+
+Brief: an embeddable editor that anyone can use on a phone, that looks like part of the host app,
+sibling of image-ultra. Fixed by the brief: plum brand, calm dark chrome, image-ultra's token
+system, the host's font. The free choices below are spent on the timeline — the one memorable
+element — and everything else stays quiet.
+
+**Colour** (dark theme; light mirrors image-ultra)
+
+| Name     | Hex                                  | Role                                                                                 |
+| -------- | ------------------------------------ | ------------------------------------------------------------------------------------ |
+| Night    | `#0b0b0d`                            | editor background (image-ultra `--bg`)                                               |
+| Stage    | `#060607`                            | behind the video — darker than chrome so footage glows                               |
+| Graphite | `#16161a`                            | timeline lanes                                                                       |
+| Plum     | `#9c479c` (dark) / `#4d194d` (light) | selection, playhead, primary action — the only saturated chrome colour               |
+| Lilac    | `#d08bd0`                            | accent text/icons on dark surfaces                                                   |
+| Amber    | `#f5b54a`                            | trim handles only: "you are changing length" reads at a glance, never used elsewhere |
+
+Clip bodies are desaturated per kind (video graphite-violet, text umber, stickers teal, audio
+slate) so the thumbnails and waveforms carry the colour, not the chrome.
+
+**Type** — the host's font (`inherit`), falling back to the system stack. One family; hierarchy by
+size and weight only (11 / 12 / 13 / 14 / 16 px; 400 / 500 / 600). Timecodes use the same family
+with `font-variant-numeric: tabular-nums` so digits don't jitter while playing — no monospace.
+Sentence case everywhere; no all-caps labels.
+
+**Layout** — as sections 3–5. Alignment: chrome is left-aligned; the stage is centred; the phone
+timeline is centred on the fixed playhead.
+
+**The memorable element: the playhead spine.** A 2 px plum line through every lane with a small
+timecode capsule on the ruler; on phones it stays fixed in the centre and the film strip slides
+under it, with a light haptic tick when it snaps to a cut. Clips are drawn as continuous film strips
+(thumbnail frames, not one repeated poster) with a 6 px radius that's smaller than chrome buttons'
+(8 px) — clips read as material, buttons as controls.
+
+**Principles**
+
+1. Footage is the only vivid thing; chrome recedes.
+2. One accent (plum) means "selected / now"; amber means "length"; red means "delete". Nothing else
+   gets colour.
+3. Every control has an icon and a label; touch targets ≥ 40 px.
+4. Motion answers actions only (sheet opens, clip lifts on long-press, snap tick) — no decorative
+   entrances. Reduced motion: none.
+5. Copy names what users do: "Split", "Speed", "Add text" — never internal words.
+
+**Review against generic defaults.** The near-black + single accent combination is one of the
+common generated looks; here it's pinned by the brief (image-ultra parity), so it stays — but it's
+distinguished by footage-first contrast (stage darker than chrome), amber reserved for trimming,
+and the film-strip timeline. Changed from the first draft: dropped a monospace timecode (a generic
+tell) for tabular figures in the host font; dropped all-caps lane labels for icons + sentence case;
+clip radius made smaller than button radius instead of one radius everywhere.

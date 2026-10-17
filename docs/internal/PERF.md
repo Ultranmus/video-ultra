@@ -72,6 +72,16 @@ end, no clipping.
 At the end: 1 decoder and 1 held frame (idle clips give theirs back). Paused seek → first draw
 42–110 ms, all layers 42–184 ms (Chrome); the slowest is the first seek (cold PIP decoder).
 
+### 2026-10-17 · Engine soak (Chrome, Mac) — stopped at 6.8 min (session end)
+
+`scripts/soak.ts`: demo project looped (every 3rd pass starts with a seek), RSS of every process
+of that Chrome (browser + GPU + page + engine worker), engine counters after each pass.
+
+- RSS: 1566 MB (pass 1) → 1657 MB (pass 14, ~3.5 min, warm-up) → **plateau 1670–1678 MB**
+  (passes 15–26). Needs the full 30-minute run to confirm flat.
+- Held frames 1, decoders 1, underruns 0, A/V p95 0.8–1.4 ms in every pass.
+- **~1 late frame per pass** (single runs earlier had 0) — investigate (BACKLOG).
+
 ### 2026-10-17 · First real-device check · owner's iPhone (iOS 18.7, Safari 26.6.1, WebGPU)
 
 | File                                | Play: presented / dropped  | Scrub p95 · drag final frame          | Export (× real time) |

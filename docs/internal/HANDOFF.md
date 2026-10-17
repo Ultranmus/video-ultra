@@ -26,10 +26,16 @@ Where the last session stopped and what comes next. Update before ending every s
 Fixed from it: HDR per track (#37), iOS tier (#38), first-draw diagnostic. The owner deploys the
 playground on Vercel themselves (`apps/playground/vercel.json`); reports come back as files.
 
-**Next: rest of Day 3** — 2.2 compositor (layers, transforms, opacity, multiple clips), 2.4 audio
-engine (AudioWorklet mixer, audio clock, A/V sync), 2.5 tiers in action, 2.6 soak + worker memory.
+**Day 3 done** except finishing 2.6 (full 30-min soak + ~1 late frame/pass in loops, BACKLOG) — see PROGRESS.md. The owner wants device testing later; **start Day 4 next session**, after reviewing UI_VISION §8 (design plan) with the owner.
 
-Then Day 3 proper: compositor (layers, transforms), audio engine + A/V sync, device tiers.
+**Next batched iPhone check** (owner deploys the playground; results land in
+`~/Desktop/iphone test result/`): `/lab/engine` (Play → share report: frames, late, underruns,
+A/V offset, quality steps), the bench HDR check again (expect HDR-corrected frames > 0 and no
+blank first draw), and listen for sound.
+
+**Next: Day 4 — editor UI shell** (3.1 tokens/themes, 3.2 layouts, 3.3 import, 3.4 canvas timeline,
+3.5 selection + toolbar + stage manipulation). Read UI_VISION.md first; load the frontend-design
+skill; React effects must guard async setup (BACKLOG, strict mode).
 
 ## How to run things
 

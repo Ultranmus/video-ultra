@@ -10,6 +10,7 @@ import { createWebGPURenderer } from '../render/webgpu';
 import { Mixer, type AudioTrackSource } from '../audio/mixer';
 import { AudioOutput } from './audio-output';
 import { DecoderPool, FrameSource } from './frames';
+import { QualityGovernor } from './quality';
 import type { EngineMessage, EngineRequest, EngineResponseData, EngineStats } from './protocol';
 import { activeLayers, upcomingVideoItems, type ActiveLayer } from './timeline';
 
@@ -87,6 +88,8 @@ const stats: EngineStats = {
   previewHeight: 0,
   lastRendered: -1,
   lastLayers: 0,
+  previewQuality: 1,
+  qualityChanges: 0,
   audio: false,
   underruns: 0,
   avOffsetMs: null,
@@ -182,11 +185,21 @@ const layerDraws: LayerDraw[] = [];
 const active: ActiveLayer[] = [];
 const geometries: Float32Array[] = [];
 
+const quality = new QualityGovernor();
+
+function noteFrame(late: boolean): void {
+  quality.frame(late, performance.now());
+  stats.previewQuality = quality.factor;
+  stats.qualityChanges = quality.changes;
+}
+
 function previewSize(p: Project): { width: number; height: number } {
   const { width, height } = p.settings;
   const cap = PREVIEW_CAP[tier];
-  // Fit the project's aspect ratio inside the view, then cap the resolution for the tier.
-  const scale = Math.min(viewW / width, viewH / height, cap / Math.max(width, height), 1);
+  // Fit the project's aspect ratio inside the view, cap the resolution for the tier, then apply
+  // the adaptive quality step.
+  const scale =
+    Math.min(viewW / width, viewH / height, cap / Math.max(width, height), 1) * quality.factor;
   const even = (n: number) => Math.max(2, Math.round(n / 2) * 2);
   return { width: even(width * scale), height: even(height * scale) };
 }
@@ -305,6 +318,7 @@ async function renderAt(
   stats.lastRendered = t;
   stats.lastLayers = layerDraws.length;
   for (const frame of temporary) frame.close();
+  if (counting) noteFrame(late);
   if (late && counting) {
     stats.late++;
     if (stats.lateAt.length < 10) stats.lateAt.push(`late ${(t / FLICKS_PER_SECOND).toFixed(2)}`);

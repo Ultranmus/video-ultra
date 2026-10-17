@@ -69,11 +69,11 @@ Deferred to v0.2+: speed curves, reverse, text animations, templates, keyframes,
 
 ### Day 3 — Playback engine (Phase 2)
 
-- [ ] 2.2 Compositor: ✅ WGSL → GLSL build step; ✅ timeline + layout maths; ✅ multi-layer WebGPU + WebGL2 (transforms, crop, fit/fill, opacity, images) with golden check; ✅ engine worker playing a real Project (`engine/worker.ts`, `createEngine`, `scripts/engine-check.ts`)
+- [x] 2.2 Compositor: ✅ WGSL → GLSL build step; ✅ timeline + layout maths; ✅ multi-layer WebGPU + WebGL2 (transforms, crop, fit/fill, opacity, images) with golden check; ✅ engine worker playing a real Project (`engine/worker.ts`, `createEngine`, `scripts/engine-check.ts`)
 - [x] 2.3 HDR → SDR correction (measured calibrations, both backends, error ~5 / 255 vs Apple); rotation ✅; golden-frame CI test → BACKLOG
 - [x] 2.4 Audio engine: worker mixer → AudioWorklet, audio-driven clock, A/V sync (p95 ≤ 1.5 ms Chrome), fades, volume, resampling (`scripts/audio-check.ts`)
-- [ ] 2.5 Device tiers in action: adaptive preview resolution, cache budgets, frame-leak counter
-- [ ] 2.6 30-minute soak test + main-thread long-task monitor
+- [x] 2.5 Device tiers in action: preview caps + decoder budgets per tier, adaptive preview quality (`engine/quality.ts`), held-frame counter
+- [ ] 2.6 Soak: `scripts/soak.ts` + OS memory; 6.8-min run plateaus (PERF.md); full 30-min run + the 1-late-frame-per-pass item → next session
 - [ ] **Checkpoint (iPhone + Android):** multi-clip playback on phones
 
 ### Day 4 — Editor UI shell (Phase 3a)

@@ -26,6 +26,9 @@ export interface EngineStats {
   /** Timeline time (flicks) of the last frame drawn, and how many layers it had. */
   lastRendered: number;
   lastLayers: number;
+  /** Adaptive preview resolution factor (1, 0.75, 0.5) and how often it changed. */
+  previewQuality: number;
+  qualityChanges: number;
   /** Preview canvas size in pixels. */
   previewWidth: number;
   previewHeight: number;

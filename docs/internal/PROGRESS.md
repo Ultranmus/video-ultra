@@ -57,3 +57,17 @@ save; v0.1 production quality in one week.
   measured calibrations per engine/path; Chrome `texSubImage2D` HDR bug worked around (#36).
   Exports vs Apple: error 30–74 → **5.1–5.5 / 255** on every path; SDR unchanged.
 - Found: Playwright WebKit's WebGL upload costs 9–22 ms/frame — likely the 4K60 drop cause.
+
+## 2026-10-17 · Day 3 — playback engine (2.2 compositor, 2.4 audio, 2.5 tiers, 2.6 soak)
+
+- **2.2** Timeline + layout maths (pure, tested); multi-layer compositor on WebGPU + WebGL2 with a
+  golden check (`scripts/composite-check.ts`); engine worker v1 (`createEngine`) plays a real
+  project: 17 s demo 510/510 in Chrome, 0 late, 0 main-thread long tasks. Fixed on the way: double
+  premultiplied alpha on WebGL2 (#39), frames closed under a pending draw (#42), overlapping renders,
+  a zombie engine from React strict mode (lab page).
+- **2.4** Audio: worker mixer → MessagePort → AudioWorklet; audio is the clock (#43, #44). 0
+  underruns, A/V p95 ≤ 1.5 ms in Chrome; `scripts/audio-check.ts` verifies the mix.
+- **2.5** Tiers: preview caps and decoder budgets per tier; adaptive preview quality
+  (`QualityGovernor`, unit-tested). CPU throttling doesn't reach the engine worker (hardware
+  decode, off the main thread) — 6× throttled Chrome still plays 510/510.
+- **2.6** 10-minute soak with OS-level memory of all Chrome processes (`scripts/soak.ts`).

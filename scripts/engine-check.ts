@@ -11,6 +11,8 @@ const arg = (name: string) =>
     : undefined;
 const names = (arg('browsers') ?? 'chrome,webkit').split(',');
 const shots = arg('shots');
+/** CPU slowdown factor (Chrome only) to imitate a budget phone, e.g. --throttle 6. */
+const throttle = Number(arg('throttle') ?? 1);
 const launch = {
   chrome: () =>
     chromium.launch({ channel: 'chrome', args: ['--autoplay-policy=no-user-gesture-required'] }),
@@ -24,6 +26,10 @@ for (const name of names) {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(e.message));
     page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
+    if (throttle > 1 && name === 'chrome') {
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: throttle });
+    }
     await page.goto(`http://localhost:3200/lab/engine?backend=${backend}`);
     await page.waitForFunction(
       () => /^Ready|FAILED/.test(document.getElementById('status')!.textContent!),
@@ -71,7 +77,7 @@ for (const name of names) {
       `  played ${duration.toFixed(1)} s in ${wall.toFixed(1)} s · frames ${stats.presented}/${expected} · late ${stats.late} · skipped ${stats.skipped}${stats.lateAt.length ? ` (${stats.lateAt.join(', ')} s)` : ''}`,
     );
     console.log(
-      `  last frame: gather ${stats.gatherMs.toFixed(1)} ms, draw ${stats.drawMs.toFixed(2)} ms · decoders ${stats.decoders}/${stats.decoderBudget} · held frames ${stats.openFrames} · preview ${stats.previewWidth}×${stats.previewHeight}`,
+      `  last frame: gather ${stats.gatherMs.toFixed(1)} ms, draw ${stats.drawMs.toFixed(2)} ms · decoders ${stats.decoders}/${stats.decoderBudget} · held frames ${stats.openFrames} · preview ${stats.previewWidth}×${stats.previewHeight} (quality ${stats.previewQuality}, ${stats.qualityChanges} changes)`,
     );
     console.log(
       `  audio: ${stats.audio ? `on · underruns ${stats.underruns} · A/V offset p50 ${stats.avOffsetMs?.p50 ?? '-'} / p95 ${stats.avOffsetMs?.p95 ?? '-'} / max ${stats.avOffsetMs?.max ?? '-'} ms` : 'off'}`,
