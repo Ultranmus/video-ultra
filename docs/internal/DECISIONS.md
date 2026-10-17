@@ -156,3 +156,15 @@ reason; when one changes, edit the entry and note the date.
     WebGL2 backend (a 90% purple square came out 103 instead of 115). Bitmaps are created with
     `premultiplyAlpha: 'none'`; the golden composite check (`scripts/composite-check.ts`) asserts
     the exact blend on every backend.
+40. **Engine timing rules** (2026-10-17). (a) While playing, a layer whose frame isn't decoded by
+    80% of the frame time reuses its previous picture — playback never waits. (b) Paused seeks draw
+    what's ready within 60 ms, then redraw when the exact frames arrive (unless a newer seek came).
+    (c) Play pre-rolls: the first frame is decoded before the clock starts (≤ 500 ms). (d) Only one
+    render is ever in flight (play waits for the paused-preview loop to stop). (e) The display may
+    tick faster than the project; only new project frames are drawn.
+41. **Idle clips give back their decoder and frame** (2026-10-17): anything not on screen or within
+    a few seconds of the playhead (2 s back, 3 s ahead) releases them — memory stays flat on long
+    timelines.
+42. **Frames are borrowed only synchronously** (2026-10-17). Temporary `VideoFrame`s for drawing
+    are created right before `render()` with no `await` in between; a late frame arriving during
+    gathering could otherwise close the picture underneath (seen as "detached" in WebKit).

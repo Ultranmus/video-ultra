@@ -46,3 +46,7 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [ ] HEIC photo still missing from the owner's samples (needed to test HEIC import).
 - [ ] BrowserStack (free for open source) for real budget-Android runs in CI — owner to sign up.
 - [ ] Create the `@video-ultra` npm org (owner) before Day 7.
+- [ ] React component (Day 4): async setup in effects must check it wasn't cleaned up before
+      creating the engine (strict mode runs effects twice; the lab page leaked a zombie engine).
+- [ ] Engine: blur background, text and sticker layers (Day 5), transitions (Day 5).
+- [ ] Engine: count project frames lost to display timing (60 Hz tick vs 30 fps) separately.

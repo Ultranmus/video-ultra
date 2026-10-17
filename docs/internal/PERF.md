@@ -46,6 +46,20 @@ Starting targets (2026-10-17), to be confirmed or adjusted with Phase 0 measurem
 
 ## Measurements
 
+### 2026-10-17 · Engine v1 · demo project (Mac, headless)
+
+`scripts/engine-check.ts`: 17 s, 9:16, five main clips (H.264, photo, HEVC, rotated portrait,
+real footage) + PIP video + transparent PNG, played start to end by the engine worker.
+
+| Browser · path               | Frames    | Late | Skipped | Draw / frame             | Main-thread long tasks |
+| ---------------------------- | --------- | ---- | ------- | ------------------------ | ---------------------- |
+| Chrome · WebGPU              | 510 / 510 | 0    | 0       | 0.2 ms                   | 0                      |
+| Chrome · WebGL2              | 510 / 510 | 0    | 0       | 0.3 ms                   | 0                      |
+| WebKit (Playwright) · WebGL2 | 509 / 510 | 0    | 0       | 9 ms (test-build upload) | 0                      |
+
+At the end: 1 decoder and 1 held frame (idle clips give theirs back). Paused seek → first draw
+42–110 ms, all layers 42–184 ms (Chrome); the slowest is the first seek (cold PIP decoder).
+
 ### 2026-10-17 · First real-device check · owner's iPhone (iOS 18.7, Safari 26.6.1, WebGPU)
 
 | File                                | Play: presented / dropped  | Scrub p95 · drag final frame          | Export (× real time) |

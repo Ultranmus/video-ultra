@@ -28,3 +28,6 @@ export { createWebGL2Renderer } from './render/webgl2';
 export { createWebGPURenderer } from './render/webgpu';
 export { browserEngine, hdrCalibrationFor, needsHdrCorrection } from './render/hdr';
 export type { BrowserEngine } from './render/hdr';
+export { createEngine } from './engine/client';
+export type { Engine, EngineOptions } from './engine/client';
+export type { EngineStats } from './engine/protocol';
