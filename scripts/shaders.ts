@@ -1,6 +1,7 @@
 /**
  * Generates packages/core/src/render/shaders/generated.ts from the WGSL sources:
- * - WebGPU: the WGSL with the frame texture turned into a zero-copy `texture_external`.
+ * - WebGPU: the WGSL as written (images, text) — the video variant with a zero-copy
+ *   `texture_external` is derived from it at load time (render/shaders/external.ts).
  * - WebGL2: GLSL ES 3.0 vertex + fragment shaders translated by naga (Rust; `cargo install
  *   naga-cli`). The generated file is committed, so building the package never needs Rust.
  *
@@ -10,6 +11,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
+import { externalVariant } from '../packages/core/src/render/shaders/external.ts';
 
 const dir = join(import.meta.dirname, '..', 'packages', 'core', 'src', 'render', 'shaders');
 const out = join(dir, 'generated.ts');
@@ -18,21 +20,6 @@ const check = process.argv.includes('--check');
 function naga(args: string[]): void {
   const env = { ...process.env, PATH: `${process.env.HOME}/.cargo/bin:${process.env.PATH}` };
   execFileSync('naga', args, { stdio: ['ignore', 'ignore', 'inherit'], env });
-}
-
-/** WebGPU variant: `texture_2d` marked `@frame` → `texture_external`, sampled without mips. */
-function toExternal(wgsl: string): string {
-  const declared = wgsl.replace(
-    /(var\s+\w+\s*:\s*)texture_2d<f32>(\s*;\s*\/\/\s*@frame)/,
-    '$1texture_external$2',
-  );
-  const sampled = declared.replace(
-    /textureSample\((\w+),\s*(\w+),\s*(\w+)\)(\s*;\s*\/\/\s*@sample-frame)/,
-    'textureSampleBaseClampToEdge($1, $2, $3)$4',
-  );
-  if (declared === wgsl || sampled === declared)
-    throw new Error('Missing @frame / @sample-frame markers');
-  return sampled;
 }
 
 try {
@@ -55,7 +42,7 @@ try {
     .sort()) {
     const name = basename(file, '.wgsl');
     const source = readFileSync(join(dir, file), 'utf8');
-    const webgpu = toExternal(source);
+    const webgpu = externalVariant(source);
     // Validate both variants (external: video frames; 2d: images, text), then translate the
     // texture_2d variant to GLSL ES 3.0.
     writeFileSync(join(tmp, `${name}.external.wgsl`), webgpu);
@@ -86,7 +73,7 @@ try {
       '--keep-coordinate-space',
     ]);
     entries.push(
-      `  ${name}: {\n    wgsl: ${JSON.stringify(webgpu)},\n    wgsl2d: ${JSON.stringify(source)},\n    glslVertex: ${JSON.stringify(readFileSync(vert, 'utf8'))},\n    glslFragment: ${JSON.stringify(readFileSync(frag, 'utf8'))},\n  },`,
+      `  ${name}: {\n    wgsl2d: ${JSON.stringify(source)},\n    glslVertex: ${JSON.stringify(readFileSync(vert, 'utf8'))},\n    glslFragment: ${JSON.stringify(readFileSync(frag, 'utf8'))},\n  },`,
     );
   }
 } finally {

@@ -84,6 +84,48 @@ const probe = (file: string): Probe =>
   ) as Probe;
 
 /** Stream durations as decoded (packet timestamps), seconds. */
+/** Moments of the demo checked against the preview: animations, a light leak, a cube turn. */
+const MATCH_TIMES: [number, string][] = [
+  [0.8, 'sticker popping in, title typing'],
+  [1.3, 'logo sliding in'],
+  [7.0, 'light leak'],
+  [14.0, 'cube'],
+];
+
+/** Frame `n` of a video file as RGBA (ffmpeg). */
+function frameAt(file: string, n: number, width: number, height: number): Buffer {
+  return execFileSync(
+    'ffmpeg',
+    [
+      '-v',
+      'error',
+      '-i',
+      file,
+      '-vf',
+      `select=eq(n\\,${n})`,
+      '-vframes',
+      '1',
+      '-f',
+      'rawvideo',
+      '-pix_fmt',
+      'rgba',
+      '-s',
+      `${width}x${height}`,
+      '-',
+    ],
+    { maxBuffer: 64 * 1024 * 1024 },
+  );
+}
+
+/** Mean absolute RGB difference of two RGBA images (0…255). */
+function rgbMae(a: Buffer, b: Buffer): number {
+  let sum = 0;
+  let count = 0;
+  for (let i = 0; i + 3 < Math.min(a.length, b.length); i += 4)
+    for (let c = 0; c < 3; c++, count++) sum += Math.abs(a[i + c]! - b[i + c]!);
+  return a.length === b.length ? sum / count : 255;
+}
+
 const decodedDuration = (file: string, stream: 'v' | 'a'): number => {
   const out = execFileSync('ffprobe', [
     '-v',
@@ -228,6 +270,31 @@ for (const name of browsers) {
         decodeErrors.trim() === '',
         `${format}: full ffmpeg decode clean${decodeErrors ? ` (${decodeErrors.slice(0, 200)})` : ''}`,
       );
+      // Export = preview: frames at a transition and during element animations, decoded from the
+      // file, against the engine's own exact capture of the same moment (and of a moment 0.25 s
+      // later, to show the comparison can tell frames apart).
+      for (const [t, what] of MATCH_TIMES) {
+        const n = Math.round(t * fps);
+        const decoded = frameAt(file, n, result.width, result.height);
+        const capture = async (sec: number) =>
+          Buffer.from(
+            await page.evaluate(([x, w, h, b]) => window.engineLab!.captureFrame(x, w, h, b), [
+              sec,
+              result.width,
+              result.height,
+              backend,
+            ] as const),
+            'base64',
+          );
+        const same = rgbMae(decoded, await capture(n / fps));
+        const other = rgbMae(decoded, await capture(n / fps + 0.25));
+        // VP9 at "medium" loses more detail in WebKit / Firefox (~5–8 / 255) than H.264 (~1–3).
+        const limit = format === 'mp4' ? 6 : 10;
+        check(
+          same < limit && same < other * 0.6,
+          `${format}: frame ${n} (${what}) matches the preview (${same.toFixed(2)} / 255; 0.25 s later: ${other.toFixed(2)})`,
+        );
+      }
       if (result.audioCodec) {
         // Lip sync: the demo's sound stops at the 14 s cut (the last clip is silent).
         const silence = spawnSync(
