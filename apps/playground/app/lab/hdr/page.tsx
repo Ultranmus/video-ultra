@@ -6,6 +6,11 @@
  * (Apple's own HDR → SDR conversion). Decides how we tone-map HDR.
  * Usage: /lab/hdr?file=private/iphone-1080p2997-hdr-landscape-mono.mov&t=3
  */
+import {
+  createWebGL2Renderer,
+  createWebGPURenderer,
+  type Renderer,
+} from '@video-ultra/core/internal';
 import { ALL_FORMATS, BlobSource, Input, VideoSampleSink } from 'mediabunny';
 import { useEffect, useState } from 'react';
 
@@ -200,6 +205,62 @@ async function webgl2Path(
   return { webgl2: await toPng(flipped, w, h) };
 }
 
+/** The browser's WebGL2 conversion inside a worker — where the engine actually runs. */
+async function webgl2WorkerPath(
+  frame: VideoFrame,
+  w: number,
+  h: number,
+): Promise<Record<string, string>> {
+  const worker = new Worker(new URL('./webgl2-worker.ts', import.meta.url), { type: 'module' });
+  try {
+    const clone = frame.clone();
+    const pixels = await new Promise<Uint8ClampedArray>((resolve, reject) => {
+      worker.onmessage = (e: MessageEvent<Uint8ClampedArray>) => resolve(e.data);
+      worker.onerror = (e) => reject(new Error(e.message));
+      worker.postMessage({ frame: clone, w, h }, [clone]);
+    });
+    return { 'webgl2-worker': await toPng(pixels, w, h) };
+  } finally {
+    worker.terminate();
+  }
+}
+
+/** Our own renderers (with the HDR correction), read back as PNG. */
+async function ourPaths(frame: VideoFrame, w: number, h: number): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  const placement = {
+    rotation: 0 as const,
+    flip: false,
+    width: frame.displayWidth,
+    height: frame.displayHeight,
+  };
+  for (const [name, make] of [
+    ['ours-webgpu', (c: OffscreenCanvas) => createWebGPURenderer(c)],
+    ['ours-webgl2', (c: OffscreenCanvas) => Promise.resolve(createWebGL2Renderer(c))],
+  ] as const) {
+    let renderer: Renderer | null = null;
+    try {
+      const canvas = new OffscreenCanvas(w, h);
+      renderer = await make(canvas);
+      renderer.draw(frame, placement);
+      // Second draw of the same frame: WebGL2 now updates the texture in place (texSubImage2D),
+      // like every frame after the first one during playback/export.
+      if (new URLSearchParams(location.search).has('twice')) renderer.draw(frame, placement);
+      const blob = await canvas.convertToBlob({ type: 'image/png' });
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      let binary = '';
+      for (let i = 0; i < bytes.length; i += 0x8000)
+        binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      out[name] = btoa(binary);
+    } catch (e) {
+      out[`${name}-error`] = btoa(String(e));
+    } finally {
+      renderer?.destroy();
+    }
+  }
+  return out;
+}
+
 export default function HdrProbe() {
   const [report, setReport] = useState('Probing…');
   useEffect(() => {
@@ -207,22 +268,47 @@ export default function HdrProbe() {
       const params = new URLSearchParams(location.search);
       const file = params.get('file') ?? 'private/iphone-1080p2997-hdr-landscape-mono.mov';
       const t = Number(params.get('t') ?? 3);
-      const blob = await (await fetch(`/media/${file}`)).blob();
-      const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(blob) });
-      const track = await input.getPrimaryVideoTrack();
-      if (!track) throw new Error('no video');
-      const sample = await new VideoSampleSink(track).getSample(t);
-      if (!sample) throw new Error('no frame');
-      const frame = sample.toVideoFrame();
+      // ?raw=<path>&w=&h= builds a synthetic HLG frame from raw I420P10 data instead of decoding
+      // (does the browser convert synthetic frames like hardware-decoded ones?).
+      const raw = params.get('raw');
+      let sample: { close(): void } | null = null;
+      let frame: VideoFrame;
+      if (raw) {
+        const data = await (await fetch(`/media/${raw}`)).arrayBuffer();
+        frame = new VideoFrame(data, {
+          // Supported by browsers but missing from the DOM lib's VideoPixelFormat.
+          format: 'I420P10' as VideoPixelFormat,
+          codedWidth: Number(params.get('w') ?? 1920),
+          codedHeight: Number(params.get('h') ?? 1080),
+          timestamp: 0,
+          colorSpace: {
+            primaries: 'bt2020',
+            transfer: 'hlg',
+            matrix: 'bt2020-ncl',
+            fullRange: false,
+          } as unknown as VideoColorSpaceInit, // 'hlg' is missing from the DOM lib's transfer list
+        });
+      } else {
+        const blob = await (await fetch(`/media/${file}`)).blob();
+        const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(blob) });
+        const track = await input.getPrimaryVideoTrack();
+        if (!track) throw new Error('no video');
+        const decoded = await new VideoSampleSink(track).getSample(t);
+        if (!decoded) throw new Error('no frame');
+        sample = decoded;
+        frame = decoded.toVideoFrame();
+      }
       const w = OUT_W;
       const h = Math.round((OUT_W * frame.displayHeight) / frame.displayWidth);
       const images = {
         ...(await webgpuPaths(frame, w, h).catch(() => ({}))),
         ...(await webgl2Path(frame, w, h)),
+        ...(await webgl2WorkerPath(frame, w, h).catch(() => ({}))),
+        ...(await ourPaths(frame, w, h)),
       };
       const result = { file, t, size: [w, h], colorSpace: frame.colorSpace.toJSON(), images };
       frame.close();
-      sample.close();
+      sample?.close();
       setReport(JSON.stringify(result));
     })().catch((e: unknown) => setReport(`FAILED: ${String(e)}`));
   }, []);

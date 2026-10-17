@@ -31,8 +31,14 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       worker (Day 7 packaging).
 - [ ] Turbopack also copies `lab.worker.js` as an unused static asset — harmless, check again
       with the real engine worker.
-- [ ] **HDR (HLG/PQ) looks washed out** — researched (research/HDR.md, DECISIONS #33): correction
-      shader + per-device self-calibration on Day 3. Verify on iPhone + Android.
+- [x] HDR (HLG) washed out — fixed: correction shader + measured calibrations (Chrome WebGPU 5.5,
+      Chrome WebGL2 5.4, WebKit 5.1 / 255 vs Apple). DECISIONS #33, #35, #36.
+- [ ] HDR: measure Safari's WebGPU path (iPhone, iOS 26) and Android Chrome with the bench's HDR
+      check; add PQ (HDR10) calibration (needs a PQ test file); golden-frame HDR test in CI with a
+      shareable (non-private) HLG clip + reference.
+- [ ] **Playwright WebKit spends 9 ms (1080p) / 22 ms (4K) per frame uploading video to WebGL**
+      (SDR too) — the real cause of the 4K60 drops (> 16.7 ms budget). Check real Safari; if real,
+      low tier needs a proxy / lower preview size for 4K60.
 - [ ] Playwright WebKit drops 30% of frames on iPhone 4K60 HDR — check real Safari on the iPhone
       and Mac; if real, low tier must use a proxy for 4K60.
 - [ ] HEIC photo still missing from the owner's samples (needed to test HEIC import).

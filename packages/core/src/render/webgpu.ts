@@ -1,30 +1,18 @@
+import {
+  browserEngine,
+  curvePixels,
+  hdrCalibrationFor,
+  needsHdrCorrection,
+  UNIFORM_FLOATS,
+  writeHdrUniforms,
+} from './hdr';
+import { SHADERS } from './shaders/generated';
 import { placementMatrix, type FramePlacement, type Renderer } from './types';
-
-const SHADER = /* wgsl */ `
-struct Uniforms { m: vec4f };
-@group(0) @binding(0) var<uniform> u: Uniforms;
-@group(0) @binding(1) var samp: sampler;
-@group(0) @binding(2) var tex: texture_external;
-
-struct VsOut { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
-
-@vertex fn vs(@builtin(vertex_index) i: u32) -> VsOut {
-  var quad = array<vec2f, 4>(vec2f(-1.0, -1.0), vec2f(1.0, -1.0), vec2f(-1.0, 1.0), vec2f(1.0, 1.0));
-  let q = quad[i];
-  var out: VsOut;
-  out.pos = vec4f(u.m.x * q.x + u.m.y * q.y, u.m.z * q.x + u.m.w * q.y, 0.0, 1.0);
-  out.uv = q * 0.5 + 0.5;
-  return out;
-}
-
-@fragment fn fs(in: VsOut) -> @location(0) vec4f {
-  return textureSampleBaseClampToEdge(tex, samp, in.uv);
-}
-`;
 
 /**
  * WebGPU renderer. Frames are imported with `importExternalTexture`, which hands the decoded
- * frame to the GPU without a copy (the main reason WebGPU is our first choice).
+ * frame to the GPU without a copy (the main reason WebGPU is our first choice). HDR frames get the
+ * measured correction for this browser (render/hdr.ts).
  */
 export async function createWebGPURenderer(canvas: OffscreenCanvas): Promise<Renderer> {
   const gpu = (navigator as Navigator & { gpu?: GPU }).gpu;
@@ -37,7 +25,7 @@ export async function createWebGPURenderer(canvas: OffscreenCanvas): Promise<Ren
   const format = gpu.getPreferredCanvasFormat();
   context.configure({ device, format, alphaMode: 'opaque' });
 
-  const module = device.createShaderModule({ code: SHADER });
+  const module = device.createShaderModule({ code: SHADERS.composite.wgsl });
   const pipeline = device.createRenderPipeline({
     layout: 'auto',
     vertex: { module, entryPoint: 'vs' },
@@ -45,11 +33,25 @@ export async function createWebGPURenderer(canvas: OffscreenCanvas): Promise<Ren
     primitive: { topology: 'triangle-strip' },
   });
   const sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear' });
+  const uniforms = new Float32Array(UNIFORM_FLOATS);
   const uniformBuffer = device.createBuffer({
-    size: 16,
+    size: uniforms.byteLength,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
-  const matrix = new Float32Array(4);
+
+  const { calibration } = hdrCalibrationFor(browserEngine(), 'webgpu');
+  const curve = device.createTexture({
+    size: [256, 1],
+    format: 'rgba8unorm',
+    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+  });
+  device.queue.writeTexture(
+    { texture: curve },
+    curvePixels(calibration),
+    { bytesPerRow: 256 * 4 },
+    [256, 1],
+  );
+  const curveView = curve.createView();
   const layout = pipeline.getBindGroupLayout(0);
   let destroyed = false;
 
@@ -61,8 +63,9 @@ export async function createWebGPURenderer(canvas: OffscreenCanvas): Promise<Ren
     },
     draw(frame: VideoFrame, placement: FramePlacement) {
       if (destroyed) return;
-      placementMatrix(placement, canvas.width, canvas.height, matrix);
-      device.queue.writeBuffer(uniformBuffer, 0, matrix);
+      placementMatrix(placement, canvas.width, canvas.height, uniforms);
+      writeHdrUniforms(uniforms, calibration, needsHdrCorrection(frame.colorSpace));
+      device.queue.writeBuffer(uniformBuffer, 0, uniforms);
       // External textures expire at the end of the task, so the bind group is per frame.
       const external = device.importExternalTexture({ source: frame });
       const bindGroup = device.createBindGroup({
@@ -71,6 +74,7 @@ export async function createWebGPURenderer(canvas: OffscreenCanvas): Promise<Ren
           { binding: 0, resource: { buffer: uniformBuffer } },
           { binding: 1, resource: sampler },
           { binding: 2, resource: external },
+          { binding: 3, resource: curveView },
         ],
       });
       const encoder = device.createCommandEncoder();
@@ -93,6 +97,7 @@ export async function createWebGPURenderer(canvas: OffscreenCanvas): Promise<Ren
     destroy() {
       destroyed = true;
       uniformBuffer.destroy();
+      curve.destroy();
       context.unconfigure();
       device.destroy();
     },

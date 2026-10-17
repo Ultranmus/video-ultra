@@ -305,6 +305,10 @@ export function Bench() {
         ['Size', `${(r.sizeBytes / 1048576).toFixed(2)} MB for ${r.mediaSeconds} s`],
         ['Written to', r.storage === 'opfs' ? 'OPFS (disk)' : 'memory (no OPFS here)'],
         [
+          'HDR-corrected frames',
+          `${r.hdrFrames}${r.otherTransfers.length ? ` (others: ${r.otherTransfers.join(', ')})` : ''}`,
+        ],
+        [
           'AAC encoder',
           r.audioCodec === 'aac' ? (r.aacFallback ? 'WASM fallback' : 'native') : 'n/a',
         ],

@@ -44,3 +44,16 @@ save; v0.1 production quality in one week.
 - HDR research (research/HDR.md): frames are opaque, browsers tone-map themselves (too bright);
   a fitted LUT + matrix brings every path to Apple's look on unseen frames (MAE 30–72 → 11).
   Decision #33: correction shader + startup self-calibration, zero-copy kept.
+
+## 2026-10-17 · Day 2 finished, Day 3 started (batch tasks 2–4)
+
+- **Day 2 · 1.5 media probing** (`media/probe.ts`): tracks, rotation, HDR, VFR, iPhone audio-track
+  choice, plain-language errors, incomplete files (playable length). All test files pass in 3
+  browsers (`scripts/probe-check.ts`).
+- **Day 2 · 2.1 FrameSource** (`engine/frames.ts`): one decoder per clip, forward continuation,
+  latest-wins, keyframe preview, watchdog, pool. Final frame after a drag 0–100 ms on real footage.
+  A direct-VideoDecoder version failed on iPhone HEVC in Safari → Mediabunny iterators (#34).
+- **Day 3 · 2.3 HDR correction:** one WGSL source → WebGPU + generated GLSL (`pnpm shaders`, #35);
+  measured calibrations per engine/path; Chrome `texSubImage2D` HDR bug worked around (#36).
+  Exports vs Apple: error 30–74 → **5.1–5.5 / 255** on every path; SDR unchanged.
+- Found: Playwright WebKit's WebGL upload costs 9–22 ms/frame — likely the 4K60 drop cause.

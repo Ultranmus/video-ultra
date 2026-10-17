@@ -18,6 +18,7 @@ import {
   type VideoSample,
 } from 'mediabunny';
 import { DecoderPool, FrameSource } from '../engine/frames';
+import { needsHdrCorrection } from '../render/hdr';
 import type { FramePlacement, Renderer } from '../render/types';
 import { createWebGL2Renderer } from '../render/webgl2';
 import { createWebGPURenderer } from '../render/webgpu';
@@ -433,6 +434,8 @@ async function exportVideo(
   await output.start();
   const t0 = performance.now();
   const frameCount = Math.floor(mediaSeconds * fps);
+  let hdrFrames = 0;
+  const transfers = new Set<string>();
 
   const videoJob = (async () => {
     const sink = new VideoSampleSink(video);
@@ -447,6 +450,8 @@ async function exportVideo(
       }
       if (sample) {
         const frame = frameOf(sample);
+        if (needsHdrCorrection(frame.colorSpace)) hdrFrames++;
+        else transfers.add(String(frame.colorSpace.transfer));
         exportRenderer.draw(frame, placement);
         closeFrame(frame);
         sample.close();
@@ -491,6 +496,8 @@ async function exportVideo(
     blob,
     storage: opfs ? 'opfs' : 'memory',
     aacFallback: aacFallbackRegistered,
+    hdrFrames,
+    otherTransfers: [...transfers],
     sizeBytes,
     width,
     height,

@@ -69,8 +69,8 @@ Deferred to v0.2+: speed curves, reverse, text animations, templates, keyframes,
 
 ### Day 3 — Playback engine (Phase 2)
 
-- [ ] 2.2 Compositor: WGSL → GLSL build step; WebGPU + WebGL2 backends; layers, transforms, opacity
-- [ ] 2.3 HDR → SDR tone-mapping; rotation; golden-frame tests on both backends
+- [ ] 2.2 Compositor: ~~WGSL → GLSL build step~~ ✅ (`pnpm shaders`); WebGPU + WebGL2 backends; layers, transforms, opacity
+- [x] 2.3 HDR → SDR correction (measured calibrations, both backends, error ~5 / 255 vs Apple); rotation ✅; golden-frame CI test → BACKLOG
 - [ ] 2.4 Audio engine: AudioWorklet mixer, audio-driven clock, A/V sync, fades
 - [ ] 2.5 Device tiers in action: adaptive preview resolution, cache budgets, frame-leak counter
 - [ ] 2.6 30-minute soak test + main-thread long-task monitor

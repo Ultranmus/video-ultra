@@ -15,3 +15,7 @@ export type {
   ProbeErrorCode,
   ProbeWarningCode,
 } from './media/probe';
+export { createWebGL2Renderer } from './render/webgl2';
+export { createWebGPURenderer } from './render/webgpu';
+export { browserEngine, hdrCalibrationFor, needsHdrCorrection } from './render/hdr';
+export type { BrowserEngine } from './render/hdr';

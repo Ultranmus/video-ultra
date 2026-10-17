@@ -19,7 +19,8 @@
     "release": "pnpm build && changeset publish",
     "e2e": "turbo run e2e",
     "media": "node scripts/test-media.ts",
-    "verify": "pnpm lint && pnpm format:check && pnpm build && pnpm typecheck && pnpm test"
+    "verify": "pnpm shaders --check && pnpm lint && pnpm format:check && pnpm build && pnpm typecheck && pnpm test",
+    "shaders": "node scripts/shaders.ts"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",

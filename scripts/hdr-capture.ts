@@ -16,16 +16,19 @@ const out = join(root, 'files', 'hdr-research');
 const media = join(root, 'private');
 mkdirSync(out, { recursive: true });
 
-const shots: [string, number][] = [
-  ['iphone-1080p2997-hdr-landscape-mono.mov', 3],
-  ['iphone-1080p2997-hdr-landscape-mono.mov', 12],
-  ['iphone-1080p2997-hdr-landscape-mono.mov', 22],
-  ['iphone-1080p30-hdr-portrait.mov', 4],
-  ['iphone-1080p30-hdr-portrait.mov', 15],
-  ['iphone-1080p2997-hdr-portrait.mov', 6],
-  ['iphone-1080p2997-hdr-portrait.mov', 25],
-  ['iphone-4k60-hdr-portrait-28s.mov', 8],
-];
+const durations: Record<string, number> = {
+  'iphone-1080p2997-hdr-landscape-mono.mov': 26,
+  'iphone-1080p30-hdr-portrait.mov': 25,
+  'iphone-1080p2997-hdr-portrait.mov': 34,
+  'iphone-4k60-hdr-portrait-28s.mov': 28,
+  'iphone-4k60-hdr-portrait-54s.mov': 53,
+};
+// Six moments spread across each HDR video: more varied scenes (dark, bright, colourful).
+const shots: [string, number][] = Object.entries(durations).flatMap(([file, seconds]) =>
+  [0.08, 0.25, 0.42, 0.58, 0.75, 0.92].map(
+    (f) => [file, Math.round(seconds * f * 10) / 10] as [string, number],
+  ),
+);
 
 const key = (file: string, t: number) => `${file.replace(/\.[^.]+$/, '')}@${t}`;
 

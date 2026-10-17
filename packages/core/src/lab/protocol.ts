@@ -78,6 +78,9 @@ export interface ExportResult {
   storage: 'opfs' | 'memory';
   /** The WASM AAC encoder was used (no native AAC encoder in this browser). */
   aacFallback: boolean;
+  /** Frames that got the HDR correction, and the transfer functions of the others. */
+  hdrFrames: number;
+  otherTransfers: string[];
   sizeBytes: number;
   width: number;
   height: number;

@@ -130,11 +130,18 @@ reason; when one changes, edit the entry and note the date.
     `research/HDR.md`). Hardware-decoded frames are opaque (no raw 10-bit access), and every
     browser converts HDR → SDR itself, too bright. A per-path correction (tone-curve LUT + 3×3
     matrix) in the shader brings every path to Apple's look (held-out error 30–72 → 11 / 255).
-    The editor self-calibrates per device at startup with a synthetic HLG test frame; the shipped
-    calibration is the fallback. Rejected: raw-plane tone mapping (impossible with hardware decode),
-    software decoding for HDR (too slow for 4K60 on phones).
+    Calibrations are measured per engine + GPU path and shipped (`render/hdr-calibration.ts`).
+    Rejected: raw-plane tone mapping (impossible with hardware decode), software decoding for HDR
+    (too slow for 4K60 on phones), startup self-calibration with a synthetic frame (synthetic frames
+    convert differently from decoded ones on Chrome WebGL2; WebKit can't build them).
 34. **Preview decoding goes through Mediabunny's iterators, not a hand-driven `VideoDecoder`**
     (2026-10-17). A direct-decoder version was fast in Chrome but produced no frames for iPhone
     HEVC in Safari: Mediabunny carries per-browser/codec workarounds (HEVC RASL pictures, Chromium
     packet fixes, WebKit timestamps). `FrameSource` adds continuation, latest-wins, previews,
     watchdog and pooling on top of `VideoSampleSink.samples()`.
+35. **Shaders: one WGSL source, generated GLSL committed** (2026-10-17). `pnpm shaders` turns
+    `render/shaders/*.wgsl` into the WebGPU variant (frame as `texture_external`) and WebGL2 GLSL
+    ES 3.0 via naga (`--keep-coordinate-space`: we draw straight to the canvas). `generated.ts` is
+    committed so building never needs Rust; `pnpm verify` checks it's fresh when naga is installed.
+36. **WebGL2: HDR frames always upload with `texImage2D`** (2026-10-17). Chrome converts HDR video
+    differently in `texSubImage2D`; WebKit doesn't. SDR frames keep the in-place update.
