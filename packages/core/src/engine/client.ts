@@ -3,8 +3,10 @@ import type { BackendChoice } from '../lab/protocol';
 import type { Project } from '../model/schema';
 import type { Time } from '../model/time';
 import type { RenderBackend } from '../render/types';
+import type { ExportOptions, ExportProgress, ExportResult } from './export-plan';
 import type {
   EngineEvent,
+  ExportRunInfo,
   EngineMessage,
   EngineRequest,
   EngineResponseData,
@@ -24,11 +26,41 @@ export interface Engine {
   play(): Promise<void>;
   pause(): Promise<void>;
   stats(): Promise<EngineStats>;
+  /**
+   * Renders the whole project to a video file, offline (every frame exact; not real time). Preview
+   * playback pauses while it runs and `play()` is refused. Rejects with an `AbortError` when
+   * `signal` aborts (the partial file is deleted), or with a plain-language error (e.g. the browser
+   * can't encode that format / size). Progress arrives ~4 times a second.
+   */
+  export(
+    options: ExportOptions,
+    onProgress?: (progress: ExportProgress) => void,
+    signal?: AbortSignal,
+  ): Promise<ExportResult>;
+  /**
+   * One exact frame of the project at `time` as an ImageBitmap (caller closes it): preview size by
+   * default, or `width × height`; `backend` picks the GPU path (golden-image checks).
+   */
+  capture(
+    time: Time,
+    options?: { width?: number; height?: number; backend?: RenderBackend },
+  ): Promise<ImageBitmap>;
   /** Playhead updates (every frame while playing). */
   onTime: ((time: Time, playing: boolean) => void) | null;
   onEnded: (() => void) | null;
   onError: ((message: string) => void) | null;
   destroy(): void;
+}
+
+/** Engine plus internal extras for checks and the bench (not part of the UI contract). */
+export interface EngineInternal extends Engine {
+  /** Like `export`, plus timing details; `backend` forces the export's GPU path. */
+  exportWithInfo(
+    options: ExportOptions,
+    onProgress?: (progress: ExportProgress) => void,
+    signal?: AbortSignal,
+    backend?: RenderBackend,
+  ): Promise<{ result: ExportResult; info: ExportRunInfo }>;
 }
 
 export interface EngineOptions {
@@ -46,13 +78,15 @@ export interface EngineOptions {
 export async function createEngine(
   canvas: HTMLCanvasElement,
   options: EngineOptions,
-): Promise<Engine> {
+): Promise<EngineInternal> {
   const worker = new Worker(new URL('./engine.worker.js', import.meta.url), { type: 'module' });
   let nextId = 1;
   const pending = new Map<
     number,
     { resolve: (d: EngineResponseData) => void; reject: (e: Error) => void }
   >();
+  const progressHandlers = new Map<number, (p: ExportProgress) => void>();
+  let nextJob = 1;
   const handlers = {
     onTime: null as Engine['onTime'],
     onEnded: null as Engine['onEnded'],
@@ -65,6 +99,7 @@ export async function createEngine(
       const e: EngineEvent = message.event;
       if (e.type === 'time') handlers.onTime?.(e.time, e.playing);
       else if (e.type === 'ended') handlers.onEnded?.();
+      else if (e.type === 'export-progress') progressHandlers.get(e.jobId)?.(e.progress);
       else handlers.onError?.(e.message);
       return;
     }
@@ -72,6 +107,8 @@ export async function createEngine(
     if (!entry) return;
     pending.delete(message.id);
     if (message.ok) entry.resolve(message.data);
+    else if (message.name === 'AbortError')
+      entry.reject(new DOMException(message.error, 'AbortError'));
     else entry.reject(new Error(message.error));
   };
   worker.onerror = (event) => {
@@ -149,6 +186,27 @@ export async function createEngine(
     return audio.ready;
   };
 
+  async function exportWithInfo(
+    options: ExportOptions,
+    onProgress?: (progress: ExportProgress) => void,
+    signal?: AbortSignal,
+    backend?: RenderBackend,
+  ): Promise<{ result: ExportResult; info: ExportRunInfo }> {
+    if (signal?.aborted) throw new DOMException('Export cancelled', 'AbortError');
+    const jobId = nextJob++;
+    if (onProgress) progressHandlers.set(jobId, onProgress);
+    const abort = () => void send({ type: 'export-cancel', jobId });
+    signal?.addEventListener('abort', abort, { once: true });
+    try {
+      const data = await send({ type: 'export', jobId, options, ...(backend ? { backend } : {}) });
+      if (data.type !== 'export') throw new Error('Unexpected engine response');
+      return { result: data.result, info: data.stats };
+    } finally {
+      signal?.removeEventListener('abort', abort);
+      progressHandlers.delete(jobId);
+    }
+  }
+
   return Object.assign(handlers, {
     backend: init.backend,
     async setProject(project: Project) {
@@ -174,6 +232,22 @@ export async function createEngine(
       const data = await send({ type: 'stats' });
       if (data.type !== 'stats') throw new Error('Unexpected engine response');
       return data.stats;
+    },
+    async export(
+      options: ExportOptions,
+      onProgress?: (progress: ExportProgress) => void,
+      signal?: AbortSignal,
+    ) {
+      return (await exportWithInfo(options, onProgress, signal)).result;
+    },
+    exportWithInfo,
+    async capture(
+      time: Time,
+      captureOptions: { width?: number; height?: number; backend?: RenderBackend } = {},
+    ) {
+      const data = await send({ type: 'capture', time, ...captureOptions });
+      if (data.type !== 'capture') throw new Error('Unexpected engine response');
+      return data.bitmap;
     },
     destroy() {
       void audio?.context.close();

@@ -70,7 +70,7 @@ export interface ScrubResult {
   drag: { framesShown: number; settleMs: number; skipped: number } | null;
 }
 
-export interface ExportResult {
+export interface LabExportResult {
   backend: RenderBackend;
   fileName: string;
   /** The file itself when OPFS wasn't available; otherwise read `fileName` from OPFS. */
@@ -128,7 +128,7 @@ export type LabResponseData =
   | { type: 'load'; info: MediaInfo }
   | { type: 'play'; result: PlayResult }
   | { type: 'scrub'; result: ScrubResult }
-  | { type: 'export'; result: ExportResult }
+  | { type: 'export'; result: LabExportResult }
   | { type: 'hdrCheck'; result: HdrCheckResult }
   | { type: 'resize' }
   | { type: 'cancel' };

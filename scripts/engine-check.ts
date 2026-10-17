@@ -5,6 +5,9 @@
  */
 import { chromium, webkit } from '@playwright/test';
 
+/** Playground URL (PLAYGROUND=http://localhost:3301 when another dev server uses 3200). */
+const BASE = process.env.PLAYGROUND ?? 'http://localhost:3200';
+
 const arg = (name: string) =>
   process.argv.includes(`--${name}`)
     ? process.argv[process.argv.indexOf(`--${name}`) + 1]
@@ -30,7 +33,7 @@ for (const name of names) {
       const cdp = await page.context().newCDPSession(page);
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: throttle });
     }
-    await page.goto(`http://localhost:3200/lab/engine?backend=${backend}`);
+    await page.goto(`${BASE}/lab/engine?backend=${backend}`);
     await page.waitForFunction(
       () => /^Ready|FAILED/.test(document.getElementById('status')!.textContent!),
       null,

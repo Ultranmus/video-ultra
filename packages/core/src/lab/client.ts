@@ -1,6 +1,6 @@
 import type {
   BackendChoice,
-  ExportResult,
+  LabExportResult,
   HdrCheckResult,
   LabMessage,
   LabRequest,
@@ -22,7 +22,7 @@ export interface LabSession {
   scrub(count: number): Promise<ScrubResult>;
   exportVideo(
     options: Omit<Extract<LabRequest, { type: 'export' }>, 'type'>,
-  ): Promise<ExportResult>;
+  ): Promise<LabExportResult>;
   cancel(): Promise<void>;
   hdrCheck(times: number[], width: number): Promise<HdrCheckResult>;
   /** Called with 0…1 during export. */

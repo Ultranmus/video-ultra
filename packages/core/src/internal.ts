@@ -6,6 +6,7 @@ export { createLabSession } from './lab/client';
 export type { LabSession } from './lab/client';
 export type * from './lab/protocol';
 export type {
+  Backdrop,
   FramePlacement,
   LayerDraw,
   LayerSource,
@@ -14,8 +15,23 @@ export type {
 } from './render/types';
 export { layerGeometry, displaySize, applyGeometry, GEOMETRY_FLOATS } from './render/layout';
 export type { LayerLook, LayerMedia } from './render/layout';
-export { activeLayers, itemIndexAt, sourceTimeAt, upcomingVideoItems } from './engine/timeline';
-export type { ActiveLayer, VisualItem } from './engine/timeline';
+export {
+  activeLayers,
+  itemIndexAt,
+  sourceTimeAt,
+  upcomingVideoItems,
+  upcomingVideo,
+  visibleSpan,
+  transitionLength,
+} from './engine/timeline';
+export type { ActiveLayer, VisualItem, LayerTransition, UpcomingItem } from './engine/timeline';
+export { measureTextBox, textFont, textFontPx } from './engine/text';
+export type { MeasureText } from './engine/text';
+export { colourParams, identityColour, FILTER_PARAMS, writeEffects } from './effects/colour';
+export type { ColourParams, LayerFx } from './effects/colour';
+export { transitionLook, fadeOverlay } from './effects/transitions';
+export type { TransitionLook } from './effects/transitions';
+export { placedGeometry, shiftGeometry, fullCanvasGeometry } from './render/layout';
 export { probeMedia, assetFromProbe, sniffImage, unsupportedVideoMessage } from './media/probe';
 export type {
   ProbeResult,
@@ -29,7 +45,7 @@ export { createWebGPURenderer } from './render/webgpu';
 export { browserEngine, hdrCalibrationFor, needsHdrCorrection } from './render/hdr';
 export type { BrowserEngine } from './render/hdr';
 export { createEngine } from './engine/client';
-export type { Engine, EngineOptions } from './engine/client';
-export type { EngineStats } from './engine/protocol';
+export type { Engine, EngineInternal, EngineOptions } from './engine/client';
+export type { EngineStats, ExportRunInfo } from './engine/protocol';
 export { Mixer } from './audio/mixer';
 export type { AudioTrackSource } from './audio/mixer';

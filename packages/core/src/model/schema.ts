@@ -76,6 +76,11 @@ export const BackgroundSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('blur'), amount: unit }),
 ]);
 
+/**
+ * Text look. Units (engine/text.ts): font size = `size` × canvas height × transform.scale;
+ * `letterSpacing` in em; `lineHeight`, `outline.width`, `background.padding` and
+ * `background.radius` × font size; `shadow` blur / x / y in px at a 1080-px-tall canvas.
+ */
 export const TextStyleSchema = z.object({
   fontFamily: z.string(),
   fontWeight: z.int(),
@@ -180,7 +185,10 @@ export const TextItemSchema = z.object({
 export const StickerItemSchema = z.object({
   ...base,
   kind: z.literal('sticker'),
-  /** An image/GIF asset, or an emoji character. Exactly one is set. */
+  /**
+   * An image/GIF asset, or an emoji character. Exactly one is set. At transform.scale 1 the
+   * sticker contain-fits the canvas (an emoji is a square of side min(width, height)).
+   */
   assetId: z.nullable(id),
   emoji: z.nullable(z.string()),
   transform: TransformSchema,
