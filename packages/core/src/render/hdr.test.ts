@@ -5,8 +5,8 @@ import {
   curvePixels,
   frameIsHdr,
   hdrCalibrationFor,
-  UNIFORM_FLOATS,
-  writeHdrUniforms,
+  LAYER_FLOATS,
+  writeLayerUniforms,
 } from './hdr';
 
 const UA = {
@@ -82,14 +82,17 @@ describe('HDR calibration', () => {
     }
   });
 
-  it('lays out the uniform block like the shader (vec4-aligned)', () => {
-    const u = new Float32Array(UNIFORM_FLOATS);
+  it('lays out the uniforms of a layer like the shader (vec4-aligned)', () => {
+    const u = new Float32Array(LAYER_FLOATS * 2);
     const calibration = HDR_CALIBRATIONS['chromium-webgl2'];
-    writeHdrUniforms(u, calibration, true);
-    expect(u[4]).toBe(1);
-    expect(Array.from(u.slice(8, 11))).toEqual(calibration.matrix[0].map((v) => Math.fround(v)));
-    expect(u[11]).toBe(0);
-    writeHdrUniforms(u, calibration, false);
-    expect(u[4]).toBe(0);
+    const geometry = Float32Array.from({ length: 12 }, (_, i) => i + 1);
+    writeLayerUniforms(u, LAYER_FLOATS, geometry, 0.5, true, calibration);
+    expect(Array.from(u.slice(28, 34))).toEqual([1, 2, 3, 4, 5, 6]); // pos + posT.xy
+    expect(u[34]).toBe(0.5); // opacity
+    expect(u[35]).toBe(1); // hdr
+    expect(Array.from(u.slice(36, 42))).toEqual([7, 8, 9, 10, 11, 12]); // uv + uvT.xy
+    expect(Array.from(u.slice(44, 47))).toEqual(calibration.matrix[0].map((v) => Math.fround(v)));
+    expect(u[47]).toBe(0);
+    expect(u[0]).toBe(0); // the first slot is untouched
   });
 });

@@ -70,21 +70,48 @@ export function curvePixels(calibration: HdrCalibration): Uint8Array<ArrayBuffer
   return pixels;
 }
 
-/**
- * Fills the uniform block: m (placement) is written by the caller into [0..3];
- * this writes hdr flag [4] and matrix rows [8..19] (vec4-aligned, std140 / WGSL layout).
- */
-export function writeHdrUniforms(
-  out: Float32Array,
-  calibration: HdrCalibration,
-  enabled: boolean,
-): void {
-  out[4] = enabled ? 1 : 0;
-  const [r0, r1, r2] = calibration.matrix;
-  out.set([r0[0]!, r0[1]!, r0[2]!, 0], 8);
-  out.set([r1[0]!, r1[1]!, r1[2]!, 0], 12);
-  out.set([r2[0]!, r2[1]!, r2[2]!, 0], 16);
-}
+/** Floats per layer in the uniform block (7 × vec4: pos, posT, uv, uvT, c0, c1, c2). */
+export const LAYER_FLOATS = 28;
 
-/** Floats in the uniform block (m, hdr, c0, c1, c2 = 5 × vec4). */
-export const UNIFORM_FLOATS = 20;
+/**
+ * Writes one layer's uniforms at `offset` (floats) — same layout as `Uniforms` in composite.wgsl
+ * (std140 / WGSL, vec4-aligned): geometry from render/layout.ts, opacity, HDR flag + matrix.
+ */
+export function writeLayerUniforms(
+  out: Float32Array,
+  offset: number,
+  geometry: Float32Array,
+  opacity: number,
+  hdr: boolean,
+  calibration: HdrCalibration,
+): void {
+  out[offset] = geometry[0]!;
+  out[offset + 1] = geometry[1]!;
+  out[offset + 2] = geometry[2]!;
+  out[offset + 3] = geometry[3]!;
+  out[offset + 4] = geometry[4]!;
+  out[offset + 5] = geometry[5]!;
+  out[offset + 6] = opacity;
+  out[offset + 7] = hdr ? 1 : 0;
+  out[offset + 8] = geometry[6]!;
+  out[offset + 9] = geometry[7]!;
+  out[offset + 10] = geometry[8]!;
+  out[offset + 11] = geometry[9]!;
+  out[offset + 12] = geometry[10]!;
+  out[offset + 13] = geometry[11]!;
+  out[offset + 14] = 0;
+  out[offset + 15] = 0;
+  const [r0, r1, r2] = calibration.matrix;
+  out[offset + 16] = r0[0]!;
+  out[offset + 17] = r0[1]!;
+  out[offset + 18] = r0[2]!;
+  out[offset + 19] = 0;
+  out[offset + 20] = r1[0]!;
+  out[offset + 21] = r1[1]!;
+  out[offset + 22] = r1[2]!;
+  out[offset + 23] = 0;
+  out[offset + 24] = r2[0]!;
+  out[offset + 25] = r2[1]!;
+  out[offset + 26] = r2[2]!;
+  out[offset + 27] = 0;
+}

@@ -56,7 +56,8 @@ try {
     const name = basename(file, '.wgsl');
     const source = readFileSync(join(dir, file), 'utf8');
     const webgpu = toExternal(source);
-    // Validate both variants, then translate the texture_2d variant to GLSL ES 3.0.
+    // Validate both variants (external: video frames; 2d: images, text), then translate the
+    // texture_2d variant to GLSL ES 3.0.
     writeFileSync(join(tmp, `${name}.external.wgsl`), webgpu);
     naga([join(tmp, `${name}.external.wgsl`)]);
     const vert = join(tmp, `${name}.vert`);
@@ -85,7 +86,7 @@ try {
       '--keep-coordinate-space',
     ]);
     entries.push(
-      `  ${name}: {\n    wgsl: ${JSON.stringify(webgpu)},\n    glslVertex: ${JSON.stringify(readFileSync(vert, 'utf8'))},\n    glslFragment: ${JSON.stringify(readFileSync(frag, 'utf8'))},\n  },`,
+      `  ${name}: {\n    wgsl: ${JSON.stringify(webgpu)},\n    wgsl2d: ${JSON.stringify(source)},\n    glslVertex: ${JSON.stringify(readFileSync(vert, 'utf8'))},\n    glslFragment: ${JSON.stringify(readFileSync(frag, 'utf8'))},\n  },`,
     );
   }
 } finally {

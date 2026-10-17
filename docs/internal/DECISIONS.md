@@ -151,3 +151,8 @@ reason; when one changes, edit the entry and note the date.
     says HLG is corrected too.
 38. **iOS devices are at least "mid" tier** (2026-10-17). Safari reports a fixed low core count and
     no memory size; the owner's iPhone plays 4K60 HDR smoothly.
+39. **Image layers use straight (non-premultiplied) alpha** (2026-10-17). WebGL ignores its unpack
+    flags for ImageBitmaps, so a premultiplied bitmap got its transparency applied twice on the
+    WebGL2 backend (a 90% purple square came out 103 instead of 115). Bitmaps are created with
+    `premultiplyAlpha: 'none'`; the golden composite check (`scripts/composite-check.ts`) asserts
+    the exact blend on every backend.

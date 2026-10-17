@@ -1,13 +1,16 @@
-// Single-layer compositor shader — the source of truth for both backends.
-// `pnpm shaders` generates the WebGPU variant (zero-copy external texture) and the WebGL2 GLSL
-// (via naga) into generated.ts. Edit this file, never the generated one.
+// Layer compositor shader — the source of truth for both backends. One draw per layer.
+// `pnpm shaders` generates the WebGPU variants (zero-copy external texture for video frames, and
+// texture_2d for images) and the WebGL2 GLSL (via naga) into generated.ts. Never edit that file.
 
 struct Uniforms {
-  // Placement: unit quad (−1…1, y down) → clip space. ndc = (m.x·q.x + m.y·q.y, m.z·q.x + m.w·q.y)
-  m: vec4f,
-  // x: 1 = apply the HDR correction (browser's own HDR → SDR conversion → our target look).
-  hdr: vec4f,
-  // HDR colour matrix rows.
+  // Unit quad q (−1…1, y down) → clip space: clip = mat2(pos) · q + posT.xy  (render/layout.ts)
+  pos: vec4f,
+  // xy: clip offset · z: opacity · w: 1 = apply the HDR correction
+  posT: vec4f,
+  // q → texture uv: uv = mat2(uv) · q + uvT.xy
+  uv: vec4f,
+  uvT: vec4f,
+  // HDR colour matrix rows (render/hdr.ts).
   c0: vec4f,
   c1: vec4f,
   c2: vec4f,
@@ -15,8 +18,8 @@ struct Uniforms {
 
 @group(0) @binding(0) var<uniform> u: Uniforms;
 @group(0) @binding(1) var samp: sampler;
-@group(0) @binding(2) var frame: texture_2d<f32>; // @frame — external texture on WebGPU
-@group(0) @binding(3) var curve: texture_2d<f32>; // 256×1, per-channel tone curve
+@group(0) @binding(2) var frame: texture_2d<f32>; // @frame — external texture for video on WebGPU
+@group(0) @binding(3) var curve: texture_2d<f32>; // 256×1, per-channel HDR tone curve
 
 struct VsOut {
   @builtin(position) pos: vec4f,
@@ -28,8 +31,8 @@ fn vs(@builtin(vertex_index) i: u32) -> VsOut {
   var quad = array<vec2f, 4>(vec2f(-1.0, -1.0), vec2f(1.0, -1.0), vec2f(-1.0, 1.0), vec2f(1.0, 1.0));
   let q = quad[i];
   var out: VsOut;
-  out.pos = vec4f(u.m.x * q.x + u.m.y * q.y, u.m.z * q.x + u.m.w * q.y, 0.0, 1.0);
-  out.uv = q * 0.5 + 0.5;
+  out.pos = vec4f(u.pos.x * q.x + u.pos.y * q.y + u.posT.x, u.pos.z * q.x + u.pos.w * q.y + u.posT.y, 0.0, 1.0);
+  out.uv = vec2f(u.uv.x * q.x + u.uv.y * q.y + u.uvT.x, u.uv.z * q.x + u.uv.w * q.y + u.uvT.y);
   return out;
 }
 
@@ -51,6 +54,7 @@ fn correctHdr(c: vec3f) -> vec3f {
 @fragment
 fn fs(in: VsOut) -> @location(0) vec4f {
   let c = sampleFrame(in.uv);
-  let corrected = correctHdr(c.rgb);
-  return vec4f(mix(c.rgb, corrected, u.hdr.x), 1.0);
+  let rgb = mix(c.rgb, correctHdr(c.rgb), u.posT.w);
+  // Straight alpha out; blending is src·α + dst·(1 − α). Images keep their own transparency.
+  return vec4f(rgb, c.a * u.posT.z);
 }

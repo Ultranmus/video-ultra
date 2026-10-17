@@ -470,12 +470,20 @@ make({ file: 'photo.jpg', label: 'JPEG 4032×3024 (12 MP, phone-sized)', kind: '
     p,
   ]),
 );
+// Transparent 512² canvas with a 90%-opaque purple square in the middle (drawbox can't write alpha,
+// so the square is overlaid). The composite check relies on these values.
 make({ file: 'logo.png', label: 'PNG with transparency', kind: 'image' }, (p) =>
   ffmpeg([
     '-f',
     'lavfi',
     '-i',
-    'color=c=red@0.0:size=512x512,format=rgba,drawbox=x=128:y=128:w=256:h=256:color=purple@0.9:t=fill',
+    'color=c=black@0.0:size=512x512,format=rgba',
+    '-f',
+    'lavfi',
+    '-i',
+    'color=c=purple@0.9:size=256x256,format=rgba',
+    '-filter_complex',
+    '[0][1]overlay=128:128:format=auto,format=rgba',
     '-frames:v',
     '1',
     p,

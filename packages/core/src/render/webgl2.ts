@@ -1,13 +1,15 @@
+import { DEFAULT_TRANSFORM, NO_CROP } from '../model/project';
 import {
   browserEngine,
   curvePixels,
-  hdrCalibrationFor,
   frameIsHdr,
-  UNIFORM_FLOATS,
-  writeHdrUniforms,
+  hdrCalibrationFor,
+  LAYER_FLOATS,
+  writeLayerUniforms,
 } from './hdr';
+import { layerGeometry } from './layout';
 import { SHADERS } from './shaders/generated';
-import { placementMatrix, type FramePlacement, type Renderer, type RendererOptions } from './types';
+import type { FramePlacement, LayerDraw, Renderer, RendererOptions } from './types';
 
 function compile(gl: WebGL2RenderingContext, type: number, source: string): WebGLShader {
   const shader = gl.createShader(type);
@@ -20,10 +22,20 @@ function compile(gl: WebGL2RenderingContext, type: number, source: string): WebG
   return shader;
 }
 
+function newTexture(gl: WebGL2RenderingContext): WebGLTexture {
+  const texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  return texture;
+}
+
 /**
- * WebGL2 renderer, running GLSL generated from the same WGSL as the WebGPU one (naga). Uploads each
- * frame into one reused texture (`texSubImage2D` once the size is known), so it allocates nothing
- * per frame. HDR frames get the measured correction for this browser (render/hdr.ts).
+ * WebGL2 compositor, running GLSL generated from the same WGSL as the WebGPU one (naga). Video
+ * layers upload into per-slot textures reused frame to frame; images upload once and are cached
+ * until `release()`. Alpha blending, one draw per layer.
  */
 export function createWebGL2Renderer(
   canvas: OffscreenCanvas,
@@ -53,7 +65,7 @@ export function createWebGL2Renderer(
   gl.useProgram(program);
 
   // naga emits one uniform block per stage for the same WGSL struct; both read binding point 0.
-  const uniforms = new Float32Array(UNIFORM_FLOATS);
+  const uniforms = new Float32Array(LAYER_FLOATS);
   const ubo = gl.createBuffer();
   gl.bindBuffer(gl.UNIFORM_BUFFER, ubo);
   gl.bufferData(gl.UNIFORM_BUFFER, uniforms.byteLength, gl.DYNAMIC_DRAW);
@@ -62,22 +74,19 @@ export function createWebGL2Renderer(
     const index = gl.getUniformBlockIndex(program, block);
     if (index !== gl.INVALID_INDEX) gl.uniformBlockBinding(program, index, 0);
   }
-  // Generated sampler names: _group_<g>_binding_<b>_fs. Frame → unit 0, curve → unit 1.
+  // Generated sampler names: _group_<g>_binding_<b>_fs. Layer → unit 0, HDR curve → unit 1.
   gl.uniform1i(gl.getUniformLocation(program, '_group_0_binding_2_fs'), 0);
   gl.uniform1i(gl.getUniformLocation(program, '_group_0_binding_3_fs'), 1);
 
   // gl_VertexID needs a bound (empty) vertex array on some drivers.
   const vao = gl.createVertexArray();
   gl.bindVertexArray(vao);
+  gl.enable(gl.BLEND);
+  gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
   const { calibration } = hdrCalibrationFor(browserEngine(), 'webgl2');
-  const curve = gl.createTexture();
   gl.activeTexture(gl.TEXTURE1);
-  gl.bindTexture(gl.TEXTURE_2D, curve);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  const curve = newTexture(gl);
   gl.texImage2D(
     gl.TEXTURE_2D,
     0,
@@ -90,47 +99,93 @@ export function createWebGL2Renderer(
     curvePixels(calibration),
   );
 
-  const texture = gl.createTexture();
-  gl.activeTexture(gl.TEXTURE0);
-  gl.bindTexture(gl.TEXTURE_2D, texture);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  let texW = 0;
-  let texH = 0;
+  // Video layers: one texture per layer slot, re-specified only when the size changes.
+  const videoSlots: { texture: WebGLTexture; w: number; h: number }[] = [];
+  // Images: uploaded once.
+  const images = new Map<ImageBitmap | OffscreenCanvas, WebGLTexture>();
 
-  return {
+  const single: LayerDraw = {
+    source: null as unknown as VideoFrame,
+    geometry: new Float32Array(12),
+    opacity: 1,
+    hdr: false,
+  };
+  const singleList = [single];
+
+  const renderer: Renderer = {
     backend: 'webgl2',
     resize(width, height) {
       canvas.width = width;
       canvas.height = height;
     },
-    draw(frame: VideoFrame, placement: FramePlacement) {
-      const w = frame.displayWidth;
-      const h = frame.displayHeight;
-      const hdr = frameIsHdr(frame.colorSpace, placement.hdr);
-      gl.activeTexture(gl.TEXTURE0);
-      // Chrome converts HDR frames differently in texSubImage2D than in texImage2D (brighter, part
-      // of its HDR → SDR step skipped); WebKit doesn't. The calibration matches texImage2D, so HDR
-      // frames always re-specify the texture. SDR frames update in place (no allocation).
-      if (hdr || w !== texW || h !== texH) {
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, frame);
-        texW = w;
-        texH = h;
-      } else {
-        gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, frame);
-      }
-      placementMatrix(placement, canvas.width, canvas.height, uniforms);
-      writeHdrUniforms(uniforms, calibration, correct && hdr);
-      gl.bufferSubData(gl.UNIFORM_BUFFER, 0, uniforms);
+    render(layers, background = [0, 0, 0]) {
       gl.viewport(0, 0, canvas.width, canvas.height);
-      gl.clearColor(0, 0, 0, 1);
+      gl.clearColor(background[0], background[1], background[2], 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
-      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      gl.activeTexture(gl.TEXTURE0);
+      let videoIndex = 0;
+      for (const layer of layers) {
+        const source = layer.source;
+        let hdr = false;
+        if (source instanceof VideoFrame) {
+          hdr = frameIsHdr(source.colorSpace, layer.hdr);
+          const slot = (videoSlots[videoIndex] ??= { texture: newTexture(gl), w: 0, h: 0 });
+          videoIndex++;
+          gl.bindTexture(gl.TEXTURE_2D, slot.texture);
+          const w = source.displayWidth;
+          const h = source.displayHeight;
+          // Chrome converts HDR frames differently in texSubImage2D than in texImage2D (brighter,
+          // part of its HDR → SDR step skipped); WebKit doesn't. The calibration matches
+          // texImage2D, so HDR frames always re-specify the texture (DECISIONS #36).
+          if (hdr || w !== slot.w || h !== slot.h) {
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+            slot.w = w;
+            slot.h = h;
+          } else {
+            gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, source);
+          }
+        } else {
+          let texture = images.get(source);
+          if (!texture) {
+            texture = newTexture(gl);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+            images.set(source, texture);
+          } else {
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+          }
+        }
+        writeLayerUniforms(uniforms, 0, layer.geometry, layer.opacity, correct && hdr, calibration);
+        gl.bufferSubData(gl.UNIFORM_BUFFER, 0, uniforms);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      }
+    },
+    draw(frame: VideoFrame, placement: FramePlacement) {
+      layerGeometry(
+        canvas.width,
+        canvas.height,
+        {
+          width: placement.width,
+          height: placement.height,
+          rotation: placement.rotation,
+          flip: placement.flip,
+        },
+        { transform: DEFAULT_TRANSFORM, crop: NO_CROP, fit: 'fit' },
+        single.geometry,
+      );
+      single.source = frame;
+      single.hdr = placement.hdr ?? false;
+      renderer.render(singleList);
+    },
+    release(source) {
+      const texture = images.get(source);
+      if (!texture) return;
+      gl.deleteTexture(texture);
+      images.delete(source);
     },
     destroy() {
-      gl.deleteTexture(texture);
+      for (const texture of images.values()) gl.deleteTexture(texture);
+      images.clear();
+      for (const slot of videoSlots) gl.deleteTexture(slot.texture);
       gl.deleteTexture(curve);
       gl.deleteBuffer(ubo);
       gl.deleteVertexArray(vao);
@@ -140,4 +195,5 @@ export function createWebGL2Renderer(
       gl.getExtension('WEBGL_lose_context')?.loseContext();
     },
   };
+  return renderer;
 }
