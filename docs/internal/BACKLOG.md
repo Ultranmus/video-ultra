@@ -4,8 +4,7 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 
 ## Open
 
-- [ ] Rust toolchain needed for the WGSL → GLSL build step (naga) — owner to approve installing
-      `rustup` before Day 3, or we find an npm-distributed naga build.
+- [x] Rust toolchain installed (rustup, 2026-10-17); `naga-cli` for WGSL → GLSL.
 - [ ] Verify real Safari (owner's iPhone + Mac Safari): WebGPU in workers (Safari 26),
       OPFS `createSyncAccessHandle`, WebCodecs audio, HEVC/HLG decode, export speed. Playwright's
       WebKit has no OPFS and no WebGPU, so it can't answer these.
@@ -30,6 +29,11 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       worker (Day 7 packaging).
 - [ ] Turbopack also copies `lab.worker.js` as an unused static asset — harmless, check again
       with the real engine worker.
-- [ ] HDR (HLG/PQ) is detected but not tone-mapped yet — Phase 2 shader.
+- [ ] **HDR (HLG/PQ) looks washed out in Chrome/WebGPU** (seen on the owner's iPhone videos) —
+      top of Day 3. `importExternalTexture` converts colours itself, so tone-mapping may need the
+      raw planes (`VideoFrame.copyTo`) or a different import path — research first.
+- [ ] Playwright WebKit drops 30% of frames on iPhone 4K60 HDR — check real Safari on the iPhone
+      and Mac; if real, low tier must use a proxy for 4K60.
+- [ ] HEIC photo still missing from the owner's samples (needed to test HEIC import).
 - [ ] BrowserStack (free for open source) for real budget-Android runs in CI — owner to sign up.
 - [ ] Create the `@video-ultra` npm org (owner) before Day 7.

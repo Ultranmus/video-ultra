@@ -7,7 +7,16 @@
  * test-media/private (also git-ignored) and are never published.
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -495,5 +504,31 @@ make(
     ]),
 );
 
+// The owner's own phone files (test-media/private, git-ignored) are served at /media/private/.
+const privateDir = join(root, 'private');
+if (existsSync(privateDir)) {
+  const link = join(out, 'private');
+  if (!existsSync(link) && !lstatExists(link)) symlinkSync('../private', link);
+  for (const name of readdirSync(privateDir).sort()) {
+    if (name.startsWith('.') || !statSync(join(privateDir, name)).isFile()) continue;
+    const kind: Kind = /\.(heic|heif|jpe?g|png|webp|gif)$/i.test(name)
+      ? 'image'
+      : /\.(mp3|m4a|wav|aac)$/i.test(name)
+        ? 'audio'
+        : 'video';
+    entries.push({ file: `private/${name}`, label: `Owner: ${name}`, kind });
+    console.log(`  ✓ private/${name}`);
+  }
+}
+
 writeFileSync(join(out, 'manifest.json'), JSON.stringify(entries, null, 2) + '\n');
 console.log(`Done: ${entries.length} files, manifest.json written.`);
+
+function lstatExists(path: string): boolean {
+  try {
+    lstatSync(path);
+    return true;
+  } catch {
+    return false;
+  }
+}

@@ -26,7 +26,7 @@ save; v0.1 production quality in one week.
 ## 2026-10-17 · Day 2 (started early) — Core engine
 
 - Project model (`model/`): flicks time base, Zod schema, `createProject`, invariants, migration
-  + repair (damaged files open with warnings instead of failing).
+  - repair (damaged files open with warnings instead of failing).
 - Edit operations (`edit/ops.ts`) and editor store with Immer patches: undo/redo, slider
   coalescing, operation log + replay (crash recovery).
 - Tests: 31 unit/property tests. The property test (random edit sequences: invariants, full undo,

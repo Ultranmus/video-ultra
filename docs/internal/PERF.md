@@ -88,6 +88,23 @@ AAC 48 kHz stereo (also from mono 22 kHz input), rotated input → 1080×1920 ou
 **Bundle:** main-thread page JS 139 KB gz (incl. React + Next). Worker (engine + Mediabunny)
 107 KB gz. WASM AAC fallback 281 KB gz, loaded only by browsers without native AAC, only on export.
 
+**Owner's real iPhone footage (Chrome / WebKit, desktop):** all iPhone videos are HEVC Main 10,
+HLG + Dolby Vision 8.4, mostly rotated, with an AAC track **and** an Apple spatial-audio (APAC,
+4 ch) track. The engine picks the AAC track correctly.
+
+| File                             | Chrome play / scrub p95 / export | WebKit play / scrub p95 / export |
+| -------------------------------- | -------------------------------- | -------------------------------- |
+| 1080p30 HDR portrait             | 300/0 · 24 ms · 2.3×             | 300/0 · 32 ms · 2.9×             |
+| 4K60 HDR portrait (54 Mbps)      | 600/0 · 97 ms · 5.5×             | **415/185** · 116 ms · 1.0×      |
+| 1080p29.97 HDR landscape, mono   | 300/0 · 25 ms · 4.8×             | 300/0 · 29 ms · 2.8×             |
+| Screen recording HEVC 60 fps VFR | 600/0 · 110 ms · 6.1×            | 600/0 · 116 ms · 2.2×            |
+| Social H.264 Baseline VFR        | 296/0 · 15 ms · 3.8×             | 296/0 · 20 ms · 6.1×             |
+
+iPhone keyframes are ~1 s apart, so scrubbing real footage is far faster than our synthetic
+long-GOP files. Firefox can't decode any of the iPhone HEVC files.
+**HDR looks washed out in the Chrome/WebGPU export** (HLG clipped, not tone-mapped); WebKit's
+WebGL2 output looks natural. Tone-mapping is now top of Day 3.
+
 **What this tells us**
 
 - Playback, decoding and export are comfortably fast on desktop in every browser; the main thread

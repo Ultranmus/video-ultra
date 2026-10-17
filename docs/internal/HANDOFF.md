@@ -14,8 +14,8 @@ Where the last session stopped and what comes next. Update before ending every s
    (`cloudflared`), or a trusted local certificate (mkcert + install the CA on the phone).
 2. **3–4 iPhone files** into `test-media/private/`: HDR video (default camera), portrait video,
    slow-motion clip, HEIC photo.
-3. **Rust toolchain** (`rustup`) for the WGSL → GLSL build step (naga), needed on Day 3.
-4. **GitHub repo:** create `Ultranmus/video-ultra` (private or public?) and push.
+3. ~~Rust toolchain~~ — installed. ~~GitHub repo~~ — `Ultranmus/video-ultra` (private) pushed.
+   Owner's iPhone files linked in `test-media/private/` (no HEIC or slow-mo yet).
 
 **Next (Day 2 rest → Day 3):**
 
