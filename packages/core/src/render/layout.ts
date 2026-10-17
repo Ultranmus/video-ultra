@@ -122,3 +122,72 @@ export function applyGeometry(
     uv: [g[6]! * qx + g[7]! * qy + g[10]!, g[8]! * qx + g[9]! * qy + g[11]!],
   };
 }
+
+/**
+ * Geometry for a picture shown at a fixed size — `widthPx × heightPx` canvas pixels at scale 1
+ * (text blocks) — placed by `transform`'s position, rotation, flips and scale. The whole texture
+ * is shown.
+ */
+export function placedGeometry(
+  canvasW: number,
+  canvasH: number,
+  widthPx: number,
+  heightPx: number,
+  tf: Transform,
+  out: Float32Array = new Float32Array(GEOMETRY_FLOATS),
+): Float32Array {
+  const halfW = (widthPx * tf.scale) / 2;
+  const halfH = (heightPx * tf.scale) / 2;
+  const fx = tf.flipX ? -1 : 1;
+  const fy = tf.flipY ? -1 : 1;
+  const rad = (tf.rotation * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const sx = 2 / canvasW;
+  const sy = -2 / canvasH;
+  out[0] = sx * cos * halfW * fx;
+  out[1] = sx * -sin * halfH * fy;
+  out[2] = sy * sin * halfW * fx;
+  out[3] = sy * cos * halfH * fy;
+  out[4] = sx * tf.x * canvasW - 1;
+  out[5] = 1 + sy * tf.y * canvasH;
+  out[6] = 0.5;
+  out[7] = 0;
+  out[8] = 0;
+  out[9] = 0.5;
+  out[10] = 0.5;
+  out[11] = 0.5;
+  return out;
+}
+
+/**
+ * Moves a computed geometry on the canvas (transitions): scales it by `scale` around the canvas
+ * centre, then shifts it by `dx` / `dy` canvas widths / heights (y down). In place.
+ */
+export function shiftGeometry(g: Float32Array, scale: number, dx: number, dy: number): void {
+  g[0] = g[0]! * scale;
+  g[1] = g[1]! * scale;
+  g[2] = g[2]! * scale;
+  g[3] = g[3]! * scale;
+  g[4] = g[4]! * scale + 2 * dx;
+  g[5] = g[5]! * scale - 2 * dy;
+}
+
+/** Geometry covering the whole canvas with the whole texture (solid overlays). */
+export function fullCanvasGeometry(
+  out: Float32Array = new Float32Array(GEOMETRY_FLOATS),
+): Float32Array {
+  out[0] = 1;
+  out[1] = 0;
+  out[2] = 0;
+  out[3] = -1;
+  out[4] = 0;
+  out[5] = 0;
+  out[6] = 0.5;
+  out[7] = 0;
+  out[8] = 0;
+  out[9] = 0.5;
+  out[10] = 0.5;
+  out[11] = 0.5;
+  return out;
+}

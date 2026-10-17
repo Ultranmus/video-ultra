@@ -1,3 +1,4 @@
+import { EFFECT_FLOATS, IDENTITY_EFFECTS } from '../effects/colour';
 import { HDR_CALIBRATIONS, type HdrCalibration, type HdrCalibrationKey } from './hdr-calibration';
 import type { RenderBackend } from './types';
 
@@ -70,12 +71,16 @@ export function curvePixels(calibration: HdrCalibration): Uint8Array<ArrayBuffer
   return pixels;
 }
 
-/** Floats per layer in the uniform block (7 × vec4: pos, posT, uv, uvT, c0, c1, c2). */
-export const LAYER_FLOATS = 28;
+/**
+ * Floats per layer in the uniform block: 7 × vec4 (pos, posT, uv, uvT, c0, c1, c2) + the effect
+ * block (8 × vec4, effects/colour.ts).
+ */
+export const LAYER_FLOATS = 28 + EFFECT_FLOATS;
 
 /**
  * Writes one layer's uniforms at `offset` (floats) — same layout as `Uniforms` in composite.wgsl
- * (std140 / WGSL, vec4-aligned): geometry from render/layout.ts, opacity, HDR flag + matrix.
+ * (std140 / WGSL, vec4-aligned): geometry from render/layout.ts, opacity, HDR flag + matrix, then
+ * the effect block (identity when `effects` is null) with the source's texel size.
  */
 export function writeLayerUniforms(
   out: Float32Array,
@@ -84,6 +89,9 @@ export function writeLayerUniforms(
   opacity: number,
   hdr: boolean,
   calibration: HdrCalibration,
+  effects: Readonly<Float32Array> | null = null,
+  texelW = 0,
+  texelH = 0,
 ): void {
   out[offset] = geometry[0]!;
   out[offset + 1] = geometry[1]!;
@@ -114,4 +122,8 @@ export function writeLayerUniforms(
   out[offset + 25] = r2[1]!;
   out[offset + 26] = r2[2]!;
   out[offset + 27] = 0;
+  out.set(effects ?? IDENTITY_EFFECTS, offset + 28);
+  // Texel size of the source (sharpen taps) — only the renderer knows it.
+  out[offset + 28 + 26] = texelW;
+  out[offset + 28 + 27] = texelH;
 }
