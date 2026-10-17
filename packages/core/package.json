@@ -48,7 +48,10 @@
   },
   "dependencies": {
     "@mediabunny/aac-encoder": "^1.61.6",
-    "mediabunny": "^1.61.6"
+    "immer": "^11.1.21",
+    "mediabunny": "^1.61.6",
+    "zod": "^4.6.7",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@webgpu/types": "^0.1.74",

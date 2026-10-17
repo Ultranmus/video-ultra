@@ -1,0 +1,77 @@
+import { ALLOWED_KINDS, assetKindsFor, itemEnd, projectFrame, sourceSpan } from './project';
+import type { Project } from './schema';
+
+/**
+ * Rules every project must satisfy after any edit. The edit operations keep them; the property
+ * tests prove it with random edit sequences. Returns a list of violations (empty = valid).
+ */
+export function checkInvariants(project: Project): string[] {
+  const problems: string[] = [];
+  const frame = projectFrame(project);
+  const ids = new Set<string>();
+  const seen = (id: string, what: string) => {
+    if (ids.has(id)) problems.push(`duplicate id ${id} (${what})`);
+    ids.add(id);
+  };
+
+  const mains = project.tracks.filter((t) => t.kind === 'main');
+  if (mains.length !== 1 || project.tracks[0]?.kind !== 'main') {
+    problems.push('there must be exactly one main track, first in the list');
+  }
+
+  for (const track of project.tracks) {
+    seen(track.id, 'track');
+    if (track.kind !== 'main' && track.items.length === 0) problems.push(`empty lane ${track.id}`);
+    let cursor = 0;
+    track.items.forEach((item, index) => {
+      seen(item.id, 'item');
+      const where = `${track.kind} track ${track.id}, item ${item.id}`;
+      if (!ALLOWED_KINDS[track.kind].includes(item.kind)) {
+        problems.push(`${where}: ${item.kind} not allowed here`);
+      }
+      if (item.duration < frame) problems.push(`${where}: shorter than one frame`);
+      if (track.kind === 'main') {
+        if (item.start !== cursor)
+          problems.push(`${where}: main track has a gap or overlap at ${cursor}`);
+      } else if (item.start < cursor) {
+        problems.push(`${where}: overlaps the previous item`);
+      }
+      cursor = itemEnd(item);
+
+      // Asset references
+      const assetId = 'assetId' in item ? item.assetId : null;
+      if (item.kind === 'sticker') {
+        if ((item.assetId === null) === (item.emoji === null)) {
+          problems.push(`${where}: sticker needs exactly one of assetId / emoji`);
+        }
+      }
+      if (assetId !== null) {
+        const asset = project.assets[assetId];
+        if (!asset) problems.push(`${where}: missing asset ${assetId}`);
+        else if (!assetKindsFor(item.kind).includes(asset.kind)) {
+          problems.push(`${where}: ${item.kind} can't use a ${asset.kind} asset`);
+        } else if (item.kind === 'video' || item.kind === 'audio') {
+          // 1-flick tolerance for rounding of duration × speed.
+          if (item.sourceIn + sourceSpan(item) > asset.duration + 1) {
+            problems.push(`${where}: reads past the end of its media`);
+          }
+        } else if (item.kind === 'freeze' && item.sourceTime > asset.duration) {
+          problems.push(`${where}: freeze frame past the end of its media`);
+        }
+      }
+
+      // Transitions
+      if ('transitionIn' in item && item.transitionIn) {
+        if (track.kind !== 'main') problems.push(`${where}: transitions only on the main track`);
+        else if (index === 0) problems.push(`${where}: first item can't have a transition in`);
+        else {
+          const previous = track.items[index - 1]!;
+          if (item.transitionIn.duration > Math.min(previous.duration, item.duration)) {
+            problems.push(`${where}: transition longer than its neighbours`);
+          }
+        }
+      }
+    });
+  }
+  return problems;
+}

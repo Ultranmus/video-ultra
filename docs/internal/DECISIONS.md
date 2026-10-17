@@ -106,3 +106,20 @@ reason; when one changes, edit the entry and note the date.
     lazy-loaded WASM decoder on browsers without native support; **rotation metadata** is applied;
     **variable frame rate** uses real timestamps; odd audio (mono, no audio, unusual sample rates)
     is normalised in the mixer; unsupported/corrupt files fail per file with a clear message.
+
+## Phase 0 findings (2026-10-17)
+
+27. **Export target: OPFS first, in-memory fallback.** OPFS streams the file to disk in constant
+    memory. Where OPFS is missing (Safari Private Browsing, some webviews), we write a fragmented
+    MP4 append-only into Blob parts instead of failing.
+28. **AAC everywhere via a lazy WASM fallback.** Firefox has no native AAC encoder. We load
+    `@mediabunny/aac-encoder` (MPL-2.0; FFmpeg's AAC encoder in WASM) only when
+    `canEncodeAudio('aac')` is false and only at export — other browsers never download it.
+    Rejected: Opus-in-MP4 (social apps and older players reject it).
+29. **Export audio is always 48 kHz stereo.** Encoders reject odd layouts (e.g. mono 22.05 kHz);
+    the mixer/encoder normalises.
+30. **Capability detection uses plain WebCodecs `isConfigSupported`, no media library** — keeps the
+    main-thread bundle small (Mediabunny only loads inside the worker).
+31. **Worker packaging:** the worker ships as its own file next to the code that loads it
+    (`new Worker(new URL('./x.worker.js', import.meta.url), { type: 'module' })`). Verified in
+    Next.js 16 (Turbopack dev + build) and Vite 8 (dev + build) across Chrome, WebKit, Firefox.

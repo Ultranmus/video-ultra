@@ -6,10 +6,10 @@ A free (MIT), fast, fully typed video editor for React and Next.js. Works on pho
 
 ## Packages
 
-| Package | What it is |
-| --- | --- |
-| `@video-ultra/core` | Framework-agnostic engine: decoding, compositing (WebGPU + WebGL2), export |
-| `@video-ultra/react` | `<VideoEditor />` component and headless hooks (coming in Phase 3) |
+| Package              | What it is                                                                 |
+| -------------------- | -------------------------------------------------------------------------- |
+| `@video-ultra/core`  | Framework-agnostic engine: decoding, compositing (WebGPU + WebGL2), export |
+| `@video-ultra/react` | `<VideoEditor />` component and headless hooks (coming in Phase 3)         |
 
 ## Development
 

@@ -46,4 +46,55 @@ Starting targets (2026-10-17), to be confirmed or adjusted with Phase 0 measurem
 
 ## Measurements
 
-_None yet — Phase 0 (Day 1) fills the first table from the bench on the owner's Mac and iPhone._
+### 2026-10-17 · Phase 0 lab · MacBook (Apple M4, 16 GB, macOS 15.5)
+
+`node scripts/bench.ts` — headless, so these are best-case desktop numbers. Single layer, preview
+canvas 1280 px wide. Export = 5 s at 1080p30 with audio. Test files have one keyframe every
+~8 s (x264 default), the worst case for seeking. **Phones still to measure (owner's iPhone).**
+
+**Chrome 155 (installed Chrome, real GPU, hardware decode)**
+
+| File                      | Renderer        | Play: presented / dropped | Scrub p50 / p95 (ms) | Export (× real time) |
+| ------------------------- | --------------- | ------------------------- | -------------------- | -------------------- |
+| H.264 1080p30             | WebGPU          | 298 / 2 (startup)         | 63 / 91              | 2.1×                 |
+| H.264 4K30 (57 Mbps)      | WebGPU          | 300 / 0                   | 263 / 503 ❌         | 2.5×                 |
+| H.264 4K30                | WebGL2          | 299 / 1                   | 235 / 488 ❌         | 5.0×                 |
+| HEVC 1080p30              | WebGPU / WebGL2 | 300 / 0                   | 45 / 90              | 4.1× / 4.3×          |
+| HEVC 10-bit HLG (HDR)     | WebGPU / WebGL2 | 179 / 1 · 180 / 0         | 37 / 63              | 4.1× / 5.3×          |
+| H.264 rotated (portrait)  | both            | 180 / 0                   | 60 / 98              | 4.9× / 5.2×          |
+| H.264 VFR                 | both            | 180 / 0                   | 22 / 36              | 3.8× / 4.3×          |
+| VP9 1080p30               | both            | 300 / 0                   | 66 / 150 ❌          | 4.0× / 5.1×          |
+| AV1 1080p30               | both            | 300 / 0                   | 42 / 71              | 4.1× / 5.1×          |
+| H.264 1080p60 (two files) | both            | 600 / 0                   | 40 / 103             | 4.9× / 5.4×          |
+
+Every run: **0 main-thread tasks > 50 ms, max 1 open VideoFrame, 0 open after.** Draw CPU per
+frame ≈ 0.2 ms. Main-thread JS heap ≈ 14–15 MB.
+
+**WebKit (Playwright build ≈ Safari engine; no WebGPU in this build)** — WebGL2: 1080p30 300 / 0,
+scrub 75 / 98 ms, HLG 37 / 73 ms, VP9 79 / 168 ms. Export 2.7× real time (memory fallback: no
+OPFS in Playwright's WebKit). 0 long tasks, 0 leaked frames.
+
+**Firefox 157** — WebGL2 (no WebGPU on macOS here): 1080p30 300 / 0 but **scrub 240 / 356 ms**
+(slowest), VP9 122 / 331 ms. No HEVC decode. No native AAC encoder → WASM AAC fallback: export
+3.5× real time. 0 long tasks, 0 leaked frames.
+
+**Soak, 10 minutes (Chrome, WebGPU, 360p30):** 18,000 frames presented, **0 dropped**, frame
+interval p95 37 ms, max 1 open VideoFrame, 0 after; main-thread heap 15.0 → 13.8 MB (flat);
+0 long tasks. Worker-side memory isn't measured yet (Day 3: add worker heap + GPU byte counters).
+
+**Exports verified with ffprobe + full ffmpeg decode** (Chrome, WebKit, Firefox): 150 frames / 5 s,
+AAC 48 kHz stereo (also from mono 22 kHz input), rotated input → 1080×1920 output, no decode errors.
+
+**Bundle:** main-thread page JS 139 KB gz (incl. React + Next). Worker (engine + Mediabunny)
+107 KB gz. WASM AAC fallback 281 KB gz, loaded only by browsers without native AAC, only on export.
+
+**What this tells us**
+
+- Playback, decoding and export are comfortably fast on desktop in every browser; the main thread
+  stays free and frames never leak. The worker architecture works.
+- **Seeking long-GOP 4K and VP9 misses the scrub target** (p95 0.5 s / 0.15–0.33 s). Fix in
+  Phase 2: show the nearest keyframe immediately, then refine; keep a forward-decoding decoder warm
+  while scrubbing; on-demand proxies for long-GOP 4K on low tier.
+- **WebGPU export is ~2× slower than WebGL2 export** (canvas capture from a WebGPU canvas costs
+  more). Phase 2: measure capture paths; until then export renders with WebGL2.
+- Firefox is the slowest seeker; its numbers set the "mid" expectations for desktop.

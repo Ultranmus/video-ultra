@@ -47,20 +47,20 @@ Deferred to v0.2+: speed curves, reverse, text animations, templates, keyframes,
 
 - [x] 0.1a Monorepo skeleton (pnpm, turbo, TS, ESLint, Prettier, changesets), LICENSE
 - [x] 0.1b `CLAUDE.md` + all `docs/internal/` docs
-- [ ] 0.1c CI workflow, git init, first commit
-- [ ] 0.2 Spike: Mediabunny decode in a worker → WebGPU (`importExternalTexture`) and WebGL2 → playback; measure frame time, decode time, memory, dropped frames
-- [ ] 0.3 Spike: 1080p MP4 export via WebCodecs, streamed to OPFS; measure speed + memory
-- [ ] 0.4 Spike: engine worker shipped inside the package loads in Next.js (Turbopack) and Vite → pick the bundler
-- [ ] 0.5 Capability detection + device tier (`detectCapabilities()`), bench page reachable from a phone
-- [ ] 0.6 Test media library: download free-licence files + generate edge cases with ffmpeg (`pnpm media`)
+- [x] 0.1c CI workflow, git init, first commit
+- [x] 0.2 Spike: Mediabunny decode in a worker → WebGPU (`importExternalTexture`) and WebGL2 → playback; measure frame time, decode time, memory, dropped frames
+- [x] 0.3 Spike: 1080p MP4 export via WebCodecs, streamed to OPFS; measure speed + memory
+- [x] 0.4 Spike: engine worker shipped inside the package loads in Next.js (Turbopack) and Vite → works with tsup (DECISIONS #22); bundler choice final on Day 7
+- [x] 0.5 Capability detection + device tier (`detectCapabilities()`), bench page (phone access needs HTTPS — owner decision)
+- [x] 0.6 Test media library: download free-licence files + generate edge cases with ffmpeg (`pnpm media`)
 - [ ] **Checkpoint:** owner runs the bench on iPhone + Mac browsers → go / no-go on the engine design; owner supplies 3–4 iPhone files (HDR, portrait, slow-mo, HEIC); decide on installing Rust (for naga)
 
 ### Day 2 — Core engine (Phase 1) + decoder pool
 
-- [ ] 1.1 Project model, rational time maths (no float drift), Zod schema + migrations
-- [ ] 1.2 Edit operations: add, move, trim, split, delete, duplicate, speed, reorder, freeze frame
-- [ ] 1.3 Operation log + undo/redo + snapshots (OPFS)
-- [ ] 1.4 Property tests (fast-check): random edit sequences never break invariants
+- [x] 1.1 Project model, time in integer flicks (no float drift), Zod schema + migrations + repair
+- [x] 1.2 Edit operations: add, move, trim, split, delete, duplicate, speed, reorder, freeze frame, transitions, properties
+- [x] 1.3 Operation log + undo/redo + coalescing + log replay (OPFS persistence adapter → Day 6, 4.2)
+- [x] 1.4 Property tests (fast-check): random edit sequences never break invariants (30,000 runs pass)
 - [ ] 1.5 Media probing: duration, codecs, rotation, VFR, HDR (transfer/primaries), audio layout
 - [ ] 2.1 Decoder pool with tier budget, frame scheduling, cancellation, watchdog
 - [ ] **Checkpoint:** engine demo in the playground
