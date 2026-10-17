@@ -1,0 +1,33 @@
+# Every push to main and every pull request: the same checks as locally.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6 # version from package.json "packageManager"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint and formatting
+        run: pnpm lint && pnpm format:check
+      - name: Build
+        run: pnpm build
+      - name: Types
+        run: pnpm typecheck
+      - name: Unit tests
+        run: pnpm test

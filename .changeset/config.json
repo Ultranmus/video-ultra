@@ -1,0 +1,9 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config/schema.json",
+  "changelog": "@changesets/cli/changelog",
+  "commit": false,
+  "fixed": [["@video-ultra/core", "@video-ultra/react"]],
+  "access": "public",
+  "baseBranch": "main",
+  "ignore": ["playground"]
+}

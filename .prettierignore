@@ -1,0 +1,9 @@
+dist
+.next
+pnpm-lock.yaml
+test-results
+playwright-report
+build
+out
+test-media/files
+test-media/private

@@ -1,0 +1,38 @@
+{
+  "name": "video-ultra-monorepo",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.6.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "playground": "turbo run build --filter=@video-ultra/react && pnpm --filter playground dev",
+    "lint": "eslint .",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "changeset": "changeset",
+    "release": "pnpm build && changeset publish",
+    "e2e": "turbo run e2e",
+    "media": "node scripts/test-media.ts"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5",
+    "@changesets/cli": "^3.0.3",
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^26.6.5",
+    "eslint": "^10.12.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "jiti": "^2.7.0",
+    "prettier": "^3.9.10",
+    "publint": "^0.3.25",
+    "turbo": "^2.11.9",
+    "typescript": "6.0.3",
+    "typescript-eslint": "^8.71.2"
+  }
+}

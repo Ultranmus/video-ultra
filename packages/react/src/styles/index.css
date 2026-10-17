@@ -1,0 +1,16 @@
+/* Entry for `@video-ultra/react/styles.css`. Everything lives in @layer video-ultra. */
+@layer video-ultra;
+@import './tokens.css';
+
+/*
+ * The one unlayered rule (DECISIONS #24). Unlayered page CSS beats every layer, so a global reset
+ * like create-next-app's `* { padding: 0; margin: 0 }` or Tailwind v3's preflight would strip the
+ * editor's own styles. Inside the editor, every property rolls back to the layers instead: ours, or
+ * a later layer of the app's. Theme variables are custom properties, which `all` doesn't touch.
+ */
+.vu-root :where(*),
+.vu-root :where(*)::before,
+.vu-root :where(*)::after,
+.vu-root :where(*)::placeholder {
+  all: revert-layer;
+}

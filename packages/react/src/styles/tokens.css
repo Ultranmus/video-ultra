@@ -1,0 +1,183 @@
+/* Design tokens — keep in sync with docs/internal/THEMING.md. Dark is the default theme. */
+@layer video-ultra {
+  .vu-root {
+    /* Colour — dark */
+    --vu-bg: #0b0b0d;
+    --vu-stage: #060607;
+    --vu-surface-1: #131316;
+    --vu-surface-2: #1c1c21;
+    --vu-surface-3: #26262d;
+    --vu-border: rgba(255, 255, 255, 0.08);
+    --vu-border-strong: rgba(255, 255, 255, 0.16);
+    --vu-text: #f4f4f5;
+    --vu-text-muted: #a1a1aa;
+    --vu-text-subtle: #6b6b75;
+    /* Brand plum #4d194d, lightened for dark surfaces (contrast checked, see THEMING.md). */
+    --vu-accent: #9c479c;
+    --vu-accent-hover: #ab55ab;
+    --vu-accent-contrast: #ffffff;
+    --vu-accent-soft: rgba(156, 71, 156, 0.22);
+    --vu-accent-text: #d08bd0;
+    --vu-danger: #ff5c6c;
+    --vu-warning: #f5b54a;
+    --vu-overlay: rgba(0, 0, 0, 0.55);
+    /* Selection handles sit on the photo too: accent outline, white fill in both themes. */
+    --vu-handle-fill: #ffffff;
+    --vu-guide: #ff2d95;
+    --vu-checker-a: #26262b;
+    --vu-checker-b: #1d1d21;
+    --vu-shadow-popover: 0 12px 32px rgba(0, 0, 0, 0.5);
+    /* Timeline (video-specific) */
+    --vu-timeline-bg: #0e0e11;
+    --vu-track-bg: #16161a;
+    --vu-clip-video: #3b3b46;
+    --vu-clip-text: #7a4a14;
+    --vu-clip-sticker: #1f5a4a;
+    --vu-clip-audio: #1e4466;
+    --vu-waveform: rgba(255, 255, 255, 0.55);
+    --vu-playhead: #ffffff;
+    --vu-trim-handle: #f5b54a;
+    --vu-selection: var(--vu-accent);
+
+    /* Typography */
+    --vu-font-family: inherit;
+    --vu-font-fallback: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --vu-font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+    --vu-text-xs: 11px;
+    --vu-text-sm: 12px;
+    --vu-text-md: 13px;
+    --vu-text-lg: 14px;
+    --vu-text-xl: 16px;
+    --vu-weight-regular: 400;
+    --vu-weight-medium: 500;
+    --vu-weight-semibold: 600;
+
+    /* Space & shape */
+    --vu-space-1: 4px;
+    --vu-space-2: 8px;
+    --vu-space-3: 12px;
+    --vu-space-4: 16px;
+    --vu-space-5: 20px;
+    --vu-space-6: 24px;
+    --vu-space-7: 32px;
+    --vu-space-8: 40px;
+    --vu-radius-md: 8px;
+    --vu-radius-sm: calc(var(--vu-radius-md) * 0.75);
+    --vu-radius-lg: calc(var(--vu-radius-md) * 1.5);
+    --vu-radius-full: 999px;
+
+    /* Motion */
+    --vu-duration-fast: 120ms;
+    --vu-duration-base: 200ms;
+    --vu-duration-slow: 320ms;
+    --vu-ease: cubic-bezier(0.2, 0, 0, 1);
+
+    /* Sizes */
+    --vu-size-topbar: 48px;
+    --vu-size-rail: 72px;
+    --vu-size-rail-mobile: 64px;
+    --vu-size-touch: 40px;
+    --vu-size-panel: 280px;
+    --vu-size-inspector: 280px;
+    --vu-size-toolbar: 64px;
+    --vu-size-track: 48px;
+    --vu-size-track-main: 56px;
+    --vu-size-ruler: 24px;
+    --vu-size-trim-handle: 12px;
+    /* Segmented switches and chips; 36px on touch screens (below). */
+    --vu-size-choice: 28px;
+
+    /* Layers */
+    --vu-z-overlay: 10;
+    --vu-z-popover: 20;
+    --vu-z-toast: 30;
+
+    --vu-focus-ring: 0 0 0 2px var(--vu-bg), 0 0 0 4px var(--vu-accent);
+    color-scheme: dark;
+  }
+
+  .vu-root[data-vu-theme='light'] {
+    --vu-bg: #f4f4f6;
+    --vu-stage: #e9e9ed;
+    --vu-surface-1: #ffffff;
+    --vu-surface-2: #f1f1f4;
+    --vu-surface-3: #e4e4ea;
+    --vu-border: rgba(0, 0, 0, 0.08);
+    --vu-border-strong: rgba(0, 0, 0, 0.16);
+    --vu-text: #18181b;
+    --vu-text-muted: #5b5b66;
+    --vu-text-subtle: #8a8a94;
+    --vu-accent: #4d194d;
+    --vu-accent-hover: #3a123a;
+    --vu-accent-soft: rgba(77, 25, 77, 0.1);
+    --vu-accent-text: #4d194d;
+    --vu-danger: #c41d30;
+    --vu-warning: #9a5b00;
+    --vu-overlay: rgba(0, 0, 0, 0.45);
+    --vu-checker-a: #ffffff;
+    --vu-checker-b: #e6e6ea;
+    --vu-shadow-popover: 0 12px 32px rgba(0, 0, 0, 0.14);
+    --vu-timeline-bg: #ececf0;
+    --vu-track-bg: #f7f7f9;
+    --vu-clip-video: #d9d9e3;
+    --vu-clip-text: #f3d9b5;
+    --vu-clip-sticker: #bfe6d8;
+    --vu-clip-audio: #c4daf0;
+    --vu-waveform: rgba(0, 0, 0, 0.45);
+    --vu-playhead: #18181b;
+    --vu-trim-handle: #9a5b00;
+    color-scheme: light;
+  }
+
+  /* theme="auto": no data attribute, follow the OS. Same values as the light block above. */
+  @media (prefers-color-scheme: light) {
+    .vu-root:not([data-vu-theme]) {
+      --vu-bg: #f4f4f6;
+      --vu-stage: #e9e9ed;
+      --vu-surface-1: #ffffff;
+      --vu-surface-2: #f1f1f4;
+      --vu-surface-3: #e4e4ea;
+      --vu-border: rgba(0, 0, 0, 0.08);
+      --vu-border-strong: rgba(0, 0, 0, 0.16);
+      --vu-text: #18181b;
+      --vu-text-muted: #5b5b66;
+      --vu-text-subtle: #8a8a94;
+      --vu-accent: #4d194d;
+      --vu-accent-hover: #3a123a;
+      --vu-accent-soft: rgba(77, 25, 77, 0.1);
+      --vu-accent-text: #4d194d;
+      --vu-danger: #c41d30;
+      --vu-warning: #9a5b00;
+      --vu-overlay: rgba(0, 0, 0, 0.45);
+      --vu-checker-a: #ffffff;
+      --vu-checker-b: #e6e6ea;
+      --vu-shadow-popover: 0 12px 32px rgba(0, 0, 0, 0.14);
+      --vu-timeline-bg: #ececf0;
+      --vu-track-bg: #f7f7f9;
+      --vu-clip-video: #d9d9e3;
+      --vu-clip-text: #f3d9b5;
+      --vu-clip-sticker: #bfe6d8;
+      --vu-clip-audio: #c4daf0;
+      --vu-waveform: rgba(0, 0, 0, 0.45);
+      --vu-playhead: #18181b;
+      --vu-trim-handle: #9a5b00;
+      color-scheme: light;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .vu-root {
+      --vu-duration-fast: 0ms;
+      --vu-duration-base: 0ms;
+      --vu-duration-slow: 0ms;
+    }
+  }
+
+  /* Touch screens: bigger trim handles and choices for thumbs. */
+  @media (pointer: coarse) {
+    .vu-root {
+      --vu-size-trim-handle: 20px;
+      --vu-size-choice: 36px;
+    }
+  }
+}

@@ -1,0 +1,17 @@
+node_modules
+dist
+.next
+.turbo
+coverage
+*.tsbuildinfo
+.DS_Store
+next-env.d.ts
+playwright-report
+test-results
+build
+out
+# Test media: downloaded/generated files are rebuilt by `pnpm media`; private = owner's own phone files.
+test-media/files
+test-media/private
+# Local Claude Code settings (owner's own permissions)
+.claude/settings.local.json

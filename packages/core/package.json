@@ -1,0 +1,60 @@
+{
+  "name": "@video-ultra/core",
+  "version": "0.0.0",
+  "description": "Framework-agnostic, typed video editing engine for video-ultra.",
+  "license": "MIT",
+  "author": "Ultranmus",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ultranmus/video-ultra.git",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/Ultranmus/video-ultra/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./internal": {
+      "types": "./dist/internal.d.ts",
+      "default": "./dist/internal.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "video-editor",
+    "video",
+    "editor",
+    "webcodecs",
+    "webgpu",
+    "typescript"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@mediabunny/aac-encoder": "^1.61.6",
+    "mediabunny": "^1.61.6"
+  },
+  "devDependencies": {
+    "@webgpu/types": "^0.1.74",
+    "fast-check": "^4.10.2",
+    "tsup": "^8.5.1",
+    "typescript": "6.0.3",
+    "vitest": "^5.0.5"
+  }
+}

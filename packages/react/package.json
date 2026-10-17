@@ -1,0 +1,64 @@
+{
+  "name": "@video-ultra/react",
+  "version": "0.0.0",
+  "description": "Fast, fully typed video editor component for React and Next.js.",
+  "license": "MIT",
+  "author": "Ultranmus",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ultranmus/video-ultra.git",
+    "directory": "packages/react"
+  },
+  "bugs": {
+    "url": "https://github.com/Ultranmus/video-ultra/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "type": "module",
+  "sideEffects": [
+    "*.css"
+  ],
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./styles.css": "./dist/styles.css",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "react",
+    "nextjs",
+    "video-editor",
+    "video",
+    "typescript"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "peerDependencies": {
+    "react": "^18.2.0 || ^19.0.0",
+    "react-dom": "^18.2.0 || ^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@webgpu/types": "^0.1.74",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "tsup": "^8.5.1",
+    "typescript": "6.0.3",
+    "vitest": "^5.0.5"
+  },
+  "dependencies": {
+    "@video-ultra/core": "workspace:*"
+  }
+}
