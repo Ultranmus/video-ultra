@@ -14,12 +14,15 @@ import {
   type Item,
   type TextStyle,
   type Transform,
+  ADJUST_KEYS,
+  FILTER_PRESETS,
+  FONT_PRESETS,
+  TRANSITION_PRESETS,
 } from '@video-ultra/core';
 import type { ReactElement } from 'react';
 import { useController, useLabels, useProject, useUi } from './context';
 import { ColorField, EditSlider, Section, Segmented, ToolButton } from './controls';
 import { RATIOS, ratioOf } from './items';
-import { ADJUST_KEYS, FILTER_PRESETS, FONT_PRESETS, TRANSITION_PRESETS } from './pending';
 import type { ToolId } from './state';
 
 const seconds = (t: number) => t / FLICKS_PER_SECOND;

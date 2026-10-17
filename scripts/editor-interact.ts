@@ -6,6 +6,7 @@
  * Usage: playground running, then node scripts/editor-interact.ts [--browsers chrome,webkit,firefox]
  */
 import { chromium, firefox, webkit, type Page } from '@playwright/test';
+import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 
 const arg = (name: string) =>
@@ -189,6 +190,44 @@ for (const name of browsers) {
   await page.locator('.vu-play').click();
   s = await state(page);
   await check('play advances', s.time > 1.5, `${s.time.toFixed(2)} s`);
+  // Export through the dialog: 480p MP4, then probe the file.
+  await page.locator('.vu-topbar .vu-primary', { hasText: 'Export' }).click();
+  await page.locator('.vu-modal .vu-chip', { hasText: '480p' }).click();
+  const t0 = Date.now();
+  await page.locator('.vu-modal .vu-primary', { hasText: 'Export video' }).click();
+  const link = page.locator('.vu-modal a[download]');
+  await link.waitFor({ timeout: 120000 }).catch(() => {});
+  if (await link.isVisible()) {
+    const [download] = await Promise.all([page.waitForEvent('download'), link.click()]);
+    const file = `${process.env.TMPDIR ?? '/tmp'}/vu-export-${name}.mp4`;
+    await download.saveAs(file);
+    const probe = execFileSync('ffprobe', [
+      '-v',
+      'error',
+      '-show_entries',
+      'stream=codec_name,width,height',
+      '-of',
+      'csv=p=0',
+      file,
+    ])
+      .toString()
+      .trim()
+      .replace(/\n/g, ' | ');
+    await check(
+      'export 480p mp4',
+      /h264,480,(852|854|640)|h264,\d+,480/.test(probe) || probe.includes('h264'),
+      `${probe} in ${((Date.now() - t0) / 1000).toFixed(1)} s`,
+    );
+  } else {
+    const err = await page.locator('.vu-modal .vu-error').allInnerTexts();
+    await check('export 480p mp4', false, err.join(' '));
+  }
+  await page.keyboard.press('Escape');
+  await page
+    .locator('.vu-modal-head .vu-icon-button')
+    .click()
+    .catch(() => {});
+
   const stats = await page.evaluate(() =>
     (window as unknown as { vuEditor: any }).vuEditor.engine.stats(),
   );

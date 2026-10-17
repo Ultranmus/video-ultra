@@ -1,14 +1,17 @@
-import { fps as toFps, projectDuration } from '@video-ultra/core';
+import {
+  fps as toFps,
+  exportLimits,
+  maxExportHeight,
+  type ExportLimits,
+  projectDuration,
+  type ExportOptions,
+  type ExportProgress,
+  type ExportResult,
+} from '@video-ultra/core';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { useController, useLabels, useProject, useUi } from './context';
 import { Segmented } from './controls';
 import { Icon } from './icons';
-import {
-  maxExportHeight,
-  type ExportOptions,
-  type ExportProgress,
-  type ExportResult,
-} from './pending';
 
 const HEIGHTS = [480, 720, 1080, 1440, 2160] as const;
 
@@ -31,6 +34,18 @@ export function ExportDialog(): ReactElement | null {
   const tier = ctl.caps?.tier ?? 'mid';
   const shortSide = Math.min(width, height);
   const limit = Math.min(maxExportHeight(tier), Math.max(480, shortSide));
+  // What this device's encoders can really do (checked once, off the hot path).
+  const [limits, setLimits] = useState<ExportLimits | null>(null);
+  useEffect(() => {
+    if (!open || limits) return;
+    let live = true;
+    void exportLimits(tier).then((l) => {
+      if (live) setLimits(l);
+    });
+    return () => {
+      live = false;
+    };
+  }, [open, limits, tier]);
   const [options, setOptions] = useState<ExportOptions>(() => ({
     format: 'mp4',
     height: Math.min(1080, limit) as ExportOptions['height'],
@@ -59,6 +74,14 @@ export function ExportDialog(): ReactElement | null {
 
   if (!open) return null;
 
+  const available = HEIGHTS.filter(
+    (h) => h <= limit && (!limits || limits[options.format].includes(h)),
+  );
+  // Keep the choice valid when the format or the device's limits change.
+  const outHeight: ExportOptions['height'] = available.includes(options.height)
+    ? options.height
+    : (available[available.length - 1] ?? 480);
+
   const close = () => {
     abort.current?.abort();
     abort.current = null;
@@ -84,7 +107,11 @@ export function ExportDialog(): ReactElement | null {
       ?.request('screen')
       .catch(() => null);
     try {
-      const out = await ctl.exportVideo(options, setProgress, controller.signal);
+      const out = await ctl.exportVideo(
+        { ...options, height: outHeight },
+        setProgress,
+        controller.signal,
+      );
       setResult({ result: out, url: URL.createObjectURL(out.blob) });
     } catch (e) {
       if (!controller.signal.aborted) setError(e instanceof Error ? e.message : String(e));
@@ -172,8 +199,8 @@ export function ExportDialog(): ReactElement | null {
           <div className="vu-export-form">
             <Segmented
               label={l.resolution}
-              value={String(options.height)}
-              options={HEIGHTS.filter((h) => h <= limit).map((h) => ({
+              value={String(outHeight)}
+              options={available.map((h) => ({
                 value: String(h),
                 label: h === 2160 ? '4K' : `${h}p`,
               }))}

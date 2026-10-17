@@ -8,7 +8,8 @@ import {
   type TextItem,
 } from '@video-ultra/core';
 import { describe, expect, it } from 'vitest';
-import { boxContains, hitStage, itemBox, measureTextBox, snapCentre } from './geometry';
+import { measureTextBox } from '@video-ultra/core/internal';
+import { boxContains, hitStage, itemBox, snapCentre } from './geometry';
 
 const measure = (_font: string, text: string) => text.length * 10;
 

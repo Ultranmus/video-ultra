@@ -25,6 +25,9 @@ import {
   type Item,
   type Project,
   type Time,
+  type ExportOptions,
+  type ExportProgress,
+  type ExportResult,
 } from '@video-ultra/core';
 import {
   assetFromProbe,
@@ -41,7 +44,6 @@ import {
 import { produce } from 'immer';
 import { audioItem, visualItem } from './items';
 import type { Labels } from './labels';
-import type { ExportOptions, ExportProgress, ExportResult } from './pending';
 import { createUiStore, Playhead, type LayoutMode, type PanelId, type ToolId } from './state';
 
 /** Options the `<VideoEditor />` passes to its controller. */
@@ -57,12 +59,6 @@ export interface ControllerOptions {
   /** Keep a local autosave + crash-recovery copy in the browser (default true). */
   autosave?: boolean;
 }
-
-type ExportFn = (
-  options: ExportOptions,
-  onProgress?: (p: ExportProgress) => void,
-  signal?: AbortSignal,
-) => Promise<ExportResult>;
 
 /**
  * Owns everything behind the editor UI: the core editor (project + undo), the engine worker, the
@@ -527,21 +523,17 @@ export class EditorController {
 
   // ── export ─────────────────────────────────────────────────────────────
 
-  /** The engine's export, when this build has it. */
-  get exporter(): ExportFn | null {
-    const engine = this.engine as (Engine & { export?: ExportFn }) | null;
-    return engine?.export ? engine.export.bind(engine) : null;
-  }
-
+  /** Renders the project to a video file (the engine pauses preview meanwhile). */
   async exportVideo(
     options: ExportOptions,
     onProgress: (p: ExportProgress) => void,
     signal: AbortSignal,
   ): Promise<ExportResult> {
-    const exporter = this.exporter;
-    if (!exporter) throw new Error(this.labels.exportUnavailable);
+    const engine = this.engine;
+    if (!engine) throw new Error(this.labels.exportUnavailable);
     this.pause();
-    const result = await exporter(options, onProgress, signal);
+    const result = await engine.export(options, onProgress, signal);
+    for (const warning of result.warnings) this.toast(warning, 'info');
     this.options.onExport?.(result);
     return result;
   }

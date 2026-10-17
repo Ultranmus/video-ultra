@@ -1,9 +1,8 @@
-import { FLICKS_PER_SECOND, type Asset } from '@video-ultra/core';
+import { FLICKS_PER_SECOND, type Asset, FONT_PRESETS, STICKER_EMOJI } from '@video-ultra/core';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { useController, useLabels, useProject, useUi } from './context';
 import { Icon } from './icons';
 import { stickerItem, textItem } from './items';
-import { FONT_PRESETS, STICKER_EMOJI } from './pending';
 import type { PanelId } from './state';
 import { ToolPanel } from './ToolPanel';
 

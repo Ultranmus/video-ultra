@@ -1,4 +1,5 @@
-import { itemEnd, type Item, type Project, type TextItem, type Time } from '@video-ultra/core';
+import { itemEnd, type Item, type Project, type Time } from '@video-ultra/core';
+import { measureTextBox, type MeasureText } from '@video-ultra/core/internal';
 
 /** A layer's box on the canvas, in canvas pixels: centre, size, clockwise rotation (degrees). */
 export interface Box {
@@ -10,45 +11,7 @@ export interface Box {
 }
 
 /** Measures a string's width in px for a CSS font (canvas 2D measureText on the main thread). */
-export type MeasureText = (font: string, text: string) => number;
-
-/** The CSS font string for a text item at `px` size. */
-export function textFont(item: TextItem, px: number): string {
-  const s = item.style;
-  return `${s.italic ? 'italic ' : ''}${s.fontWeight} ${px}px ${s.fontFamily}`;
-}
-
-/**
- * The text block's size: widest line × lines × line height, plus background padding. Same maths
- * as the engine's text rasteriser.
- */
-export function measureTextBox(
-  item: TextItem,
-  canvasW: number,
-  canvasH: number,
-  measure: MeasureText,
-): { width: number; height: number } {
-  void canvasW;
-  const px = item.style.size * canvasH * item.transform.scale;
-  const lines = (item.text || ' ').split('\n');
-  const font = textFont(item, px);
-  let widest = 0;
-  for (const line of lines) {
-    const spacing = item.style.letterSpacing * px * Math.max(0, [...line].length - 1);
-    widest = Math.max(widest, measure(font, line) + spacing);
-  }
-  let width = widest;
-  let height = lines.length * item.style.lineHeight * px;
-  const outline = item.style.outline ? item.style.outline.width * px : 0;
-  width += outline * 2;
-  height += outline * 2;
-  if (item.style.background) {
-    const pad = item.style.background.padding * px;
-    width += pad * 2;
-    height += pad * 2;
-  }
-  return { width: Math.max(1, width), height: Math.max(1, height) };
-}
+export type { MeasureText };
 
 /** Where an item draws on a `canvasW × canvasH` canvas, or null for audio. */
 export function itemBox(

@@ -10,8 +10,14 @@ export { useController, useUi, useProject, useHistory, useLabels } from './conte
 export { DEFAULT_LABELS } from './labels';
 export type { Labels } from './labels';
 export type { UiState, LayoutMode, PanelId, ToolId } from './state';
-export type { ExportOptions, ExportProgress, ExportResult } from './pending';
 export { themeOverridesToStyle } from './theme';
 export type { ThemeMode, ThemeOverrides } from './theme';
 export { VERSION, detectCapabilities } from '@video-ultra/core';
-export type { Capabilities, DeviceTier, Project } from '@video-ultra/core';
+export type {
+  Capabilities,
+  DeviceTier,
+  Project,
+  ExportOptions,
+  ExportProgress,
+  ExportResult,
+} from '@video-ultra/core';

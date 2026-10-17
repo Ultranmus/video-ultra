@@ -1,11 +1,16 @@
-import { detectCapabilities, type Asset, type Capabilities, type Project } from '@video-ultra/core';
+import {
+  detectCapabilities,
+  type Asset,
+  type Capabilities,
+  type Project,
+  type ExportResult,
+} from '@video-ultra/core';
 import { useEffect, useRef, useState, type CSSProperties, type ReactElement } from 'react';
 import { ControllerContext, useController, useLabels, useUi } from './context';
 import { EditorController } from './controller';
 import { ExportDialog } from './ExportDialog';
 import { Icon } from './icons';
 import { DEFAULT_LABELS, type Labels } from './labels';
-import type { ExportResult } from './pending';
 import {
   Inspector,
   Panel,
