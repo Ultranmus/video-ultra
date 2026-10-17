@@ -46,6 +46,54 @@ Starting targets (2026-10-17), to be confirmed or adjusted with Phase 0 measurem
 
 ## Measurements
 
+### 2026-10-17 · Media analyzer (Mac M4, headless, `scripts/analyzer-check.ts`, tier mid)
+
+20 thumbnails 96 px high requested at once (as a timeline strip), fresh analyzer each:
+
+| File                                  | Mode     | Chrome first / all 20 | WebKit first / all 20 | Firefox first / all 20 |
+| ------------------------------------- | -------- | --------------------- | --------------------- | ---------------------- |
+| 60 s 1080p H.264 (keyframe every 1 s) | keyframe | 10 / 55 ms            | 25 / 245 ms           | 12 / 72 ms             |
+|                                       | exact    | 22 / 178 ms           | 48 / 494 ms           | 30 / 397 ms            |
+| 4K30 H.264, long GOP                  | keyframe | 33 / 77 ms            | 61 / 249 ms           | 42 / 106 ms            |
+|                                       | exact    | 65 / 697 ms           | 104 / 1208 ms         | 99 / 2016 ms           |
+| HEVC 1080p                            | keyframe | 8 / 14 ms             | 28 / 54 ms            | (no HEVC)              |
+| iPhone 4K60 HDR HEVC portrait         | keyframe | 14 / 360 ms           | 46 / 555 ms           | (no HEVC)              |
+|                                       | exact    | 59 / 874 ms           | 81 / 1303 ms          | (no HEVC)              |
+
+Same strip again (cache): 1–7 ms. Cold start (new worker + first file): first thumbnail 56 ms
+Chrome, 78 ms WebKit, 27 ms Firefox. Low tier (1 decoder, Chrome): 60 s strip 67 ms.
+Photo 12 MP → 128×96: 39–59 ms. Probe in the worker: 6–30 ms.
+
+Waveforms (100 peaks/s; levels match ffmpeg volumedetect to 3 decimals):
+
+| File                     | Chrome | WebKit | Firefox |
+| ------------------------ | ------ | ------ | ------- |
+| 3-min MP3 (18,005 peaks) | 220 ms | 394 ms | 522 ms  |
+| 60 s video (AAC)         | 86 ms  | 189 ms | 195 ms  |
+| 20 s AAC m4a             | 25 ms  | 39 ms  | 59 ms   |
+
+20 thumbnails requested while the 3-min waveform decodes: 50 / 229 / 115 ms (they don't wait for
+it; low tier Chrome 60 ms). Abort: 30 of 40 aborted → all 30 resolve `null` at once, only the 10
+live ones decode. **0 main-thread long tasks, 0 open frames after every scenario, in all three.**
+
+### 2026-10-17 · Storage (`scripts/storage-check.ts`, `storage.test.ts`)
+
+| Check                                      | Chrome                   | Firefox            | WebKit (Playwright) |
+| ------------------------------------------ | ------------------------ | ------------------ | ------------------- |
+| Backend · open time                        | OPFS · 14–17 ms          | OPFS · 28–45 ms    | memory (no OPFS)    |
+| Reload after 40 edits (no explicit flush)  | 40 / 40, exact           | 40 / 40, exact     | in-page only        |
+| Tab killed mid-burst (edit every 5 ms)     | crash: 373 of ~380       | close: 282 of ~310 | —                   |
+| Load (snapshot + log replay)               | 2–6 ms                   | 2–5 ms             | —                   |
+| Copy 57 MB into OPFS (worker, sync handle) | 64–87 ms (~650–890 MB/s) | 56–61 ms (~1 GB/s) | —                   |
+| Same with main-thread `createWritable`     | 64–83 ms                 | 63–66 ms           | —                   |
+| 500-item project: stringify / attach+flush | 0.1 ms / 5 ms            | ≤ 1 ms / 3–10 ms   | —                   |
+| Main-thread long tasks                     | 0                        | 0                  | 0                   |
+
+Killed-tab recovery is always exactly a saved state, and never older than what the 250 ms batch
+had written (edits made ≥ 1 s before the kill are always there). Node (vitest): 500-item project
+175 KB JSON, stringify 1.0 ms, load 14 ms. Crash property test (random edits, random flushes, a
+crash at a random byte, random snapshotEvery 2–12): 2000 runs pass (`FC_RUNS=2000`).
+
 ### 2026-10-17 · Engine v1 · demo project (Mac, headless)
 
 `scripts/engine-check.ts`: 17 s, 9:16, five main clips (H.264, photo, HEVC, rotated portrait,

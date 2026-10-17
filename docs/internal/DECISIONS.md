@@ -212,3 +212,48 @@ reason; when one changes, edit the entry and note the date.
     Timeline clips in the accessible layer: ←/→ move (main: reorder), ⇧←/→ trim end, ⌥ = 1 s.
 52. **`onReady(controller)` is public** (2026-10-17): hosts (and our tests) drive the editor
     programmatically — play, seek, `run(label, recipe)` with the core edit operations.
+
+## Media analysis & storage (Day 4 · 3.3/3.4, Day 6 · 4.2)
+
+53. **Media analysis runs in its own worker, not the engine worker** (2026-10-17). Thumbnail and
+    waveform decoding must never take the engine's decoders or delay a preview frame, and gets its
+    own tier budget (**low 1 decode job, else 2**). Cost: Mediabunny is loaded by two workers
+    (one extra ~100 KB gz parse; a few MB of worker heap).
+54. **Timeline thumbnails snap to the keyframe at or before the time** (2026-10-17, measured).
+    One packet decode per thumbnail; requests that snap to the same keyframe + height share one
+    decode. Measured 20-thumbnail strips (Chrome / WebKit / Firefox): 60 s 1080p 55–126 / 245 /
+    72 ms vs exact 178 / 494 / 397 ms; long-GOP 4K 77 / 249 / 106 ms vs 697 / 1208 / 2016 ms;
+    iPhone 4K60 HEVC 360 / 555 ms vs 874 / 1303 ms. `exact` mode stays available (cover frames).
+    Decoding goes through Mediabunny `VideoSampleSink.samplesAtTimestamps` (one decoder per batch,
+    keeps the per-browser workarounds of #34). Scaling happens in the worker: OffscreenCanvas 2D +
+    `VideoSample.drawWithFit` (applies rotation) + `transferToImageBitmap`. `CanvasSink` would do
+    the same decode + draw but hands out a canvas pool, not transferable bitmaps.
+55. **Thumbnail scheduling: newest request first, batched per asset, abortable, byte-budgeted
+    cache** (low 8 MB, mid 24 MB, high 48 MB of bitmaps). The caller owns every returned bitmap
+    (the cache keeps its own copy). Watchdog 4 s per decode step.
+56. **Waveforms: max |sample| over all channels per 10 ms bucket (100/s), capped at 262,144
+    buckets (1 MB) per asset**; stream-decoded, never the whole PCM. A waveform job yields its
+    decode slot to waiting thumbnails every 8 s of audio. Cached in memory and, through
+    `WaveformCache`, in OPFS (`media/<id>.peaks`).
+57. **Project files: `snapshot-<seq>.json` + `log-<seq>.jsonl`, never overwritten** (2026-10-17).
+    OPFS has no atomic rename everywhere (`move()` is missing in older Safari/Firefox), so a new
+    snapshot gets a new name and older snapshots/logs are deleted only after it is complete.
+    Load = newest snapshot that parses + its log while seqs continue without a gap; a torn last
+    line is ignored. Log entries store `patches` only (no `inverse`): undo history isn't restored
+    after a crash. Seqs belong to the storage (the editor's restart at 1 per session).
+58. **Every OPFS write goes through a storage worker using `createSyncAccessHandle`**
+    (2026-10-17). It's the only OPFS write API on iOS 17/18 Safari (`createWritable` arrived in
+    Safari 26) and keeps 1 GB copies off the main thread. Measured the same speed as main-thread
+    `createWritable` (57 MB: 64 ms vs 64 ms Chrome, 56 vs 66 ms Firefox). Different files write in
+    parallel (a big import doesn't hold up autosave); a locked file is retried briefly.
+59. **Memory fallback, and OPFS is only given up after a retried probe** (2026-10-17). Falling
+    back silently loses work on reload: in dev (strict mode) two storages probing one file made
+    Firefox fall back once. Probe files are unique; both lock errors (`NoModificationAllowedError`,
+    Firefox `InvalidStateError`) retry. `putMedia` checks `estimate()` first and maps
+    `QuotaExceededError` to `StorageFullError`; a failed log append is reported and closed by a
+    snapshot ~1 s later.
+60. **Autosave makes the editor's project the saved state at attach** (fresh snapshot), batches
+    log writes every 250 ms, snapshots every 200 entries / 5 s idle / tab hidden / pagehide /
+    1 s after a rename, and calls `onSave` 1 s after the last edit. `listProjects` reads names
+    from `meta.json` (written after each snapshot) and only lists projects whose first snapshot
+    completed.

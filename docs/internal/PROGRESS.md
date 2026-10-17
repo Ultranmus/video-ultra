@@ -71,3 +71,20 @@ save; v0.1 production quality in one week.
   (`QualityGovernor`, unit-tested). CPU throttling doesn't reach the engine worker (hardware
   decode, off the main thread) — 6× throttled Chrome still plays 510/510.
 - **2.6** 10-minute soak with OS-level memory of all Chrome processes (`scripts/soak.ts`).
+
+## 2026-10-17 · Media analyzer + persistence (Day 4 · 3.3/3.4 core, Day 6 · 4.2)
+
+- `media/analyzer.ts` + `analyzer-worker.ts` (→ `dist/analyzer.worker.js`): `createMediaAnalyzer`
+  — probing in the worker, keyframe thumbnail batches (newest first, deduplicated, abortable,
+  cached, tier decode budget, watchdog), streamed waveform peaks (`media/peaks.ts`, unit-tested
+  against brute force).
+- `storage/*`: `createProjectStorage` (OPFS via `storage.worker.js` sync access handles, memory
+  fallback, IndexedDB file handles), snapshot + op-log format with compaction, crash-safe load,
+  `StorageFullError`, waveform cache; `attachAutosave` (250 ms batches, snapshots every 200 / idle
+  / hidden / pagehide, debounced `onSave`, follows `editor.load`).
+- Tests: `storage.test.ts` (round trip, compaction, torn log line, torn snapshot, damaged line,
+  editor.load, onSave debounce, full disk, media + waveform, 500-item project, crash property test),
+  `peaks.test.ts`. Random-edit generator moved to `test/random-edits.ts` (shared with history tests).
+- Browser checks: `scripts/analyzer-check.ts` (`/lab/analyzer`) and `scripts/storage-check.ts`
+  (`/lab/storage`) — all pass in Chrome, WebKit, Firefox, 0 main-thread long tasks.
+- Test media: `avc-1080p30-60s.mp4` (60 s, keyframe every 1 s) and `music-3min.mp3` (`pnpm media`).

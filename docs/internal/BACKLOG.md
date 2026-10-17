@@ -13,7 +13,7 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       local certificate — owner decision.
 - [x] Scrubbing: `FrameSource` (continue forward, latest wins, keyframe preview, watchdog,
       pool) — final frame after a drag 0–100 ms on real footage (PERF.md).
-- [ ] **Fast drags on 4K show almost no frames until release** (decoder can't keep pace). Show
+- [x] **Fast drags on 4K show almost no frames until release** — fixed 2026-10-17: the stage shows the analyzer's keyframe thumbnail while a scrub is fast (`stage/ScrubPreview.tsx`; 37/40 steps covered in a 4K drag). (decoder can't keep pace). Show
       timeline thumbnails (Day 4) while the drag is fast, exact frames when it slows/stops.
       Long-GOP 4K on WebKit settles in 1.3 s — proxies on low tier.
 - [ ] Keyframe-preview decoder isn't counted by `DecoderPool`; previews are off on the low tier.
@@ -46,7 +46,7 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [ ] HEIC photo still missing from the owner's samples (needed to test HEIC import).
 - [ ] BrowserStack (free for open source) for real budget-Android runs in CI — owner to sign up.
 - [ ] Create the `@video-ultra` npm org (owner) before Day 7.
-- [ ] React component (Day 4): async setup in effects must check it wasn't cleaned up before
+- [x] React component (Day 4): async setup in effects must check it wasn't cleaned up before
       creating the engine (strict mode runs effects twice; the lab page leaked a zombie engine).
 - [ ] Engine: blur background, text and sticker layers (Day 5), transitions (Day 5).
 - [ ] Engine: count project frames lost to display timing (60 Hz tick vs 30 fps) separately.
@@ -57,3 +57,31 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [ ] Next iPhone batch: audio plays, A/V offset, underruns on a real phone (engine lab page).
 - [ ] Soak: ~1 late frame per pass in looped playback (0 in single runs) — find where (`lateAt`
       in stats); run the full 30-minute soak; confirm RSS stays at the ~1675 MB plateau.
+- [ ] **Real Safari (iPhone batch):** storage worker with `createSyncAccessHandle` on iOS 17/18/26,
+      `persist()` answer, recovery after the tab is killed by iOS; analyzer thumbnails of iPhone HEVC
+      on the phone. Playwright's WebKit has no OPFS, so storage-check only covers memory there.
+- [ ] **Two tabs on one project** corrupt each other's log (both append, both compact). Take a Web
+      Lock (`navigator.locks`) per project in `attachAutosave`; the second tab opens read-only or asks.
+- [ ] `url` sources: `getMedia` fetches the whole file into a Blob. Use range reads (Mediabunny
+      `UrlSource`) in the engine/analyzer, or stream it into OPFS once.
+- [ ] File handles: `requestPermission` only works inside a user gesture → the UI needs a
+      "re-link / allow access" prompt when `getMedia` returns null for a `handle` source.
+- [ ] Orphaned media: a crash between `putMedia` and the next snapshot leaves `media/<id>` that no
+      project lists. Add a sweep (media not referenced by any project's meta, older than a day).
+- [ ] HDR thumbnails show the browser's own HDR → SDR conversion (too bright, DECISIONS #33): the
+      2D-canvas path has no correction. Fine for a strip; revisit if it looks wrong on iPhone.
+- [ ] Two decode jobs on one asset can decode the same keyframe twice (long-GOP 4K: 5 decodes for 3
+      keyframes). Share in-flight keyframe decodes across jobs.
+- [ ] Analyzer watchdog isn't exercised by a test (needs a stalled fake decoder).
+- [ ] `exact` thumbnails on long-GOP 4K take 0.7–2 s per strip — keep `keyframe` for strips; use
+      `exact` only for single frames (cover / freeze preview).
+- [ ] Mediabunny loads in two workers (engine + analyzer); measure the memory on a low-end phone.
+- [ ] **Startup long tasks in Chrome:** two main-thread tasks of 70–140 ms in the first ~0.4 s after
+      mount (production build; none in WebKit/Firefox, none while editing or playing). Likely the
+      AudioContext + worklet setup (#44) and the capability probe. Profile and split.
+- [ ] Stage: pinch with nothing selected should zoom the view (UI_VISION §6) — not built yet.
+- [ ] Voiceover plays the project while recording (so the speaker can follow); without headphones
+      the project's sound is recorded too. Offer "mute while recording".
+- [ ] File handles (Chromium desktop): import still copies into OPFS; use `showOpenFilePicker` +
+      `putMediaHandle` and a re-link flow.
+- [ ] Timeline: lanes have no per-lane mute/hide/lock buttons yet (icons only).
