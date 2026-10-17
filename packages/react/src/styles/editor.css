@@ -1147,27 +1147,6 @@
       var(--vu-shadow-popover);
   }
 
-  .vu-notice {
-    display: flex;
-    align-items: center;
-    gap: var(--vu-space-2);
-    padding: var(--vu-space-2) var(--vu-space-2) var(--vu-space-2) var(--vu-space-3);
-    border-radius: var(--vu-radius-md);
-    background: var(--vu-surface-2);
-    color: var(--vu-text-muted);
-    font-size: var(--vu-text-sm);
-    box-shadow: var(--vu-shadow-popover);
-    pointer-events: auto;
-  }
-
-  .vu-notice > span {
-    flex: 1;
-  }
-
-  .vu-notice .vu-icon {
-    color: var(--vu-warning);
-  }
-
   .vu-modal-backdrop {
     position: absolute;
     inset: 0;

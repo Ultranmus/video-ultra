@@ -10,7 +10,7 @@ import {
   trimItem,
   type Item,
 } from '@video-ultra/core';
-import { useEffect, useRef, useState, type ReactElement } from 'react';
+import { useEffect, useRef, type ReactElement } from 'react';
 import { useController, useHistory, useLabels, useProject, useUi } from './context';
 import { IconButton, ToolButton } from './controls';
 import { Icon } from './icons';
@@ -473,7 +473,6 @@ export function Toasts(): ReactElement {
   const toasts = useUi((s) => s.toasts);
   return (
     <div className="vu-toasts" role="status" aria-live="polite">
-      <StorageNotice />
       {toasts.map((t) => (
         <div key={t.id} className="vu-toast" data-tone={t.tone}>
           <span>{t.message}</span>
@@ -482,23 +481,6 @@ export function Toasts(): ReactElement {
           </button>
         </div>
       ))}
-    </div>
-  );
-}
-
-/** Small banner when the browser may evict local storage (the host's onSave is the durable save). */
-export function StorageNotice(): ReactElement | null {
-  const l = useLabels();
-  const persistent = useUi((s) => s.persistent);
-  const [hidden, setHidden] = useState(false);
-  if (persistent !== false || hidden) return null;
-  return (
-    <div className="vu-notice" role="note">
-      <Icon name="warning" size={16} />
-      <span>{l.notPersistent}</span>
-      <button type="button" className="vu-link" onClick={() => setHidden(true)}>
-        {l.dismiss}
-      </button>
     </div>
   );
 }

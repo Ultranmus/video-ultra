@@ -152,6 +152,20 @@ export class EditorController {
       });
     }
     void this.storage.status().then((s) => this.ui.setState({ persistent: s.persistent }));
+    // Tell once (per browser) that local storage may be cleared — after the first real edit, when
+    // there is work to lose, not on an empty editor.
+    const off = this.editor.onCommit(() => {
+      off();
+      if (this.ui.getState().persistent !== false) return;
+      const key = 'video-ultra:storage-notice';
+      try {
+        if (localStorage.getItem(key)) return;
+        localStorage.setItem(key, '1');
+      } catch {
+        /* storage blocked: show it anyway */
+      }
+      this.toast(this.labels.notPersistent, 'info');
+    });
     await Promise.all(
       Object.values(this.project.assets).map(async (asset) => {
         const blob =
@@ -504,7 +518,11 @@ export class EditorController {
   toast(message: string, tone: 'info' | 'error' | 'success' = 'info'): void {
     const id = ++this.#toastId;
     this.ui.setState((s) => ({ toasts: [...s.toasts.slice(-2), { id, message, tone }] }));
-    setTimeout(() => this.dismissToast(id), tone === 'error' ? 7000 : 3500);
+    // Long enough to read: ~60 ms per character, at least 3.5 s (errors 7 s).
+    setTimeout(
+      () => this.dismissToast(id),
+      Math.max(tone === 'error' ? 7000 : 3500, message.length * 60),
+    );
   }
 
   dismissToast(id: number): void {
