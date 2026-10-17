@@ -69,13 +69,9 @@ export function TopBar({ onClose }: { onClose?: (() => void) | undefined }): Rea
         {save === 'saving' ? l.saving : save === 'saved' ? l.saved : ''}
       </span>
       <span className="vu-spacer" />
-      <button
-        type="button"
-        className="vu-ratio-button"
-        aria-label={l.aspectRatio}
-        onClick={() => ctl.openTool('canvas')}
-      >
+      <button type="button" className="vu-ratio-button" onClick={() => ctl.openTool('canvas')}>
         <span>{ratio ?? `${width}×${height}`}</span>
+        <span className="vu-sr-only">{l.aspectRatio}</span>
         <Icon name="chevronDown" size={16} />
       </button>
       <button

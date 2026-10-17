@@ -18,6 +18,9 @@ function Editor() {
         theme={theme}
         backend={backend}
         autosave={params.get('autosave') !== '0'}
+        onReady={(controller) => {
+          (window as unknown as { vuEditor: unknown }).vuEditor = controller;
+        }}
         onExport={(result) =>
           console.info('[editor] exported', result.width, result.height, result.blob.size)
         }

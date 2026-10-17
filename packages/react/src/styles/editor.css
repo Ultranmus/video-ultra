@@ -44,6 +44,10 @@
     opacity: 0.4;
   }
 
+  .vu-root:focus {
+    outline: none;
+  }
+
   .vu-root :focus-visible {
     outline: none;
     box-shadow: var(--vu-focus-ring);
@@ -949,7 +953,7 @@
   }
 
   .vu-timecode-total {
-    color: var(--vu-text-subtle);
+    color: var(--vu-text-muted);
     font-weight: var(--vu-weight-regular);
   }
 

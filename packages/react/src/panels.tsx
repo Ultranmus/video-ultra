@@ -121,7 +121,7 @@ function AssetTile({ asset }: { asset: Asset }) {
     <button
       type="button"
       className="vu-asset"
-      aria-label={`${l.addToTimeline}: ${asset.name}`}
+      aria-label={`${l.addToTimeline}: ${asset.name}${asset.kind === 'video' ? `, ${formatDuration(asset)}` : ''}`}
       onClick={() => ctl.addAssetToTimeline(asset.id)}
     >
       <canvas ref={canvasRef} className="vu-asset-thumb" aria-hidden="true" />

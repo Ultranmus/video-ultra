@@ -45,6 +45,8 @@ export interface VideoEditorProps {
   labels?: Partial<Labels>;
   /** Text direction of the editor chrome. The timeline always runs left to right. */
   dir?: 'ltr' | 'rtl';
+  /** Called once the editor is ready, with its controller (programmatic control: play, seek, edits). */
+  onReady?: (controller: EditorController) => void;
   /** Force a renderer (testing). Default: WebGPU when available, else WebGL2. */
   backend?: 'auto' | 'webgpu' | 'webgl2';
   className?: string;
@@ -97,7 +99,9 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
         return;
       }
       await controller.start(caps, ctl.initial);
-      if (!cancelled) controller.ui.setState({ status: 'ready' });
+      if (cancelled) return;
+      controller.ui.setState({ status: 'ready' });
+      props.onReady?.(controller);
     })().catch((error: unknown) => {
       if (!cancelled)
         controller.ui.setState({
@@ -134,6 +138,13 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
         className={`vu-root${props.className ? ` ${props.className}` : ''}`}
         data-vu-theme={theme === 'auto' ? undefined : theme}
         dir={props.dir ?? 'ltr'}
+        tabIndex={-1}
+        onPointerDown={(e) => {
+          // Clicking the canvas or empty chrome keeps keyboard shortcuts working.
+          const target = e.target as HTMLElement;
+          if (!target.closest('input, textarea, select, button, a, [tabindex]:not(.vu-root)'))
+            rootRef.current?.focus({ preventScroll: true });
+        }}
         style={{ ...themeOverridesToStyle(props.themeOverrides), ...props.style }}
       >
         <Shell rootRef={rootRef} onClose={props.onClose} />
