@@ -18,7 +18,8 @@
     "changeset": "changeset",
     "release": "pnpm build && changeset publish",
     "e2e": "turbo run e2e",
-    "media": "node scripts/test-media.ts"
+    "media": "node scripts/test-media.ts",
+    "verify": "pnpm lint && pnpm format:check && pnpm build && pnpm typecheck && pnpm test"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",

@@ -82,7 +82,7 @@ async function runOne(page: Page, file: string, backend: string): Promise<string
       return btoa(binary);
     });
     mkdirSync(saveDir, { recursive: true });
-    const name = `${page.context().browser()?.browserType().name()}-${backend}-${file.replace(/\.[^.]+$/, '').replace(/[\/]/g, '_')}.mp4`;
+    const name = `${page.context().browser()?.browserType().name()}-${backend}-${file.replace(/\.[^.]+$/, '').replace(/\//g, '_')}.mp4`;
     writeFileSync(join(saveDir, name), Buffer.from(base64, 'base64'));
   }
   const errors = await page.locator('.error').allInnerTexts();
