@@ -178,3 +178,37 @@ reason; when one changes, edit the entry and note the date.
     (2026-10-17). Creating it + loading the worklet took 110–139 ms of main-thread time in Chrome
     when done inside the tap; a context created without a gesture starts suspended, and `resume()`
     in the tap is cheap and satisfies iOS Safari's gesture rule.
+
+## Editor UI (Day 4–5)
+
+45. **A plain-TypeScript controller owns the editor; React only selects slices** (2026-10-17).
+    `EditorController` (packages/react) holds the core editor (project + undo), the engine, the
+    media analyzer, storage, a small Zustand UI store and the `Playhead` (a plain observable, not
+    React state). Components subscribe to the slice they show; the timecode, timeline and stage
+    overlay follow the playhead through subscriptions, so nothing re-renders per frame. The timeline
+    is an imperative canvas view (`timeline/view.ts`) with its own redraw-per-frame scheduling.
+    Rejected: playhead in React state (renders 60×/s), a DOM node per clip (#25).
+46. **The controller is restartable** (2026-10-17). `start()` / `stop()` with a generation counter;
+    async work from an older start backs out. React strict mode (dev) unmounts and remounts once —
+    a one-shot `destroy()` on unmount killed the engine of the real mount.
+47. **Drags and sliders preview without touching the store** (2026-10-17). `controller.preview()`
+    applies the edit to an Immer draft and sends the result to the engine (coalesced per frame); the
+    timeline draws the same ghost. Release commits exactly one operation. Sliders preview on `input`
+    and commit on the native `change` event (pointer release or one keyboard step, coalesced into one
+    undo step).
+48. **Phone timeline: a drag scrubs, a long-press lifts** (2026-10-17). With the playhead fixed in
+    the centre, a plain horizontal drag scrolls the film strip (= seeks, with a short fling); a
+    long-press (350 ms, haptic tick) lifts a clip to reorder (main track) or move (lanes). Trim
+    handles of the selected clip drag at once. Desktop: dragging a clip moves it immediately;
+    dragging the ruler or empty space scrubs.
+49. **The playhead spine uses the accent colour** (2026-10-17). UI_VISION §8 (approved with the
+    owner's go-ahead for Days 4–6) — `--vu-playhead` is `var(--vu-accent)` in both themes.
+50. **"Storage may be cleared" is a one-time notice after the first edit** (2026-10-17), not a
+    permanent banner: shown once per browser (remembered in localStorage) when
+    `storage.persist()` is refused. A banner over an empty editor covered the controls.
+51. **Keyboard shortcuts work after clicking the canvas** (2026-10-17): the editor root is
+    focusable (`tabIndex=-1`) and takes focus on pointer-down outside controls. Space/K play,
+    S split, Delete, ⌘/Ctrl Z / ⇧Z / Y, ⌘/Ctrl D duplicate, ←/→ frame (⇧ ×10), Home/End, Esc.
+    Timeline clips in the accessible layer: ←/→ move (main: reorder), ⇧←/→ trim end, ⌥ = 1 s.
+52. **`onReady(controller)` is public** (2026-10-17): hosts (and our tests) drive the editor
+    programmatically — play, seek, `run(label, recipe)` with the core edit operations.

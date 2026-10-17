@@ -40,12 +40,18 @@ Video-specific tokens:
 | `--vu-clip-sticker` | `#1f5a4a`                | `#bfe6d8`          | stickers / PIP                            |
 | `--vu-clip-audio`   | `#1e4466`                | `#c4daf0`          | audio clips                               |
 | `--vu-waveform`     | `rgba(255,255,255,0.55)` | `rgba(0,0,0,0.45)` | waveform peaks                            |
-| `--vu-playhead`     | `#ffffff`                | `#18181b`          | playhead line + head                      |
+| `--vu-playhead`     | `var(--vu-accent)`       | same               | playhead spine + timecode capsule         |
 | `--vu-trim-handle`  | `#f5b54a`                | `#9a5b00`          | trim handles on the selected clip         |
 | `--vu-selection`    | `var(--vu-accent)`       | same               | selected clip outline                     |
+| `--vu-trim-grip`    | `rgba(0,0,0,0.55)`       | same               | grip lines on trim handles                |
+| `--vu-on-media`     | `#ffffff`                | same               | labels drawn over thumbnails / footage    |
+| `--vu-stage-canvas` | `#000000`                | same               | the preview frame before the first draw   |
 
-Clip colours were picked for label contrast ≥ 4.5:1 with `--vu-text`; verify again when the
-timeline is built (Day 4) and record the checked ratios here.
+Contrast checked on the built timeline (2026-10-17), label `--vu-text` on clip bodies — dark:
+video 10.1, text 6.8, sticker 7.3, audio 9.2; light: video 12.6, text 13.0, sticker 13.1,
+audio 12.4. Playhead capsule text on accent: 5.5 (dark), 13.5 (light). Ruler labels
+(`--vu-text-muted` on `--vu-timeline-bg`): 7.5 / 5.7. DOM chrome: axe WCAG 2.2 AA, 0 violations
+in both themes at phone and desktop sizes (`scripts/a11y-check.ts`).
 
 ## Non-colour tokens
 
@@ -55,7 +61,13 @@ Same scale as image-ultra: `--vu-text-xs…xl` (11–16px), `--vu-weight-*`, `--
 
 Video-specific sizes: `--vu-size-topbar` 48px, `--vu-size-rail` 72px, `--vu-size-panel` 280px,
 `--vu-size-inspector` 280px, `--vu-size-toolbar` 64px, `--vu-size-track` 48px (main track 56px:
-`--vu-size-track-main`), `--vu-size-ruler` 24px, `--vu-size-trim-handle` 12px (touch: 20px).
+`--vu-size-track-main`), `--vu-size-ruler` 24px, `--vu-size-trim-handle` 12px (touch: 20px),
+`--vu-size-timeline` 248px (phone: `--vu-size-timeline-phone` 184px), `--vu-size-transport` 48px,
+`--vu-size-sheet` 360px (max), `--vu-size-tool` 56px, `--vu-size-handle` 12px (touch 18px),
+`--vu-size-min-height` 480px, plus control sizes (`--vu-size-choice-lg`, `-preset`,
+`-preset-tile`, `-asset`, `-swatch`, `-slider-track`, `-slider-thumb`, `-toast`, `-modal`) and
+`--vu-text-emoji`. Element resets in editor.css use `:where()` (zero specificity) so component
+classes always win.
 
 ## `ThemeOverrides` (public, typed)
 

@@ -15,7 +15,7 @@ const arg = (name: string) =>
 const browsers = (arg('browsers') ?? 'chrome').split(',');
 const sizes = (arg('sizes') ?? 'phone,desktop').split(',');
 const shots = arg('shots');
-const files = (arg('files') ?? 'avc-1080p30.mp4,photo.jpg,hevc-1080p30.mp4,tone-mp3.mp3')
+const files = (arg('files') ?? 'avc-1080p30.mp4,photo.jpg,hevc-1080p30.mp4,music.mp3')
   .split(',')
   .map((f) => resolve('test-media/files', f));
 const port = arg('port') ?? '3200';
