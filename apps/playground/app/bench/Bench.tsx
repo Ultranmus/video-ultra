@@ -369,13 +369,7 @@ export function Bench() {
   }
 
   function downloadHdrFile() {
-    if (!hdrFile) return;
-    const url = URL.createObjectURL(hdrFile);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = hdrFile.name;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    if (hdrFile) downloadFile(hdrFile);
   }
 
   async function runAll() {
@@ -400,6 +394,33 @@ export function Bench() {
       lines.push('');
     }
     return lines.join('\n');
+  }
+
+  /** The report as a file: Markdown for reading + the raw results as JSON, for AirDrop/download. */
+  function reportFile(): File {
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+    const body = `${report()}\n\n<!-- raw results -->\n\n\`\`\`json\n${JSON.stringify({ capabilities: caps, results }, null, 2)}\n\`\`\`\n`;
+    return new File([body], `video-ultra-bench-${stamp}.md`, { type: 'text/markdown' });
+  }
+
+  async function shareReport() {
+    const file = reportFile();
+    try {
+      await navigator.share({ files: [file], title: 'video-ultra bench report' });
+    } catch (e) {
+      // Cancelled, or sharing files isn't supported here: fall back to a download.
+      if (e instanceof Error && e.name === 'AbortError') return;
+      downloadFile(file);
+    }
+  }
+
+  function downloadFile(file: File) {
+    const url = URL.createObjectURL(file);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = file.name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
   }
 
   async function copyReport() {
@@ -564,6 +585,12 @@ export function Bench() {
         <>
           <h2>Results</h2>
           <div className="row">
+            {typeof navigator !== 'undefined' && typeof navigator.share === 'function' && (
+              <button className="primary" onClick={shareReport}>
+                Share report (AirDrop)
+              </button>
+            )}
+            <button onClick={() => downloadFile(reportFile())}>Download report</button>
             <button onClick={copyReport}>{copied ? 'Copied' : 'Copy report (Markdown)'}</button>
             <button onClick={() => setResults([])}>Clear</button>
           </div>
