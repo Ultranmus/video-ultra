@@ -35,9 +35,19 @@
     --vu-clip-sticker: #1f5a4a;
     --vu-clip-audio: #1e4466;
     --vu-waveform: rgba(255, 255, 255, 0.55);
-    --vu-playhead: #ffffff;
+    /* The playhead spine is the accent (UI_VISION §8). */
+    --vu-playhead: var(--vu-accent);
     --vu-trim-handle: #f5b54a;
+    --vu-trim-grip: rgba(0, 0, 0, 0.55);
     --vu-selection: var(--vu-accent);
+    /* Text and icons drawn over footage (thumbnails, stage) stay light in both themes. */
+    --vu-on-media: #ffffff;
+    --vu-stage-canvas: #000000;
+    --vu-shadow-stage: 0 0 0 1px rgba(255, 255, 255, 0.06);
+    --vu-shadow-thumb: 0 1px 3px rgba(0, 0, 0, 0.4);
+    --vu-swatch-hue-1: #ff4d6d;
+    --vu-swatch-hue-2: #5b8cff;
+    --vu-swatch-hue-3: #8fd16a;
 
     /* Typography */
     --vu-font-family: inherit;
@@ -86,6 +96,24 @@
     --vu-size-trim-handle: 12px;
     /* Segmented switches and chips; 36px on touch screens (below). */
     --vu-size-choice: 28px;
+    --vu-size-choice-lg: 32px;
+    --vu-size-min-height: 480px;
+    --vu-size-tool: 56px;
+    --vu-size-rail-item: 56px;
+    --vu-size-transport: 48px;
+    --vu-size-timeline: 248px;
+    --vu-size-timeline-phone: 184px;
+    --vu-size-sheet: 360px;
+    --vu-size-preset: 88px;
+    --vu-size-preset-tile: 56px;
+    --vu-size-asset: 72px;
+    --vu-size-swatch: 28px;
+    --vu-size-slider-track: 4px;
+    --vu-size-slider-thumb: 18px;
+    --vu-size-handle: 12px;
+    --vu-size-toast: 420px;
+    --vu-size-modal: 440px;
+    --vu-text-emoji: 24px;
 
     /* Layers */
     --vu-z-overlay: 10;
@@ -124,7 +152,7 @@
     --vu-clip-sticker: #bfe6d8;
     --vu-clip-audio: #c4daf0;
     --vu-waveform: rgba(0, 0, 0, 0.45);
-    --vu-playhead: #18181b;
+    --vu-shadow-stage: 0 0 0 1px rgba(0, 0, 0, 0.08);
     --vu-trim-handle: #9a5b00;
     color-scheme: light;
   }
@@ -159,7 +187,7 @@
       --vu-clip-sticker: #bfe6d8;
       --vu-clip-audio: #c4daf0;
       --vu-waveform: rgba(0, 0, 0, 0.45);
-      --vu-playhead: #18181b;
+      --vu-shadow-stage: 0 0 0 1px rgba(0, 0, 0, 0.08);
       --vu-trim-handle: #9a5b00;
       color-scheme: light;
     }
@@ -178,6 +206,7 @@
     .vu-root {
       --vu-size-trim-handle: 20px;
       --vu-size-choice: 36px;
+      --vu-size-handle: 18px;
     }
   }
 }

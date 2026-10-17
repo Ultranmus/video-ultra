@@ -295,6 +295,12 @@ importers:
       '@video-ultra/core':
         specifier: workspace:*
         version: link:../core
+      immer:
+        specifier: ^11.1.21
+        version: 11.1.21
+      zustand:
+        specifier: ^5.0.15
+        version: 5.0.15(@types/react@19.3.0)(immer@11.1.21)(react@19.3.1)
     devDependencies:
       '@types/react':
         specifier: ^19.3.0

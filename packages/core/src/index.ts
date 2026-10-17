@@ -15,6 +15,7 @@ export {
   findItem,
   mainTrack,
   itemEnd,
+  projectFrame,
   sourceSpan,
   randomId,
   sequentialIds,

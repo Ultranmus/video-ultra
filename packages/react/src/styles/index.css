@@ -1,6 +1,7 @@
 /* Entry for `@video-ultra/react/styles.css`. Everything lives in @layer video-ultra. */
 @layer video-ultra;
 @import './tokens.css';
+@import './editor.css';
 
 /*
  * The one unlayered rule (DECISIONS #24). Unlayered page CSS beats every layer, so a global reset

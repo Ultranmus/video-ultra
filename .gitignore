@@ -18,3 +18,5 @@ test-media/private
 # Links to test-media/files, created by `pnpm media`
 apps/playground/public/media
 apps/examples/vite/public/media
+# Agent worktrees
+.claude/worktrees

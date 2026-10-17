@@ -1,0 +1,110 @@
+import {
+  createProject,
+  fromSeconds,
+  insertMain,
+  sequentialIds,
+  type VideoItem,
+} from '@video-ultra/core';
+import { describe, expect, it } from 'vitest';
+import {
+  hitTest,
+  layoutRows,
+  majorTickSeconds,
+  reorderIndex,
+  snapTime,
+  tickLabel,
+  timeToX,
+  xToTime,
+  type TimelineMetrics,
+} from './geometry';
+
+const m: TimelineMetrics = {
+  ruler: 24,
+  mainTrack: 56,
+  track: 48,
+  gap: 4,
+  header: 0,
+  trimHandle: 12,
+};
+
+function clip(id: string, seconds: number): VideoItem {
+  return {
+    id,
+    kind: 'video',
+    assetId: 'a',
+    start: 0,
+    duration: fromSeconds(seconds),
+    sourceIn: 0,
+    speed: 1,
+    volume: 1,
+    muted: false,
+    fadeIn: 0,
+    fadeOut: 0,
+    transform: { x: 0.5, y: 0.5, scale: 1, rotation: 0, opacity: 1, flipX: false, flipY: false },
+    crop: { left: 0, top: 0, right: 0, bottom: 0 },
+    fit: 'fit',
+    filter: null,
+    adjust: {},
+    transitionIn: null,
+  };
+}
+
+function project() {
+  const p = createProject({ ids: sequentialIds('p') });
+  p.assets.a = {
+    id: 'a',
+    kind: 'video',
+    name: 'a.mp4',
+    mimeType: 'video/mp4',
+    size: 1,
+    duration: fromSeconds(60),
+    hasAudio: false,
+    source: { type: 'url', url: 'x' },
+  };
+  insertMain(p, clip('c1', 2));
+  insertMain(p, clip('c2', 3));
+  return p;
+}
+
+describe('timeline geometry', () => {
+  it('maps time and x both ways', () => {
+    const scale = { pps: 50, x0: 100 };
+    expect(timeToX(scale, fromSeconds(2))).toBe(200);
+    expect(xToTime(scale, 200)).toBe(fromSeconds(2));
+  });
+
+  it('picks readable tick steps', () => {
+    expect(majorTickSeconds(100)).toBe(1);
+    expect(majorTickSeconds(10)).toBe(10);
+    expect(majorTickSeconds(600)).toBe(0.2);
+    expect(tickLabel(65, 5)).toBe('1:05');
+    expect(tickLabel(2.5, 0.5)).toBe('0:02.5');
+  });
+
+  it('snaps within the threshold only', () => {
+    const near = snapTime(fromSeconds(1.05), [fromSeconds(1)], 100, 8);
+    expect(near.snapped).toBe(fromSeconds(1));
+    const far = snapTime(fromSeconds(1.2), [fromSeconds(1)], 100, 8);
+    expect(far.snapped).toBeNull();
+  });
+
+  it('hit-tests clips, trim handles of the selection, and the ruler', () => {
+    const p = project();
+    const rows = layoutRows(p, m);
+    const scale = { pps: 100, x0: 0 };
+    const y = rows[0]!.top + 20;
+    expect(hitTest(rows, m, scale, 50, 10, null, false).type).toBe('ruler');
+    const body = hitTest(rows, m, scale, 50, y, null, false);
+    expect(body.type === 'item' && body.item.id).toBe('c1');
+    const trim = hitTest(rows, m, scale, 205, y, 'c1', false);
+    expect(trim.type === 'trim' && trim.edge).toBe('end');
+    expect(hitTest(rows, m, scale, 200, rows[0]!.top + 28, null, false).type).toBe('transition');
+  });
+
+  it('finds the reorder slot from the drag position', () => {
+    const p = project();
+    const items = p.tracks[0]!.items;
+    expect(reorderIndex(items, 'c1', fromSeconds(2.0))).toBe(1);
+    expect(reorderIndex(items, 'c2', fromSeconds(0.5))).toBe(0);
+  });
+});
