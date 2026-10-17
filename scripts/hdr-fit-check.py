@@ -49,9 +49,19 @@ def main():
     key = sys.argv[sys.argv.index('--key') + 1] if '--key' in sys.argv else None
     check = json.load(open(path))
     size = check['file']['sizeBytes']
-    match = next((f for f in os.listdir(PRIVATE) if os.path.getsize(os.path.join(PRIVATE, f)) == size), None)
+    files = [f for f in os.listdir(PRIVATE) if not f.startswith('.')]
+    match = next((f for f in files if os.path.getsize(os.path.join(PRIVATE, f)) == size), None)
     if not match:
-        sys.exit(f'No file of {size} bytes in test-media/private — copy the original video there.')
+        # The phone may have re-saved the video when it was picked: match by duration instead.
+        def duration(f):
+            out = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', os.path.join(PRIVATE, f)], capture_output=True, text=True).stdout
+            return float(out.strip() or 0)
+        want = check['file']['durationS']
+        best = min(files, key=lambda f: abs(duration(f) - want), default=None)
+        if best is None or abs(duration(best) - want) > 0.1:
+            sys.exit(f'No original video matches {check["file"]["name"]} — copy it into test-media/private.')
+        match = best
+        print('(matched by duration — the phone re-saved the file; check the codec/HDR in the report)')
     print(f'{check["engine"]} · {check["userAgent"][:90]}…\nvideo: {check["file"]["name"]} = {match}')
     os.makedirs(WORK, exist_ok=True)
     sdr = os.path.join(WORK, f'{match}.apple-sdr.mp4')
