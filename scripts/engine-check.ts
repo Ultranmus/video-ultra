@@ -3,7 +3,7 @@
  * transparent PNG; 9:16) start to end and reports the engine's stats and main-thread long tasks.
  * Usage: playground running, then node scripts/engine-check.ts [--browsers chrome,webkit] [--shots dir]
  */
-import { chromium, webkit } from '@playwright/test';
+import { chromium, firefox, webkit } from '@playwright/test';
 
 /** Playground URL (PLAYGROUND=http://localhost:3301 when another dev server uses 3200). */
 const BASE = process.env.PLAYGROUND ?? 'http://localhost:3200';
@@ -20,6 +20,7 @@ const launch = {
   chrome: () =>
     chromium.launch({ channel: 'chrome', args: ['--autoplay-policy=no-user-gesture-required'] }),
   webkit: () => webkit.launch(),
+  firefox: () => firefox.launch(),
 };
 
 for (const name of names) {
@@ -33,7 +34,9 @@ for (const name of names) {
       const cdp = await page.context().newCDPSession(page);
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: throttle });
     }
-    await page.goto(`${BASE}/lab/engine?backend=${backend}`);
+    await page.goto(
+      `${BASE}/lab/engine?backend=${backend}${arg('tier') ? `&tier=${arg('tier')}` : ''}`,
+    );
     await page.waitForFunction(
       () => /^Ready|FAILED/.test(document.getElementById('status')!.textContent!),
       null,

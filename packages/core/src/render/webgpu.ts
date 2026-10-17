@@ -54,7 +54,12 @@ export async function createWebGPURenderer(
   const videoLayout = videoPipeline.getBindGroupLayout(0);
   const imageLayout = imagePipeline.getBindGroupLayout(0);
   // The blurred background's small render target is rgba8unorm; its pipelines are made on first use.
-  let smallPipelines: { video: GPURenderPipeline; image: GPURenderPipeline } | null = null;
+  let smallPipelines: {
+    video: GPURenderPipeline;
+    image: GPURenderPipeline;
+    videoLayout: GPUBindGroupLayout;
+    imageLayout: GPUBindGroupLayout;
+  } | null = null;
   const sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear' });
 
   const { calibration } = hdrCalibrationFor(browserEngine(), 'webgpu');
@@ -158,16 +163,28 @@ export async function createWebGPURenderer(
       : source instanceof GPUTextureView
         ? source
         : imageView(source);
-    const pipelines = small
-      ? (smallPipelines ??= {
-          video: makePipeline(videoModule, 'rgba8unorm'),
-          image: makePipeline(imageModule, 'rgba8unorm'),
-        })
-      : { video: videoPipeline, image: imagePipeline };
-    const pipeline = isVideo ? pipelines.video : pipelines.image;
+    let pipeline: GPURenderPipeline;
+    let layout: GPUBindGroupLayout;
+    if (small) {
+      if (!smallPipelines) {
+        const video = makePipeline(videoModule, 'rgba8unorm');
+        const image = makePipeline(imageModule, 'rgba8unorm');
+        smallPipelines = {
+          video,
+          image,
+          videoLayout: video.getBindGroupLayout(0),
+          imageLayout: image.getBindGroupLayout(0),
+        };
+      }
+      pipeline = isVideo ? smallPipelines.video : smallPipelines.image;
+      layout = isVideo ? smallPipelines.videoLayout : smallPipelines.imageLayout;
+    } else {
+      pipeline = isVideo ? videoPipeline : imagePipeline;
+      layout = isVideo ? videoLayout : imageLayout;
+    }
     // External textures expire at the end of the task, so video bind groups are per frame.
     const group = device.createBindGroup({
-      layout: small ? pipeline.getBindGroupLayout(0) : isVideo ? videoLayout : imageLayout,
+      layout,
       entries: [
         {
           binding: 0,

@@ -37,6 +37,7 @@ import {
   type ExportResult,
 } from './export-plan';
 import { DecoderPool } from './frames';
+import { upcomingVideo } from './timeline';
 
 /**
  * Offline export in the engine worker: every frame is composed exactly (waiting for each decoded
@@ -49,6 +50,8 @@ import { DecoderPool } from './frames';
 const OPFS_PREFIX = 'video-ultra-export-';
 const AUDIO_BLOCK = 4096;
 const PROGRESS_MS = 250;
+/** Keep decoders of clips needed within this window (flicks); release the rest. */
+const RELEASE_AHEAD = 2 * FLICKS_PER_SECOND;
 
 interface SyncAccessHandle {
   write(data: Uint8Array, options: { at: number }): number;
@@ -412,6 +415,7 @@ export async function runExport(
     stats.audioMs += performance.now() - a0;
   };
 
+  const keep = new Set<string>();
   let lastProgress = 0;
   const report = (framesDone: number, force = false) => {
     const now = performance.now();
@@ -435,8 +439,15 @@ export async function runExport(
     report(0, true);
     for (let i = 0; i < framesTotal; i++) {
       if (deps.isCancelled()) throw new ExportCancelled();
+      const t = exportFrameTime(i, fps);
+      // Clips that are done give back their decoder and last frame (memory stays flat).
+      if (i % 15 === 0) {
+        keep.clear();
+        for (const u of upcomingVideo(project, t, RELEASE_AHEAD)) keep.add(u.item.id);
+        composer.releaseExcept(keep);
+      }
       const c0 = performance.now();
-      const composed = await composer.render(project, exportFrameTime(i, fps), width, height, null);
+      const composed = await composer.render(project, t, width, height, null);
       stats.composeMs += performance.now() - c0;
       stats.missingLayers += composed.missing;
       const e0 = performance.now();

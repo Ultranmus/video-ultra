@@ -4,7 +4,7 @@
  * checks the backends agree and known pixels are right. Needs the playground and `pnpm media`.
  * Usage: node scripts/composite-check.ts [--browsers chrome,webkit]
  */
-import { chromium, webkit } from '@playwright/test';
+import { chromium, firefox, webkit } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -22,6 +22,7 @@ const save = process.argv.includes('--save')
 const launch = {
   chrome: () => chromium.launch({ channel: 'chrome' }),
   webkit: () => webkit.launch(),
+  firefox: () => firefox.launch(),
 };
 let failures = 0;
 const check = (ok: boolean, what: string) => {

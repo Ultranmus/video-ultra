@@ -117,13 +117,17 @@ function emoji(id: string, char: string, startS: number, seconds: number): Stick
   };
 }
 
-async function buildDemo(blurBackground: boolean): Promise<{ project: Project; blobs: Blobs }> {
+async function buildDemo(
+  blurBackground: boolean,
+  repeat = 1,
+): Promise<{ project: Project; blobs: Blobs }> {
   const project = createProject({ name: 'Engine demo', width: 1080, height: 1920 });
   const blobs: Blobs = new Map();
   let n = 0;
   const id = () => `item${++n}`;
   const ids: string[] = [];
-  for (const clip of MAIN) {
+  // `?repeat=N` makes the main track N times longer (memory checks on long exports).
+  for (const clip of Array.from({ length: repeat }, () => MAIN).flat()) {
     // Firefox can't decode HEVC: it gets the VP9 file instead (same length).
     const assetId = await loadAsset(project, blobs, clip.file).catch((error: unknown) => {
       if (!clip.file.startsWith('hevc')) throw error;
@@ -299,7 +303,9 @@ export default function EngineLab() {
     (async () => {
       const caps = await detectCapabilities();
       const backend = (params.get('backend') ?? 'auto') as 'auto' | 'webgpu' | 'webgl2';
-      const created = await createEngine(canvas, { tier: caps.tier, backend });
+      // `?tier=low` imitates a budget phone's budgets (decoders, preview size, raster cache).
+      const tier = (params.get('tier') ?? caps.tier) as typeof caps.tier;
+      const created = await createEngine(canvas, { tier, backend });
       if (disposed) {
         created.destroy();
         return;
@@ -318,7 +324,10 @@ export default function EngineLab() {
         setStatus('Golden done');
         return;
       }
-      const { project, blobs } = await buildDemo(params.get('bg') !== 'color');
+      const { project, blobs } = await buildDemo(
+        params.get('bg') !== 'color',
+        Math.max(1, Number(params.get('repeat') ?? 1)),
+      );
       if (disposed) return;
       const lab = {
         duration: toSeconds(projectDuration(project)),
@@ -365,7 +374,7 @@ export default function EngineLab() {
           }
         },
       });
-      setStatus(`Ready · ${engine.backend} · tier ${caps.tier} · ${lab.duration.toFixed(1)} s`);
+      setStatus(`Ready · ${engine.backend} · tier ${tier} · ${lab.duration.toFixed(1)} s`);
     })().catch((err: unknown) => setStatus(`FAILED: ${String(err)}`));
     return () => {
       disposed = true;

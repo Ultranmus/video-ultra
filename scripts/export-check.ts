@@ -9,7 +9,7 @@
  *   node scripts/export-check.ts [--browsers chrome,webkit,firefox] [--formats mp4,webm]
  *     [--backends webgl2,webgpu] [--height 720] [--fps 30] [--save dir]
  */
-import { chromium, firefox, webkit } from '@playwright/test';
+import { chromium, firefox, webkit, type Browser } from '@playwright/test';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -25,6 +25,8 @@ const formats = (arg('formats') ?? 'mp4,webm').split(',') as ('mp4' | 'webm')[];
 const backends = (arg('backends') ?? 'webgl2').split(',') as ('webgl2' | 'webgpu')[];
 const height = Number(arg('height') ?? 720) as 720;
 const fps = Number(arg('fps') ?? 30) as 30;
+const memory = process.argv.includes('--memory');
+const repeat = Number(arg('repeat') ?? 1);
 const dir = arg('save') ?? mkdtempSync(join(tmpdir(), 'vu-export-'));
 mkdirSync(dir, { recursive: true });
 
@@ -40,6 +42,18 @@ const check = (ok: boolean, what: string) => {
   console.log(`  ${ok ? '✓' : '✗'} ${what}`);
   if (!ok) failures++;
 };
+
+/** Total RSS (MB) of the processes using Chrome profile `profile`. */
+function rssMb(profile: string): number {
+  const out = execFileSync('ps', ['-ax', '-o', 'rss=,command='], {
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  let kb = 0;
+  for (const line of out.split('\n'))
+    if (line.includes(profile)) kb += Number(line.trim().split(/\s+/, 1)[0]) || 0;
+  return Math.round(kb / 1024);
+}
 
 interface Probe {
   streams: {
@@ -94,15 +108,25 @@ const decodedDuration = (file: string, stream: 'v' | 'a'): number => {
 for (const name of browsers) {
   for (const backend of backends) {
     if (backend === 'webgpu' && name !== 'chrome') continue;
-    const browser = await launch[name as keyof typeof launch]();
-    const page = await browser.newPage({ viewport: { width: 600, height: 900 } });
+    // --memory: Chrome with its own profile dir, so its processes' RSS can be sampled.
+    const profile = memory && name === 'chrome' ? mkdtempSync(join(tmpdir(), 'vu-expmem-')) : null;
+    const context = profile
+      ? await chromium.launchPersistentContext(profile, {
+          channel: 'chrome',
+          viewport: { width: 600, height: 900 },
+        })
+      : null;
+    const browser = context ?? (await launch[name as keyof typeof launch]());
+    const page = context
+      ? (context.pages()[0] ?? (await context.newPage()))
+      : await (browser as Browser).newPage({ viewport: { width: 600, height: 900 } });
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(e.message));
     page.on(
       'console',
       (m) => m.type() === 'error' && !/404/.test(m.text()) && errors.push(m.text()),
     );
-    await page.goto(`${BASE}/lab/engine`);
+    await page.goto(`${BASE}/lab/engine${repeat > 1 ? `?repeat=${repeat}` : ''}`);
     await page.waitForFunction(
       () => /^Ready|FAILED/.test(document.getElementById('status')!.textContent!),
       null,
@@ -119,6 +143,8 @@ for (const name of browsers) {
     for (const format of formats) {
       const options = { format, height, fps, quality: 'medium' as const };
       let out: Awaited<ReturnType<NonNullable<Window['engineLab']>['exportVideo']>>;
+      const rss: number[] = [];
+      const sampler = profile ? setInterval(() => rss.push(rssMb(profile)), 500) : null;
       try {
         out = await page.evaluate(([o, b]) => window.engineLab!.exportVideo(o, b), [
           options,
@@ -127,6 +153,17 @@ for (const name of browsers) {
       } catch (error) {
         check(false, `${format}: export failed — ${String(error).slice(0, 300)}`);
         continue;
+      }
+      if (sampler) clearInterval(sampler);
+      if (rss.length > 6) {
+        const third = Math.max(1, Math.floor(rss.length / 3));
+        const avg = (a: number[]) => Math.round(a.reduce((x, y) => x + y, 0) / a.length);
+        const early = avg(rss.slice(0, third));
+        const late = avg(rss.slice(-third));
+        console.log(
+          `    memory (RSS of this Chrome): first third ${early} MB, last third ${late} MB, max ${Math.max(...rss)} MB`,
+        );
+        check(late - early < 150, `${format}: memory flat during export (+${late - early} MB)`);
       }
       const { result, info } = out;
       const file = join(dir, `${name}-${backend}-${format}.${result.extension}`);
@@ -155,9 +192,9 @@ for (const name of browsers) {
       check(
         v?.width === result.width &&
           v.height === result.height &&
-          result.width === 720 &&
-          result.height === 1280,
-        `${format}: ${v?.width}×${v?.height} (720p = shorter side for 9:16)`,
+          result.width === height &&
+          result.height === Math.round((height * 16) / 9 / 2) * 2,
+        `${format}: ${v?.width}×${v?.height} (${height}p = shorter side for 9:16)`,
       );
       check(
         Number(v?.nb_read_frames) === expectedFrames,
