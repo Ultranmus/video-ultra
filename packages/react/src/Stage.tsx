@@ -1,6 +1,7 @@
 import { findItem, itemEnd, updateItem, type Item, type Transform } from '@video-ultra/core';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactElement } from 'react';
 import { useController, useLabels, useProject, useUi } from './context';
+import { ScrubPreview } from './stage/ScrubPreview';
 import { hitStage, itemBox, snapCentre, type Box, type MeasureText } from './stage/geometry';
 
 /**
@@ -334,6 +335,7 @@ export function Stage(): ReactElement {
         role="img"
         aria-label={l.timeline}
       >
+        {frame.w > 0 ? <ScrubPreview width={frame.w} height={frame.h} /> : null}
         <div ref={guideX} className="vu-guide vu-guide-x" hidden />
         <div ref={guideY} className="vu-guide vu-guide-y" hidden />
         <div ref={boxRef} className="vu-selection-box" hidden>
