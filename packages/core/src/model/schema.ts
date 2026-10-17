@@ -223,6 +223,12 @@ export const AssetSchema = z.object({
   rotation: z.optional(z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)])),
   hasAudio: z.boolean(),
   hdr: z.optional(z.boolean()),
+  /** Best-guess frame rate (video). */
+  fps: z.optional(z.number().check(z.positive())),
+  /** Variable frame rate (video). */
+  vfr: z.optional(z.boolean()),
+  /** Which of the file's audio tracks plays (iPhones add an extra spatial-audio track). */
+  audioTrack: z.optional(z.int().check(z.nonnegative())),
   /** Where the bytes live. The host can resolve `url` sources itself. */
   source: z.discriminatedUnion('type', [
     z.object({ type: z.literal('opfs'), key: z.string() }),

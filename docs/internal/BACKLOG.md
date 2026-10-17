@@ -20,10 +20,9 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [ ] Exported audio is ~0.05–0.1 s longer than video (AAC padding). Trim to video length.
 - [ ] WebKit's encoder makes ~3× smaller files at the same quality setting — compare visual
       quality; set explicit bitrates per resolution if needed.
-- [ ] Truncated files play their first part without a warning. Detect (metadata duration vs
-      real duration / read errors) and show "this file looks incomplete".
-- [ ] Firefox can't decode HEVC (iPhone video) → import must say so clearly and suggest another
-      browser.
+- [x] Truncated files: probe finds the playable length and warns "incomplete" (2026-10-17).
+- [x] Firefox + HEVC: probe returns `unsupported-video-codec` with a plain message (2026-10-17);
+      the import UI (Day 4) must show it.
 - [ ] Vite consumers should set `worker: { format: 'es' }`; without it Vite inlines the AAC
       fallback into the worker (1.57 MB instead of a lazy chunk). Document, or ship a pre-bundled
       worker (Day 7 packaging).

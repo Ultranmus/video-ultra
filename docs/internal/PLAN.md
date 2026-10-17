@@ -63,7 +63,7 @@ Deferred to v0.2+: speed curves, reverse, text animations, templates, keyframes,
 - [x] 1.2 Edit operations: add, move, trim, split, delete, duplicate, speed, reorder, freeze frame, transitions, properties
 - [x] 1.3 Operation log + undo/redo + coalescing + log replay (OPFS persistence adapter → Day 6, 4.2)
 - [x] 1.4 Property tests (fast-check): random edit sequences never break invariants (30,000 runs pass)
-- [ ] 1.5 Media probing: duration, codecs, rotation, VFR, HDR (transfer/primaries), audio layout
+- [x] 1.5 Media probing: duration, codecs, rotation, VFR, HDR, audio-track choice (skips iPhone spatial audio), clear unsupported-codec messages, incomplete-file detection with playable length (`scripts/probe-check.ts`: all pass in 3 browsers)
 - [ ] 2.1 Decoder pool with tier budget, frame scheduling, cancellation, watchdog
 - [ ] **Checkpoint:** engine demo in the playground
 
