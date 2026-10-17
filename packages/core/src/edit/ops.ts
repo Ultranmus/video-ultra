@@ -1,6 +1,7 @@
 import { current, isDraft, type Draft } from 'immer';
 import {
   ALLOWED_KINDS,
+  DEFAULT_TRANSFORM,
   findItem,
   itemEnd,
   laneKindFor,
@@ -304,6 +305,64 @@ export function moveItemToNewLane(
   project.tracks.splice(at, 0, lane);
   removeEmptyLanes(project);
   return lane.id;
+}
+
+/** Size a full-frame clip takes when it becomes a layer, so it reads as an element over the video. */
+export const LAYER_SCALE = 0.6;
+
+/**
+ * Lifts a main-track clip onto a brand-new overlay lane at track position `atIndex`, starting at
+ * `start`: the clip becomes a layer over the video, and the main track closes the gap. A clip still
+ * at full-frame size shrinks to {@link LAYER_SCALE} so it shows as an element (and its own
+ * animation, filter and so on visibly apply to it alone). Returns the new lane's id.
+ */
+export function moveMainToLane(
+  project: Project,
+  itemId: string,
+  start: Time,
+  ids: IdFactory,
+  atIndex: number,
+): string {
+  const { track, item, index } = editable(project, itemId);
+  if (track.kind !== 'main') throw new EditError('invalid', 'Only main-track clips can be lifted');
+  track.items.splice(index, 1);
+  layoutMain(project);
+  if ('transitionIn' in item) item.transitionIn = null;
+  item.start = snap(project, start);
+  if ('transform' in item) {
+    const t = item.transform;
+    const d = DEFAULT_TRANSFORM;
+    if (t.x === d.x && t.y === d.y && t.scale === d.scale && t.rotation === d.rotation)
+      item.transform = { ...t, scale: LAYER_SCALE };
+  }
+  const lane: Track = {
+    id: ids(),
+    kind: 'overlay',
+    muted: false,
+    hidden: false,
+    locked: false,
+    items: [item],
+  };
+  project.tracks.splice(Math.max(1, Math.min(Math.round(atIndex), project.tracks.length)), 0, lane);
+  return lane.id;
+}
+
+/**
+ * Puts a picture from an overlay lane into the main sequence at position `toIndex` (the clips
+ * after it move later). Stickers can't join the main track.
+ */
+export function moveLaneToMain(project: Project, itemId: string, toIndex: number): void {
+  const { track, item, index } = editable(project, itemId);
+  if (track.kind === 'main') throw new EditError('invalid', 'Use reorderMain for main-track items');
+  if (!ALLOWED_KINDS.main.includes(item.kind))
+    throw new EditError('invalid', `A ${item.kind} can't go on the main track`);
+  const main = mainTrack(project);
+  if (main.locked) throw new EditError('locked', 'That track is locked');
+  track.items.splice(index, 1);
+  if ('transitionIn' in item) item.transitionIn = null;
+  main.items.splice(Math.max(0, Math.min(Math.round(toIndex), main.items.length)), 0, item);
+  layoutMain(project);
+  removeEmptyLanes(project);
 }
 
 // ── trimming, splitting, speed ─────────────────────────────────────────────

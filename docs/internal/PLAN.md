@@ -108,3 +108,9 @@ Deferred to v0.2+: speed curves, reverse, text animations, templates, keyframes,
 - [ ] 5.2 Package checks (publint, attw, size limits), fresh install from npm tarball; turn CI back on for push / PR + add the release workflow
 - [ ] 5.3 Fix Day 6 findings
 - [ ] 5.4 **Owner publishes** (`changeset publish`) + deploys the demo site
+
+## Known tasks for later releases
+
+- [ ] 6.0 (before v0.3) Command registry — every action as a command with id, label, shortcut,
+      `enabled()` + reason, `run()`; toolbar, shortcuts, accessible layer and tests use it
+      (DECISIONS #91)

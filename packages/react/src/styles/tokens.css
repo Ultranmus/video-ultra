@@ -45,8 +45,9 @@
     --vu-waveform: rgba(255, 255, 255, 0.55);
     /* The playhead spine is the accent (UI_VISION §8). */
     --vu-playhead: var(--vu-accent);
-    --vu-trim-handle: #f5b54a;
-    --vu-trim-grip: rgba(0, 0, 0, 0.55);
+    --vu-trim-handle: var(--vu-accent);
+    --vu-trim-grip: var(--vu-accent-contrast);
+    --vu-timeline-slot: rgba(255, 255, 255, 0.025);
     --vu-selection: var(--vu-accent);
     /* Text and icons drawn over footage (thumbnails, stage) stay light in both themes. */
     --vu-on-media: #ffffff;
@@ -70,6 +71,7 @@
     --vu-weight-regular: 400;
     --vu-weight-medium: 500;
     --vu-weight-semibold: 600;
+    --vu-weight-bold: 800;
 
     /* Space & shape */
     --vu-space-1: 4px;
@@ -90,22 +92,34 @@
     --vu-duration-base: 200ms;
     --vu-duration-slow: 320ms;
     --vu-ease: cubic-bezier(0.2, 0, 0, 1);
+    --vu-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 
     /* Sizes */
     --vu-size-topbar: 48px;
-    --vu-size-rail: 72px;
+    --vu-size-rail: 88px;
     --vu-size-rail-mobile: 64px;
     --vu-size-touch: 40px;
     --vu-size-panel: 280px;
     --vu-size-inspector: 280px;
     --vu-size-toolbar: 64px;
     --vu-size-track: 44px;
+    --vu-size-timeline-slot: 30px;
     --vu-size-dock: 280px;
     --vu-size-filter-tile: 72px;
     --vu-size-bar: 52px;
-    --vu-size-trx-w: 52px;
-    --vu-size-trx-h: 34px;
+    --vu-size-trx-w: 80px;
+    --vu-size-trx-h: 48px;
     --vu-trx-duration: 1.6s;
+    --vu-size-browser-bar: 56px;
+    --vu-size-ease-tile: 72px;
+    --vu-size-ratio-frame: 32px;
+    --vu-size-effect-sample: 36px;
+    --vu-size-switch-w: 36px;
+    --vu-size-switch-h: 20px;
+    --vu-size-ease-curve-w: 40px;
+    --vu-size-ease-curve-h: 28px;
+    --vu-size-browser-section: 480px;
+    --vu-browser-bar-bg: var(--vu-surface-1);
     --vu-size-dock-tall: 420px;
     --vu-size-sticker: 64px;
     --vu-size-textstyle: 64px;
@@ -153,6 +167,13 @@
     --vu-size-handle: 12px;
     --vu-size-toast: 420px;
     --vu-size-modal: 440px;
+    --vu-size-modal-wide: 760px;
+    --vu-size-export-poster: 460px;
+    --vu-size-export-poster-phone: 200px;
+    --vu-size-export-ring: 72px;
+    --vu-size-export-option: 96px;
+    --vu-size-export-go: 48px;
+    --vu-size-export-check: 64px;
     --vu-text-emoji: 24px;
 
     /* Layers */
@@ -188,6 +209,7 @@
     --vu-shadow-popover: 0 12px 32px rgba(0, 0, 0, 0.14);
     --vu-timeline-bg: #ececf0;
     --vu-track-bg: #f7f7f9;
+    --vu-timeline-slot: rgba(0, 0, 0, 0.03);
     --vu-clip-video: #d9d9e3;
     --vu-clip-lane: #ffffff;
     --vu-clip-lane-hover: #f4f4f7;
@@ -204,7 +226,7 @@
     --vu-waveform: rgba(0, 0, 0, 0.45);
     --vu-shadow-stage: 0 0 0 1px rgba(0, 0, 0, 0.12), 0 8px 28px rgba(0, 0, 0, 0.12);
     --vu-shadow-tooltip: 0 4px 14px rgba(0, 0, 0, 0.16);
-    --vu-trim-handle: #9a5b00;
+    --vu-trim-handle: var(--vu-accent);
     color-scheme: light;
   }
 
@@ -235,6 +257,7 @@
       --vu-shadow-popover: 0 12px 32px rgba(0, 0, 0, 0.14);
       --vu-timeline-bg: #ececf0;
       --vu-track-bg: #f7f7f9;
+      --vu-timeline-slot: rgba(0, 0, 0, 0.03);
       --vu-clip-video: #d9d9e3;
       --vu-clip-lane: #ffffff;
       --vu-clip-lane-hover: #f4f4f7;
@@ -254,7 +277,7 @@
       --vu-waveform: rgba(0, 0, 0, 0.45);
       --vu-shadow-stage: 0 0 0 1px rgba(0, 0, 0, 0.12), 0 8px 28px rgba(0, 0, 0, 0.12);
       --vu-shadow-tooltip: 0 4px 14px rgba(0, 0, 0, 0.16);
-      --vu-trim-handle: #9a5b00;
+      --vu-trim-handle: var(--vu-accent);
       color-scheme: light;
     }
   }

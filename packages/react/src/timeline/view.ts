@@ -1,8 +1,11 @@
 import {
   FLICKS_PER_SECOND,
   itemEnd,
+  mainTrack,
   moveItem,
   moveItemToNewLane,
+  moveLaneToMain,
+  moveMainToLane,
   projectDuration,
   projectFrame,
   reorderMain,
@@ -12,6 +15,7 @@ import {
   type Project,
   type Time,
 } from '@video-ultra/core';
+import { ALLOWED_KINDS, laneKindFor } from '@video-ultra/core/internal';
 import type { EditorController } from '../controller';
 import { formatClock, formatDurationShort } from '../format';
 import { itemTitle } from '../items';
@@ -20,10 +24,12 @@ import {
   clampPps,
   contentHeight,
   hitTest,
+  isLayerTrack,
   layoutRows,
   majorTickSeconds,
   reorderIndex,
   snapCandidates,
+  slotRect,
   snapTime,
   tickLabel,
   timeToX,
@@ -77,6 +83,7 @@ interface Colors {
   accentSoft: string;
   onMedia: string;
   grip: string;
+  slot: string;
   font: string;
 }
 
@@ -106,26 +113,30 @@ type Drag =
       type: 'move';
       id: number;
       item: Item;
+      /** Whether the clip started on the main track. */
+      fromMain: boolean;
       /** Pointer offset from the clip's top-left when grabbed (px). */
       grabX: number;
       grabY: number;
       pointer: { x: number; y: number };
       start: Time;
-      /** Where it lands: an existing lane, or a new lane at a track position. */
-      target: { type: 'lane'; trackId: string } | { type: 'new'; index: number };
-    }
-  | {
-      type: 'reorder';
-      id: number;
-      item: Item;
-      grabX: number;
-      grabY: number;
-      pointer: { x: number; y: number };
-      index: number;
+      target: DropTarget;
     }
   | { type: 'pinch'; ids: [number, number]; distance: number; pps: number };
 
+/**
+ * Where a dragged clip lands: an existing lane; a brand-new lane at a track position (`y` is where
+ * its band is drawn); or a position in the main sequence.
+ */
+type DropTarget =
+  | { type: 'lane'; trackId: string }
+  | { type: 'new'; index: number; y: number }
+  | { type: 'main'; index: number };
+
 const LONG_PRESS_MS = 350;
+/** Distance from an edge (px) where a drag starts scrolling the timeline, and the top speed. */
+const EDGE_ZONE = 48;
+const EDGE_SPEED = 14;
 const DRAG_SLOP = 5;
 const TOUCH_SLOP = 8;
 const FLASH_MS = 700;
@@ -144,7 +155,15 @@ export class TimelineView {
   readonly #ctl: EditorController;
   readonly #hooks: TimelineHooks;
   readonly #cache: TimelineMediaCache;
-  #m: TimelineMetrics = { ruler: 24, mainTrack: 56, track: 48, gap: 6, header: 40, trimHandle: 12 };
+  #m: TimelineMetrics = {
+    ruler: 24,
+    mainTrack: 56,
+    track: 48,
+    gap: 6,
+    header: 40,
+    trimHandle: 12,
+    slot: 36,
+  };
   #radius = 6;
   #c!: Colors;
   #width = 0;
@@ -167,6 +186,11 @@ export class TimelineView {
   #wheel = { axis: null as 'x' | 'y' | null, at: 0 };
   #frame = 0;
   #momentum = 0;
+  #edgeFrame = 0;
+  /** Scratch levels for the waveform (reused between draws). */
+  #levels = new Float32Array(512);
+  /** Loudest peak per waveform (computed once). */
+  #waveMax = new WeakMap<Float32Array, number>();
   #disposers: (() => void)[] = [];
   #icons = new Map<string, Path2D>();
 
@@ -236,6 +260,7 @@ export class TimelineView {
   destroy(): void {
     cancelAnimationFrame(this.#frame);
     cancelAnimationFrame(this.#momentum);
+    cancelAnimationFrame(this.#edgeFrame);
     this.#cancelDrag();
     for (const dispose of this.#disposers) dispose();
     this.#cache.destroy();
@@ -271,6 +296,7 @@ export class TimelineView {
       accentSoft: v('--vu-accent-soft', 'rgba(156,71,156,0.22)'),
       onMedia: v('--vu-on-media', '#fff'),
       grip: v('--vu-trim-grip', 'rgba(0,0,0,0.55)'),
+      slot: v('--vu-timeline-slot', 'rgba(255,255,255,0.03)'),
       font: style.fontFamily || 'system-ui, sans-serif',
     };
     this.#m = {
@@ -280,6 +306,7 @@ export class TimelineView {
       gap: px('--vu-space-2', 8) * 0.75,
       header: this.#phone ? 0 : px('--vu-size-touch', 40),
       trimHandle: px('--vu-size-trim-handle', 12),
+      slot: px('--vu-size-timeline-slot', 30) + px('--vu-space-2', 8) * 0.75,
     };
     this.#radius = px('--vu-radius-sm', 6);
     this.invalidate();
@@ -479,33 +506,113 @@ export class TimelineView {
     const item = pending.hit.item;
     const row = pending.hit.row;
     const left = timeToX(this.#scale(), item.start);
-    const grabX = x - left;
-    const grabY = y - row.top;
-    if (row.track.kind === 'main') {
-      const index = this.#ctl.project.tracks[0]!.items.findIndex((i) => i.id === item.id);
-      this.#drag = {
-        type: 'reorder',
-        id: pending.id,
-        item,
-        grabX,
-        grabY,
-        pointer: { x, y },
-        index,
-      };
-    } else {
-      this.#drag = {
-        type: 'move',
-        id: pending.id,
-        item,
-        grabX,
-        grabY,
-        pointer: { x, y },
-        start: item.start,
-        target: { type: 'lane', trackId: row.track.id },
-      };
-    }
+    const fromMain = row.track.kind === 'main';
+    this.#drag = {
+      type: 'move',
+      id: pending.id,
+      item,
+      fromMain,
+      grabX: x - left,
+      grabY: y - row.top,
+      pointer: { x, y },
+      start: item.start,
+      target: fromMain
+        ? { type: 'main', index: row.track.items.findIndex((i) => i.id === item.id) }
+        : { type: 'lane', trackId: row.track.id },
+    };
     this.#canvas.style.cursor = 'grabbing';
     this.invalidate();
+  }
+
+  /** Recomputes a moving clip's time and landing place from the pointer (also while auto-scrolling). */
+  #updateMove(drag: Extract<Drag, { type: 'move' }>): void {
+    const p = drag.pointer;
+    const item = drag.item;
+    // Time from where the clip's left edge now is under the pointer.
+    const raw = Math.max(0, xToTime(this.#scale(), p.x - drag.grabX));
+    const candidates = snapCandidates(this.#ctl.project, this.#ctl.playhead.time, item.id);
+    const s1 = snapTime(raw, candidates, this.#pps);
+    const s2 = snapTime(raw + item.duration, candidates, this.#pps);
+    let start = raw;
+    let guide: Time | null = null;
+    if (
+      s1.snapped !== null &&
+      (s2.snapped === null || Math.abs(s1.time - raw) <= Math.abs(s2.time - raw - item.duration))
+    ) {
+      start = s1.time;
+      guide = s1.snapped;
+    } else if (s2.snapped !== null) {
+      start = s2.time - item.duration;
+      guide = s2.snapped;
+    }
+    drag.start = Math.max(0, Math.round(start));
+    const own = this.#rows(this.#ctl.project).find((r) =>
+      r.track.items.some((i) => i.id === item.id),
+    );
+    const centreY = p.y - drag.grabY + (own?.height ?? this.#m.track) / 2;
+    const centreT = xToTime(
+      this.#scale(),
+      p.x - drag.grabX + ((item.duration / FLICKS_PER_SECOND) * this.#pps) / 2,
+    );
+    drag.target = this.#dropTarget(item, drag.start, centreY, centreT);
+    // Snapping only means something when the clip keeps its time (not when it joins the sequence).
+    this.#setSnap(drag.target.type === 'main' ? null : guide);
+    this.invalidate();
+  }
+
+  /** While a clip is dragged near an edge, scroll that way (and keep the drop place updated). */
+  #edgeScroll(): void {
+    if (this.#edgeFrame) return;
+    const step = () => {
+      this.#edgeFrame = 0;
+      const drag = this.#drag;
+      if (drag?.type !== 'move') return;
+      const { x, y } = drag.pointer;
+      const speed = (d: number) => EDGE_SPEED * Math.min(1, Math.max(0, 1 - d / EDGE_ZONE)) ** 2;
+      const left = this.#m.header;
+      const vx =
+        x < left + EDGE_ZONE
+          ? -speed(x - left)
+          : x > this.#width - EDGE_ZONE
+            ? speed(this.#width - x)
+            : 0;
+      const top = this.#m.ruler;
+      const vy =
+        y < top + EDGE_ZONE
+          ? -speed(y - top)
+          : y > this.#height - EDGE_ZONE
+            ? speed(this.#height - y)
+            : 0;
+      let moved = false;
+      if (vx) {
+        if (this.#phone) {
+          const t = Math.max(0, this.#ctl.playhead.time + (vx / this.#pps) * FLICKS_PER_SECOND);
+          if (t !== this.#ctl.playhead.time) {
+            this.#ctl.seek(t);
+            moved = true;
+          }
+        } else {
+          const next = Math.min(
+            this.#maxScrollX() + EDGE_ZONE * 4,
+            Math.max(0, this.#scrollX + vx),
+          );
+          if (next !== this.#scrollX) {
+            this.#scrollX = next;
+            moved = true;
+          }
+        }
+      }
+      if (vy) {
+        const next = Math.min(this.#maxScrollY(), Math.max(0, this.#scrollY + vy));
+        if (next !== this.#scrollY) {
+          this.#scrollY = next;
+          moved = true;
+        }
+      }
+      if (moved) this.#updateMove(drag);
+      if (vx || vy) this.#edgeFrame = requestAnimationFrame(step);
+    };
+    this.#edgeFrame = requestAnimationFrame(step);
   }
 
   #move(e: PointerEvent): void {
@@ -604,44 +711,11 @@ export class TimelineView {
         this.invalidate();
         return;
       }
-      case 'move': {
+      case 'move':
         drag.pointer = p;
-        const item = drag.item;
-        // Time from where the clip's left edge now is under the pointer.
-        const raw = Math.max(0, xToTime(this.#scale(), p.x - drag.grabX));
-        const candidates = snapCandidates(this.#ctl.project, this.#ctl.playhead.time, item.id);
-        const s1 = snapTime(raw, candidates, this.#pps);
-        const s2 = snapTime(raw + item.duration, candidates, this.#pps);
-        let start = raw;
-        let guide: Time | null = null;
-        if (
-          s1.snapped !== null &&
-          (s2.snapped === null ||
-            Math.abs(s1.time - raw) <= Math.abs(s2.time - raw - item.duration))
-        ) {
-          start = s1.time;
-          guide = s1.snapped;
-        } else if (s2.snapped !== null) {
-          start = s2.time - item.duration;
-          guide = s2.snapped;
-        }
-        this.#setSnap(guide);
-        drag.start = Math.max(0, Math.round(start));
-        // Vertical: where the ghost's centre is.
-        drag.target = this.#dropTarget(item, drag.start, p.y - drag.grabY);
-        this.invalidate();
+        this.#updateMove(drag);
+        this.#edgeScroll();
         return;
-      }
-      case 'reorder': {
-        drag.pointer = p;
-        const centre = xToTime(
-          this.#scale(),
-          p.x - drag.grabX + ((drag.item.duration / FLICKS_PER_SECOND) * this.#pps) / 2,
-        );
-        drag.index = reorderIndex(this.#ctl.project.tracks[0]!.items, drag.item.id, centre);
-        this.invalidate();
-        return;
-      }
     }
   }
 
@@ -680,8 +754,35 @@ export class TimelineView {
         break;
       }
       case 'move': {
-        const { item, start, target } = drag;
-        if (target.type === 'new') {
+        cancelAnimationFrame(this.#edgeFrame);
+        this.#edgeFrame = 0;
+        const { item, start, target, fromMain } = drag;
+        if (target.type === 'main') {
+          if (fromMain) {
+            const from = mainTrack(this.#ctl.project).items.findIndex((i) => i.id === item.id);
+            if (from !== target.index)
+              this.#ctl.run(l.move, (d) => reorderMain(d, item.id, target.index));
+          } else {
+            this.#ctl.run(l.move, (d) => moveLaneToMain(d, item.id, target.index));
+            this.#ctl.toast(l.movedToMain, 'success', {
+              label: l.undo,
+              run: () => this.#ctl.undo(),
+            });
+          }
+        } else if (fromMain) {
+          this.#ctl.run(l.move, (d, ctx) => {
+            const lane = moveMainToLane(
+              d,
+              item.id,
+              start,
+              ctx.ids,
+              target.type === 'new' ? target.index : 1,
+            );
+            if (target.type === 'lane') moveItem(d, item.id, start, ctx.ids, target.trackId);
+            return lane;
+          });
+          this.#ctl.toast(l.becameLayer, 'success', { label: l.undo, run: () => this.#ctl.undo() });
+        } else if (target.type === 'new') {
           this.#ctl.run(l.move, (d, ctx) =>
             moveItemToNewLane(d, item.id, start, ctx.ids, target.index),
           );
@@ -689,12 +790,6 @@ export class TimelineView {
           const trackId = target.trackId;
           this.#ctl.run(l.move, (d, ctx) => moveItem(d, item.id, start, ctx.ids, trackId));
         }
-        break;
-      }
-      case 'reorder': {
-        const { item, index } = drag;
-        const from = this.#ctl.project.tracks[0]!.items.findIndex((i) => i.id === item.id);
-        if (from !== index) this.#ctl.run(l.move, (d) => reorderMain(d, item.id, index));
         break;
       }
       default:
@@ -712,32 +807,71 @@ export class TimelineView {
   }
 
   /**
-   * Where a lane clip dropped with its top at `top` lands: the lane under its centre when that lane
-   * takes this kind and has room; a new lane right after it when the clip would overlap; a new
-   * lane at the nearest gap when over another kind (or the main track) or below every lane.
+   * Where a clip whose centre is at (`centreT`, `centreY`) lands. Pictures and text: over the top
+   * slot (or above every row) → a new top layer; the top or bottom quarter of a layer row → a new
+   * layer just in front of / behind it; the middle of a row of its kind with room → that lane;
+   * over the main track → into the sequence (pictures) or a new layer right above it (text,
+   * stickers). Sound only goes to sound lanes, below the main track.
    */
-  #dropTarget(item: Item, start: Time, top: number): Extract<Drag, { type: 'move' }>['target'] {
+  #dropTarget(item: Item, start: Time, centreY: number, centreT: Time): DropTarget {
     const project = this.#ctl.project;
+    const m = this.#m;
     const rows = this.#rows(project);
-    const own = rows.find((r) => r.track.items.some((i) => i.id === item.id));
-    if (!own) return { type: 'new', index: project.tracks.length };
-    const centre = top + own.height / 2;
-    const over = rows.find(
-      (r) => centre >= r.top - this.#m.gap / 2 && centre < r.top + r.height + this.#m.gap / 2,
-    );
-    if (!over)
-      return { type: 'new', index: centre < (rows[0]?.top ?? 0) ? 1 : project.tracks.length };
-    if (over.track.kind === own.track.kind && !over.track.locked) {
-      const end = start + item.duration;
-      const free = over.track.items.every(
-        (o) => o.id === item.id || itemEnd(o) <= start || o.start >= end,
-      );
-      return free
-        ? { type: 'lane', trackId: over.track.id }
-        : { type: 'new', index: over.index + 1 };
+    const main = rows.find((r) => r.track.kind === 'main')!;
+    const kind = laneKindFor(item.kind);
+    const end = start + item.duration;
+    const fits = (row: Row) =>
+      row.track.kind === kind &&
+      !row.track.locked &&
+      row.track.items.every((o) => o.id === item.id || itemEnd(o) <= start || o.start >= end);
+    const inRow = (row: Row) =>
+      centreY >= row.top - m.gap / 2 && centreY < row.top + row.height + m.gap / 2;
+    const above = (row: Row) => row.top - m.gap / 2;
+    const below = (row: Row) => row.top + row.height + m.gap / 2;
+
+    if (kind === 'audio') {
+      const sound = rows.filter((r) => r.track.kind === 'audio');
+      for (const row of sound) {
+        if (!inRow(row)) continue;
+        const f = (centreY - row.top) / row.height;
+        if (f < 0.25) return { type: 'new', index: row.index, y: above(row) };
+        if (f > 0.75) return { type: 'new', index: row.index + 1, y: below(row) };
+        return fits(row)
+          ? { type: 'lane', trackId: row.track.id }
+          : { type: 'new', index: row.index + 1, y: below(row) };
+      }
+      const last = sound[sound.length - 1];
+      if (last && centreY >= below(last))
+        return { type: 'new', index: project.tracks.length, y: below(last) };
+      return { type: 'new', index: sound[0]?.index ?? project.tracks.length, y: below(main) };
     }
-    const upper = centre < over.top + over.height / 2;
-    return { type: 'new', index: Math.max(1, upper ? over.index : over.index + 1) };
+
+    const toMain = ALLOWED_KINDS.main.includes(item.kind);
+    const intoMain = (): DropTarget => ({
+      type: 'main',
+      index: reorderIndex(main.track.items, item.id, centreT),
+    });
+    const layers = rows.filter((r) => isLayerTrack(r.track));
+    const top = layers[0] ?? main;
+    if (centreY < above(top)) {
+      const slot = slotRect(m, this.#scrollY);
+      return {
+        type: 'new',
+        index: layers[0] ? layers[0].index + 1 : 1,
+        y: slot.top + slot.height / 2,
+      };
+    }
+    for (const row of layers) {
+      if (!inRow(row)) continue;
+      const f = (centreY - row.top) / row.height;
+      if (f < 0.25) return { type: 'new', index: row.index + 1, y: above(row) };
+      if (f > 0.75) return { type: 'new', index: row.index, y: below(row) };
+      return fits(row)
+        ? { type: 'lane', trackId: row.track.id }
+        : { type: 'new', index: row.index + 1, y: above(row) };
+    }
+    // Over (or below) the main track.
+    return toMain ? intoMain() : { type: 'new', index: 1, y: above(main) };
   }
 
   #trackOf(itemId: string): string | undefined {
@@ -947,15 +1081,17 @@ export class TimelineView {
     ctx.beginPath();
     ctx.rect(contentLeft, m.ruler, w - contentLeft, h - m.ruler);
     ctx.clip();
+    this.#drawSlot(rows, drag?.type === 'move' ? drag : null);
     for (const row of rows) {
       if (row.top > h || row.top + row.height < m.ruler) continue;
-      ctx.fillStyle = c.track;
+      // The main track is a solid bed; layers and sound lanes are lighter, so the picture's
+      // sequence reads as the base everything else sits on.
+      ctx.fillStyle = row.track.kind === 'main' ? c.track : c.slot;
       this.#roundRect(contentLeft + 4, row.top, w - contentLeft - 8, row.height, this.#radius + 2);
       ctx.fill();
       this.#drawRow(row, scale, project, selectedId);
     }
-    if (drag?.type === 'move' || drag?.type === 'reorder')
-      this.#drawDrop(drag, scale, rows, project);
+    if (drag?.type === 'move') this.#drawDrop(drag, scale, rows, project);
     this.#drawFlashes(scale);
     if (this.#snapGuide !== null) {
       const x = Math.round(timeToX(scale, this.#snapGuide)) + 0.5;
@@ -974,7 +1110,7 @@ export class TimelineView {
     this.#drawRuler(scale);
     this.#drawPlayhead(scale);
     if (drag?.type === 'trim') this.#drawTrimLabel(drag, scale, rows, project);
-    if (drag?.type === 'move' || drag?.type === 'reorder') this.#drawFloating(drag, project);
+    if (drag?.type === 'move') this.#drawFloating(drag, project);
     this.#cache.flush();
   }
 
@@ -1024,7 +1160,7 @@ export class TimelineView {
     const items = row.track.items;
     const left = this.#m.header;
     const drag = this.#drag;
-    const lifted = drag?.type === 'move' || drag?.type === 'reorder' ? drag.item.id : null;
+    const lifted = drag?.type === 'move' ? drag.item.id : null;
     for (let i = 0; i < items.length; i++) {
       const item = items[i]!;
       const x1 = timeToX(scale, item.start);
@@ -1089,87 +1225,156 @@ export class TimelineView {
     }
   }
 
-  /** Where a dragged clip will land: an outline (lanes) or an insertion bar (main track). */
+  /**
+   * The "new layer" slot above every row: a quiet dashed bed with a hint while idle; lit up when
+   * a dragged clip will become a new top layer.
+   */
+  #drawSlot(rows: Row[], drag: Extract<Drag, { type: 'move' }> | null): void {
+    const m = this.#m;
+    if (m.slot <= 0) return;
+    const ctx = this.#ctx;
+    const c = this.#c;
+    const slot = slotRect(m, this.#scrollY);
+    if (slot.top + slot.height < m.ruler || slot.top > this.#height) return;
+    const x = m.header + 4;
+    const w = this.#width - m.header - 8;
+    const target = drag?.target;
+    const active = target?.type === 'new' && Math.abs(target.y - (slot.top + slot.height / 2)) < 1;
+    const layers = rows.some((r) => isLayerTrack(r.track));
+    ctx.save();
+    ctx.setLineDash([4, 4]);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = active ? c.selection : c.border;
+    ctx.fillStyle = active ? c.accentSoft : c.slot;
+    this.#roundRect(x + 0.5, slot.top + 0.5, w - 1, slot.height - 1, this.#radius + 2);
+    ctx.fill();
+    if (active || drag || !layers) ctx.stroke();
+    ctx.setLineDash([]);
+    // The hint stays at the left edge of the view, whatever the scroll.
+    const l = this.#ctl.labels;
+    const text = active ? l.dropNewLayer : drag ? l.newLane : layers ? '' : l.layerSlotHint;
+    if (text) {
+      const cy = slot.top + slot.height / 2;
+      const ix = x + 12;
+      ctx.strokeStyle = active ? c.selection : c.subtle;
+      ctx.lineWidth = 1.75;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(ix, cy - 5);
+      ctx.lineTo(ix, cy + 5);
+      ctx.moveTo(ix - 5, cy);
+      ctx.lineTo(ix + 5, cy);
+      ctx.stroke();
+      ctx.fillStyle = active ? c.selection : c.subtle;
+      ctx.font = `${active ? 600 : 500} 12px ${c.font}`;
+      ctx.textBaseline = 'middle';
+      ctx.fillText(this.#ellipsize(text, w - 40), ix + 14, cy + 0.5);
+    }
+    ctx.restore();
+  }
+
+  /** Where a dragged clip will land: an outline (lanes), a band (new layer) or a bar (sequence). */
   #drawDrop(
-    drag: Extract<Drag, { type: 'move' | 'reorder' }>,
+    drag: Extract<Drag, { type: 'move' }>,
     scale: TimeScale,
     rows: Row[],
     project: Project,
   ): void {
     const ctx = this.#ctx;
-    ctx.strokeStyle = this.#c.selection;
-    ctx.fillStyle = this.#c.selection;
-    if (drag.type === 'move') {
-      const x1 = timeToX(scale, drag.start);
-      const x2 = timeToX(scale, drag.start + drag.item.duration);
-      ctx.lineWidth = 2;
-      ctx.setLineDash([5, 4]);
-      if (drag.target.type === 'lane') {
-        const id = drag.target.trackId;
-        const row = rows.find((r) => r.track.id === id);
-        if (row) {
-          this.#roundRect(x1 + 1, row.top + 3, x2 - x1 - 2, row.height - 6, this.#radius);
-          ctx.stroke();
-        }
-      } else {
-        // A new lane: a highlighted band at the gap where it will be inserted.
-        const index = drag.target.index;
-        const before = rows[index - 1];
-        const y = before
-          ? before.top + before.height + this.#m.gap / 2
-          : (rows[0]?.top ?? this.#m.ruler);
-        const band = Math.min(this.#m.track, 28);
-        ctx.setLineDash([]);
-        ctx.fillStyle = this.#c.accentSoft;
-        this.#roundRect(
-          this.#m.header + 4,
-          y - band / 2,
-          this.#width - this.#m.header - 8,
-          band,
-          6,
-        );
+    const c = this.#c;
+    const target = drag.target;
+    const x1 = timeToX(scale, drag.start);
+    const x2 = timeToX(scale, drag.start + drag.item.duration);
+    ctx.save();
+    ctx.strokeStyle = c.selection;
+    ctx.fillStyle = c.selection;
+    ctx.lineWidth = 2;
+    if (target.type === 'lane') {
+      const row = rows.find((r) => r.track.id === target.trackId);
+      if (row) {
+        ctx.fillStyle = c.accentSoft;
+        this.#roundRect(x1 + 1, row.top + 3, x2 - x1 - 2, row.height - 6, this.#radius);
         ctx.fill();
         ctx.setLineDash([5, 4]);
-        this.#roundRect(x1 + 1, y - band / 2 + 2, x2 - x1 - 2, band - 4, this.#radius);
         ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.fillStyle = this.#c.selection;
-        ctx.font = `600 11px ${this.#c.font}`;
-        ctx.textBaseline = 'middle';
-        ctx.fillText(this.#ctl.labels.newLane, Math.max(this.#m.header + 12, x2 + 10), y + 0.5);
       }
-      ctx.setLineDash([]);
-      return;
+    } else if (target.type === 'new') {
+      const slot = slotRect(this.#m, this.#scrollY);
+      if (Math.abs(target.y - (slot.top + slot.height / 2)) >= 1) {
+        // A new layer between rows: a glowing line across with its label and the clip's span.
+        const y = Math.round(target.y);
+        ctx.shadowColor = c.selection;
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.roundRect(this.#m.header + 4, y - 1.5, this.#width - this.#m.header - 8, 3, 1.5);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.beginPath();
+        ctx.roundRect(x1, y - 4, Math.max(6, x2 - x1), 8, 4);
+        ctx.fill();
+        const label = this.#ctl.labels.dropNewLayer;
+        ctx.font = `600 11px ${c.font}`;
+        const tw = ctx.measureText(label).width + 16;
+        const lx = Math.min(Math.max(this.#m.header + 8, x2 + 8), this.#width - tw - 8);
+        this.#roundRect(lx, y - 10, tw, 20, 10);
+        ctx.fill();
+        ctx.fillStyle = c.playheadText;
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, lx + 8, y + 0.5);
+      } else {
+        // Into the top slot: the clip's span inside it.
+        ctx.setLineDash([5, 4]);
+        this.#roundRect(x1 + 1, slot.top + 3, x2 - x1 - 2, slot.height - 6, this.#radius);
+        ctx.stroke();
+      }
+    } else {
+      const main = rows.find((r) => r.track.kind === 'main');
+      if (main) {
+        // The bar sits on the cut (in today's layout) before the clip that will follow the drop.
+        const all = mainTrack(project).items;
+        const rest = all.filter((i) => i.id !== drag.item.id);
+        const next = rest[target.index];
+        const last = rest[rest.length - 1];
+        const x = next
+          ? timeToX(scale, next.start)
+          : last
+            ? timeToX(scale, itemEnd(last))
+            : timeToX(scale, 0);
+        ctx.shadowColor = c.selection;
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.roundRect(Math.round(x) - 2, main.top - 4, 4, main.height + 8, 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        for (const y of [main.top - 4, main.top + main.height + 4]) {
+          ctx.beginPath();
+          ctx.arc(Math.round(x), y, 4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
     }
-    const main = rows[0];
-    if (!main) return;
-    // The bar sits on the cut (in today's layout) before the clip that will follow the drop.
-    const all = project.tracks[0]!.items;
-    const rest = all.filter((i) => i.id !== drag.item.id);
-    const next = rest[drag.index];
-    const x = next ? timeToX(scale, next.start) : timeToX(scale, itemEnd(all[all.length - 1]!));
-    ctx.beginPath();
-    ctx.roundRect(Math.round(x) - 2, main.top - 2, 4, main.height + 4, 2);
-    ctx.fill();
+    ctx.restore();
   }
 
   /** The floating copy of a dragged clip, under the pointer (drawn above everything). */
-  #drawFloating(drag: Extract<Drag, { type: 'move' | 'reorder' }>, project: Project): void {
+  #drawFloating(drag: Extract<Drag, { type: 'move' }>, project: Project): void {
     const ctx = this.#ctx;
     const own = this.#rows(this.#ctl.project).find((r) =>
       r.track.items.some((i) => i.id === drag.item.id),
     );
     if (!own) return;
     const width = Math.max(24, (drag.item.duration / FLICKS_PER_SECOND) * this.#pps);
-    const shown = drag.type === 'reorder' ? Math.min(width, 160) : width;
-    const grabX = drag.type === 'reorder' ? Math.min(drag.grabX, shown - 8) : drag.grabX;
+    // Joining the sequence, only the order matters: a compact card. Anywhere else, its true length.
+    const compact = drag.target.type === 'main';
+    const shown = compact ? Math.min(width, 160) : width;
+    const grabX = compact ? Math.min(drag.grabX, shown - 8) : drag.grabX;
     const x1 = drag.pointer.x - grabX;
     const top = drag.pointer.y - drag.grabY;
     ctx.save();
     ctx.shadowColor = this.#c.overlay;
-    ctx.shadowBlur = 16;
-    ctx.shadowOffsetY = 6;
-    this.#drawItem(drag.item, x1, x1 + shown, { ...own, top }, project, false, 0.92, true);
+    ctx.shadowBlur = 20;
+    ctx.shadowOffsetY = 8;
+    this.#drawItem(drag.item, x1, x1 + shown, { ...own, top }, project, false, 0.95, true);
     ctx.restore();
   }
 
@@ -1243,15 +1448,30 @@ export class TimelineView {
     const bw = Math.max(2, x2 - x1 - cutGap * 2);
     const hovered = this.#hoverId === item.id && !selected;
     const picture = item.kind === 'video' || item.kind === 'image' || item.kind === 'freeze';
+    const accent =
+      item.kind === 'text'
+        ? c.accentText
+        : item.kind === 'sticker'
+          ? c.accentSticker
+          : c.accentAudio;
     ctx.save();
     ctx.globalAlpha = alpha;
-    // Pictures carry their own colour (thumbnails); everything else is one calm neutral, with a
-    // small kind accent — no loud colour blocks.
+    // Pictures carry their own colour (thumbnails). Text, stickers and sound get a calm body
+    // washed with their kind's colour (a soft gradient), so each kind is told apart at a glance.
     ctx.fillStyle = picture ? c.accentVideo : hovered ? c.laneHover : c.lane;
     this.#roundRect(bx, top, bw, height, this.#radius);
     ctx.fill();
     ctx.save();
     ctx.clip();
+    if (!picture) {
+      const wash = ctx.createLinearGradient(0, top, 0, top + height);
+      wash.addColorStop(0, accent);
+      wash.addColorStop(1, 'transparent');
+      ctx.globalAlpha = alpha * (hovered || selected ? 0.34 : 0.24);
+      ctx.fillStyle = wash;
+      ctx.fillRect(bx, top, bw, height);
+      ctx.globalAlpha = alpha;
+    }
 
     const asset = 'assetId' in item && item.assetId ? project.assets[item.assetId] : undefined;
     if (picture && asset) {
@@ -1264,17 +1484,57 @@ export class TimelineView {
         height,
         x1,
       );
+      // The clip's own sound as a strip along the bottom (main track, tall enough).
+      if (item.kind === 'video' && asset.hasAudio && height >= 40 && !item.muted) {
+        const band = Math.round(height * 0.3);
+        ctx.fillStyle = c.overlay;
+        ctx.fillRect(bx, top + height - band, bw, band);
+        this.#drawWaveform(item, bx, bw, top + height - band, band, x1, c.onMedia, 'up');
+      }
     } else if (item.kind === 'audio' && asset) {
-      this.#drawWaveform(item, bx, bw, top, height, x1);
+      this.#drawWaveform(item, bx, bw, top, height, x1, accent, 'mirror');
     }
+    let labelX = bx + 9;
     if (!picture) {
-      ctx.fillStyle =
-        item.kind === 'text'
-          ? c.accentText
-          : item.kind === 'sticker'
-            ? c.accentSticker
-            : c.accentAudio;
+      // Kind accent: a slim bar, plus a sticker's own picture as a chip.
+      ctx.fillStyle = accent;
       ctx.fillRect(bx, top, 3, height);
+      if (item.kind === 'sticker' && item.assetId && bw > height) {
+        const size = height - 8;
+        const bitmap = this.#cache.thumbnail(item.assetId, 0, Math.round(size * this.#dpr));
+        if (bitmap) {
+          const k = Math.min(size / bitmap.width, size / bitmap.height);
+          ctx.drawImage(
+            bitmap,
+            bx + 8 + (size - bitmap.width * k) / 2,
+            top + 4 + (size - bitmap.height * k) / 2,
+            bitmap.width * k,
+            bitmap.height * k,
+          );
+        }
+        labelX = bx + size + 14;
+      } else if (bw > 44) {
+        // A small kind glyph before the name.
+        const glyph =
+          item.kind === 'text'
+            ? 'M5 6V4.5h14V6M12 4.5v15M9 19.5h6'
+            : item.kind === 'audio'
+              ? 'M9 18V5.5l11-2V16M9 18a3 3 0 11-6 0 3 3 0 016 0zM20 16a3 3 0 11-6 0 3 3 0 016 0z'
+              : '';
+        if (glyph) {
+          ctx.save();
+          const gy = item.kind === 'audio' ? top + 5 : top + height / 2 - 7;
+          ctx.translate(bx + 9, gy);
+          ctx.scale(14 / 24, 14 / 24);
+          ctx.strokeStyle = accent;
+          ctx.lineWidth = 2.25;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.stroke(this.#icon(`glyph-${item.kind}`, glyph));
+          ctx.restore();
+          labelX = bx + 28;
+        }
+      }
     }
 
     // Label: an icon-free name, on a soft backing over thumbnails.
@@ -1286,9 +1546,14 @@ export class TimelineView {
           : itemTitle(item, project.assets);
     const showDuration = row.track.kind === 'main';
     const durationText = `${(item.duration / FLICKS_PER_SECOND).toFixed(1)}s`;
-    ctx.font = item.kind === 'text' ? `600 12px ${c.font}` : `500 11px ${c.font}`;
+    const emojiClip = item.kind === 'sticker' && item.emoji !== null;
+    ctx.font = emojiClip
+      ? `${Math.round(Math.min(22, height - 14))}px ${c.font}`
+      : item.kind === 'text'
+        ? `600 12px ${c.font}`
+        : `500 11px ${c.font}`;
     ctx.textBaseline = 'middle';
-    const maxText = bw - 14;
+    const maxText = bx + bw - labelX - 6;
     if (maxText > 14) {
       const label = this.#ellipsize(title, maxText - (showDuration && bw > 70 ? 36 : 0));
       const tw = ctx.measureText(label).width;
@@ -1300,7 +1565,8 @@ export class TimelineView {
         ctx.fillText(label, bx + 9, top + 13);
       } else if (label) {
         ctx.fillStyle = c.label;
-        ctx.fillText(label, bx + 11, top + height / 2 + 0.5);
+        // Sound: the name sits at the top, over the quiet part of the wave.
+        ctx.fillText(label, labelX, item.kind === 'audio' ? top + 12 : top + height / 2 + 0.5);
       }
       if (showDuration && bw > 70) {
         ctx.font = `500 11px ${c.font}`;
@@ -1327,10 +1593,14 @@ export class TimelineView {
     ctx.restore(); // clip
 
     if (selected) {
+      ctx.save();
+      ctx.shadowColor = c.selection;
+      ctx.shadowBlur = 10;
       ctx.strokeStyle = c.selection;
       ctx.lineWidth = 2;
       this.#roundRect(bx + 1, top + 1, bw - 2, height - 2, this.#radius);
       ctx.stroke();
+      ctx.restore();
       if (alpha > 0.9 && !row.track.locked) this.#drawTrimHandles(bx, bw, top, height);
     } else if (lifted) {
       ctx.strokeStyle = c.selection;
@@ -1354,14 +1624,21 @@ export class TimelineView {
     ctx.roundRect(bx - hw + 1, top, hw, height, [this.#radius, 2, 2, this.#radius]);
     ctx.roundRect(bx + bw - 1, top, hw, height, [2, this.#radius, this.#radius, 2]);
     ctx.fill();
+    // Chevrons pointing outward: "pull this edge".
     ctx.strokeStyle = this.#c.grip;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 1.75;
     ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    const cy = top + height / 2;
     ctx.beginPath();
-    for (const x of [bx - hw / 2 + 1, bx + bw + hw / 2 - 1]) {
-      ctx.moveTo(x, top + height / 2 - 7);
-      ctx.lineTo(x, top + height / 2 + 7);
-    }
+    const lx = bx - hw / 2 + 1;
+    ctx.moveTo(lx + 1.5, cy - 4);
+    ctx.lineTo(lx - 1.5, cy);
+    ctx.lineTo(lx + 1.5, cy + 4);
+    const rx = bx + bw + hw / 2 - 1;
+    ctx.moveTo(rx - 1.5, cy - 4);
+    ctx.lineTo(rx + 1.5, cy);
+    ctx.lineTo(rx - 1.5, cy + 4);
     ctx.stroke();
   }
 
@@ -1409,40 +1686,78 @@ export class TimelineView {
     }
   }
 
+  /**
+   * The sound as a smooth filled envelope (not noisy bars): peaks per pixel column on a decibel
+   * scale, lightly smoothed, drawn as one path — mirrored around the middle for sound clips, or
+   * rising from the bottom for a video's sound strip. Reuses one scratch array (no allocation per
+   * draw once it is big enough).
+   */
   #drawWaveform(
-    item: Extract<Item, { kind: 'audio' }>,
+    item: Extract<Item, { kind: 'audio' | 'video' }>,
     bx: number,
     bw: number,
     top: number,
     height: number,
     x1: number,
+    color: string,
+    mode: 'mirror' | 'up',
   ): void {
     const wave = this.#cache.waveform(item.assetId);
     if (!wave) return;
     const ctx = this.#ctx;
-    ctx.fillStyle = this.#c.waveform;
-    const mid = top + height / 2;
-    const amp = (height - 10) / 2;
     const left = Math.max(bx, this.#m.header);
     const right = Math.min(bx + bw, this.#width);
+    if (right <= left) return;
     const pps = this.#pps;
-    const bar = 2;
+    const step = 2;
+    const n = Math.ceil((right - left) / step) + 1;
+    if (this.#levels.length < n) this.#levels = new Float32Array(Math.max(n, 512));
+    const levels = this.#levels;
     const gain = item.muted ? 0 : Math.min(2, item.volume);
-    ctx.save();
-    ctx.globalAlpha *= 0.55;
-    for (let x = left; x < right; x += bar + 1) {
+    // Scaled to the file's own loudest moment, so loud music isn't one solid block and quiet
+    // speech still shows its shape.
+    let max = this.#waveMax.get(wave.peaks);
+    if (max === undefined) {
+      max = 0;
+      for (let i = 0; i < wave.peaks.length; i++) max = Math.max(max, wave.peaks[i]!);
+      this.#waveMax.set(wave.peaks, max);
+    }
+    const norm = max > 0 ? 1 / max : 0;
+    for (let k = 0; k < n; k++) {
+      const x = left + k * step;
       const t0 = item.sourceIn / FLICKS_PER_SECOND + ((x - x1) / pps) * item.speed;
-      const t1 = t0 + ((bar + 1) / pps) * item.speed;
+      const t1 = t0 + (step / pps) * item.speed;
       const i0 = Math.max(0, Math.floor(t0 * wave.peaksPerSecond));
       const i1 = Math.min(wave.peaks.length, Math.max(i0 + 1, Math.ceil(t1 * wave.peaksPerSecond)));
       let peak = 0;
       for (let i = i0; i < i1; i++) peak = Math.max(peak, wave.peaks[i]!);
-      // Decibel scale (−48 dB … 0 dB): quiet audio stays visible, like it sounds.
-      const level = peak * gain;
-      const db = level > 0 ? 1 + (20 * Math.log10(Math.min(1, level))) / 48 : 0;
-      const hgt = Math.max(1, Math.max(0, db) * amp);
-      ctx.fillRect(x, mid - hgt, bar, hgt * 2);
+      levels[k] = Math.min(1, (peak * norm) ** 1.6 * gain);
     }
+    // Light smoothing (3-tap), in place.
+    let prev = levels[0]!;
+    for (let k = 1; k < n - 1; k++) {
+      const cur = levels[k]!;
+      levels[k] = (prev + cur * 2 + levels[k + 1]!) / 4;
+      prev = cur;
+    }
+    const pad = mode === 'mirror' ? 6 : 2;
+    const amp = mode === 'mirror' ? (height - pad * 2) / 2 : height - pad * 2;
+    const base = mode === 'mirror' ? top + height / 2 : top + height - pad;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(left, base);
+    for (let k = 0; k < n; k++)
+      ctx.lineTo(Math.min(right, left + k * step), base - Math.max(0.5, levels[k]! * amp));
+    if (mode === 'mirror') {
+      for (let k = n - 1; k >= 0; k--)
+        ctx.lineTo(Math.min(right, left + k * step), base + Math.max(0.5, levels[k]! * amp));
+    } else {
+      ctx.lineTo(right, base);
+    }
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.globalAlpha *= mode === 'mirror' ? 0.75 : 0.6;
+    ctx.fill();
     ctx.restore();
   }
 

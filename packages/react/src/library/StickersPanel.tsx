@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useController, useLabels } from '../context';
+import { CategoryBrowser } from '../browse';
 import { Button, Segmented } from '../controls';
 import { Icon } from '../icons';
 import { stickerItem } from '../items';
@@ -64,7 +65,6 @@ export function StickersPanel(): ReactElement {
   const library =
     ctl.options.stickerLibrary === undefined ? DEFAULT_STICKER_LIBRARY : ctl.options.stickerLibrary;
   const [tab, setTab] = useState<Tab>(library ? '3d' : 'emoji');
-  const [group, setGroup] = useState<(typeof GROUPS)[number]>('smileys');
   const [query, setQuery] = useState('');
   const [rows, setRows] = useState<readonly EmojiRow[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -81,16 +81,24 @@ export function StickersPanel(): ReactElement {
     };
   }, [tab]);
 
+  const pool = useMemo(
+    () => (rows ? (tab === '3d' ? rows.filter((r) => r[4]) : rows) : []),
+    [rows, tab],
+  );
   const shown = useMemo(() => {
-    if (!rows) return [];
     const q = query.trim().toLowerCase();
-    const pool = tab === '3d' ? rows.filter((r) => r[4]) : rows;
-    if (q) {
-      const words = q.split(/\s+/);
-      return pool.filter((r) => words.every((w) => r[3].includes(w))).slice(0, SEARCH_LIMIT);
-    }
-    return pool.filter((r) => r[2] === group);
-  }, [rows, tab, group, query]);
+    if (!q) return pool;
+    const words = q.split(/\s+/);
+    return pool.filter((r) => words.every((w) => r[3].includes(w))).slice(0, SEARCH_LIMIT);
+  }, [pool, query]);
+  const groups = useMemo(
+    () =>
+      GROUPS.filter((g) => pool.some((r) => r[2] === g)).map((g) => ({
+        id: g,
+        label: l.emojiGroup(g),
+      })),
+    [pool, l],
+  );
 
   const addEmoji = (emoji: string) =>
     ctl.addLaneItem(l.stickers, (id, start) => stickerItem(id, start, { emoji }));
@@ -108,6 +116,53 @@ export function StickersPanel(): ReactElement {
     }
   };
 
+  const renderGrid = (label: string, list: readonly EmojiRow[]) => (
+    <ul className={tab === '3d' ? 'vu-sticker-grid' : 'vu-emoji-grid'} aria-label={label}>
+      {list.map(([emoji, name, , , file]) => (
+        <li key={emoji}>
+          {tab === '3d' && library ? (
+            <button
+              type="button"
+              className="vu-sticker"
+              aria-label={name}
+              data-tooltip={name}
+              aria-busy={busy === emoji || undefined}
+              onClick={() =>
+                void addFile(
+                  emoji,
+                  async () => {
+                    const res = await fetch(`${library}${file}.webp`);
+                    if (!res.ok) throw new Error(String(res.status));
+                    return res.blob();
+                  },
+                  `${name}.webp`,
+                )
+              }
+            >
+              <img
+                alt=""
+                src={`${library}${file}.webp`}
+                loading="lazy"
+                decoding="async"
+                draggable={false}
+              />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="vu-emoji"
+              aria-label={name}
+              data-tooltip={name}
+              onClick={() => addEmoji(emoji)}
+            >
+              {emoji}
+            </button>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+
   return (
     <div className="vu-panel-body vu-stickers">
       <Segmented
@@ -124,6 +179,13 @@ export function StickersPanel(): ReactElement {
           setQuery('');
         }}
       />
+      <Button
+        icon="plus"
+        label={l.uploadSticker}
+        variant="secondary"
+        tip={l.uploadStickerTip}
+        onClick={() => uploadRef.current?.click()}
+      />
       {tab !== 'shapes' ? (
         <>
           <label className="vu-search">
@@ -136,22 +198,6 @@ export function StickersPanel(): ReactElement {
               onChange={(e) => setQuery(e.currentTarget.value)}
             />
           </label>
-          {query ? null : (
-            <div className="vu-chips vu-chips-scroll" role="radiogroup" aria-label={l.category}>
-              {GROUPS.map((g) => (
-                <button
-                  key={g}
-                  type="button"
-                  role="radio"
-                  aria-checked={g === group}
-                  className="vu-chip"
-                  onClick={() => setGroup(g)}
-                >
-                  {l.emojiGroup(g)}
-                </button>
-              ))}
-            </div>
-          )}
         </>
       ) : null}
 
@@ -180,59 +226,18 @@ export function StickersPanel(): ReactElement {
         <p className="vu-hint">{l.loading}</p>
       ) : shown.length === 0 ? (
         <p className="vu-hint">{l.noStickersFound}</p>
+      ) : query ? (
+        renderGrid(l.stickers, shown)
       ) : (
-        <ul className={tab === '3d' ? 'vu-sticker-grid' : 'vu-emoji-grid'} aria-label={l.stickers}>
-          {shown.map(([emoji, name, , , file]) => (
-            <li key={emoji}>
-              {tab === '3d' && library ? (
-                <button
-                  type="button"
-                  className="vu-sticker"
-                  aria-label={name}
-                  data-tooltip={name}
-                  aria-busy={busy === emoji || undefined}
-                  onClick={() =>
-                    void addFile(
-                      emoji,
-                      async () => {
-                        const res = await fetch(`${library}${file}.webp`);
-                        if (!res.ok) throw new Error(String(res.status));
-                        return res.blob();
-                      },
-                      `${name}.webp`,
-                    )
-                  }
-                >
-                  <img
-                    alt=""
-                    src={`${library}${file}.webp`}
-                    loading="lazy"
-                    decoding="async"
-                    draggable={false}
-                  />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="vu-emoji"
-                  aria-label={name}
-                  data-tooltip={name}
-                  onClick={() => addEmoji(emoji)}
-                >
-                  {emoji}
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
+        <CategoryBrowser key={tab} label={l.category} categories={groups}>
+          {(g) =>
+            renderGrid(
+              g.label,
+              pool.filter((r) => r[2] === g.id),
+            )
+          }
+        </CategoryBrowser>
       )}
-      <Button
-        icon="plus"
-        label={l.uploadSticker}
-        variant="secondary"
-        tip={l.uploadStickerTip}
-        onClick={() => uploadRef.current?.click()}
-      />
       <input
         ref={uploadRef}
         type="file"

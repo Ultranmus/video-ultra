@@ -22,7 +22,8 @@ import {
 } from '@video-ultra/core';
 import { useState, type ReactElement } from 'react';
 import { useController, useLabels, useProject, useUi } from './context';
-import { Button, Chips, ColorField, EditSlider, IconButton, Section, Segmented } from './controls';
+import { Button, ColorField, EditSlider, IconButton, Section, Segmented } from './controls';
+import { Icon } from './icons';
 import { RATIOS, ratioOf } from './items';
 import { AnimatePanel, FilterStrip, TransitionGrid } from './looks';
 import type { ToolId } from './state';
@@ -431,7 +432,7 @@ function CropTool({ item }: { item: Item }) {
         label={l.crop}
         hideLabel
         value={edge}
-        options={edges.map(([value, label]) => ({ value, label }))}
+        options={edges.map(([value]) => ({ value, label: l[value] }))}
         onChange={setEdge}
       />
       <EditSlider
@@ -657,6 +658,55 @@ function TextStyleTool({ item }: { item: Item }) {
         commitLabel={l.color}
         coalesceKey={`textcolor:${item.id}`}
       />
+      <div className="vu-field">
+        <span className="vu-field-row">{l.format}</span>
+        <div className="vu-format-bar" role="group" aria-label={l.format}>
+          <button
+            type="button"
+            className="vu-format"
+            aria-pressed={style.fontWeight >= 600}
+            data-tooltip={l.bold}
+            aria-label={l.bold}
+            onClick={() => set({ fontWeight: style.fontWeight >= 600 ? 400 : 700 })}
+          >
+            <span className="vu-format-glyph" data-glyph="bold">
+              B
+            </span>
+          </button>
+          <button
+            type="button"
+            className="vu-format"
+            aria-pressed={style.italic}
+            data-tooltip={l.italic}
+            aria-label={l.italic}
+            onClick={() => set({ italic: !style.italic })}
+          >
+            <span className="vu-format-glyph" data-glyph="italic">
+              I
+            </span>
+          </button>
+          <span className="vu-format-divider" aria-hidden="true" />
+          {(
+            [
+              ['left', 'alignLeft', l.alignLeft],
+              ['center', 'alignCenter', l.alignCenter],
+              ['right', 'alignRight', l.alignRight],
+            ] as const
+          ).map(([align, icon, tip]) => (
+            <button
+              key={align}
+              type="button"
+              className="vu-format"
+              aria-pressed={style.align === align}
+              data-tooltip={tip}
+              aria-label={tip}
+              onClick={() => set({ align })}
+            >
+              <Icon name={icon} size={18} />
+            </button>
+          ))}
+        </div>
+      </div>
       <EditSlider
         label={l.textSize}
         value={style.size}
@@ -664,91 +714,273 @@ function TextStyleTool({ item }: { item: Item }) {
         max={0.2}
         step={0.002}
         defaultValue={0.06}
-        format={(v) => `${Math.round(v * 1000) / 10}`}
-        recipe={(d, v) => updateItem(d, item.id, { style: { ...style, size: v } })}
+        format={(v) => `${Math.round(v * 1000)}`}
+        recipe={(d, v) => restyle(d, { size: v })}
         commitLabel={l.style}
         coalesceKey={`textsize:${item.id}`}
       />
-      <Segmented
-        label={l.alignment}
-        value={style.align}
-        options={[
-          { value: 'left', label: l.left, icon: 'alignLeft', tip: l.alignLeft },
-          { value: 'center', label: l.centre, icon: 'alignCenter', tip: l.alignCenter },
-          { value: 'right', label: l.right, icon: 'alignRight', tip: l.alignRight },
-        ]}
-        onChange={(align) => set({ align })}
+      <EditSlider
+        label={l.letterSpacing}
+        value={style.letterSpacing}
+        min={-0.05}
+        max={0.5}
+        step={0.005}
+        defaultValue={0}
+        origin={0}
+        format={(v) => `${Math.round(v * 100)}`}
+        recipe={(d, v) => restyle(d, { letterSpacing: v })}
+        commitLabel={l.style}
+        coalesceKey={`textspacing:${item.id}`}
+      />
+      <EditSlider
+        label={l.lineHeight}
+        value={style.lineHeight}
+        min={0.8}
+        max={2}
+        step={0.05}
+        defaultValue={1.2}
+        format={(v) => v.toFixed(2)}
+        recipe={(d, v) => restyle(d, { lineHeight: v })}
+        commitLabel={l.style}
+        coalesceKey={`textline:${item.id}`}
       />
       <div className="vu-field">
         <span className="vu-field-row">{l.textEffects}</span>
-        <div className="vu-row">
-          <Button
-            label={l.bold}
-            variant="secondary"
-            pressed={style.fontWeight >= 600}
-            onClick={() => set({ fontWeight: style.fontWeight >= 600 ? 400 : 700 })}
-          />
-          <Button
-            label={l.italic}
-            variant="secondary"
-            pressed={style.italic}
-            onClick={() => set({ italic: !style.italic })}
-          />
-          <Button
+        <div className="vu-effects">
+          <EffectCard
             label={l.outline}
-            variant="secondary"
-            pressed={style.outline !== null}
-            onClick={() =>
+            on={style.outline !== null}
+            sample={{
+              color: style.color,
+              WebkitTextStroke: `2px ${style.outline?.color ?? '#000000'}`,
+              paintOrder: 'stroke fill',
+            }}
+            onToggle={() =>
               set({ outline: style.outline ? null : { color: '#000000', width: 0.08 } })
             }
-          />
-          <Button
+          >
+            {style.outline ? (
+              <>
+                <ColorField
+                  label={l.color}
+                  value={style.outline.color}
+                  recipe={(d, color) => restyle(d, { outline: { ...style.outline!, color } })}
+                  commitLabel={l.outlineColor}
+                  coalesceKey={`outlinecolor:${item.id}`}
+                />
+                <EditSlider
+                  label={l.thickness}
+                  value={style.outline.width}
+                  min={0.01}
+                  max={0.3}
+                  step={0.005}
+                  defaultValue={0.08}
+                  format={(v) => `${Math.round(v * 100)}`}
+                  recipe={(d, v) => restyle(d, { outline: { ...style.outline!, width: v } })}
+                  commitLabel={l.outline}
+                  coalesceKey={`outlinewidth:${item.id}`}
+                />
+              </>
+            ) : null}
+          </EffectCard>
+          <EffectCard
             label={l.shadow}
-            variant="secondary"
-            pressed={style.shadow !== null}
-            onClick={() =>
+            on={style.shadow !== null}
+            sample={{
+              color: style.color,
+              textShadow: `2px 3px 4px ${style.shadow?.color ?? 'rgba(0,0,0,0.6)'}`,
+            }}
+            onToggle={() =>
               set({
                 shadow: style.shadow ? null : { color: 'rgba(0,0,0,0.5)', blur: 4, x: 0, y: 2 },
               })
             }
-          />
-          <Button
-            label={l.background}
-            variant="secondary"
-            pressed={style.background !== null}
-            onClick={() =>
+          >
+            {style.shadow ? (
+              <>
+                <ColorField
+                  label={l.color}
+                  value={style.shadow.color}
+                  recipe={(d, color) => restyle(d, { shadow: { ...style.shadow!, color } })}
+                  commitLabel={l.shadow}
+                  coalesceKey={`shadowcolor:${item.id}`}
+                />
+                <EditSlider
+                  label={l.softness}
+                  value={style.shadow.blur}
+                  min={0}
+                  max={30}
+                  step={0.5}
+                  defaultValue={4}
+                  format={(v) => `${Math.round(v)}`}
+                  recipe={(d, v) => restyle(d, { shadow: { ...style.shadow!, blur: v } })}
+                  commitLabel={l.shadow}
+                  coalesceKey={`shadowblur:${item.id}`}
+                />
+                <EditSlider
+                  label={l.distance}
+                  value={Math.hypot(style.shadow.x, style.shadow.y)}
+                  min={0}
+                  max={12}
+                  step={0.25}
+                  defaultValue={2}
+                  format={(v) => `${Math.round(v * 10) / 10}`}
+                  recipe={(d, v) => {
+                    const sh = style.shadow!;
+                    const len = Math.hypot(sh.x, sh.y);
+                    // Keep the direction (straight down when there was none).
+                    const [ux, uy] = len > 0 ? [sh.x / len, sh.y / len] : [0, 1];
+                    restyle(d, { shadow: { ...sh, x: ux * v, y: uy * v } });
+                  }}
+                  commitLabel={l.shadow}
+                  coalesceKey={`shadowdist:${item.id}`}
+                />
+              </>
+            ) : null}
+          </EffectCard>
+          <EffectCard
+            label={l.labelBox}
+            on={style.background !== null}
+            sample={{
+              color: style.color,
+              background: style.background?.color ?? '#000000',
+              borderRadius: '0.25em',
+              padding: '0 0.3em',
+            }}
+            onToggle={() =>
               set({
                 background: style.background
                   ? null
                   : { color: '#000000', padding: 0.3, radius: 0.2 },
               })
             }
-          />
+          >
+            {style.background ? (
+              <>
+                <ColorField
+                  label={l.color}
+                  value={style.background.color}
+                  recipe={(d, color) => restyle(d, { background: { ...style.background!, color } })}
+                  commitLabel={l.backgroundColorText}
+                  coalesceKey={`boxcolor:${item.id}`}
+                />
+                <EditSlider
+                  label={l.roundness}
+                  value={style.background.radius}
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  defaultValue={0.2}
+                  format={(v) => `${Math.round(v * 100)}%`}
+                  recipe={(d, v) => restyle(d, { background: { ...style.background!, radius: v } })}
+                  commitLabel={l.labelBox}
+                  coalesceKey={`boxradius:${item.id}`}
+                />
+                <EditSlider
+                  label={l.boxPadding}
+                  value={style.background.padding}
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  defaultValue={0.3}
+                  format={(v) => `${Math.round(v * 100)}`}
+                  recipe={(d, v) =>
+                    restyle(d, { background: { ...style.background!, padding: v } })
+                  }
+                  commitLabel={l.labelBox}
+                  coalesceKey={`boxpad:${item.id}`}
+                />
+              </>
+            ) : null}
+          </EffectCard>
         </div>
       </div>
-      {style.outline ? (
-        <ColorField
-          label={l.outlineColor}
-          value={style.outline.color}
-          recipe={(d, color) => restyle(d, { outline: { ...style.outline!, color } })}
-          commitLabel={l.outlineColor}
-          coalesceKey={`outlinecolor:${item.id}`}
-        />
-      ) : null}
-      {style.background ? (
-        <ColorField
-          label={l.backgroundColorText}
-          value={style.background.color}
-          recipe={(d, color) => restyle(d, { background: { ...style.background!, color } })}
-          commitLabel={l.backgroundColorText}
-          coalesceKey={`boxcolor:${item.id}`}
-        />
-      ) : null}
     </>
   );
 }
 
+/** A text effect: a sample of how it looks, its name and an on/off switch; settings when on. */
+function EffectCard({
+  label,
+  on,
+  sample,
+  onToggle,
+  children,
+}: {
+  label: string;
+  on: boolean;
+  sample: React.CSSProperties;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="vu-effect" data-on={on || undefined}>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        className="vu-effect-head"
+        onClick={onToggle}
+      >
+        <span className="vu-effect-sample" style={sample} aria-hidden="true">
+          Aa
+        </span>
+        <span className="vu-effect-name">{label}</span>
+        <span className="vu-switch" aria-hidden="true">
+          <span className="vu-switch-knob" />
+        </span>
+      </button>
+      {on ? <div className="vu-effect-body">{children}</div> : null}
+    </div>
+  );
+}
+
 /** Video settings: shape of the canvas and what shows behind the clips. */
+/** Frame shapes as tiles: the shape itself, its ratio and what it's for. */
+function RatioPicker({
+  value,
+  onChange,
+}: {
+  value: string | null;
+  onChange: (ratio: (typeof RATIOS)[number]) => void;
+}) {
+  const l = useLabels();
+  return (
+    <div className="vu-field">
+      <span className="vu-field-row" id="vu-ratio-label">
+        {l.ratio}
+      </span>
+      <div className="vu-ratio-grid" role="radiogroup" aria-labelledby="vu-ratio-label">
+        {RATIOS.map((r) => {
+          const long = Math.max(r.width, r.height);
+          return (
+            <button
+              key={r.id}
+              type="button"
+              role="radio"
+              aria-checked={r.id === value}
+              className="vu-ratio"
+              data-tooltip={l.ratioTip(r.id)}
+              onClick={() => onChange(r)}
+            >
+              <span className="vu-ratio-frame" aria-hidden="true">
+                <span
+                  style={{
+                    width: `${(r.width / long) * 100}%`,
+                    height: `${(r.height / long) * 100}%`,
+                  }}
+                />
+              </span>
+              <span className="vu-ratio-id">{r.id}</span>
+              <span className="vu-ratio-use">{l.ratioName(r.id)}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function CanvasTool(): ReactElement {
   const ctl = useController();
   const l = useLabels();
@@ -759,14 +991,9 @@ export function CanvasTool(): ReactElement {
   }));
   return (
     <>
-      <Chips
-        label={l.ratio}
+      <RatioPicker
         value={ratioOf(width, height)}
-        options={RATIOS.map((r) => ({ value: r.id, label: r.id, tip: l.ratioTip(r.id) }))}
-        onChange={(id) => {
-          const r = RATIOS.find((x) => x.id === id)!;
-          ctl.run(l.aspectRatio, (d) => setCanvasSize(d, r.width, r.height));
-        }}
+        onChange={(r) => ctl.run(l.aspectRatio, (d) => setCanvasSize(d, r.width, r.height))}
       />
       <Segmented
         label={l.background}

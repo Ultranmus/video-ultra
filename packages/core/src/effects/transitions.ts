@@ -1,4 +1,4 @@
-import type { Direction, Ease } from '../model/schema';
+import { EaseSchema, type Direction, type Ease } from '../model/schema';
 import { BlurMode, MaskShape, noFx, resetFx, WarpKind, type LayerFx } from './colour';
 import { TRANSITION_ALIASES, TRANSITION_PRESETS, type TransitionPreset } from './presets';
 
@@ -93,9 +93,15 @@ export function smoothstep(a: number, b: number, x: number): number {
   return t * t * (3 - 2 * t);
 }
 
+/** Every timing curve, in picker order. */
+export const EASES: readonly Ease[] = EaseSchema.options;
+
 /**
- * A timing curve at t (0…1): `linear`; `smooth` (ease in-out); `snappy` (fast through the middle,
- * soft ends); `bounce` (overshoots and settles, like a spring). 0 → 0 and 1 → 1 for all.
+ * A timing curve at t (0…1): `linear`; `smooth` (ease in-out); `ease-in` (speeds up); `ease-out`
+ * (slows down); `snappy` (fast through the middle, soft ends); `expo` (very fast start, long
+ * settle); `back` (overshoots, then settles); `anticipate` (pulls back first); `bounce` (springs
+ * past and settles); `elastic` (wobbles in); `ball` (lands and bounces); `slow-mo` (fast, slow
+ * middle, fast); `steps` (stop-motion, 6 steps). 0 → 0 and 1 → 1 for all.
  */
 export function easeAt(ease: Ease, t: number): number {
   const x = clamp01(t);
@@ -106,6 +112,42 @@ export function easeAt(ease: Ease, t: number): number {
       return x < 0.5 ? 16 * x ** 5 : 1 - (2 - 2 * x) ** 5 / 2;
     case 'bounce':
       return x >= 1 ? 1 : 1 - Math.cos(x * Math.PI * 2.5) * Math.exp(-5 * x) * (1 - x);
+    case 'ease-in':
+      return x * x * x;
+    case 'ease-out':
+      return 1 - (1 - x) ** 3;
+    case 'expo':
+      return x >= 1 ? 1 : 1 - 2 ** (-10 * x);
+    case 'back': {
+      const c = 1.70158;
+      return 1 + (c + 1) * (x - 1) ** 3 + c * (x - 1) ** 2;
+    }
+    case 'anticipate': {
+      const c = 1.70158;
+      return (c + 1) * x ** 3 - c * x * x;
+    }
+    case 'elastic':
+      return x <= 0
+        ? 0
+        : x >= 1
+          ? 1
+          : 2 ** (-10 * x) * Math.sin((x * 10 - 0.75) * ((2 * Math.PI) / 3)) + 1;
+    case 'ball': {
+      // Lands at 1 and bounces twice (the classic bounce-out).
+      const n = 7.5625;
+      const d = 2.75;
+      if (x < 1 / d) return n * x * x;
+      if (x < 2 / d) return n * (x - 1.5 / d) ** 2 + 0.75;
+      if (x < 2.5 / d) return n * (x - 2.25 / d) ** 2 + 0.9375;
+      return n * (x - 2.625 / d) ** 2 + 0.984375;
+    }
+    case 'slow-mo': {
+      // Fast in, a long slow middle, fast out.
+      const y = 2 * x - 1;
+      return 0.5 + 0.5 * (0.35 * y + 0.65 * y ** 5);
+    }
+    case 'steps':
+      return x >= 1 ? 1 : Math.floor(x * 6) / 6;
     default:
       return x * x * (3 - 2 * x);
   }

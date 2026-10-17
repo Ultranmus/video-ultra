@@ -17,7 +17,7 @@ const shots = arg('shots') ?? '.';
 const only = arg('only');
 const theme = arg('theme') ?? 'dark';
 const port = arg('port') ?? '3200';
-const media = ['bbb-1080p60.mp4', 'avc-rotated.mp4', 'photo.jpg', 'music.mp3'].map((f) =>
+const media = ['avc-1080p30.mp4', 'avc-rotated.mp4', 'photo.jpg', 'music.mp3'].map((f) =>
   resolve('test-media/files', f),
 );
 
@@ -70,10 +70,16 @@ if (only !== 'phone') {
   await page.locator('.vu-rail .vu-btn', { hasText: 'Filters' }).click();
   await page.waitForTimeout(1500);
   await snap(page, 'd06-filters');
-  await page.locator('.vu-filter-tile', { hasText: 'Warm' }).click();
+  await page.locator('.vu-browser-section[data-category="warm"] .vu-filter-tile').first().click();
   await snap(page, 'd07-filter-applied');
   await page.locator('.vu-rail .vu-btn', { hasText: 'Transitions' }).click();
   await snap(page, 'd08-transitions');
+  await page
+    .locator('.vu-browser-section[data-category="slide"] .vu-transition-tile')
+    .first()
+    .hover();
+  await page.waitForTimeout(900);
+  await snap(page, 'd08b-transition-hover');
   await page.keyboard.press('Escape');
   await page.evaluate(() => (window as any).vuEditor.seek(705_600_000 * 4));
   await page.keyboard.press('s');
@@ -83,7 +89,13 @@ if (only !== 'phone') {
   await page.locator('.vu-panel .vu-btn', { hasText: 'Add text' }).click();
   await page.locator('.vu-inspector .vu-textarea').fill('Summer trip');
   await snap(page, 'd10-text');
+  await page.locator('.vu-inspector .vu-effect-head', { hasText: 'Outline' }).click();
+  await page
+    .locator('.vu-inspector .vu-effect-head', { hasText: 'Outline' })
+    .scrollIntoViewIfNeeded();
+  await snap(page, 'd10b-text-effects');
   await page.locator('.vu-rail .vu-btn', { hasText: 'Stickers' }).click();
+  await page.locator('.vu-panel .vu-segment', { hasText: 'Emoji' }).click();
   await page.locator('.vu-emoji').nth(16).click();
   await snap(page, 'd11-sticker');
   // Drag the sticker clip on the timeline (mid-drag screenshot).
@@ -94,14 +106,22 @@ if (only !== 'phone') {
   });
   await page.mouse.move(
     canvas.x + 56 + 4.5 * lane.pps,
-    canvas.y + 24 + 6 + 56 + 6 + 44 + 6 + 44 + 6 + 22,
+    // Ruler, gap, new-layer slot; the sticker is the top layer.
+    canvas.y + 24 + 6 + 36 + 22,
   );
   await page.mouse.down();
-  await page.mouse.move(canvas.x + 56 + 6 * lane.pps, canvas.y + 150, { steps: 6 });
+  await page.mouse.move(canvas.x + 56 + 6 * lane.pps, canvas.y + 40, { steps: 6 });
   await snap(page, 'd12-dragging');
   await page.mouse.up();
   await page.locator('.vu-topbar .vu-btn', { hasText: 'Export' }).click();
   await snap(page, 'd13-export');
+  await page.locator('.vu-modal .vu-export-option', { hasText: '480p' }).click();
+  await page.locator('.vu-modal .vu-export-go').click();
+  await page.waitForTimeout(2500);
+  await snap(page, 'd13b-exporting');
+  await page.locator('.vu-modal a[download]').waitFor({ timeout: 180000 });
+  await page.waitForTimeout(900);
+  await snap(page, 'd13c-done');
   await page.keyboard.press('Escape');
   await page
     .locator('.vu-modal-head .vu-btn')

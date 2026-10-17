@@ -425,3 +425,50 @@ reason; when one changes, edit the entry and note the date.
 90. **A dropped lane clip never bounces back** (2026-10-17): it lands in the lane under it when
     that lane takes its kind and has room, else in a new lane right there (`moveItemToNewLane`),
     shown as a "New lane" band while dragging.
+91. **Every user action becomes a command, before v0.3** (2026-10-17). One registry: stable id,
+    translatable label, shortcut, an `enabled()` check that returns a plain reason when it's off
+    ("Select a clip first"), and `run()` that dispatches the edit operation. Toolbar buttons,
+    menus, keyboard shortcuts, the timeline's accessible layer, tests and the future
+    `@video-ultra/ai` automation all go through it, so they can't drift apart, and disabled
+    controls can say why. Done before v0.3 adds the pro tools, while the action list is still
+    short. Commands are thin: they never replace the operation log (#18) as the source of truth.
+92. **The playground exposes a test / debug API on `window`, never the package** (2026-10-17):
+    `execute(commandId, params)`, `info()` (backend, WebCodecs support, tier, counters such as
+    the frame-leak count) and `screenshot()`. Scripts drive the editor through it instead of
+    clicking, and the owner can read `info()` on the phone. Plus URL flags to force a path:
+    `?webgl`, `?nowebcodecs`, `?fresh` (no restored media), `?norecover`. Host apps never get a
+    global.
+93. **A fatal engine error shows a "stopped" screen, never a frozen editor** (2026-10-17). If the
+    engine worker dies (uncaught error, out of memory) the editor replaces the stage with a
+    translated message, the error text and a Reload button; crash recovery (#60) reopens the
+    project after reload. Serves "never hangs": the user always sees what happened and a way out.
+
+## Editor UI, round 4 (owner review, 2026-10-18)
+
+94. **Layers sit above the main track; sound below it** (2026-10-18). The timeline shows picture
+    and text lanes on top in front-to-back order (the top row is drawn in front), then the main
+    track, then sound lanes. "Higher = in front" is how people picture layers. Track order in the
+    project is unchanged (display only). A dashed "new layer" slot stays above every row, so
+    there is always an obvious place to drop.
+95. **A main clip dragged up becomes a layer; a layer picture dragged onto the main track joins
+    the sequence** (2026-10-18). New core ops `moveMainToLane` / `moveLaneToMain`. A clip still
+    at full-frame size shrinks to 60% (`LAYER_SCALE`) when lifted, so it reads as an element
+    and its own animation / filter visibly apply to it alone (owner: "image over video, animation
+    applied to the whole frame"). A toast with Undo says what happened.
+96. **Picker previews are the engine's real output** (2026-10-18). Transition tiles: a still of
+    clip A | clip B (a linear wipe at its midpoint) and, on hover / focus / while chosen, a
+    12-frame flip-book of that preset on the real cut (`engine.transitionPreview`). Animation
+    tiles: the selected element alone at rest and its 12-frame flip-book on hover
+    (`engine.itemPreview`). Fetched on first hover, LRU of 12, all closed when the panel closes.
+    CSS approximations per family were misleading (owner: "all look like fade") and are gone.
+97. **Libraries scroll by category; the chip row follows** (2026-10-18). Filters, transitions,
+    animations, text styles and stickers are one scrolling list with a small heading and divider
+    per category; the sticky chip row highlights the category in view and jumps on tap. Filter
+    previews load per section as it nears the view; off-screen sticker sections use
+    `content-visibility`.
+98. **13 timing curves** (2026-10-18): even, smooth, speed up, slow down, snappy, swift,
+    overshoot, wind up, spring, elastic, bounce, slow-mo, stop-motion. Additive enum values, so
+    old projects stay valid with no migration. Shown as tiles that draw their curve.
+99. **Waveforms are filled envelopes scaled to the file's own peak** (2026-10-18), mirrored on
+    sound clips and rising along the bottom of video clips that have sound. Replaces the dB bar
+    chart that turned loud music into a solid block.

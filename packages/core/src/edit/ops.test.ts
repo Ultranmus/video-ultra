@@ -27,6 +27,9 @@ import {
   splitItem,
   trimItem,
   updateItem,
+  moveMainToLane,
+  moveLaneToMain,
+  LAYER_SCALE,
 } from './ops';
 
 const frame = frameDuration({ num: 30, den: 1 });
@@ -233,6 +236,61 @@ describe('moveItemToNewLane', () => {
     expect(p.tracks[1]!.items.map((i) => i.id)).toEqual(['tb']);
     expect(p.tracks.length).toBe(before + 1);
     expect(checkInvariants(p)).toEqual([]);
+  });
+});
+
+describe('main ↔ layers', () => {
+  it('lifts a main clip onto a new layer, closes the gap and shrinks it to an element', () => {
+    const { project, ids } = setup();
+    setTransition(project, 'c', { type: 'fade', duration: s(1) });
+    const lane = moveMainToLane(project, 'b', s(2), ids, 1);
+    expect(starts(project)).toEqual([
+      ['a', 0, 5],
+      ['c', 5, 4],
+    ]);
+    const track = project.tracks.find((t) => t.id === lane)!;
+    expect(track.kind).toBe('overlay');
+    const b = track.items[0]!;
+    expect(b.start).toBe(s(2));
+    expect('transform' in b && b.transform.scale).toBe(LAYER_SCALE);
+    expect(checkInvariants(project)).toEqual([]);
+  });
+
+  it('keeps a clip the user already sized', () => {
+    const { project, ids } = setup();
+    updateItem(project, 'b', {
+      transform: {
+        x: 0.3,
+        y: 0.5,
+        scale: 0.4,
+        rotation: 0,
+        opacity: 1,
+        flipX: false,
+        flipY: false,
+      },
+    });
+    const lane = moveMainToLane(project, 'b', 0, ids, 1);
+    const b = project.tracks.find((t) => t.id === lane)!.items[0]!;
+    expect('transform' in b && b.transform.scale).toBe(0.4);
+  });
+
+  it('puts a layer picture back into the sequence', () => {
+    const { project, ids } = setup();
+    moveMainToLane(project, 'b', s(1), ids, 1);
+    moveLaneToMain(project, 'b', 0);
+    expect(starts(project)).toEqual([
+      ['b', 0, 3],
+      ['a', 3, 5],
+      ['c', 8, 4],
+    ]);
+    expect(project.tracks.length).toBe(1);
+    expect(checkInvariants(project)).toEqual([]);
+  });
+
+  it('refuses stickers on the main track', () => {
+    const { project, ids } = setup();
+    addToLane(project, stickerItem('st', 0), ids);
+    expect(() => moveLaneToMain(project, 'st', 0)).toThrow();
   });
 });
 

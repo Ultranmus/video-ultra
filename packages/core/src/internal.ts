@@ -2,6 +2,7 @@
  * Internal API for @video-ultra/react and the playground. Not covered by semver.
  */
 export * from './index';
+export { ALLOWED_KINDS, laneKindFor } from './model/project';
 export { createLabSession } from './lab/client';
 export type { LabSession } from './lab/client';
 export type * from './lab/protocol';
@@ -44,6 +45,7 @@ export {
   transitionOverlay,
   fadeOverlay,
   easeAt,
+  EASES,
   plainLook,
   noOverlay,
 } from './effects/transitions';

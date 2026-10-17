@@ -67,7 +67,21 @@ export const AdjustSchema = z.object({
 export const DirectionSchema = z.enum(['left', 'right', 'up', 'down']);
 
 /** Timing curve of a transition: `smooth` (default), `linear`, `snappy` or `bounce`. */
-export const EaseSchema = z.enum(['linear', 'smooth', 'snappy', 'bounce']);
+export const EaseSchema = z.enum([
+  'linear',
+  'smooth',
+  'ease-in',
+  'ease-out',
+  'snappy',
+  'expo',
+  'back',
+  'anticipate',
+  'bounce',
+  'elastic',
+  'ball',
+  'slow-mo',
+  'steps',
+]);
 
 export const TransitionSchema = z.object({
   /** Transition preset id (`TRANSITION_PRESETS`), e.g. `'fade'`. */

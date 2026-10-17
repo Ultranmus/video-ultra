@@ -89,17 +89,50 @@ export const DEFAULT_LABELS = {
   split: 'Split',
   trim: 'Trim',
   move: 'Move',
-  newLane: 'New lane',
+  newLane: 'New layer',
+  dropNewLayer: 'New layer on top',
+  layerSlotHint: 'Drag a clip up here to put it on top of the video',
+  becameLayer: 'Now a layer on top of the video',
+  movedToMain: 'Added to the main video',
   direction: 'Direction',
   directionName: (d: string) =>
     (({ left: 'Left', right: 'Right', up: 'Up', down: 'Down' }) as Record<string, string>)[d] ?? d,
   feel: 'Feel',
   easeName: (e: string) =>
     (
-      ({ linear: 'Even', smooth: 'Smooth', snappy: 'Snappy', bounce: 'Bounce' }) as Record<
-        string,
-        string
-      >
+      ({
+        linear: 'Even',
+        smooth: 'Smooth',
+        'ease-in': 'Speed up',
+        'ease-out': 'Slow down',
+        snappy: 'Snappy',
+        expo: 'Swift',
+        back: 'Overshoot',
+        anticipate: 'Wind up',
+        bounce: 'Spring',
+        elastic: 'Elastic',
+        ball: 'Bounce',
+        'slow-mo': 'Slow-mo',
+        steps: 'Stop-motion',
+      }) as Record<string, string>
+    )[e] ?? e,
+  easeTip: (e: string) =>
+    (
+      ({
+        linear: 'Same speed all the way',
+        smooth: 'Starts and ends gently',
+        'ease-in': 'Starts slow, ends fast',
+        'ease-out': 'Starts fast, ends slow',
+        snappy: 'Quick in the middle',
+        expo: 'Very fast, then settles',
+        back: 'Goes a little past, then settles',
+        anticipate: 'Pulls back before it moves',
+        bounce: 'Springs past and settles',
+        elastic: 'Wobbles into place',
+        ball: 'Lands and bounces',
+        'slow-mo': 'Slows down in the middle',
+        steps: 'Moves in jumps, like stop-motion',
+      }) as Record<string, string>
     )[e] ?? e,
   playPreview: 'Play preview',
   animate: 'Animate',
@@ -184,7 +217,16 @@ export const DEFAULT_LABELS = {
   exporting: 'Exporting…',
   exportProgress: (percent: number, eta: string | null) =>
     eta ? `${percent}% · about ${eta} left` : `${percent}%`,
-  exportDone: 'Your video is ready.',
+  exportDone: 'Your video is ready',
+  exportReadyTitle: 'Done',
+  exportFrames: (done: number, total: number) => `Frame ${done} of ${total}`,
+  resolutionName: (h: number) =>
+    ({ 480: 'Small', 720: 'HD', 1080: 'Full HD', 1440: '2K', 2160: 'Ultra HD' })[h] ?? '',
+  aboutSize: (size: string) => `About ${size}`,
+  formatMp4Tip: 'Plays everywhere: phones, social apps, TVs',
+  formatWebmTip: 'For the web; some phones can’t play it',
+  share: 'Share',
+  backToEditing: 'Back to editing',
   download: 'Download',
   exportFailed: (reason: string) => `Export failed: ${reason}`,
   exportUnavailable: "Export isn't available in this build yet.",
@@ -304,8 +346,27 @@ export const DEFAULT_LABELS = {
   alignment: 'Alignment',
   centre: 'Centre',
   textEffects: 'Effects',
+  letterSpacing: 'Letter spacing',
+  lineHeight: 'Line height',
+  thickness: 'Thickness',
+  softness: 'Softness',
+  distance: 'Distance',
+  labelBox: 'Label box',
+  roundness: 'Roundness',
+  boxPadding: 'Box size',
   outlineColor: 'Outline colour',
   backgroundColorText: 'Box colour',
+  ratioName: (id: string) =>
+    (
+      ({
+        '9:16': 'Story',
+        '1:1': 'Square',
+        '4:5': 'Portrait',
+        '16:9': 'Wide',
+        '4:3': 'Classic',
+        '21:9': 'Cinema',
+      }) as Record<string, string>
+    )[id] ?? id,
   ratioTip: (id: string) =>
     (
       ({

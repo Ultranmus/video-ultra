@@ -536,6 +536,10 @@ async function filterPreviews(
     ],
   };
   await mediaReady(mini);
+  // A fresh renderer's first draw can land before the frame is decoded: warm it up once.
+  base.filter = null;
+  await looks.composer.render(mini, local, size, size, null);
+  looks.canvas.transferToImageBitmap().close();
   const bitmaps: ImageBitmap[] = [];
   for (const id of request.filters) {
     base.filter = id ? { id, intensity: 1 } : null;
@@ -548,6 +552,151 @@ async function filterPreviews(
     looks = null;
   }, 5000);
   return { data: { type: 'filter-previews', bitmaps }, transfer: bitmaps };
+}
+
+/** The warm looks renderer at `width × height` (shared by the picker previews). */
+async function looksRenderer(width: number, height: number) {
+  clearTimeout(looksIdle);
+  const key = width * 1000 + height;
+  if (!looks || looks.size !== key) {
+    looks?.composer.destroy();
+    looks?.renderer.destroy();
+    const canvas = new OffscreenCanvas(width, height);
+    const r = await makeRenderer(canvas, renderer?.backend ?? 'webgl2');
+    looks = {
+      canvas,
+      renderer: r,
+      composer: new Composer(r, new DecoderPool(2), media, true, 4 << 20, false),
+      size: key,
+    };
+  }
+  return looks;
+}
+
+function looksDone(): void {
+  looksIdle = setTimeout(() => {
+    looks?.composer.destroy();
+    looks?.renderer.destroy();
+    looks = null;
+  }, 5000);
+}
+
+/**
+ * Animation picker: one lane item alone, centred and large in the tile, at the requested times
+ * with the requested animation (a still when `animation` is null).
+ */
+async function itemPreview(
+  request: Extract<EngineRequest, { type: 'item-preview' }>,
+): Promise<{ data: EngineResponseData; transfer: Transferable[] }> {
+  const empty = { data: { type: 'item-preview' as const, bitmaps: [] }, transfer: [] };
+  if (!project) throw new Error('No project');
+  const found = findItem(project, request.itemId);
+  if (!found || found.track.kind === 'main' || !('transform' in found.item)) return empty;
+  const width = Math.max(16, Math.min(320, Math.round(request.width)));
+  const height = Math.max(16, Math.min(320, Math.round(request.height)));
+  const l = await looksRenderer(width, height);
+  const item = found.item;
+  const shown = {
+    ...item,
+    transform: { ...item.transform, x: 0.5, y: 0.5, rotation: 0, opacity: 1 },
+    animation: request.animation ?? undefined,
+  } as Item;
+  // Pictures fill most of the tile; text and stickers keep their own size, capped to fit.
+  if (item.kind === 'video' || item.kind === 'image' || item.kind === 'freeze')
+    (shown as { transform: { scale: number } }).transform.scale = 0.72;
+  else if (item.kind === 'sticker')
+    (shown as { transform: { scale: number } }).transform.scale = 0.7;
+  const mini: Project = {
+    ...project,
+    settings: {
+      ...project.settings,
+      width,
+      height,
+      background: { type: 'color', color: request.background },
+    },
+    tracks: [
+      { id: 'looks-main', kind: 'main', muted: true, hidden: false, locked: false, items: [] },
+      { ...found.track, muted: true, hidden: false, items: [shown] },
+    ],
+  };
+  await mediaReady(mini);
+  const times = request.times.slice(0, 24);
+  const clampT = (t: number) =>
+    Math.max(item.start, Math.min(item.start + item.duration - 1, Math.round(t)));
+  await l.composer.render(mini, clampT(times[0] ?? item.start), width, height, null);
+  l.canvas.transferToImageBitmap().close();
+  const bitmaps: ImageBitmap[] = [];
+  for (const t of times) {
+    const at = Math.max(item.start, Math.min(item.start + item.duration - 1, Math.round(t)));
+    await l.composer.render(mini, at, width, height, null);
+    bitmaps.push(l.canvas.transferToImageBitmap());
+  }
+  looksDone();
+  return { data: { type: 'item-preview', bitmaps }, transfer: bitmaps };
+}
+
+/**
+ * Transition picker flip-book: the real cut (previous clip → this clip) with one transition,
+ * rendered at a few points across its window on the warm looks renderer.
+ */
+async function transitionPreview(
+  request: Extract<EngineRequest, { type: 'transition-preview' }>,
+): Promise<{ data: EngineResponseData; transfer: Transferable[] }> {
+  const empty = { data: { type: 'transition-preview' as const, bitmaps: [] }, transfer: [] };
+  if (!project) throw new Error('No project');
+  const track = project.tracks.find((t) => t.kind === 'main');
+  const index = track ? track.items.findIndex((i) => i.id === request.itemId) : -1;
+  if (!track || index < 1) return empty;
+  const prev = track.items[index - 1]!;
+  const item = track.items[index]!;
+  if (!('transitionIn' in item)) return empty;
+  clearTimeout(looksIdle);
+  const width = Math.max(16, Math.min(320, Math.round(request.width)));
+  const height = Math.max(16, Math.min(320, Math.round(request.height)));
+  const key = width * 1000 + height;
+  if (!looks || looks.size !== key) {
+    looks?.composer.destroy();
+    looks?.renderer.destroy();
+    const canvas = new OffscreenCanvas(width, height);
+    const r = await makeRenderer(canvas, renderer?.backend ?? 'webgl2');
+    looks = {
+      canvas,
+      renderer: r,
+      composer: new Composer(r, new DecoderPool(2), media, true, 4 << 20, false),
+      size: key,
+    };
+  }
+  const transition = request.transition;
+  const next = { ...item, transitionIn: transition } as Item;
+  const mini: Project = {
+    ...project,
+    settings: { ...project.settings, width, height },
+    tracks: [{ ...track, muted: true, hidden: false, items: [prev, next] }],
+  };
+  await mediaReady(mini);
+  const half = Math.min(transition.duration, prev.duration, item.duration) / 2;
+  const from = item.start - half;
+  const frames = Math.max(2, Math.min(24, Math.round(request.frames)));
+  await looks.composer.render(mini, Math.max(0, Math.round(from)), width, height, null);
+  looks.canvas.transferToImageBitmap().close();
+  const bitmaps: ImageBitmap[] = [];
+  for (let i = 0; i < frames; i++) {
+    const t = Math.round(from + (2 * half * i) / (frames - 1));
+    await looks.composer.render(
+      mini,
+      Math.min(t, item.start + item.duration - 1),
+      width,
+      height,
+      null,
+    );
+    bitmaps.push(looks.canvas.transferToImageBitmap());
+  }
+  looksIdle = setTimeout(() => {
+    looks?.composer.destroy();
+    looks?.renderer.destroy();
+    looks = null;
+  }, 5000);
+  return { data: { type: 'transition-preview', bitmaps }, transfer: bitmaps };
 }
 
 // ── messages ─────────────────────────────────────────────────────────────
@@ -672,6 +821,10 @@ async function handle(
       return capture(request);
     case 'filter-previews':
       return filterPreviews(request);
+    case 'transition-preview':
+      return transitionPreview(request);
+    case 'item-preview':
+      return itemPreview(request);
   }
 }
 

@@ -22,6 +22,8 @@ export interface TimelineMetrics {
   /** Left column with lane icons (0 on phones). */
   header: number;
   trimHandle: number;
+  /** The "new layer" drop slot above every row (0 = none). */
+  slot: number;
 }
 
 /** Horizontal mapping between time and screen x. */
@@ -49,21 +51,46 @@ export interface Row {
   height: number;
 }
 
-/** Rows top to bottom: the main track, then lanes in track order, shifted up by `scrollY`. */
+/** Picture and text layers sit above the main track; sound sits below it. */
+export function isLayerTrack(track: Track): boolean {
+  return track.kind === 'overlay' || track.kind === 'text';
+}
+
+/**
+ * Rows top to bottom, shifted up by `scrollY`: the layers in front-to-back order (the last track is
+ * drawn on top of the picture, so it is the top row — higher means in front), then the main track,
+ * then sound lanes in track order. The "new layer" slot sits above them all.
+ */
 export function layoutRows(project: Project, m: TimelineMetrics, scrollY = 0): Row[] {
+  const order: number[] = [];
+  project.tracks.forEach((t, i) => {
+    if (isLayerTrack(t)) order.unshift(i);
+  });
+  project.tracks.forEach((t, i) => {
+    if (t.kind === 'main') order.push(i);
+  });
+  project.tracks.forEach((t, i) => {
+    if (t.kind === 'audio') order.push(i);
+  });
   const rows: Row[] = [];
-  let y = m.ruler + m.gap;
-  project.tracks.forEach((track, index) => {
+  let y = m.ruler + m.gap + m.slot;
+  for (const index of order) {
+    const track = project.tracks[index]!;
     const height = track.kind === 'main' ? m.mainTrack : m.track;
     rows.push({ track, index, top: y - scrollY, height });
     y += height + m.gap;
-  });
+  }
   return rows;
+}
+
+/** The "new layer" slot above the rows (where a clip is dropped to put it on top). */
+export function slotRect(m: TimelineMetrics, scrollY = 0): { top: number; height: number } {
+  return { top: m.ruler + m.gap - scrollY, height: Math.max(0, m.slot - m.gap) };
 }
 
 /** Total height of all rows (for vertical scrolling). */
 export function contentHeight(project: Project, m: TimelineMetrics): number {
-  let y = m.ruler + m.gap;
+  let y = m.ruler + m.gap + m.slot;
   for (const track of project.tracks) y += (track.kind === 'main' ? m.mainTrack : m.track) + m.gap;
   return y;
 }

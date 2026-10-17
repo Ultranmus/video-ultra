@@ -57,6 +57,7 @@ const paths = {
   stop: 'M6.5 6.5h11v11h-11z',
   check: 'M5 12.5l4.5 4.5L19 7.5',
   warning: 'M12 4l9 16H3zM12 10v4.5M12 17.5h.01',
+  share: 'M12 3.5v11M7.5 8L12 3.5 16.5 8M5.5 12v8h13v-8',
   download: 'M12 4v11M7 10.5l5 5 5-5M5 20h14',
   chevronDown: 'M6 9.5l6 6 6-6',
   back: 'M15 5l-7 7 7 7',

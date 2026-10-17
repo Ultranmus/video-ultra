@@ -25,6 +25,7 @@ const m: TimelineMetrics = {
   gap: 4,
   header: 0,
   trimHandle: 12,
+  slot: 0,
 };
 
 function clip(id: string, seconds: number): VideoItem {
@@ -99,6 +100,23 @@ describe('timeline geometry', () => {
     const trim = hitTest(rows, m, scale, 205, y, 'c1', false);
     expect(trim.type === 'trim' && trim.edge).toBe('end');
     expect(hitTest(rows, m, scale, 200, rows[0]!.top + 28, null, false).type).toBe('transition');
+  });
+
+  it('puts layers above the main track (front-most on top) and sound below it', () => {
+    const p = project();
+    const lane = (id: string, kind: 'overlay' | 'text' | 'audio') =>
+      ({
+        id,
+        kind,
+        muted: false,
+        hidden: false,
+        locked: false,
+        items: [],
+      }) as (typeof p.tracks)[number];
+    p.tracks.push(lane('o1', 'overlay'), lane('s1', 'audio'), lane('t1', 'text'));
+    const rows = layoutRows(p, { ...m, slot: 30 });
+    expect(rows.map((r) => r.track.id)).toEqual(['t1', 'o1', p.tracks[0]!.id, 's1']);
+    expect(rows[0]!.top).toBe(m.ruler + m.gap + 30);
   });
 
   it('finds the reorder slot from the drag position', () => {

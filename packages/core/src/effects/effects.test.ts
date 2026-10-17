@@ -13,6 +13,7 @@ import {
 } from './presets';
 import {
   easeAt,
+  EASES,
   fadeOverlay,
   TRANSITION_LOOK_IDS,
   plainLook,
@@ -311,7 +312,7 @@ describe('transition maths', () => {
 });
 
 describe('ease curves', () => {
-  const eases: Ease[] = ['linear', 'smooth', 'snappy', 'bounce'];
+  const eases: readonly Ease[] = EASES;
   it.each(eases)('%s starts at 0 and ends at 1', (ease) => {
     expect(easeAt(ease, 0)).toBeCloseTo(0, 9);
     expect(easeAt(ease, 1)).toBeCloseTo(1, 9);
@@ -320,7 +321,16 @@ describe('ease curves', () => {
   });
 
   it('linear, smooth and snappy never go back; smooth and snappy are symmetric', () => {
-    for (const ease of ['linear', 'smooth', 'snappy'] as const) {
+    for (const ease of [
+      'linear',
+      'smooth',
+      'snappy',
+      'ease-in',
+      'ease-out',
+      'expo',
+      'slow-mo',
+      'steps',
+    ] as const) {
       let last = -1;
       for (let i = 0; i <= 100; i++) {
         const v = easeAt(ease, i / 100);

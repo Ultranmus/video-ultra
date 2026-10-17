@@ -118,7 +118,8 @@ for (const name of browsers) {
   await check('redo split', s.main.length === 3);
 
   // Select the first clip and drag its end trim handle 40 px to the left.
-  const rowY = box.y + 24 + 4 + 28;
+  // Ruler, gap, the new-layer slot, then the main track (no layers yet): its middle.
+  const rowY = box.y + 24 + 6 + 36 + 28;
   await page.mouse.click(x0 + 1 * s.pps, rowY);
   s = await state(page);
   await check('click selects clip', s.selected === s.main[0]!.id);
@@ -192,7 +193,7 @@ for (const name of browsers) {
   await check('play advances', s.time > 1.5, `${s.time.toFixed(2)} s`);
   // Export through the dialog: 480p MP4, then probe the file.
   await page.locator('.vu-topbar .vu-btn', { hasText: 'Export' }).click();
-  await page.locator('.vu-modal .vu-segment', { hasText: '480p' }).click();
+  await page.locator('.vu-modal .vu-export-option', { hasText: '480p' }).click();
   const t0 = Date.now();
   await page.locator('.vu-modal .vu-btn', { hasText: 'Export video' }).click();
   const link = page.locator('.vu-modal a[download]');

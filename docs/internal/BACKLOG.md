@@ -152,3 +152,15 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       it shows up again on the new build.
 - [ ] A few emoji draw as boxes where the OS font lacks them (headless Chrome on macOS); the 3D
       tab doesn't have this. Consider hiding emoji the platform can't draw.
+- [ ] Playground `window` test API + URL debug flags (DECISIONS #92). Small; helps phone debugging.
+- [ ] Fatal engine error screen with Reload (DECISIONS #93): catch worker `error` /
+      `messageerror` / OOM, show the message, keep the autosave intact.
+- [ ] v0.3 references to build against (specs, not code): loudness to EBU R128 / ITU-R BS.1770
+      (integrated + true peak; "normalize audio" and an export loudness target such as −14 LUFS);
+      SRT / WebVTT import + export with frame-exact timing and burn-in (ties into v0.4 AI
+      captions); scopes — waveform, RGB parade, histogram, vectorscope.
+- [ ] Animation tiles: text previews use the item's own size — very long text can be tiny in the
+      tile; consider fitting text to the tile in `itemPreview`.
+- [ ] Transition still (A | B) and flip-books are re-fetched when the panel reopens; cache per
+      cut signature across opens if it shows on low-tier phones.
+- [ ] Waveform for video clips needs the clip tall enough (≥ 40 px); phone main track checks.

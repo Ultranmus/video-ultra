@@ -11,6 +11,7 @@ import { Icon } from './icons';
 import { textItem } from './items';
 import type { PanelId } from './state';
 import { StickersPanel } from './library/StickersPanel';
+import { CategoryBrowser } from './browse';
 import { TEXT_STYLE_CATEGORIES, TEXT_STYLE_PRESETS } from './library/textStyles';
 import { FilterStrip, TransitionGrid } from './looks';
 import { CanvasTool } from './ToolPanel';
@@ -150,15 +151,19 @@ function AssetTile({ asset }: { asset: Asset }) {
 }
 
 /** CSS that approximates a text style for the picker tiles (the engine draws the real thing). */
-function previewCss(style: TextStyle): React.CSSProperties {
+function previewCss(style: TextStyle, sample: string): React.CSSProperties {
   const em = 22;
+  // Shrink long samples so they fit the tile (with room for outline, shadow and label box).
+  const width =
+    sample.length * (0.62 + style.letterSpacing) +
+    (style.background ? 2 * style.background.padding : 0);
   const css: React.CSSProperties = {
     fontFamily: style.fontFamily,
     fontWeight: style.fontWeight,
     fontStyle: style.italic ? 'italic' : 'normal',
     color: style.color,
     letterSpacing: `${style.letterSpacing}em`,
-    fontSize: `${em}px`,
+    fontSize: `min(${em}px, ${(78 / width).toFixed(2)}cqi)`,
   };
   if (style.outline) {
     css.WebkitTextStroke = `${Math.max(1, style.outline.width * em * 2)}px ${style.outline.color}`;
@@ -177,13 +182,11 @@ function previewCss(style: TextStyle): React.CSSProperties {
 function TextPanel() {
   const ctl = useController();
   const l = useLabels();
-  const [category, setCategory] = useState(TEXT_STYLE_CATEGORIES[0]!.id);
   const selectedId = useUi((s) => s.selectedId);
   const selected = useProject((p) => {
     const found = selectedId ? findItem(p, selectedId)?.item : null;
     return found && found.kind === 'text' ? found : null;
   });
-  const presets = TEXT_STYLE_PRESETS.filter((p) => p.category === category);
   const apply = (preset: (typeof TEXT_STYLE_PRESETS)[number]) => {
     if (selected) {
       // Keep the user's size, alignment and line height; take the look.
@@ -221,35 +224,25 @@ function TextPanel() {
       <p className="vu-target" data-active={selected ? '' : undefined}>
         {selected ? l.styleAppliesTo(selected.text.split('\n')[0] || l.text) : l.styleAddsNew}
       </p>
-      <div className="vu-chips vu-chips-scroll" role="radiogroup" aria-label={l.category}>
-        {TEXT_STYLE_CATEGORIES.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            role="radio"
-            aria-checked={c.id === category}
-            className="vu-chip"
-            onClick={() => setCategory(c.id)}
-          >
-            {c.label}
-          </button>
-        ))}
-      </div>
-      <ul className="vu-textstyle-grid" aria-label={l.style}>
-        {presets.map((preset) => (
-          <li key={preset.id}>
-            <button
-              type="button"
-              className="vu-textstyle"
-              aria-label={preset.label}
-              data-tooltip={preset.label}
-              onClick={() => apply(preset)}
-            >
-              <span style={previewCss(preset.style)}>{preset.sample}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
+      <CategoryBrowser label={l.category} categories={TEXT_STYLE_CATEGORIES}>
+        {(c) => (
+          <ul className="vu-textstyle-grid" aria-label={c.label}>
+            {TEXT_STYLE_PRESETS.filter((p) => p.category === c.id).map((preset) => (
+              <li key={preset.id}>
+                <button
+                  type="button"
+                  className="vu-textstyle"
+                  aria-label={preset.label}
+                  data-tooltip={preset.label}
+                  onClick={() => apply(preset)}
+                >
+                  <span style={previewCss(preset.style, preset.sample)}>{preset.sample}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CategoryBrowser>
     </div>
   );
 }

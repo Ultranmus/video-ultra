@@ -1,6 +1,6 @@
 import type { DeviceTier } from '../capabilities';
 import type { BackendChoice } from '../lab/protocol';
-import type { Project } from '../model/schema';
+import type { ItemAnimation, Project, Transition } from '../model/schema';
 import type { Time } from '../model/time';
 import type { RenderBackend } from '../render/types';
 import type { ExportOptions, ExportProgress, ExportResult } from './export-plan';
@@ -55,6 +55,31 @@ export interface Engine {
     time: Time,
     size: number,
     filters: readonly (string | null)[],
+  ): Promise<ImageBitmap[]>;
+  /**
+   * A short flip-book of one transition played on the real cut before `itemId` (its previous
+   * clip into it): `frames` bitmaps across the transition window, `width × height` — for the
+   * transition picker's hover preview. The caller closes the bitmaps.
+   */
+  transitionPreview(
+    itemId: string,
+    transition: Transition,
+    width: number,
+    height: number,
+    frames: number,
+  ): Promise<ImageBitmap[]>;
+  /**
+   * One lane item drawn alone (centred, filling most of a `width × height` tile, on `background`)
+   * at each timeline time in `times`, with `animation` in place of its own — the animation
+   * picker's tiles and hover flip-books. The caller closes the bitmaps.
+   */
+  itemPreview(
+    itemId: string,
+    animation: ItemAnimation | null,
+    times: readonly Time[],
+    width: number,
+    height: number,
+    background: string,
   ): Promise<ImageBitmap[]>;
   /** Playhead updates (every frame while playing). */
   onTime: ((time: Time, playing: boolean) => void) | null;
@@ -274,6 +299,44 @@ export async function createEngine(
         filters: [...filters],
       });
       if (data.type !== 'filter-previews') throw new Error('Unexpected engine response');
+      return data.bitmaps;
+    },
+    async itemPreview(
+      itemId: string,
+      animation: ItemAnimation | null,
+      times: readonly Time[],
+      width: number,
+      height: number,
+      background: string,
+    ) {
+      const data = await send({
+        type: 'item-preview',
+        itemId,
+        animation,
+        times: [...times],
+        width,
+        height,
+        background,
+      });
+      if (data.type !== 'item-preview') throw new Error('Unexpected engine response');
+      return data.bitmaps;
+    },
+    async transitionPreview(
+      itemId: string,
+      transition: Transition,
+      width: number,
+      height: number,
+      frames: number,
+    ) {
+      const data = await send({
+        type: 'transition-preview',
+        itemId,
+        transition: { ...transition },
+        width,
+        height,
+        frames,
+      });
+      if (data.type !== 'transition-preview') throw new Error('Unexpected engine response');
       return data.bitmaps;
     },
     destroy() {

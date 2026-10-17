@@ -2,6 +2,15 @@
 
 Where the last session stopped and what comes next. Update before ending every session.
 
+## 2026-10-18 (UI round 4)
+
+Done from the owner's fourth list: scroll-by-category libraries, real engine previews for
+transitions and animations, 13 feel curves, ratio tiles, text inspector rebuilt, export dialog
+rebuilt, timeline overhaul (layers above main, new-layer slot, main ↔ layer drags, auto-scroll,
+new clip look and waveforms). Per-element animation confirmed: a lifted photo animates alone.
+Waiting on the owner to try it (desktop, then iPhone). Check on a real phone: long-press lift
+into the new-layer slot, edge auto-scroll while dragging, export Share sheet.
+
 ## 2026-10-17 (UI round 3 — effects library)
 
 Done from the owner's third list: ruler sliders, icon rows, 146 text styles, sticker library (3D /

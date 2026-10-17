@@ -178,3 +178,31 @@ scrollbars; Saved chip; full-screen icon; filters and transitions by category wi
 previews and animated tiles, direction / feel / length options, play-once previews; Animate panel
 (In / Out / Loop) for lane items; panels select their target; lane drops into existing or new
 lanes. Checks: verify (373 + 10 tests), interaction 3 browsers, axe 0, composite golden.
+
+## 2026-10-17 · Review of an open-source Rust editor for ideas
+
+Read its docs (not its code; we copy nothing). Not usable directly: its web build runs all work
+on the UI thread, wants cross-origin isolation, ships its own codecs in WASM and draws a canvas
+UI. Ideas recorded: command registry (DECISIONS #91, PLAN 6.0), playground test API + URL flags
+(#92), fatal-error screen (#93), and v0.3 specs to follow — R128 loudness, SRT / WebVTT,
+scopes (BACKLOG). Things it does that we already do: exact integer time, audio-clock master,
+OPFS recovery, WebCodecs first, ranged reads.
+
+## 2026-10-18 · UI round 4 (owner list 4)
+
+- Libraries scroll by category with a following chip row (filters, transitions, animations,
+  text styles, stickers); filter previews per section, lazily.
+- Transition and animation tiles show the engine's real frames (still + hover flip-book).
+- 13 timing curves with curve tiles; ratio picker as shape tiles; button rows share width;
+  wider side rail; ellipsis on segments / chips; text style samples fit their tiles.
+- Text inspector: format strip (bold, italic, align), size / letter spacing / line height,
+  effect cards (outline, shadow, label box) with switches and their settings.
+- Export dialog: poster beside the options, resolution / quality tiles with size estimates,
+  progress ring over a greying poster, animated done state with the video inline, Share on phones.
+- Timeline: layers above main, new-layer slot, main ↔ layer drags (core ops + tests), edge
+  auto-scroll, kind-tinted clips with glyphs, accent trim handles with chevrons, selection glow,
+  filled-envelope waveforms (sound clips and video clips with sound).
+- Fixes: filter previews thrown away under strict mode; first preview frame black on a fresh
+  renderer (warm-up draw).
+- Checks: verify (386 core + 11 React tests), interaction 15 steps × Chrome / Firefox / WebKit,
+  axe 0 (phone + desktop), recovery, composite golden; ui-review desktop + phone, dark + light.

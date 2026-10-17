@@ -18,12 +18,15 @@ import {
   type Direction,
   type Ease,
   type Item,
+  type Transition,
 } from '@video-ultra/core';
-import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useController, useLabels, useProject, useUi } from './context';
 import { Button, EditSlider, EmptyState, Segmented } from './controls';
 import type { IconName } from './icons';
 import { itemTitle } from './items';
+import { EASES, easeAt } from '@video-ultra/core/internal';
+import { CategoryBrowser, useNearView } from './browse';
 import { useTargets, type LookItem } from './targets';
 
 const TILE = 72;
@@ -38,36 +41,6 @@ function useAutoSelect(id: string | null) {
   useEffect(() => {
     if (id && !ctl.ui.getState().selectedId) ctl.select(id, { keepPanel: true });
   }, [ctl, id]);
-}
-
-/** A scrolling row of category chips. */
-function Categories({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  options: readonly { id: string; label: string }[];
-  onChange: (id: string) => void;
-}) {
-  return (
-    <div className="vu-chips vu-chips-scroll" role="radiogroup" aria-label={label}>
-      {options.map((c) => (
-        <button
-          key={c.id}
-          type="button"
-          role="radio"
-          aria-checked={c.id === value}
-          className="vu-chip"
-          onClick={() => onChange(c.id)}
-        >
-          {c.label}
-        </button>
-      ))}
-    </div>
-  );
 }
 
 // ── Filters ───────────────────────────────────────────────────────────────
@@ -106,88 +79,32 @@ function FilterGrid({ item }: { item: LookItem }) {
   const ctl = useController();
   const l = useLabels();
   const current = item.filter?.id ?? null;
-  const [category, setCategory] = useState<string>(
-    () => FILTER_PRESETS.find((f) => f.id === current)?.category ?? FILTER_CATEGORIES[0]!.id,
-  );
-  const ids = useMemo<(string | null)[]>(
-    () => [null, ...FILTER_PRESETS.filter((f) => f.category === category).map((f) => f.id)],
-    [category],
-  );
-  const [tiles, setTiles] = useState<ImageBitmap[] | null>(null);
-  const tilesRef = useRef<ImageBitmap[] | null>(null);
-  // Re-render previews when the clip's picture inputs or the category change, not on every edit.
+  // Previews are re-rendered when the clip's picture inputs change, not on every edit.
   const inputs = JSON.stringify([
     'adjust' in item ? item.adjust : null,
     'crop' in item ? item.crop : null,
     item.kind === 'video' ? item.sourceIn : 0,
   ]);
-
-  useEffect(() => {
-    let live = true;
-    const engine = ctl.engine;
-    if (!engine) return;
-    const t = ctl.playhead.time;
-    const at =
-      t >= item.start && t < itemEnd(item) ? t : item.start + Math.floor(item.duration / 3);
-    const dpr = Math.min(devicePixelRatio || 1, 2);
-    const timer = setTimeout(() => {
-      engine
-        .filterPreviews(item.id, at, Math.round(TILE * dpr), ids)
-        .then((bitmaps) => {
-          if (!live) {
-            for (const b of bitmaps) b.close();
-            return;
-          }
-          for (const b of tilesRef.current ?? []) b.close();
-          tilesRef.current = bitmaps;
-          setTiles(bitmaps);
-        })
-        .catch(() => {});
-    }, 120);
-    return () => {
-      live = false;
-      clearTimeout(timer);
-    };
-    // `inputs` stands for the item's look; the item object changes on every edit.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ctl, item.id, inputs, ids]);
-  useEffect(
-    () => () => {
-      for (const b of tilesRef.current ?? []) b.close();
-      tilesRef.current = null;
-    },
-    [],
+  const sections = useMemo(
+    () => [
+      { id: 'original', label: l.original, ids: [null] as (string | null)[] },
+      ...FILTER_CATEGORIES.map((c) => ({
+        id: c.id as string,
+        label: c.label,
+        ids: FILTER_PRESETS.filter((f) => f.category === c.id).map((f) => f.id) as (
+          string | null
+        )[],
+      })),
+    ],
+    [l.original],
   );
-  const ready = tiles && tiles.length === ids.length;
+  const initial = current ? (FILTER_PRESETS.find((f) => f.id === current)?.category ?? null) : null;
 
   return (
     <div className="vu-looks">
       <p className="vu-target" data-active="">
         {l.filtersFor(itemTitle(item, ctl.project.assets))}
       </p>
-      <Categories
-        label={l.category}
-        value={category}
-        options={FILTER_CATEGORIES}
-        onChange={setCategory}
-      />
-      <div className="vu-filter-grid" role="radiogroup" aria-label={l.filter}>
-        {ids.map((id, i) => (
-          <button
-            key={id ?? 'none'}
-            type="button"
-            role="radio"
-            aria-checked={current === id}
-            className="vu-filter-tile"
-            onClick={() => ctl.applyFilter(item, id)}
-          >
-            <TileImage bitmap={ready ? (tiles[i] ?? null) : null} />
-            <span className="vu-filter-name">
-              {id ? (FILTER_PRESETS.find((f) => f.id === id)?.label ?? id) : l.original}
-            </span>
-          </button>
-        ))}
-      </div>
       {item.filter ? (
         <EditSlider
           label={l.intensity}
@@ -216,6 +133,79 @@ function FilterGrid({ item }: { item: LookItem }) {
           }}
         />
       </div>
+      <CategoryBrowser label={l.category} categories={sections} initial={initial}>
+        {(section) => (
+          <FilterSection
+            key={`${section.id}:${inputs}`}
+            item={item}
+            ids={section.ids}
+            current={current}
+          />
+        )}
+      </CategoryBrowser>
+    </div>
+  );
+}
+
+/** One category's filter tiles; asks the engine for its previews when it scrolls near the view. */
+function FilterSection({
+  item,
+  ids,
+  current,
+}: {
+  item: LookItem;
+  ids: (string | null)[];
+  current: string | null;
+}) {
+  const ctl = useController();
+  const l = useLabels();
+  const [tiles, setTiles] = useState<ImageBitmap[] | null>(null);
+  const tilesRef = useRef<ImageBitmap[] | null>(null);
+  const live = useRef(true);
+  useEffect(() => {
+    live.current = true;
+    return () => {
+      live.current = false;
+      for (const b of tilesRef.current ?? []) b.close();
+      tilesRef.current = null;
+    };
+  }, []);
+  const ref = useNearView<HTMLDivElement>(() => {
+    const engine = ctl.engine;
+    if (!engine) return;
+    const t = ctl.playhead.time;
+    const at =
+      t >= item.start && t < itemEnd(item) ? t : item.start + Math.floor(item.duration / 3);
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    engine
+      .filterPreviews(item.id, at, Math.round(TILE * dpr), ids)
+      .then((bitmaps) => {
+        if (!live.current) {
+          for (const b of bitmaps) b.close();
+          return;
+        }
+        tilesRef.current = bitmaps;
+        setTiles(bitmaps);
+      })
+      .catch(() => {});
+  });
+  return (
+    <div ref={ref} className="vu-filter-grid" role="radiogroup" aria-label={l.filter}>
+      {ids.map((id, i) => (
+        <button
+          key={id ?? 'none'}
+          type="button"
+          role="radio"
+          aria-checked={current === id}
+          className="vu-filter-tile"
+          onClick={() => ctl.applyFilter(item, id)}
+        >
+          <TileImage bitmap={tiles?.[i] ?? null} />
+          <span className="vu-filter-name">
+            {id ? (FILTER_PRESETS.find((f) => f.id === id)?.label ?? id) : l.original}
+          </span>
+        </button>
+      ))}
     </div>
   );
 }
@@ -252,17 +242,279 @@ const DIRECTION_ICONS: Record<Direction, IconName> = {
  * A tile that shows what a transition does: clip A gives way to clip B, animated on hover/focus
  * (and while selected), styled by the transition's family.
  */
+/** The curve of a timing ease as an SVG path in a 40 × 28 box (computed once per ease). */
+const EASE_PATHS = new Map<Ease, string>();
+function easePath(ease: Ease): string {
+  let d = EASE_PATHS.get(ease);
+  if (!d) {
+    const pts: string[] = [];
+    for (let i = 0; i <= 40; i++) {
+      const x = i / 40;
+      pts.push(`${(2 + x * 36).toFixed(1)},${(23 - easeAt(ease, x) * 18).toFixed(1)}`);
+    }
+    d = `M${pts.join('L')}`;
+    EASE_PATHS.set(ease, d);
+  }
+  return d;
+}
+
+/** How the transition moves: every timing curve as a tile showing its shape. */
+function EasePicker({ value, onChange }: { value: Ease; onChange: (ease: Ease) => void }) {
+  const l = useLabels();
+  return (
+    <div className="vu-field">
+      <span className="vu-field-row" id="vu-feel-label">
+        {l.feel}
+        <span className="vu-field-value">{l.easeName(value)}</span>
+      </span>
+      <div className="vu-ease-grid" role="radiogroup" aria-labelledby="vu-feel-label">
+        {EASES.map((e) => (
+          <button
+            key={e}
+            type="button"
+            role="radio"
+            aria-checked={e === value}
+            className="vu-ease"
+            data-tooltip={l.easeTip(e)}
+            onClick={() => onChange(e)}
+          >
+            <svg viewBox="0 0 40 28" aria-hidden="true">
+              <path className="vu-ease-axis" d="M2 23H38" />
+              <path className="vu-ease-curve" d={easePath(e)} />
+            </svg>
+            <span>{l.easeName(e)}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const FLIP_FRAMES = 12;
+const FLIP_W = 160;
+const FLIP_H = 96;
+const FLIP_CACHE = 12;
+
+type Flipbooks = {
+  /** Clip A | clip B, split down the middle: every tile's still. */
+  rest: ImageBitmap | null;
+  load: (transition: Transition) => Promise<ImageBitmap[] | null>;
+};
+
+/**
+ * Hover previews for transition tiles: the engine plays each transition on the real cut (the
+ * previous clip into this one) as a short flip-book. Fetched on first hover, a few kept, all
+ * closed when the panel closes or the cut's clips change.
+ */
+function useFlipbooks(item: Extract<Item, { transitionIn: unknown }>): Flipbooks {
+  const ctl = useController();
+  const prevId = useProject((p) => {
+    const items = mainTrack(p).items;
+    const i = items.findIndex((x) => x.id === item.id);
+    return i > 0 ? items[i - 1]!.id : null;
+  });
+  const signature = `${item.id}:${prevId}:${item.kind === 'video' ? item.sourceIn : 0}`;
+  const cache = useRef(new Map<string, Promise<ImageBitmap[] | null>>());
+  const [rest, setRest] = useState<ImageBitmap | null>(null);
+  useEffect(() => {
+    const map = cache.current;
+    const engine = ctl.engine;
+    let live = true;
+    let still: ImageBitmap | null = null;
+    if (engine && prevId) {
+      const dpr = Math.min(devicePixelRatio || 1, 2);
+      // A linear wipe at its midpoint is exactly "clip A | clip B".
+      void engine
+        .transitionPreview(
+          item.id,
+          { type: 'wipe', duration: fromSeconds(0.6), direction: 'right', ease: 'linear' },
+          Math.round((FLIP_W * dpr) / 2),
+          Math.round((FLIP_H * dpr) / 2),
+          3,
+        )
+        .then((b) => {
+          b.forEach((x, i) => i !== 1 && x.close());
+          const mid = b[1];
+          if (!mid) return;
+          if (!live) return mid.close();
+          still = mid;
+          setRest(mid);
+        })
+        .catch(() => {});
+    }
+    return () => {
+      live = false;
+      still?.close();
+      setRest(null);
+      for (const p of map.values()) void p.then((b) => b?.forEach((x) => x.close()));
+      map.clear();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signature]);
+  const load = useCallback(
+    (transition: Transition) => {
+      const engine = ctl.engine;
+      if (!engine || !prevId) return Promise.resolve(null);
+      const dpr = Math.min(devicePixelRatio || 1, 2);
+      const key = JSON.stringify(transition);
+      const map = cache.current;
+      let hit = map.get(key);
+      if (hit) {
+        map.delete(key);
+        map.set(key, hit);
+        return hit;
+      }
+      hit = engine
+        .transitionPreview(
+          item.id,
+          transition,
+          Math.round((FLIP_W * dpr) / 2),
+          Math.round((FLIP_H * dpr) / 2),
+          FLIP_FRAMES,
+        )
+        .catch(() => null);
+      map.set(key, hit);
+      while (map.size > FLIP_CACHE) {
+        const [oldKey, old] = map.entries().next().value!;
+        map.delete(oldKey);
+        void old.then((b) => b?.forEach((x) => x.close()));
+      }
+      return hit;
+    },
+    // `signature` resets the cache when the cut's clips change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [ctl, item.id, prevId, signature],
+  );
+  return useMemo(() => ({ rest, load }), [rest, load]);
+}
+
+/**
+ * Plays an engine flip-book on a canvas while its tile is hovered or focused (and while chosen):
+ * `hold` seconds on the first frame, `play` seconds through, `after` seconds on the last, repeat.
+ * Shows `rest` (or nothing — the tile's own still shows through) otherwise.
+ */
+function FlipCanvas({
+  load,
+  loadKey,
+  rest = null,
+  timing = { hold: 0.25, play: 1, after: 0.45 },
+}: {
+  load: (() => Promise<ImageBitmap[] | null>) | null;
+  loadKey: string;
+  rest?: ImageBitmap | null;
+  timing?: { hold: number; play: number; after: number };
+}): ReactElement {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const loadRef = useRef(load);
+  useEffect(() => {
+    loadRef.current = load;
+  });
+  const draw = useCallback((bitmap: ImageBitmap | null) => {
+    const canvas = canvasRef.current;
+    const g = canvas?.getContext('2d');
+    if (!canvas || !g || !bitmap) return false;
+    if (canvas.width !== bitmap.width) canvas.width = bitmap.width;
+    if (canvas.height !== bitmap.height) canvas.height = bitmap.height;
+    try {
+      g.drawImage(bitmap, 0, 0);
+      return true;
+    } catch {
+      return false; // closed: the clip changed
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!playing) draw(rest);
+  }, [rest, playing, draw]);
+
+  useEffect(() => {
+    const tile = canvasRef.current?.closest<HTMLElement>('[role="radio"]');
+    if (!tile || !loadKey) return;
+    let frame = 0;
+    let active = false;
+    let token = 0;
+    const stop = () => {
+      active = false;
+      token++;
+      cancelAnimationFrame(frame);
+      setPlaying(false);
+    };
+    const start = () => {
+      if (active || !loadRef.current) return;
+      active = true;
+      const mine = ++token;
+      void loadRef.current().then((bitmaps) => {
+        if (mine !== token || !bitmaps?.length) return;
+        setPlaying(true);
+        const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const began = performance.now();
+        const cycle = timing.hold + timing.play + timing.after;
+        const loop = (now: number) => {
+          if (mine !== token) return;
+          const t = ((now - began) / 1000) % cycle;
+          const p = reduce ? 0.5 : Math.min(1, Math.max(0, (t - timing.hold) / timing.play));
+          if (!draw(bitmaps[Math.round(p * (bitmaps.length - 1))] ?? null)) return;
+          if (!reduce) frame = requestAnimationFrame(loop);
+        };
+        frame = requestAnimationFrame(loop);
+      });
+    };
+    const chosen = tile.getAttribute('aria-checked') === 'true';
+    const leave = () => {
+      if (!chosen) stop();
+    };
+    tile.addEventListener('pointerenter', start);
+    tile.addEventListener('pointerleave', leave);
+    tile.addEventListener('focus', start);
+    tile.addEventListener('blur', leave);
+    if (chosen) start();
+    return () => {
+      stop();
+      tile.removeEventListener('pointerenter', start);
+      tile.removeEventListener('pointerleave', leave);
+      tile.removeEventListener('focus', start);
+      tile.removeEventListener('blur', leave);
+    };
+    // Timing is constant per tile kind.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadKey, draw]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="vu-flip"
+      data-playing={playing || undefined}
+      data-rest={rest ? '' : undefined}
+    />
+  );
+}
+
+/**
+ * A transition tile. At rest: clip A and clip B side by side. On hover or focus (and while
+ * chosen): the real transition on this cut, from the engine.
+ */
 function TransitionTile({
   family,
-  direction,
+  transition,
+  flipbook,
 }: {
   family: string;
-  direction: Direction | undefined;
+  transition?: Transition;
+  flipbook?: Flipbooks;
 }): ReactElement {
+  const key = transition ? JSON.stringify(transition) : '';
   return (
-    <span className="vu-trx" data-family={family} data-dir={direction ?? 'left'} aria-hidden="true">
+    <span className="vu-trx" data-family={family} aria-hidden="true">
       <span className="vu-trx-a" />
       <span className="vu-trx-b" />
+      {flipbook ? (
+        <FlipCanvas
+          load={transition ? () => flipbook.load(transition) : null}
+          loadKey={transition ? `${key}:${flipbook.rest ? 1 : 0}` : ''}
+          rest={flipbook.rest}
+        />
+      ) : null}
     </span>
   );
 }
@@ -300,10 +552,7 @@ function TransitionChoices({ item }: { item: Extract<Item, { transitionIn: unkno
   const l = useLabels();
   const current = item.transitionIn;
   const preset = current ? findTransitionPreset(current.type) : undefined;
-  const [category, setCategory] = useState<string>(
-    preset?.category ?? TRANSITION_CATEGORIES[0]!.id,
-  );
-  const presets = TRANSITION_PRESETS.filter((p) => p.category === category);
+  const flipbook = useFlipbooks(item);
 
   const preview = (duration: number) => {
     const half = Math.round(duration / 2);
@@ -332,41 +581,6 @@ function TransitionChoices({ item }: { item: Extract<Item, { transitionIn: unkno
       <p className="vu-target" data-active="">
         {l.transitionsFor(itemTitle(item, ctl.project.assets))}
       </p>
-      <Categories
-        label={l.category}
-        value={category}
-        options={TRANSITION_CATEGORIES}
-        onChange={setCategory}
-      />
-      <div className="vu-transition-grid" role="radiogroup" aria-label={l.transition}>
-        <button
-          type="button"
-          role="radio"
-          aria-checked={current === null}
-          className="vu-transition-tile"
-          onClick={() => choose(null)}
-        >
-          <TransitionTile family="cut" direction={undefined} />
-          <span>{l.cut}</span>
-        </button>
-        {presets.map((p) => (
-          <button
-            key={p.id}
-            type="button"
-            role="radio"
-            aria-checked={preset?.id === p.id}
-            className="vu-transition-tile"
-            data-tooltip={p.label}
-            onClick={() => choose(p.id)}
-          >
-            <TransitionTile
-              family={p.category}
-              direction={preset?.id === p.id ? current?.direction : p.directions?.[0]}
-            />
-            <span>{p.label}</span>
-          </button>
-        ))}
-      </div>
       {current && preset ? (
         <>
           {preset.directions?.length ? (
@@ -381,13 +595,8 @@ function TransitionChoices({ item }: { item: Extract<Item, { transitionIn: unkno
               onChange={(direction) => choose(preset.id, { direction })}
             />
           ) : null}
-          <Segmented
-            label={l.feel}
+          <EasePicker
             value={current.ease ?? preset.ease}
-            options={(['linear', 'smooth', 'snappy', 'bounce'] as const).map((e) => ({
-              value: e,
-              label: l.easeName(e),
-            }))}
             onChange={(ease) => choose(preset.id, { ease })}
           />
           <EditSlider
@@ -398,9 +607,7 @@ function TransitionChoices({ item }: { item: Extract<Item, { transitionIn: unkno
             step={0.1}
             defaultValue={preset.defaultDuration ?? 0.6}
             format={(v) => `${v.toFixed(1)} s`}
-            recipe={(d, v) =>
-              setTransition(d, item.id, { type: current.type, duration: fromSeconds(v) })
-            }
+            recipe={(d, v) => setTransition(d, item.id, { ...current, duration: fromSeconds(v) })}
             commitLabel={l.transition}
             coalesceKey={`transition:${item.id}`}
           />
@@ -426,6 +633,60 @@ function TransitionChoices({ item }: { item: Extract<Item, { transitionIn: unkno
           </div>
         </>
       ) : null}
+      <div className="vu-transition-grid" role="radiogroup" aria-label={l.transition}>
+        <button
+          type="button"
+          role="radio"
+          aria-checked={current === null}
+          className="vu-transition-tile"
+          onClick={() => choose(null)}
+        >
+          <TransitionTile family="cut" flipbook={flipbook} />
+          <span>{l.cut}</span>
+        </button>
+      </div>
+      <CategoryBrowser
+        label={l.category}
+        categories={TRANSITION_CATEGORIES}
+        initial={preset?.category ?? null}
+      >
+        {(c) => (
+          <div className="vu-transition-grid" role="radiogroup" aria-label={c.label}>
+            {TRANSITION_PRESETS.filter((p) => p.category === c.id).map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                role="radio"
+                aria-checked={preset?.id === p.id}
+                className="vu-transition-tile"
+                data-tooltip={p.label}
+                onClick={() => choose(p.id)}
+              >
+                <TransitionTile
+                  family={p.category}
+                  flipbook={flipbook}
+                  transition={{
+                    type: p.id,
+                    duration:
+                      preset?.id === p.id && current
+                        ? current.duration
+                        : fromSeconds(p.defaultDuration ?? 0.6),
+                    ...(preset?.id === p.id && current
+                      ? {
+                          ...(current.direction ? { direction: current.direction } : {}),
+                          ...(current.ease ? { ease: current.ease } : {}),
+                        }
+                      : p.directions?.[0]
+                        ? { direction: p.directions[0] }
+                        : {}),
+                  }}
+                />
+                <span>{p.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </CategoryBrowser>
     </div>
   );
 }
@@ -433,6 +694,101 @@ function TransitionChoices({ item }: { item: Extract<Item, { transitionIn: unkno
 // ── Animations ────────────────────────────────────────────────────────────
 
 type Animatable = Extract<Item, { kind: 'text' | 'sticker' | 'video' | 'image' | 'freeze' }>;
+
+type AnimationBooks = {
+  /** The element at rest (no animation), drawn on every tile. */
+  rest: ImageBitmap | null;
+  load: (presetId: string) => Promise<ImageBitmap[] | null>;
+};
+
+/**
+ * Animation picker previews: the real element drawn by the engine — once at rest for every tile,
+ * and as a flip-book of each animation on first hover (a few kept). All closed when the panel
+ * closes or the element's look changes.
+ */
+function useAnimationBooks(item: Animatable, slot: AnimationSlot): AnimationBooks {
+  const ctl = useController();
+  const signature = JSON.stringify([
+    item.id,
+    item.duration,
+    'text' in item ? item.text : null,
+    'style' in item ? item.style : null,
+    'filter' in item ? item.filter : null,
+    'crop' in item ? item.crop : null,
+    'emoji' in item ? item.emoji : null,
+  ]);
+  const [rest, setRest] = useState<ImageBitmap | null>(null);
+  const cache = useRef(new Map<string, Promise<ImageBitmap[] | null>>());
+  const size = () => {
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    const root = document.querySelector('.vu-root');
+    const bg =
+      (root && getComputedStyle(root).getPropertyValue('--vu-surface-3').trim()) || '#26262d';
+    return { w: Math.round((FLIP_W * dpr) / 2), h: Math.round((FLIP_H * dpr) / 2), bg };
+  };
+  useEffect(() => {
+    const engine = ctl.engine;
+    const map = cache.current;
+    let live = true;
+    let still: ImageBitmap | null = null;
+    if (engine) {
+      const { w, h, bg } = size();
+      void engine
+        .itemPreview(item.id, null, [item.start + Math.floor(item.duration / 2)], w, h, bg)
+        .then(([b]) => {
+          if (!b) return;
+          if (!live) return b.close();
+          still = b;
+          setRest(b);
+        })
+        .catch(() => {});
+    }
+    return () => {
+      live = false;
+      still?.close();
+      setRest(null);
+      for (const p of map.values()) void p.then((b) => b?.forEach((x) => x.close()));
+      map.clear();
+    };
+    // `signature` captures what the picture depends on.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ctl, signature]);
+
+  const load = useCallback(
+    (presetId: string) => {
+      const engine = ctl.engine;
+      if (!engine) return Promise.resolve(null);
+      const key = `${slot}:${presetId}`;
+      const map = cache.current;
+      const hit = map.get(key);
+      if (hit) return hit;
+      const p = findAnimationPreset(slot, presetId);
+      const end = item.start + item.duration;
+      const duration = Math.min(item.duration, fromSeconds(p?.defaultDuration ?? 0.5));
+      const span = slot === 'loop' ? Math.min(item.duration, fromSeconds(1.6)) : duration;
+      const from = slot === 'out' ? end - span : item.start;
+      const times = Array.from({ length: FLIP_FRAMES }, (_, i) =>
+        Math.round(from + (span * i) / (FLIP_FRAMES - 1)),
+      );
+      const animation =
+        slot === 'loop'
+          ? { loop: { type: presetId, speed: 1 } }
+          : { [slot]: { type: presetId, duration } };
+      const { w, h, bg } = size();
+      const next = engine.itemPreview(item.id, animation, times, w, h, bg).catch(() => null);
+      map.set(key, next);
+      while (map.size > FLIP_CACHE) {
+        const [oldKey, old] = map.entries().next().value!;
+        map.delete(oldKey);
+        void old.then((b) => b?.forEach((x) => x.close()));
+      }
+      return next;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [ctl, slot, signature],
+  );
+  return { rest, load };
+}
 
 /**
  * Animate the selected text, sticker or picture-in-picture: an entrance, an exit and a loop.
@@ -461,10 +817,8 @@ function AnimateChoices({ item }: { item: Animatable }) {
     (p) => p.slot === slot && (!p.textOnly || item.kind === 'text'),
   );
   const categories = ANIMATION_CATEGORIES.filter((c) => forSlot.some((p) => p.category === c.id));
-  const [category, setCategory] = useState<string>('basic');
-  const shown = categories.some((c) => c.id === category) ? category : (categories[0]?.id ?? '');
-  const presets = forSlot.filter((p) => p.category === shown);
   const currentId = value?.type ?? null;
+  const books = useAnimationBooks(item, slot);
 
   const preview = (s: AnimationSlot, duration: number) => {
     const end = itemEnd(item);
@@ -502,9 +856,6 @@ function AnimateChoices({ item }: { item: Animatable }) {
         ]}
         onChange={setSlot}
       />
-      {categories.length > 1 ? (
-        <Categories label={l.category} value={shown} options={categories} onChange={setCategory} />
-      ) : null}
       <div className="vu-transition-grid" role="radiogroup" aria-label={l.animate}>
         <button
           type="button"
@@ -513,28 +864,52 @@ function AnimateChoices({ item }: { item: Animatable }) {
           className="vu-transition-tile"
           onClick={() => choose(null)}
         >
-          <span className="vu-anx" data-family="none" aria-hidden="true">
-            <span className="vu-anx-dot" />
+          <span className="vu-trx vu-anx-tile" aria-hidden="true">
+            <FlipCanvas load={null} loadKey="" rest={books.rest} />
           </span>
           <span>{l.none}</span>
         </button>
-        {presets.map((p) => (
-          <button
-            key={p.id}
-            type="button"
-            role="radio"
-            aria-checked={currentId === p.id}
-            className="vu-transition-tile"
-            data-tooltip={p.label}
-            onClick={() => choose(p.id)}
-          >
-            <span className="vu-anx" data-family={p.category} data-slot={slot} aria-hidden="true">
-              <span className="vu-anx-dot">{item.kind === 'text' ? 'Aa' : ''}</span>
-            </span>
-            <span>{p.label}</span>
-          </button>
-        ))}
       </div>
+      <CategoryBrowser
+        key={slot}
+        label={l.category}
+        categories={categories}
+        initial={currentId ? (findAnimationPreset(slot, currentId)?.category ?? null) : null}
+      >
+        {(c) => (
+          <div className="vu-transition-grid" role="radiogroup" aria-label={c.label}>
+            {forSlot
+              .filter((p) => p.category === c.id)
+              .map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={currentId === p.id}
+                  className="vu-transition-tile"
+                  data-tooltip={p.label}
+                  onClick={() => choose(p.id)}
+                >
+                  <span className="vu-trx vu-anx-tile" aria-hidden="true">
+                    <FlipCanvas
+                      load={() => books.load(p.id)}
+                      loadKey={`${slot}:${p.id}:${books.rest ? 1 : 0}`}
+                      rest={books.rest}
+                      timing={
+                        slot === 'loop'
+                          ? { hold: 0, play: 1.6, after: 0 }
+                          : slot === 'out'
+                            ? { hold: 0.35, play: 0.9, after: 0.35 }
+                            : { hold: 0.35, play: 0.9, after: 0.6 }
+                      }
+                    />
+                  </span>
+                  <span>{p.label}</span>
+                </button>
+              ))}
+          </div>
+        )}
+      </CategoryBrowser>
       {clip && slot !== 'loop' ? (
         <EditSlider
           label={l.duration}

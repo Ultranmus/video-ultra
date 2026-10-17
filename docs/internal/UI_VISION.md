@@ -106,6 +106,11 @@ the stage and everything drawn on it don't mirror. Text items in RTL scripts ren
 - **Main track** holds the story (video / photo clips, back to back). **Layer lanes** hold text,
   stickers, picture-in-picture and audio, each item free on time. Pro mode turns lanes into free
   multi-track.
+- Rows top to bottom: the "new layer" slot, picture / text layers (front-most on top), the main
+  track, sound lanes (DECISIONS #94). Drag a main clip up to make it a layer; drag a layer
+  picture onto the main track to put it in the sequence (#95). Drop places show as a dashed
+  outline (into a lane), a glowing line + "New layer on top" (between rows) or a bar on the cut
+  (into the sequence). Dragging near an edge scrolls.
 - Phone: playhead fixed in the centre, content scrolls (one-thumb scrubbing). Desktop: playhead
   moves; click the ruler to seek.
 - Snapping to playhead, clip edges and markers, with a visible guide and a light haptic on phones
@@ -120,7 +125,7 @@ the stage and everything drawn on it don't mirror. Text items in RTL scripts ren
 
 - One finger on the stage: select / move an item. Two fingers: pinch-scale and rotate the
   selected item; with nothing selected, pinch zooms the view.
-- Long-press a clip on the timeline to reorder (lift + drag).
+- Long-press a clip on the timeline to lift it: reorder, move to another lane, or make it a layer.
 - A second finger always cancels what the first one started.
 
 ## 7. Motion

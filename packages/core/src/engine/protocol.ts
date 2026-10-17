@@ -1,5 +1,5 @@
 import type { DeviceTier } from '../capabilities';
-import type { Project } from '../model/schema';
+import type { ItemAnimation, Project, Transition } from '../model/schema';
 import type { BackendChoice } from '../lab/protocol';
 import type { RenderBackend } from '../render/types';
 import type { ExportOptions, ExportProgress, ExportResult } from './export-plan';
@@ -95,6 +95,27 @@ export type EngineRequest =
       size: number;
       filters: (string | null)[];
     }
+  | {
+      type: 'item-preview';
+      /** A lane item (text, sticker, picture-in-picture), drawn alone, centred and large. */
+      itemId: string;
+      /** Replaces the item's animation (`null` = none, for a still). */
+      animation: ItemAnimation | null;
+      /** Timeline times to draw. */
+      times: number[];
+      width: number;
+      height: number;
+      background: string;
+    }
+  | {
+      type: 'transition-preview';
+      /** The main-track clip whose `transitionIn` is previewed (the clip after the cut). */
+      itemId: string;
+      transition: Transition;
+      width: number;
+      height: number;
+      frames: number;
+    }
   /** Audio output: the port to the AudioWorklet, its sample rate and output latency (s). */
   | { type: 'audio'; port: MessagePort; sampleRate: number; latency: number };
 
@@ -104,7 +125,9 @@ export type EngineResponseData =
   | { type: 'stats'; stats: EngineStats }
   | { type: 'export'; result: ExportResult; stats: ExportRunInfo }
   | { type: 'capture'; bitmap: ImageBitmap; backend: RenderBackend }
-  | { type: 'filter-previews'; bitmaps: ImageBitmap[] };
+  | { type: 'filter-previews'; bitmaps: ImageBitmap[] }
+  | { type: 'transition-preview'; bitmaps: ImageBitmap[] }
+  | { type: 'item-preview'; bitmaps: ImageBitmap[] };
 
 /** Unsolicited events from the worker. */
 export type EngineEvent =
