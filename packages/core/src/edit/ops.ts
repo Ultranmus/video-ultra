@@ -266,6 +266,37 @@ export function moveItem(
   removeEmptyLanes(project);
 }
 
+/**
+ * Moves a lane item to a brand-new lane inserted at track position `atIndex` (1 = right under the
+ * main track), starting at `start`. Returns the new track's id. The timeline uses it when a clip
+ * is dropped between lanes or where it would overlap.
+ */
+export function moveItemToNewLane(
+  project: Project,
+  itemId: string,
+  start: Time,
+  ids: IdFactory,
+  atIndex: number,
+): string {
+  const { track, item, index } = editable(project, itemId);
+  if (track.kind === 'main') throw new EditError('invalid', 'Use reorderMain for main-track items');
+  track.items.splice(index, 1);
+  item.start = snap(project, start);
+  const lane: Track = {
+    id: ids(),
+    kind: track.kind,
+    muted: false,
+    hidden: false,
+    locked: false,
+    items: [item],
+  };
+  // Count the position before empty lanes disappear, so the lane lands where it was dropped.
+  const at = Math.max(1, Math.min(Math.round(atIndex), project.tracks.length));
+  project.tracks.splice(at, 0, lane);
+  removeEmptyLanes(project);
+  return lane.id;
+}
+
 // ── trimming, splitting, speed ─────────────────────────────────────────────
 
 /**

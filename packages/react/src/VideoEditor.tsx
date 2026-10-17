@@ -46,6 +46,12 @@ export interface VideoEditorProps {
   resolveMedia?: (asset: Asset) => Promise<Blob | null>;
   /** Keep a local autosave and crash-recovery copy in the browser (default true). */
   autosave?: boolean;
+  /**
+   * Where the 3D sticker images come from: a base URL (self-host the MIT-licensed set), or `false`
+   * to offer only emoji, shapes and uploads. Default: a pinned public CDN. Placed stickers are
+   * stored in the project, so exports never depend on it.
+   */
+  stickerLibrary?: string | false;
   /** `dark` (default), `light` or `auto` (follow the OS). */
   theme?: ThemeMode;
   /** Typed overrides for the common theme tokens. */
@@ -87,6 +93,7 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
         ...(props.onExport ? { onExport: props.onExport } : {}),
         ...(props.resolveMedia ? { resolveMedia: props.resolveMedia } : {}),
         ...(props.autosave !== undefined ? { autosave: props.autosave } : {}),
+        ...(props.stickerLibrary !== undefined ? { stickerLibrary: props.stickerLibrary } : {}),
       },
       parsed?.project ?? undefined,
     );

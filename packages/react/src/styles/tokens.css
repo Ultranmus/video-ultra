@@ -20,6 +20,7 @@
     --vu-accent-soft: rgba(156, 71, 156, 0.22);
     --vu-accent-text: #d08bd0;
     --vu-danger: #ff5c6c;
+    --vu-success: #4cd97b;
     --vu-warning: #f5b54a;
     --vu-overlay: rgba(0, 0, 0, 0.55);
     /* Selection handles sit on the photo too: accent outline, white fill in both themes. */
@@ -102,6 +103,27 @@
     --vu-size-dock: 280px;
     --vu-size-filter-tile: 72px;
     --vu-size-bar: 52px;
+    --vu-size-sticker: 64px;
+    --vu-size-textstyle: 64px;
+    --vu-size-cp-square: 140px;
+    --vu-size-cp-hue: 12px;
+    --vu-size-cp-knob: 16px;
+    --vu-size-swatch-sm: 22px;
+    --vu-scrollbar: rgba(255, 255, 255, 0.18);
+    --vu-scrollbar-hover: rgba(255, 255, 255, 0.3);
+    /* Text style tiles sit on a mid tone so both light and dark text show. */
+    --vu-textstyle-bg: #3a3a44;
+    --vu-cp-black: #000000;
+    --vu-cp-white: #ffffff;
+    --vu-cp-h0: #ff0000;
+    --vu-cp-h60: #ffff00;
+    --vu-cp-h120: #00ff00;
+    --vu-cp-h180: #00ffff;
+    --vu-cp-h240: #0000ff;
+    --vu-cp-h300: #ff00ff;
+    --vu-size-ruler-slider: 32px;
+    /* Opaque stop for CSS masks (any colour works; alpha is what counts). */
+    --vu-mask: #000000;
     --vu-slider-rail: rgba(255, 255, 255, 0.16);
     --vu-size-zoom: 120px;
     --vu-size-tooltip: 280px;
@@ -154,6 +176,7 @@
     --vu-accent-soft: rgba(77, 25, 77, 0.1);
     --vu-accent-text: #4d194d;
     --vu-danger: #c41d30;
+    --vu-success: #15803d;
     --vu-warning: #9a5b00;
     --vu-overlay: rgba(0, 0, 0, 0.45);
     --vu-checker-a: #ffffff;
@@ -165,6 +188,9 @@
     --vu-clip-lane: #ffffff;
     --vu-clip-lane-hover: #f4f4f7;
     --vu-slider-rail: rgba(0, 0, 0, 0.14);
+    --vu-scrollbar: rgba(0, 0, 0, 0.18);
+    --vu-scrollbar-hover: rgba(0, 0, 0, 0.32);
+    --vu-textstyle-bg: #c9c9d2;
     --vu-clip-text: #b0742a;
     --vu-clip-sticker: #23a07c;
     --vu-clip-audio: #2f78c4;
@@ -196,6 +222,8 @@
       --vu-accent-soft: rgba(77, 25, 77, 0.1);
       --vu-accent-text: #4d194d;
       --vu-danger: #c41d30;
+      --vu-success: #15803d;
+      --vu-success: #15803d;
       --vu-warning: #9a5b00;
       --vu-overlay: rgba(0, 0, 0, 0.45);
       --vu-checker-a: #ffffff;
@@ -207,6 +235,12 @@
       --vu-clip-lane: #ffffff;
       --vu-clip-lane-hover: #f4f4f7;
       --vu-slider-rail: rgba(0, 0, 0, 0.14);
+      --vu-scrollbar: rgba(0, 0, 0, 0.18);
+      --vu-scrollbar-hover: rgba(0, 0, 0, 0.32);
+      --vu-textstyle-bg: #c9c9d2;
+      --vu-scrollbar: rgba(0, 0, 0, 0.18);
+      --vu-scrollbar-hover: rgba(0, 0, 0, 0.32);
+      --vu-textstyle-bg: #c9c9d2;
       --vu-clip-text: #b0742a;
       --vu-clip-sticker: #23a07c;
       --vu-clip-audio: #2f78c4;

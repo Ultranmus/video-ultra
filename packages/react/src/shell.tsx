@@ -60,8 +60,18 @@ export function TopBar({ onClose }: { onClose?: (() => void) | undefined }): Rea
           />
         ) : null}
         {save !== 'idle' && layout !== 'phone' ? (
-          <span className="vu-save-state" data-state={save} aria-live="polite">
-            {save === 'saving' ? l.saving : l.saved}
+          <span
+            className="vu-save-state"
+            data-state={save}
+            aria-live="polite"
+            data-tooltip={save === 'saved' ? l.savedTip : undefined}
+          >
+            {save === 'saving' ? (
+              <span className="vu-spinner" aria-hidden="true" />
+            ) : (
+              <Icon name="check" size={14} />
+            )}
+            <span>{save === 'saving' ? l.saving : l.saved}</span>
           </span>
         ) : null}
       </div>
@@ -337,7 +347,7 @@ export function TimelineBar(): ReactElement {
       ) : null}
       <div className="vu-bar-end">
         <IconButton
-          icon="preview"
+          icon="fullscreen"
           label={l.previewMode}
           tip={l.tipPreview}
           onClick={() => ctl.setPreviewMode(true)}
@@ -384,7 +394,7 @@ export function PhoneTransport(): ReactElement {
       </div>
       <div className="vu-bar-end">
         <Button
-          icon="preview"
+          icon="fullscreen"
           label={l.previewMode}
           tip={l.tipPreview}
           onClick={() => ctl.setPreviewMode(true)}

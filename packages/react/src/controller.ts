@@ -42,7 +42,7 @@ import {
   type ProjectStorage,
 } from '@video-ultra/core/internal';
 import { produce } from 'immer';
-import { audioItem, itemTitle, visualItem } from './items';
+import { audioItem, itemTitle, stickerItem, visualItem } from './items';
 import { computeTargets, type Targets } from './targets';
 import type { Labels } from './labels';
 import { createUiStore, Playhead, type LayoutMode, type PanelId, type ToolId } from './state';
@@ -59,6 +59,8 @@ export interface ControllerOptions {
   resolveMedia?: (asset: Asset) => Promise<Blob | null>;
   /** Keep a local autosave + crash-recovery copy in the browser (default true). */
   autosave?: boolean;
+  /** Base URL of the 3D sticker art (self-host it), or `false` to hide 3D stickers. */
+  stickerLibrary?: string | false;
 }
 
 /**
@@ -524,6 +526,40 @@ export class EditorController {
     );
   }
 
+  /** The same filter on every video and photo clip of the main track. */
+  applyFilterToAll(filterId: string | null): void {
+    this.run(this.labels.filter, (d) => {
+      for (const clip of mainTrack(d).items) {
+        if (!('filter' in clip)) continue;
+        updateItem(d, clip.id, {
+          filter: filterId ? { id: filterId, intensity: clip.filter?.intensity ?? 1 } : null,
+        });
+      }
+    });
+  }
+
+  #rangeStop: (() => void) | null = null;
+  /**
+   * Plays `from`…`to` once and pauses (a preview after picking a transition or an animation).
+   * Any user play/pause/seek in between cancels the auto-stop.
+   */
+  playRange(from: Time, to: Time): void {
+    this.#rangeStop?.();
+    this.pause();
+    this.seek(Math.max(0, from));
+    requestAnimationFrame(() => {
+      this.play();
+      const off = this.playhead.subscribe((t) => {
+        if (t >= to || !this.ui.getState().playing) {
+          off();
+          this.#rangeStop = null;
+          if (this.ui.getState().playing) this.pause();
+        }
+      });
+      this.#rangeStop = off;
+    });
+  }
+
   /** Sets (or clears) the transition into a main-track clip. */
   applyTransition(item: Item, type: string | null, duration: Time): void {
     this.run(this.labels.transition, (d) =>
@@ -586,7 +622,7 @@ export class EditorController {
    */
   async importFiles(
     files: readonly File[],
-    options: { addToTimeline?: boolean } = {},
+    options: { addToTimeline?: boolean; asSticker?: boolean } = {},
   ): Promise<void> {
     const addToTimeline = options.addToTimeline ?? true;
     for (const file of files) {
@@ -609,10 +645,15 @@ export class EditorController {
         const assetId = randomId();
         const source = await this.storage!.putMedia(assetId, file);
         const asset = assetFromProbe(probe.media, assetId, source);
+        let stickerId: string | null = null;
         this.run(this.labels.addMedia, (d, ctx) => {
           addAsset(d, asset);
           if (!addToTimeline) return;
-          if (asset.kind === 'audio') {
+          if (options.asSticker && asset.kind === 'image') {
+            const sticker = stickerItem(ctx.ids(), this.playhead.time, { assetId: asset.id });
+            addToLane(d, sticker, ctx.ids);
+            stickerId = sticker.id;
+          } else if (asset.kind === 'audio') {
             addToLane(d, audioItem(asset, ctx.ids(), this.playhead.time), ctx.ids);
           } else {
             const main = mainTrack(d).items;
@@ -621,6 +662,7 @@ export class EditorController {
           }
         });
         this.#registerMedia(asset, file);
+        if (stickerId) this.select(stickerId);
         this.ui.setState((s) => ({ imports: s.imports.filter((r) => r.id !== rowId) }));
       } catch (error) {
         fail(

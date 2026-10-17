@@ -20,9 +20,9 @@ import {
   type TextStyle,
   type Transform,
 } from '@video-ultra/core';
-import type { ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
 import { useController, useLabels, useProject, useUi } from './context';
-import { Button, Chips, ColorField, EditSlider, Section, Segmented } from './controls';
+import { Button, Chips, ColorField, EditSlider, IconButton, Section, Segmented } from './controls';
 import { RATIOS, ratioOf } from './items';
 import { FilterStrip, TransitionGrid } from './looks';
 import type { ToolId } from './state';
@@ -346,31 +346,46 @@ function FadeTool({ item }: { item: Item }) {
 function AdjustTool({ item }: { item: Item }) {
   const ctl = useController();
   const l = useLabels();
+  const [key, setKey] = useState<keyof Adjust>('brightness');
   if (!('adjust' in item)) return null;
   const adjust = item.adjust;
   const any = Object.values(adjust).some((v) => v);
+  const current = ADJUST_KEYS.find((k) => k.key === key) ?? ADJUST_KEYS[0]!;
   return (
     <>
-      {ADJUST_KEYS.map(({ key, label }) => (
-        <EditSlider
-          key={key}
-          label={label}
-          value={adjust[key as keyof Adjust] ?? 0}
-          min={-1}
-          max={1}
-          step={0.01}
-          defaultValue={0}
-          origin={0}
-          format={signed}
-          recipe={(d, v) => {
-            const found = findItem(d, item.id)?.item;
-            const base = found && 'adjust' in found ? found.adjust : adjust;
-            updateItem(d, item.id, { adjust: { ...base, [key]: v } });
-          }}
-          commitLabel={l.adjust}
-          coalesceKey={`adjust:${key}:${item.id}`}
-        />
-      ))}
+      <div className="vu-chips" role="radiogroup" aria-label={l.adjust}>
+        {ADJUST_KEYS.map(({ key: k, label }) => (
+          <button
+            key={k}
+            type="button"
+            role="radio"
+            aria-checked={k === key}
+            className="vu-chip"
+            data-dot={adjust[k as keyof Adjust] ? '' : undefined}
+            onClick={() => setKey(k as keyof Adjust)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <EditSlider
+        key={key}
+        label={current.label}
+        value={adjust[key] ?? 0}
+        min={-1}
+        max={1}
+        step={0.01}
+        defaultValue={0}
+        origin={0}
+        format={signed}
+        recipe={(d, v) => {
+          const found = findItem(d, item.id)?.item;
+          const base = found && 'adjust' in found ? found.adjust : adjust;
+          updateItem(d, item.id, { adjust: { ...base, [key]: v } });
+        }}
+        commitLabel={l.adjust}
+        coalesceKey={`adjust:${key}:${item.id}`}
+      />
       <div className="vu-row">
         <Button
           icon="undo"
@@ -387,6 +402,7 @@ function AdjustTool({ item }: { item: Item }) {
 function CropTool({ item }: { item: Item }) {
   const ctl = useController();
   const l = useLabels();
+  const [edge, setEdge] = useState<'left' | 'right' | 'top' | 'bottom'>('left');
   if (!('crop' in item)) return null;
   const crop = item.crop;
   const any = crop.left || crop.right || crop.top || crop.bottom;
@@ -398,25 +414,30 @@ function CropTool({ item }: { item: Item }) {
   ] as const;
   return (
     <>
-      {edges.map(([edge, label]) => (
-        <EditSlider
-          key={edge}
-          label={label}
-          value={crop[edge]}
-          min={0}
-          max={0.45}
-          step={0.005}
-          defaultValue={0}
-          format={percent}
-          recipe={(d, v) => {
-            const found = findItem(d, item.id)?.item;
-            const base = found && 'crop' in found ? found.crop : crop;
-            updateItem(d, item.id, { crop: { ...base, [edge]: v } });
-          }}
-          commitLabel={l.crop}
-          coalesceKey={`crop:${edge}:${item.id}`}
-        />
-      ))}
+      <Segmented
+        label={l.crop}
+        hideLabel
+        value={edge}
+        options={edges.map(([value, label]) => ({ value, label }))}
+        onChange={setEdge}
+      />
+      <EditSlider
+        key={edge}
+        label={edges.find(([e]) => e === edge)![1]}
+        value={crop[edge]}
+        min={0}
+        max={0.45}
+        step={0.005}
+        defaultValue={0}
+        format={percent}
+        recipe={(d, v) => {
+          const found = findItem(d, item.id)?.item;
+          const base = found && 'crop' in found ? found.crop : crop;
+          updateItem(d, item.id, { crop: { ...base, [edge]: v } });
+        }}
+        commitLabel={l.crop}
+        coalesceKey={`crop:${edge}:${item.id}`}
+      />
       <div className="vu-row">
         <Button
           icon="undo"
@@ -451,30 +472,35 @@ function TransformTool({ item }: { item: Item }) {
     tf.flipY;
   return (
     <>
-      <div className="vu-row">
-        <Button
+      <div className="vu-icon-row" role="group" aria-label={l.rotate}>
+        <IconButton
           icon="rotate"
           label={l.rotate90}
-          variant="secondary"
           onClick={() =>
             set(l.rotate, {
               rotation: ((Math.round(tf.rotation / 90) * 90 + 90 + 180) % 360) - 180,
             })
           }
         />
-        <Button
+        <IconButton
           icon="flip"
           label={l.flipH}
-          variant="secondary"
           pressed={tf.flipX}
           onClick={() => set(l.flipH, { flipX: !tf.flipX })}
         />
-        <Button
+        <IconButton
           icon="flipV"
           label={l.flipV}
-          variant="secondary"
           pressed={tf.flipY}
           onClick={() => set(l.flipV, { flipY: !tf.flipY })}
+        />
+        <IconButton
+          icon="undo"
+          label={l.resetPosition}
+          disabledReason={moved ? null : l.nothingToReset}
+          onClick={() =>
+            set(l.reset, { ...DEFAULT_TRANSFORM, scale: baseScale, opacity: tf.opacity })
+          }
         />
       </div>
       {'fit' in item ? (
@@ -513,17 +539,6 @@ function TransformTool({ item }: { item: Item }) {
         commitLabel={l.rotate}
         coalesceKey={`rotate:${item.id}`}
       />
-      <div className="vu-row">
-        <Button
-          icon="undo"
-          label={l.resetPosition}
-          variant="secondary"
-          disabledReason={moved ? null : l.nothingToReset}
-          onClick={() =>
-            set(l.reset, { ...DEFAULT_TRANSFORM, scale: baseScale, opacity: tf.opacity })
-          }
-        />
-      </div>
     </>
   );
 }
@@ -599,6 +614,8 @@ function TextStyleTool({ item }: { item: Item }) {
   const style = item.style;
   const set = (patch: Partial<TextStyle>) =>
     ctl.run(l.style, (d) => updateItem(d, item.id, { style: { ...style, ...patch } }));
+  const restyle = (d: Parameters<typeof updateItem>[0], patch: Partial<TextStyle>) =>
+    updateItem(d, item.id, { style: { ...style, ...patch } });
   const font =
     FONT_PRESETS.find((f) => f.family === style.fontFamily && f.weight === style.fontWeight)?.id ??
     FONT_PRESETS.find((f) => f.family === style.fontFamily)?.id ??
@@ -623,8 +640,9 @@ function TextStyleTool({ item }: { item: Item }) {
       <ColorField
         label={l.color}
         value={style.color}
-        onChange={(color) => set({ color })}
-        customLabel={l.customColor}
+        recipe={(d, color) => restyle(d, { color })}
+        commitLabel={l.color}
+        coalesceKey={`textcolor:${item.id}`}
       />
       <EditSlider
         label={l.textSize}
@@ -699,16 +717,18 @@ function TextStyleTool({ item }: { item: Item }) {
         <ColorField
           label={l.outlineColor}
           value={style.outline.color}
-          onChange={(color) => set({ outline: { ...style.outline!, color } })}
-          customLabel={l.customColor}
+          recipe={(d, color) => restyle(d, { outline: { ...style.outline!, color } })}
+          commitLabel={l.outlineColor}
+          coalesceKey={`outlinecolor:${item.id}`}
         />
       ) : null}
       {style.background ? (
         <ColorField
           label={l.backgroundColorText}
           value={style.background.color}
-          onChange={(color) => set({ background: { ...style.background!, color } })}
-          customLabel={l.customColor}
+          recipe={(d, color) => restyle(d, { background: { ...style.background!, color } })}
+          commitLabel={l.backgroundColorText}
+          coalesceKey={`boxcolor:${item.id}`}
         />
       ) : null}
     </>
@@ -755,10 +775,9 @@ export function CanvasTool(): ReactElement {
         <ColorField
           label={l.backgroundColor}
           value={background.color}
-          onChange={(color) =>
-            ctl.run(l.background, (d) => setBackground(d, { type: 'color', color }))
-          }
-          customLabel={l.customColor}
+          recipe={(d, color) => setBackground(d, { type: 'color', color })}
+          commitLabel={l.background}
+          coalesceKey="background-color"
         />
       ) : (
         <EditSlider

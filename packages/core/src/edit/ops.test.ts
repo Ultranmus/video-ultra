@@ -18,6 +18,7 @@ import {
   freezeFrame,
   insertMain,
   moveItem,
+  moveItemToNewLane,
   reorderMain,
   setSpeed,
   setTrackFlags,
@@ -216,5 +217,20 @@ describe('properties and locking', () => {
     const { project, ids } = setup();
     setTrackFlags(project, mainTrack(project).id, { locked: true });
     expect(() => splitItem(project, 'a', s(1), ids)).toThrow(/locked/);
+  });
+});
+
+describe('moveItemToNewLane', () => {
+  it('moves a lane item to a new lane at the given position and drops the empty one', () => {
+    const p = fixtureProject();
+    const ids = sequentialIds('n');
+    addToLane(p, textItem('ta', 0), ids);
+    addToLane(p, textItem('tb', 5), ids);
+    const before = p.tracks.length;
+    const lane = moveItemToNewLane(p, 'tb', s(1), ids, 1);
+    expect(p.tracks[1]!.id).toBe(lane);
+    expect(p.tracks[1]!.items.map((i) => i.id)).toEqual(['tb']);
+    expect(p.tracks.length).toBe(before + 1);
+    expect(checkInvariants(p)).toEqual([]);
   });
 });

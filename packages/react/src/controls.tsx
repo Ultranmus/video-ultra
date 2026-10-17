@@ -1,6 +1,7 @@
 import type { EditContext, Project } from '@video-ultra/core';
 import { useEffect, useId, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import { useController } from './context';
+import { ColorPicker } from './ColorPicker';
 import { Icon, type IconName } from './icons';
 
 /**
@@ -91,10 +92,22 @@ export function IconButton(props: Omit<ButtonProps, 'layout'> & { icon: IconName
   return <Button {...props} layout="icon" />;
 }
 
+/** A tick spacing that gives about 40 ticks over the range (1, 2, 5 × 10ⁿ). */
+function niceTick(range: number): number {
+  const raw = range / 40;
+  const pow = Math.pow(10, Math.floor(Math.log10(raw)));
+  const n = raw / pow;
+  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * pow;
+}
+
+const TICK_PX = 8;
+const SNAP_PX = 6;
+
 /**
- * A slider that previews live while dragged (no store writes, no undo steps) and commits one edit
- * on release. Keyboard steps commit each step, merged into one undo step. Double-click resets to
- * `defaultValue`.
+ * The ruler slider: a tick scale that slides under a fixed centre marker, the value above it.
+ * Drag it (touch or mouse), use the arrow keys (Shift = ×10), or double-click to reset; it snaps
+ * to the default. While dragging it previews live (no store writes, no undo steps) and commits
+ * one edit on release; key presses commit, merged into one undo step.
  */
 export function EditSlider({
   label,
@@ -128,62 +141,127 @@ export function EditSlider({
   const ctl = useController();
   const id = useId();
   const [live, setLive] = useState<number | null>(null);
-  const ref = useRef<HTMLInputElement>(null);
   const recipeRef = useRef(recipe);
   useEffect(() => {
     recipeRef.current = recipe;
   });
+  const drag = useRef<{ id: number; x: number; start: number; moved: boolean } | null>(null);
+  const [dragging, setDragging] = useState(false);
   const shown = live ?? value;
   const changed = defaultValue !== undefined && Math.abs(shown - defaultValue) > step / 2;
+  const tick = niceTick(max - min);
+  const pxPerUnit = TICK_PX / tick;
+  const clamp = (v: number) => Math.min(max, Math.max(min, Math.round(v / step) * step));
 
-  useEffect(() => {
-    const input = ref.current!;
-    // Native `change` fires on release (pointer) or per key step; React's onChange fires on input.
-    const commit = () => {
-      const v = Number(input.value);
-      setLive(null);
-      ctl.run(commitLabel, (d, ctx) => recipeRef.current(d, v, ctx), { coalesceKey });
-    };
-    input.addEventListener('change', commit);
-    return () => input.removeEventListener('change', commit);
-  }, [ctl, commitLabel, coalesceKey]);
+  const commit = (v: number) => {
+    setLive(null);
+    ctl.run(commitLabel, (d, ctx) => recipeRef.current(d, v, ctx), { coalesceKey });
+  };
+  const show = (v: number) => {
+    setLive(v);
+    onLive?.(v);
+    ctl.preview((d, ctx) => recipeRef.current(d, v, ctx));
+  };
 
-  const fill = ((shown - min) / (max - min)) * 100;
-  // Two-sided sliders (adjustments) fill from their zero point, not from the left end.
-  const from = origin !== undefined ? ((origin - min) / (max - min)) * 100 : 0;
+  // Ticks: one element per tick (≤ ~45), majors every 5; the track moves, the marker stays.
+  const ticks: ReactElement[] = [];
+  const count = Math.round((max - min) / tick);
+  for (let i = 0; i <= count; i++) {
+    const v = min + i * tick;
+    const major = Math.abs(Math.round(v / tick) % 5) === 0;
+    const isDefault = defaultValue !== undefined && Math.abs(v - defaultValue) < tick / 2;
+    ticks.push(
+      <span
+        key={i}
+        className="vu-ruler-tick"
+        data-major={major || undefined}
+        data-default={isDefault || undefined}
+        style={{ left: `${i * TICK_PX}px` }}
+      />,
+    );
+  }
+  const offset = (shown - min) * pxPerUnit;
+  const from = ((origin ?? min) - min) * pxPerUnit;
+
   return (
     <div className="vu-field">
-      <label className="vu-field-row" htmlFor={id}>
-        <span>{label}</span>
+      <div className="vu-field-row">
+        <span id={id}>{label}</span>
         <output className="vu-field-value" data-changed={changed || undefined}>
           {format ? format(shown) : String(shown)}
         </output>
-      </label>
-      <input
-        ref={ref}
-        id={id}
-        className="vu-slider"
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={shown}
-        style={{
-          ['--vu-fill-from' as string]: `${Math.min(fill, from)}%`,
-          ['--vu-fill-to' as string]: `${Math.max(fill, from)}%`,
+      </div>
+      <div
+        className="vu-ruler"
+        role="slider"
+        tabIndex={0}
+        aria-labelledby={id}
+        aria-valuemin={min}
+        aria-valuemax={max}
+        aria-valuenow={shown}
+        aria-valuetext={format ? format(shown) : String(shown)}
+        data-dragging={dragging || undefined}
+        onPointerDown={(e) => {
+          if (e.button > 0) return;
+          e.currentTarget.setPointerCapture(e.pointerId);
+          drag.current = { id: e.pointerId, x: e.clientX, start: shown, moved: false };
+        }}
+        onPointerMove={(e) => {
+          const d = drag.current;
+          if (!d || d.id !== e.pointerId) return;
+          const dx = e.clientX - d.x;
+          if (!d.moved && Math.abs(dx) < 3) return;
+          if (!d.moved) setDragging(true);
+          d.moved = true;
+          // Dragging the scale left brings higher values under the marker.
+          let v = clamp(d.start - dx / pxPerUnit);
+          if (defaultValue !== undefined && Math.abs(v - defaultValue) * pxPerUnit < SNAP_PX)
+            v = defaultValue;
+          show(v);
+        }}
+        onPointerUp={(e) => {
+          const d = drag.current;
+          drag.current = null;
+          setDragging(false);
+          if (!d || d.id !== e.pointerId) return;
+          if (d.moved && live !== null) commit(live);
+          else setLive(null);
+        }}
+        onPointerCancel={() => {
+          drag.current = null;
+          setDragging(false);
+          setLive(null);
+          ctl.preview(null);
         }}
         onDoubleClick={() => {
-          if (defaultValue === undefined) return;
-          setLive(null);
-          ctl.run(commitLabel, (d, ctx) => recipeRef.current(d, defaultValue, ctx));
+          if (defaultValue !== undefined) commit(defaultValue);
         }}
-        onChange={(e) => {
-          const v = Number(e.currentTarget.value);
-          setLive(v);
-          onLive?.(v);
-          ctl.preview((d, ctx) => recipeRef.current(d, v, ctx));
+        onKeyDown={(e) => {
+          const big = e.shiftKey ? 10 : 1;
+          let next: number | null = null;
+          if (e.key === 'ArrowRight' || e.key === 'ArrowUp') next = clamp(shown + tick * big);
+          else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') next = clamp(shown - tick * big);
+          else if (e.key === 'Home') next = min;
+          else if (e.key === 'End') next = max;
+          else if ((e.key === 'Enter' || e.key === 'Delete') && defaultValue !== undefined)
+            next = defaultValue;
+          if (next === null) return;
+          e.preventDefault();
+          e.stopPropagation();
+          commit(next);
         }}
-      />
+      >
+        <div className="vu-ruler-viewport">
+          <div className="vu-ruler-track" style={{ transform: `translateX(${-offset}px)` }}>
+            {ticks}
+            <span
+              className="vu-ruler-fill"
+              style={{ left: `${Math.min(from, offset)}px`, width: `${Math.abs(offset - from)}px` }}
+            />
+          </div>
+        </div>
+        <span className="vu-ruler-marker" aria-hidden="true" />
+      </div>
     </div>
   );
 }
@@ -276,19 +354,26 @@ const SWATCHES = [
   ['#8fd16a', 'Green'],
 ] as const;
 
-/** Colour swatches plus a custom colour. */
+/** Colour swatches plus a full colour picker. Previews while dragging; one edit per change. */
 export function ColorField({
   label,
   value,
-  onChange,
-  customLabel,
+  recipe,
+  commitLabel,
+  coalesceKey,
 }: {
   label: string;
   value: string;
-  onChange: (value: string) => void;
-  customLabel: string;
+  /** Applies a colour to the project draft. */
+  recipe: (draft: Project, color: string) => void;
+  commitLabel: string;
+  coalesceKey: string;
 }): ReactElement {
+  const ctl = useController();
+  const l = ctl.labels;
+  const [open, setOpen] = useState(false);
   const custom = !SWATCHES.some(([c]) => c === value.toLowerCase());
+  const commit = (color: string) => ctl.run(commitLabel, (d) => recipe(d, color), { coalesceKey });
   return (
     <div className="vu-field">
       <span className="vu-field-row">{label}</span>
@@ -303,23 +388,27 @@ export function ColorField({
             data-tooltip={name}
             className="vu-swatch"
             style={{ ['--vu-swatch' as string]: color }}
-            onClick={() => onChange(color)}
+            onClick={() => commit(color)}
           />
         ))}
-        <label
+        <button
+          type="button"
           className="vu-swatch vu-swatch-custom"
-          data-tooltip={customLabel}
+          aria-label={l.customColor}
+          aria-expanded={open}
+          data-tooltip={l.customColor}
           data-checked={custom || undefined}
-        >
-          <input
-            type="color"
-            className="vu-sr-only"
-            aria-label={customLabel}
-            value={/^#[0-9a-f]{6}$/i.test(value) ? value : '#ffffff'}
-            onChange={(e) => onChange(e.currentTarget.value)}
-          />
-        </label>
+          onClick={() => setOpen(!open)}
+        />
       </div>
+      {open ? (
+        <ColorPicker
+          value={/^#[0-9a-f]{6}$/i.test(value) ? value : '#ffffff'}
+          onPreview={(c) => ctl.preview((d) => recipe(d, c))}
+          onChange={commit}
+          labels={{ saturation: l.cpSaturation, hue: l.cpHue, hex: l.cpHex, recent: l.cpRecent }}
+        />
+      ) : null}
     </div>
   );
 }

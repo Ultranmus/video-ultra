@@ -1,9 +1,17 @@
-import { FLICKS_PER_SECOND, type Asset, FONT_PRESETS, STICKER_EMOJI } from '@video-ultra/core';
+import {
+  findItem,
+  FLICKS_PER_SECOND,
+  updateItem,
+  type Asset,
+  type TextStyle,
+} from '@video-ultra/core';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { useController, useLabels, useProject, useUi } from './context';
 import { Icon } from './icons';
-import { stickerItem, textItem } from './items';
+import { textItem } from './items';
 import type { PanelId } from './state';
+import { StickersPanel } from './library/StickersPanel';
+import { TEXT_STYLE_CATEGORIES, TEXT_STYLE_PRESETS } from './library/textStyles';
 import { FilterStrip, TransitionGrid } from './looks';
 import { CanvasTool } from './ToolPanel';
 
@@ -141,9 +149,60 @@ function AssetTile({ asset }: { asset: Asset }) {
   );
 }
 
+/** CSS that approximates a text style for the picker tiles (the engine draws the real thing). */
+function previewCss(style: TextStyle): React.CSSProperties {
+  const em = 22;
+  const css: React.CSSProperties = {
+    fontFamily: style.fontFamily,
+    fontWeight: style.fontWeight,
+    fontStyle: style.italic ? 'italic' : 'normal',
+    color: style.color,
+    letterSpacing: `${style.letterSpacing}em`,
+    fontSize: `${em}px`,
+  };
+  if (style.outline) {
+    css.WebkitTextStroke = `${Math.max(1, style.outline.width * em * 2)}px ${style.outline.color}`;
+    css.paintOrder = 'stroke fill';
+  }
+  if (style.shadow)
+    css.textShadow = `${style.shadow.x * 0.5}px ${style.shadow.y * 0.5}px ${style.shadow.blur * 0.5}px ${style.shadow.color}`;
+  if (style.background) {
+    css.background = style.background.color;
+    css.padding = `${style.background.padding * em * 0.6}px ${style.background.padding * em}px`;
+    css.borderRadius = `${style.background.radius * em}px`;
+  }
+  return css;
+}
+
 function TextPanel() {
   const ctl = useController();
   const l = useLabels();
+  const [category, setCategory] = useState(TEXT_STYLE_CATEGORIES[0]!.id);
+  const selectedId = useUi((s) => s.selectedId);
+  const selected = useProject((p) => {
+    const found = selectedId ? findItem(p, selectedId)?.item : null;
+    return found && found.kind === 'text' ? found : null;
+  });
+  const presets = TEXT_STYLE_PRESETS.filter((p) => p.category === category);
+  const apply = (preset: (typeof TEXT_STYLE_PRESETS)[number]) => {
+    if (selected) {
+      // Keep the user's size, alignment and line height; take the look.
+      const style = {
+        ...preset.style,
+        size: selected.style.size,
+        align: selected.style.align,
+        lineHeight: selected.style.lineHeight,
+      };
+      ctl.run(l.style, (d) => updateItem(d, selected.id, { style }));
+      return;
+    }
+    ctl.addLaneItem(l.addText, (id, start) => {
+      const item = textItem(id, start, l.textPlaceholder);
+      item.style = { ...preset.style };
+      return item;
+    });
+    ctl.openTool('text-edit');
+  };
   return (
     <div className="vu-panel-body">
       <button
@@ -159,45 +218,34 @@ function TextPanel() {
         <Icon name="plus" />
         <span>{l.addText}</span>
       </button>
-      <p className="vu-hint">{l.addTextStyled}</p>
-      <ul className="vu-style-list">
-        {FONT_PRESETS.map((font) => (
-          <li key={font.id}>
-            <button
-              type="button"
-              className="vu-style-preset"
-              style={{ fontFamily: font.family, fontWeight: font.weight }}
-              onClick={() => {
-                ctl.addLaneItem(l.addText, (id, start) => textItem(id, start, font.label, font));
-                ctl.openTool('text-edit');
-              }}
-            >
-              {font.label}
-            </button>
-          </li>
+      <p className="vu-target" data-active={selected ? '' : undefined}>
+        {selected ? l.styleAppliesTo(selected.text.split('\n')[0] || l.text) : l.styleAddsNew}
+      </p>
+      <div className="vu-chips vu-chips-scroll" role="radiogroup" aria-label={l.category}>
+        {TEXT_STYLE_CATEGORIES.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            role="radio"
+            aria-checked={c.id === category}
+            className="vu-chip"
+            onClick={() => setCategory(c.id)}
+          >
+            {c.label}
+          </button>
         ))}
-      </ul>
-    </div>
-  );
-}
-
-function StickersPanel() {
-  const ctl = useController();
-  const l = useLabels();
-  return (
-    <div className="vu-panel-body">
-      <ul className="vu-emoji-grid" aria-label={l.stickers}>
-        {STICKER_EMOJI.map((emoji) => (
-          <li key={emoji}>
+      </div>
+      <ul className="vu-textstyle-grid" aria-label={l.style}>
+        {presets.map((preset) => (
+          <li key={preset.id}>
             <button
               type="button"
-              className="vu-emoji"
-              aria-label={emoji}
-              onClick={() =>
-                ctl.addLaneItem(l.stickers, (id, start) => stickerItem(id, start, { emoji }))
-              }
+              className="vu-textstyle"
+              aria-label={preset.label}
+              data-tooltip={preset.label}
+              onClick={() => apply(preset)}
             >
-              {emoji}
+              <span style={previewCss(preset.style)}>{preset.sample}</span>
             </button>
           </li>
         ))}

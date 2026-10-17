@@ -107,7 +107,7 @@ if (only !== 'phone') {
     .locator('.vu-modal-head .vu-btn')
     .click()
     .catch(() => {});
-  await page.locator('.vu-bar-end .vu-btn[aria-label="Preview"]').click();
+  await page.locator('.vu-bar-end .vu-btn[aria-label="Full screen"]').click();
   await snap(page, 'd14-preview');
   await browser.close();
 }
@@ -136,7 +136,7 @@ if (only !== 'desktop') {
   await snap(page, 'p07-text-edit');
   await page.locator('.vu-done').tap();
   await snap(page, 'p08-text-selected');
-  await page.locator('.vu-bar-end .vu-btn', { hasText: 'Preview' }).tap();
+  await page.locator('.vu-bar-end .vu-btn', { hasText: 'Full screen' }).tap();
   await snap(page, 'p09-preview');
   await browser.close();
 }

@@ -14,6 +14,17 @@ import { itemTitle } from './items';
 import { useTargets, type LookItem } from './targets';
 
 const TILE = 72;
+
+/**
+ * When a look panel opens with nothing selected, select the clip it acts on, so the timeline's
+ * selection outline shows exactly what will change.
+ */
+function useAutoSelect(id: string | null) {
+  const ctl = useController();
+  useEffect(() => {
+    if (id && !ctl.ui.getState().selectedId) ctl.select(id);
+  }, [ctl, id]);
+}
 const IDS: (string | null)[] = [null, ...FILTER_PRESETS.map((f) => f.id)];
 
 /**
@@ -24,6 +35,7 @@ export function FilterStrip(): ReactElement {
   const ctl = useController();
   const l = useLabels();
   const { look, hasClips } = useTargets();
+  useAutoSelect(look?.id ?? null);
   if (!look) {
     return (
       <EmptyState
@@ -115,6 +127,18 @@ function FilterGrid({ item }: { item: LookItem }) {
             </span>
           </button>
         ))}
+      </div>
+      <div className="vu-row">
+        <Button
+          icon="filter"
+          label={l.applyFilterAll}
+          variant="secondary"
+          tip={l.applyFilterAllTip}
+          onClick={() => {
+            ctl.applyFilterToAll(current);
+            ctl.toast(l.filterAppliedAll, 'success', { label: l.undo, run: () => ctl.undo() });
+          }}
+        />
       </div>
       {item.filter ? (
         <EditSlider
@@ -235,6 +259,7 @@ export function TransitionGrid(): ReactElement {
   const ctl = useController();
   const l = useLabels();
   const { transition, hasClips } = useTargets();
+  useAutoSelect(transition?.id ?? null);
   if (!transition || !('transitionIn' in transition)) {
     return (
       <EmptyState
@@ -285,8 +310,12 @@ function TransitionChoices({ item }: { item: Extract<Item, { transitionIn: unkno
             className="vu-transition-tile"
             onClick={() => {
               ctl.applyTransition(item, t.id, duration);
-              // Show it: play the transition from just before the cut.
-              ctl.seek(Math.max(0, item.start - duration));
+              // Show it once: from just before the cut to just after.
+              const half = Math.round(duration / 2);
+              ctl.playRange(
+                item.start - half - fromSeconds(0.6),
+                item.start + half + fromSeconds(0.4),
+              );
             }}
           >
             <TransitionGlyph type={t.id} />

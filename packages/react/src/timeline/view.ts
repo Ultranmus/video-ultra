@@ -2,6 +2,7 @@ import {
   FLICKS_PER_SECOND,
   itemEnd,
   moveItem,
+  moveItemToNewLane,
   projectDuration,
   projectFrame,
   reorderMain,
@@ -73,6 +74,7 @@ interface Colors {
   surfaceStrong: string;
   border: string;
   overlay: string;
+  accentSoft: string;
   onMedia: string;
   grip: string;
   font: string;
@@ -109,7 +111,8 @@ type Drag =
       grabY: number;
       pointer: { x: number; y: number };
       start: Time;
-      trackId: string;
+      /** Where it lands: an existing lane, or a new lane at a track position. */
+      target: { type: 'lane'; trackId: string } | { type: 'new'; index: number };
     }
   | {
       type: 'reorder';
@@ -265,6 +268,7 @@ export class TimelineView {
       surfaceStrong: v('--vu-surface-3', '#26262d'),
       border: v('--vu-border-strong', 'rgba(255,255,255,0.16)'),
       overlay: v('--vu-overlay', 'rgba(0,0,0,0.55)'),
+      accentSoft: v('--vu-accent-soft', 'rgba(156,71,156,0.22)'),
       onMedia: v('--vu-on-media', '#fff'),
       grip: v('--vu-trim-grip', 'rgba(0,0,0,0.55)'),
       font: style.fontFamily || 'system-ui, sans-serif',
@@ -331,7 +335,8 @@ export class TimelineView {
   }
 
   #maxScrollY(): number {
-    return Math.max(0, contentHeight(this.#project(), this.#m) - this.#height + 8);
+    // One spare lane of room below the last, so there is always a gap to drop into.
+    return Math.max(0, contentHeight(this.#project(), this.#m) + this.#m.track - this.#height + 8);
   }
 
   #onPlayhead(): void {
@@ -496,7 +501,7 @@ export class TimelineView {
         grabY,
         pointer: { x, y },
         start: item.start,
-        trackId: row.track.id,
+        target: { type: 'lane', trackId: row.track.id },
       };
     }
     this.#canvas.style.cursor = 'grabbing';
@@ -622,12 +627,8 @@ export class TimelineView {
         }
         this.#setSnap(guide);
         drag.start = Math.max(0, Math.round(start));
-        // Vertical: a lane of the same kind under the ghost's centre.
-        const own = this.#rows(this.#ctl.project).find((r) =>
-          r.track.items.some((i) => i.id === item.id),
-        );
-        const over = this.#rowAt(p.y - drag.grabY + (own?.height ?? 0) / 2);
-        if (over && own && over.track.kind === own.track.kind) drag.trackId = over.track.id;
+        // Vertical: where the ghost's centre is.
+        drag.target = this.#dropTarget(item, drag.start, p.y - drag.grabY);
         this.invalidate();
         return;
       }
@@ -679,8 +680,13 @@ export class TimelineView {
         break;
       }
       case 'move': {
-        const { item, start, trackId } = drag;
-        if (start !== item.start || trackId !== this.#trackOf(item.id)) {
+        const { item, start, target } = drag;
+        if (target.type === 'new') {
+          this.#ctl.run(l.move, (d, ctx) =>
+            moveItemToNewLane(d, item.id, start, ctx.ids, target.index),
+          );
+        } else if (start !== item.start || target.trackId !== this.#trackOf(item.id)) {
+          const trackId = target.trackId;
           this.#ctl.run(l.move, (d, ctx) => moveItem(d, item.id, start, ctx.ids, trackId));
         }
         break;
@@ -703,6 +709,35 @@ export class TimelineView {
     this.#hoverHeader = null;
     this.#setTooltip(null);
     this.invalidate();
+  }
+
+  /**
+   * Where a lane clip dropped with its top at `top` lands: the lane under its centre when that lane
+   * takes this kind and has room; a new lane right after it when the clip would overlap; a new
+   * lane at the nearest gap when over another kind (or the main track) or below every lane.
+   */
+  #dropTarget(item: Item, start: Time, top: number): Extract<Drag, { type: 'move' }>['target'] {
+    const project = this.#ctl.project;
+    const rows = this.#rows(project);
+    const own = rows.find((r) => r.track.items.some((i) => i.id === item.id));
+    if (!own) return { type: 'new', index: project.tracks.length };
+    const centre = top + own.height / 2;
+    const over = rows.find(
+      (r) => centre >= r.top - this.#m.gap / 2 && centre < r.top + r.height + this.#m.gap / 2,
+    );
+    if (!over)
+      return { type: 'new', index: centre < (rows[0]?.top ?? 0) ? 1 : project.tracks.length };
+    if (over.track.kind === own.track.kind && !over.track.locked) {
+      const end = start + item.duration;
+      const free = over.track.items.every(
+        (o) => o.id === item.id || itemEnd(o) <= start || o.start >= end,
+      );
+      return free
+        ? { type: 'lane', trackId: over.track.id }
+        : { type: 'new', index: over.index + 1 };
+    }
+    const upper = centre < over.top + over.height / 2;
+    return { type: 'new', index: Math.max(1, upper ? over.index : over.index + 1) };
   }
 
   #trackOf(itemId: string): string | undefined {
@@ -1065,14 +1100,44 @@ export class TimelineView {
     ctx.strokeStyle = this.#c.selection;
     ctx.fillStyle = this.#c.selection;
     if (drag.type === 'move') {
-      const row = rows.find((r) => r.track.id === drag.trackId);
-      if (!row) return;
       const x1 = timeToX(scale, drag.start);
       const x2 = timeToX(scale, drag.start + drag.item.duration);
       ctx.lineWidth = 2;
       ctx.setLineDash([5, 4]);
-      this.#roundRect(x1 + 1, row.top + 3, x2 - x1 - 2, row.height - 6, this.#radius);
-      ctx.stroke();
+      if (drag.target.type === 'lane') {
+        const id = drag.target.trackId;
+        const row = rows.find((r) => r.track.id === id);
+        if (row) {
+          this.#roundRect(x1 + 1, row.top + 3, x2 - x1 - 2, row.height - 6, this.#radius);
+          ctx.stroke();
+        }
+      } else {
+        // A new lane: a highlighted band at the gap where it will be inserted.
+        const index = drag.target.index;
+        const before = rows[index - 1];
+        const y = before
+          ? before.top + before.height + this.#m.gap / 2
+          : (rows[0]?.top ?? this.#m.ruler);
+        const band = Math.min(this.#m.track, 28);
+        ctx.setLineDash([]);
+        ctx.fillStyle = this.#c.accentSoft;
+        this.#roundRect(
+          this.#m.header + 4,
+          y - band / 2,
+          this.#width - this.#m.header - 8,
+          band,
+          6,
+        );
+        ctx.fill();
+        ctx.setLineDash([5, 4]);
+        this.#roundRect(x1 + 1, y - band / 2 + 2, x2 - x1 - 2, band - 4, this.#radius);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = this.#c.selection;
+        ctx.font = `600 11px ${this.#c.font}`;
+        ctx.textBaseline = 'middle';
+        ctx.fillText(this.#ctl.labels.newLane, Math.max(this.#m.header + 12, x2 + 10), y + 0.5);
+      }
       ctx.setLineDash([]);
       return;
     }

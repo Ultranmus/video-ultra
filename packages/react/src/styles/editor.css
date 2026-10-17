@@ -290,7 +290,7 @@
 
   .vu-project-name {
     min-width: 0;
-    width: 24ch;
+    width: 18ch;
     max-width: 100%;
     height: var(--vu-size-choice-lg);
     padding: 0 var(--vu-space-2);
@@ -311,10 +311,26 @@
   }
 
   .vu-save-state {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vu-space-1);
+    height: var(--vu-size-choice);
     padding: 0 var(--vu-space-2);
-    color: var(--vu-text-subtle);
-    font-size: var(--vu-text-sm);
+    border-radius: var(--vu-radius-full);
+    background: var(--vu-surface-2);
+    color: var(--vu-text-muted);
+    font-size: var(--vu-text-xs);
+    font-weight: var(--vu-weight-medium);
     white-space: nowrap;
+  }
+
+  .vu-save-state[data-state='saved'] .vu-icon {
+    color: var(--vu-success);
+  }
+
+  .vu-save-state .vu-spinner {
+    width: var(--vu-space-3);
+    height: var(--vu-space-3);
   }
 
   .vu-ratio-button {
@@ -612,6 +628,112 @@
 
   .vu-slider:focus-visible::-moz-range-thumb {
     box-shadow: var(--vu-focus-ring);
+  }
+
+  /* Ruler slider: the tick scale slides under a fixed centre marker. */
+  .vu-ruler {
+    position: relative;
+    height: var(--vu-size-ruler-slider);
+    border-radius: var(--vu-radius-sm);
+    cursor: grab;
+    touch-action: pan-y;
+    outline: none;
+  }
+
+  .vu-ruler[data-dragging] {
+    cursor: grabbing;
+  }
+
+  .vu-ruler-viewport {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(
+      90deg,
+      transparent,
+      var(--vu-mask) 22%,
+      var(--vu-mask) 78%,
+      transparent
+    );
+    mask-image: linear-gradient(
+      90deg,
+      transparent,
+      var(--vu-mask) 22%,
+      var(--vu-mask) 78%,
+      transparent
+    );
+  }
+
+  .vu-ruler-track {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    transition: transform var(--vu-duration-fast) var(--vu-ease);
+  }
+
+  .vu-ruler[data-dragging] .vu-ruler-track {
+    transition: none;
+  }
+
+  .vu-ruler-tick {
+    position: absolute;
+    top: 50%;
+    width: 1px;
+    height: 6px;
+    margin: -3px 0 0 -0.5px;
+    background: var(--vu-text-subtle);
+  }
+
+  .vu-ruler-tick[data-major] {
+    height: 11px;
+    margin-top: -5.5px;
+    background: var(--vu-text-muted);
+  }
+
+  .vu-ruler-tick[data-default] {
+    height: 15px;
+    margin-top: -7.5px;
+    background: var(--vu-text);
+  }
+
+  .vu-ruler-fill {
+    position: absolute;
+    bottom: 2px;
+    height: 2px;
+    border-radius: var(--vu-radius-full);
+    background: var(--vu-accent);
+  }
+
+  .vu-ruler-marker {
+    position: absolute;
+    top: 2px;
+    bottom: 2px;
+    left: 50%;
+    width: 2px;
+    margin-left: -1px;
+    border-radius: var(--vu-radius-full);
+    background: var(--vu-accent-text);
+    pointer-events: none;
+  }
+
+  .vu-ruler:focus-visible {
+    box-shadow: var(--vu-focus-ring);
+  }
+
+  /* Icon row: a few related actions as one compact group (rotate / flip …). */
+  .vu-icon-row {
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    border-radius: var(--vu-radius-md);
+    background: var(--vu-surface-2);
+  }
+
+  .vu-icon-row .vu-btn {
+    flex: 1;
+    min-height: var(--vu-size-choice-lg);
+    border-radius: calc(var(--vu-radius-md) - 2px);
   }
 
   /* Segmented pill: a few exclusive choices. */
@@ -1029,6 +1151,249 @@
     display: flex;
     flex-direction: column;
     gap: var(--vu-space-2);
+  }
+
+  /* Thin, quiet scrollbars that match the theme (they show only where content scrolls). */
+  .vu-root * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--vu-scrollbar) transparent;
+  }
+
+  .vu-root ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  .vu-root ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .vu-root ::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: var(--vu-radius-full);
+    background: var(--vu-scrollbar) padding-box;
+  }
+
+  .vu-root ::-webkit-scrollbar-thumb:hover {
+    background: var(--vu-scrollbar-hover) padding-box;
+  }
+
+  /* Who a panel acts on: one line, highlighted when it's the selection. */
+  .vu-target {
+    padding: var(--vu-space-2) var(--vu-space-3);
+    border-radius: var(--vu-radius-md);
+    background: var(--vu-surface-2);
+    color: var(--vu-text-muted);
+    font-size: var(--vu-text-sm);
+  }
+
+  .vu-target[data-active] {
+    background: var(--vu-accent-soft);
+    color: var(--vu-accent-text);
+  }
+
+  .vu-chips-scroll {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    /* Room for focus rings inside the scroll box. */
+    padding: var(--vu-space-1);
+    margin: calc(var(--vu-space-1) * -1);
+  }
+
+  .vu-chips-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  .vu-chips-scroll .vu-chip {
+    flex: none;
+  }
+
+  .vu-chip[data-dot]::after {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: var(--vu-radius-full);
+    background: var(--vu-accent);
+  }
+
+  .vu-search {
+    display: flex;
+    align-items: center;
+    gap: var(--vu-space-2);
+    height: var(--vu-size-touch);
+    padding: 0 var(--vu-space-3);
+    border: 1px solid var(--vu-border-strong);
+    border-radius: var(--vu-radius-md);
+    background: var(--vu-surface-2);
+    color: var(--vu-text-muted);
+  }
+
+  .vu-search:focus-within {
+    border-color: var(--vu-accent);
+    box-shadow: 0 0 0 3px var(--vu-accent-soft);
+  }
+
+  .vu-search input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    outline: none;
+    background: transparent;
+    color: var(--vu-text);
+  }
+
+  .vu-sticker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--vu-size-sticker), 1fr));
+    gap: var(--vu-space-2);
+    padding: 0;
+    list-style: none;
+  }
+
+  .vu-sticker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    aspect-ratio: 1;
+    padding: var(--vu-space-2);
+    border-radius: var(--vu-radius-md);
+    background: var(--vu-surface-2);
+    transition:
+      background-color var(--vu-duration-fast) var(--vu-ease),
+      transform var(--vu-duration-fast) var(--vu-ease);
+  }
+
+  .vu-sticker:hover {
+    background: var(--vu-surface-3);
+  }
+
+  .vu-sticker:active {
+    transform: scale(0.95);
+  }
+
+  .vu-sticker[aria-busy] {
+    opacity: 0.5;
+  }
+
+  .vu-sticker img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+  }
+
+  .vu-textstyle-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--vu-space-2);
+    padding: 0;
+    list-style: none;
+  }
+
+  .vu-textstyle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: var(--vu-size-textstyle);
+    overflow: hidden;
+    border: 1px solid var(--vu-border);
+    border-radius: var(--vu-radius-md);
+    background: var(--vu-textstyle-bg);
+    white-space: nowrap;
+  }
+
+  .vu-textstyle:hover {
+    border-color: var(--vu-border-strong);
+  }
+
+  /* Colour picker */
+  .vu-colorpicker {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-3);
+    padding: var(--vu-space-3);
+    border: 1px solid var(--vu-border);
+    border-radius: var(--vu-radius-md);
+    background: var(--vu-surface-2);
+  }
+
+  .vu-cp-square {
+    position: relative;
+    height: var(--vu-size-cp-square);
+    border-radius: var(--vu-radius-sm);
+    background:
+      linear-gradient(to top, var(--vu-cp-black), transparent),
+      linear-gradient(to right, var(--vu-cp-white), var(--vu-cp-hue));
+    cursor: crosshair;
+    touch-action: none;
+  }
+
+  .vu-cp-hue {
+    position: relative;
+    height: var(--vu-size-cp-hue);
+    border-radius: var(--vu-radius-full);
+    background: linear-gradient(
+      to right,
+      var(--vu-cp-h0),
+      var(--vu-cp-h60),
+      var(--vu-cp-h120),
+      var(--vu-cp-h180),
+      var(--vu-cp-h240),
+      var(--vu-cp-h300),
+      var(--vu-cp-h0)
+    );
+    cursor: pointer;
+    touch-action: none;
+  }
+
+  .vu-cp-knob {
+    position: absolute;
+    width: var(--vu-size-cp-knob);
+    height: var(--vu-size-cp-knob);
+    margin: calc(var(--vu-size-cp-knob) / -2);
+    border: 2px solid var(--vu-on-media);
+    border-radius: var(--vu-radius-full);
+    box-shadow: var(--vu-shadow-thumb);
+    pointer-events: none;
+  }
+
+  .vu-cp-row {
+    display: flex;
+    align-items: center;
+    gap: var(--vu-space-2);
+  }
+
+  .vu-cp-preview {
+    width: var(--vu-size-swatch);
+    height: var(--vu-size-swatch);
+    border-radius: var(--vu-radius-sm);
+    box-shadow: inset 0 0 0 1px var(--vu-border-strong);
+  }
+
+  .vu-cp-hex {
+    flex: 1;
+    min-width: 0;
+    height: var(--vu-size-choice-lg);
+    padding: 0 var(--vu-space-2);
+    border: 1px solid var(--vu-border-strong);
+    border-radius: var(--vu-radius-sm);
+    background: var(--vu-surface-1);
+    font-variant-numeric: tabular-nums;
+    text-transform: lowercase;
+  }
+
+  .vu-cp-recent {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--vu-space-2);
+  }
+
+  .vu-swatch-sm {
+    width: var(--vu-size-swatch-sm);
+    height: var(--vu-size-swatch-sm);
   }
 
   /* ── filters & transitions ──────────────────────────────────────────── */
