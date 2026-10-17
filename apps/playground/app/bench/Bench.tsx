@@ -109,6 +109,7 @@ export function Bench() {
   const [progress, setProgress] = useState<number | null>(null);
   const [exportUrl, setExportUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [hdrFile, setHdrFile] = useState<File | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -319,6 +320,64 @@ export function Bench() {
     });
   }
 
+  /**
+   * HDR check: the browser's own HDR conversion of 6 frames, per GPU path, saved as a file the
+   * owner sends back (AirDrop) to fit this device's HDR calibration.
+   */
+  async function hdrCheck() {
+    if (!info) return;
+    const fractions = [0.08, 0.25, 0.42, 0.58, 0.75, 0.92];
+    const times = fractions.map((f) => Math.round(info.durationS * f * 100) / 100);
+    const result = await run('HDR check', (s) => s.hdrCheck(times, 320));
+    if (!result) return;
+    const report = {
+      kind: 'video-ultra-hdr-check',
+      version: 1,
+      createdAt: new Date().toISOString(),
+      file: { name: info.name, sizeBytes: info.sizeBytes, durationS: info.durationS },
+      ...result,
+    };
+    const file = new File([JSON.stringify(report)], 'video-ultra-hdr-check.json', {
+      type: 'application/json',
+    });
+    const paths = Object.entries(result.paths)
+      .map(([k, v]) => `${k}: ${'error' in v ? `error (${v.error})` : `${v.frames.length} frames`}`)
+      .join(', ');
+    addResult({
+      title: 'HDR check',
+      rows: [
+        ['Captured', paths],
+        ['Engine', result.engine],
+      ],
+    });
+    // Sharing needs a fresh tap on iOS (the check takes seconds), so offer buttons instead.
+    setHdrFile(file);
+    setStatus(
+      'HDR check ready — tap "Share (AirDrop)" or "Download" and send the file to the developer.',
+    );
+  }
+
+  async function shareHdrFile() {
+    if (!hdrFile) return;
+    try {
+      await navigator.share({ files: [hdrFile], title: 'video-ultra HDR check' });
+    } catch (e) {
+      setError(
+        `Sharing didn't work (${e instanceof Error ? e.message : String(e)}). Use Download instead.`,
+      );
+    }
+  }
+
+  function downloadHdrFile() {
+    if (!hdrFile) return;
+    const url = URL.createObjectURL(hdrFile);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = hdrFile.name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  }
+
   async function runAll() {
     const loaded = await load();
     if (!loaded) return;
@@ -465,6 +524,19 @@ export function Bench() {
         <button onClick={() => exportVideo('webm')} disabled={!ready || !info}>
           Export WebM
         </button>
+        <button onClick={hdrCheck} disabled={!ready || !info?.video?.hdr}>
+          HDR check
+        </button>
+        {hdrFile && (
+          <>
+            {typeof navigator !== 'undefined' && navigator.canShare?.({ files: [hdrFile] }) && (
+              <button className="primary" onClick={shareHdrFile}>
+                Share (AirDrop)
+              </button>
+            )}
+            <button onClick={downloadHdrFile}>Download HDR check</button>
+          </>
+        )}
         <button onClick={() => session?.cancel()} disabled={!busy}>
           Cancel
         </button>

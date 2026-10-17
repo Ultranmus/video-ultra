@@ -7,7 +7,7 @@ import {
   writeHdrUniforms,
 } from './hdr';
 import { SHADERS } from './shaders/generated';
-import { placementMatrix, type FramePlacement, type Renderer } from './types';
+import { placementMatrix, type FramePlacement, type Renderer, type RendererOptions } from './types';
 
 function compile(gl: WebGL2RenderingContext, type: number, source: string): WebGLShader {
   const shader = gl.createShader(type);
@@ -25,7 +25,11 @@ function compile(gl: WebGL2RenderingContext, type: number, source: string): WebG
  * frame into one reused texture (`texSubImage2D` once the size is known), so it allocates nothing
  * per frame. HDR frames get the measured correction for this browser (render/hdr.ts).
  */
-export function createWebGL2Renderer(canvas: OffscreenCanvas): Renderer {
+export function createWebGL2Renderer(
+  canvas: OffscreenCanvas,
+  options: RendererOptions = {},
+): Renderer {
+  const correct = options.hdrCorrection ?? true;
   const gl = canvas.getContext('webgl2', {
     alpha: false,
     antialias: false,
@@ -118,7 +122,7 @@ export function createWebGL2Renderer(canvas: OffscreenCanvas): Renderer {
         gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, frame);
       }
       placementMatrix(placement, canvas.width, canvas.height, uniforms);
-      writeHdrUniforms(uniforms, calibration, hdr);
+      writeHdrUniforms(uniforms, calibration, correct && hdr);
       gl.bufferSubData(gl.UNIFORM_BUFFER, 0, uniforms);
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.clearColor(0, 0, 0, 1);

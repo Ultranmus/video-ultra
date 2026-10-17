@@ -1,6 +1,7 @@
 import type {
   BackendChoice,
   ExportResult,
+  HdrCheckResult,
   LabMessage,
   LabRequest,
   LabResponseData,
@@ -23,6 +24,7 @@ export interface LabSession {
     options: Omit<Extract<LabRequest, { type: 'export' }>, 'type'>,
   ): Promise<ExportResult>;
   cancel(): Promise<void>;
+  hdrCheck(times: number[], width: number): Promise<HdrCheckResult>;
   /** Called with 0…1 during export. */
   onProgress: ((progress: number) => void) | null;
   destroy(): void;
@@ -111,6 +113,9 @@ export async function createLabSession(
     },
     async cancel() {
       await expect({ type: 'cancel' }, 'cancel');
+    },
+    async hdrCheck(times: number[], width: number) {
+      return (await expect({ type: 'hdrCheck', times, width }, 'hdrCheck')).result;
     },
     destroy() {
       worker.terminate();

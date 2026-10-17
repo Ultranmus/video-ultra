@@ -7,14 +7,18 @@ import {
   writeHdrUniforms,
 } from './hdr';
 import { SHADERS } from './shaders/generated';
-import { placementMatrix, type FramePlacement, type Renderer } from './types';
+import { placementMatrix, type FramePlacement, type Renderer, type RendererOptions } from './types';
 
 /**
  * WebGPU renderer. Frames are imported with `importExternalTexture`, which hands the decoded
  * frame to the GPU without a copy (the main reason WebGPU is our first choice). HDR frames get the
  * measured correction for this browser (render/hdr.ts).
  */
-export async function createWebGPURenderer(canvas: OffscreenCanvas): Promise<Renderer> {
+export async function createWebGPURenderer(
+  canvas: OffscreenCanvas,
+  options: RendererOptions = {},
+): Promise<Renderer> {
+  const correct = options.hdrCorrection ?? true;
   const gpu = (navigator as Navigator & { gpu?: GPU }).gpu;
   if (!gpu) throw new Error('WebGPU is not available');
   const adapter = await gpu.requestAdapter({ powerPreference: 'high-performance' });
@@ -64,7 +68,7 @@ export async function createWebGPURenderer(canvas: OffscreenCanvas): Promise<Ren
     draw(frame: VideoFrame, placement: FramePlacement) {
       if (destroyed) return;
       placementMatrix(placement, canvas.width, canvas.height, uniforms);
-      writeHdrUniforms(uniforms, calibration, needsHdrCorrection(frame.colorSpace));
+      writeHdrUniforms(uniforms, calibration, correct && needsHdrCorrection(frame.colorSpace));
       device.queue.writeBuffer(uniformBuffer, 0, uniforms);
       // External textures expire at the end of the task, so the bind group is per frame.
       const external = device.importExternalTexture({ source: frame });

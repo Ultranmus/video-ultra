@@ -94,6 +94,16 @@ export interface ExportResult {
   openFramesAfter: number;
 }
 
+/** HDR check: the browser's own HDR conversion of a few frames, per GPU path (no correction). */
+export interface HdrCheckResult {
+  engine: string;
+  userAgent: string;
+  paths: Record<
+    string,
+    { error: string } | { width: number; height: number; frames: { t: number; rgb: string }[] }
+  >;
+}
+
 export type LabRequest =
   | { type: 'init'; canvas: OffscreenCanvas; backend: BackendChoice; width: number; height: number }
   | { type: 'resize'; width: number; height: number }
@@ -108,6 +118,7 @@ export type LabRequest =
       seconds: number;
       container: 'mp4' | 'webm';
     }
+  | { type: 'hdrCheck'; times: number[]; width: number }
   | { type: 'cancel' };
 
 export type LabResponseData =
@@ -116,6 +127,7 @@ export type LabResponseData =
   | { type: 'play'; result: PlayResult }
   | { type: 'scrub'; result: ScrubResult }
   | { type: 'export'; result: ExportResult }
+  | { type: 'hdrCheck'; result: HdrCheckResult }
   | { type: 'resize' }
   | { type: 'cancel' };
 

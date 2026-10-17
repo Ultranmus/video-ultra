@@ -1,6 +1,15 @@
 /** Which GPU API a renderer uses. */
 export type RenderBackend = 'webgpu' | 'webgl2';
 
+/** Options shared by both renderers. */
+export interface RendererOptions {
+  /**
+   * Apply the HDR correction to HLG frames (default true). `false` shows the browser's own
+   * conversion — used by the bench's HDR check to measure a device.
+   */
+  hdrCorrection?: boolean;
+}
+
 /** How a source frame is placed on the output canvas. */
 export interface FramePlacement {
   /** Clockwise rotation from the file's metadata, in degrees. */

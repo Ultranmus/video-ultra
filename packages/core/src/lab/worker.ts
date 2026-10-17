@@ -18,13 +18,14 @@ import {
   type VideoSample,
 } from 'mediabunny';
 import { DecoderPool, FrameSource } from '../engine/frames';
-import { needsHdrCorrection } from '../render/hdr';
+import { browserEngine, needsHdrCorrection } from '../render/hdr';
 import type { FramePlacement, Renderer } from '../render/types';
 import { createWebGL2Renderer } from '../render/webgl2';
 import { createWebGPURenderer } from '../render/webgpu';
 import type {
   BackendChoice,
   Distribution,
+  HdrCheckResult,
   ExportResult,
   LabMessage,
   LabRequest,
@@ -511,6 +512,71 @@ async function exportVideo(
   };
 }
 
+function toBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 0x8000)
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(binary);
+}
+
+/**
+ * HDR check: renders frames at `times` through each GPU path with the correction OFF, exactly as
+ * the engine draws them (in this worker, rotation applied), and returns small RGB images. Compared
+ * with Apple's rendering of the same frames, this gives the device's own calibration.
+ */
+async function hdrCheck(times: number[], width: number): Promise<HdrCheckResult> {
+  const { video } = requireLoaded();
+  const quarter = placement.rotation === 90 || placement.rotation === 270;
+  const displayW = quarter ? placement.height : placement.width;
+  const displayH = quarter ? placement.width : placement.height;
+  const w = width;
+  const h = Math.max(2, Math.round((width * displayH) / displayW / 2) * 2);
+  const paths: HdrCheckResult['paths'] = {};
+  for (const backend of ['webgpu', 'webgl2'] as const) {
+    const canvas = new OffscreenCanvas(w, h);
+    let r: Renderer;
+    try {
+      r =
+        backend === 'webgpu'
+          ? await createWebGPURenderer(canvas, { hdrCorrection: false })
+          : createWebGL2Renderer(canvas, { hdrCorrection: false });
+    } catch (error) {
+      paths[backend] = { error: String(error) };
+      continue;
+    }
+    const readback = new OffscreenCanvas(w, h).getContext('2d', { willReadFrequently: true })!;
+    const frames: { t: number; rgb: string }[] = [];
+    const sink = new VideoSampleSink(video);
+    try {
+      for (const t of times) {
+        const sample = await sink.getSample(t);
+        if (!sample) continue;
+        const frame = frameOf(sample);
+        r.draw(frame, placement);
+        closeFrame(frame);
+        sample.close();
+        const bitmap = canvas.transferToImageBitmap();
+        readback.drawImage(bitmap, 0, 0);
+        bitmap.close();
+        const rgba = readback.getImageData(0, 0, w, h).data;
+        const rgb = new Uint8Array(w * h * 3);
+        for (let i = 0, j = 0; i < rgba.length; i += 4, j += 3) {
+          rgb[j] = rgba[i]!;
+          rgb[j + 1] = rgba[i + 1]!;
+          rgb[j + 2] = rgba[i + 2]!;
+        }
+        frames.push({ t, rgb: toBase64(rgb) });
+      }
+      paths[backend] = { width: w, height: h, frames };
+    } catch (error) {
+      paths[backend] = { error: String(error) };
+    } finally {
+      r.destroy();
+    }
+  }
+  return { engine: browserEngine(), userAgent: navigator.userAgent, paths };
+}
+
 function post(message: LabMessage): void {
   self.postMessage(message);
 }
@@ -535,6 +601,8 @@ async function handle(request: LabRequest): Promise<LabResponseData> {
       return { type: 'scrub', result: await scrub(request.count) };
     case 'export':
       return { type: 'export', result: await exportVideo(request) };
+    case 'hdrCheck':
+      return { type: 'hdrCheck', result: await hdrCheck(request.times, request.width) };
     case 'cancel':
       cancelled = true;
       return { type: 'cancel' };
