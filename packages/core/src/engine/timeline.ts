@@ -1,5 +1,5 @@
 import { itemEnd } from '../model/project';
-import type { Item, Project, Track } from '../model/schema';
+import type { Direction, Ease, Item, Project, Track, Transition } from '../model/schema';
 import type { Time } from '../model/time';
 
 /**
@@ -23,6 +23,13 @@ export interface LayerTransition {
   progress: number;
   /** `out`: the clip before the cut; `in`: the clip after it (drawn on top). */
   role: 'out' | 'in';
+  /** `transitionIn.direction` / `.ease` (undefined = the preset's own). */
+  direction?: Direction | undefined;
+  ease?: Ease | undefined;
+}
+
+function transitionInfo(t: Transition, progress: number, role: 'out' | 'in'): LayerTransition {
+  return { type: t.type, progress, role, direction: t.direction, ease: t.ease };
 }
 
 /** One picture to draw this frame. */
@@ -138,9 +145,9 @@ function mainLayers(project: Project, track: Track, t: Time, out: ActiveLayer[])
     const windowStart = next.start - transitionLead(length);
     if (length > 0 && t >= windowStart && 'transitionIn' in next && next.transitionIn) {
       const progress = (t - windowStart) / length;
-      const type = next.transitionIn.type;
-      out.push(layer(project, track, item, t, { type, progress, role: 'out' }));
-      out.push(layer(project, track, next, t, { type, progress, role: 'in' }));
+      const tr = next.transitionIn;
+      out.push(layer(project, track, item, t, transitionInfo(tr, progress, 'out')));
+      out.push(layer(project, track, next, t, transitionInfo(tr, progress, 'in')));
       return;
     }
   }
@@ -151,9 +158,9 @@ function mainLayers(project: Project, track: Track, t: Time, out: ActiveLayer[])
     const windowStart = item.start - transitionLead(length);
     if (length > 0 && t < windowStart + length) {
       const progress = (t - windowStart) / length;
-      const type = item.transitionIn.type;
-      out.push(layer(project, track, previous, t, { type, progress, role: 'out' }));
-      out.push(layer(project, track, item, t, { type, progress, role: 'in' }));
+      const tr = item.transitionIn;
+      out.push(layer(project, track, previous, t, transitionInfo(tr, progress, 'out')));
+      out.push(layer(project, track, item, t, transitionInfo(tr, progress, 'in')));
       return;
     }
   }
