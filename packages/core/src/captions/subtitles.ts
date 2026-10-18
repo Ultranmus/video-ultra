@@ -24,7 +24,7 @@ function toFlicks(h: string | undefined, m: string, s: string, ms: string): Time
 
 /** Reads SRT or VTT text into cues (in time order; empty and broken cues are skipped). */
 export function parseSubtitles(text: string): SubtitleCue[] {
-  const lines = text.replace(/^﻿/, '').replace(/\r\n?/g, '\n').split('\n');
+  const lines = text.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n').split('\n');
   const cues: SubtitleCue[] = [];
   for (let i = 0; i < lines.length; i++) {
     const m = ARROW.exec(lines[i]!);
