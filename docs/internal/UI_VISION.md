@@ -143,6 +143,22 @@ the stage and everything drawn on it don't mirror. Text items in RTL scripts ren
   settings show "Locked — unlock it to make changes" with Unlock and are dimmed. A row locks
   from the lock at its name's right end.
 
+## 5c. Sound, picture tools, capture & export (v0.2, DECISIONS #120–124)
+
+- **Sound:** "Lower under voice" (switch + how much) in the inspector's Sound section and the
+  phone Volume tool; the host's music & sounds library in the Audio panel (search, categories,
+  ▶ preview, licence line, + Add).
+- **Picture tools:** Green screen is an inspector section and a phone tool (switch, green / blue,
+  Pick from video with a hint pill on the stage, Range, Edge softness, Clean edges). LUT looks
+  sit at the top of the Filters panel. Blend chips live in "Opacity & blend" / "Appearance"
+  (desktop) and a "Blend" phone tool. Blur is a rail entry and panel (box / oval × blur /
+  pixelate); a blurred area stretches from side handles when it's larger than 88 px on screen.
+- **Capture & export:** "Record with camera" in the Media panel opens a recorder over the whole
+  editor (preview, switch camera, mic, record / stop with a clock, then Add to video / Add as a
+  layer / Retake). The export dialog has three kinds — Video (Length: whole / part, presets),
+  Sound only (M4A / Ogg / WAV), Picture (the frame at the playhead, PNG / JPEG). I / O set the
+  part from the playhead; the ruler shows it as a band.
+
 ## 6. Gestures
 
 - One finger on the stage: select / move an item. Two fingers: pinch-scale and rotate the

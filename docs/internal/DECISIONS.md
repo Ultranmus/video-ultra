@@ -583,3 +583,37 @@ reason; when one changes, edit the entry and note the date.
 119.  **File pickers open on touch release** (2026-10-19). Browsers only count a finger lifting
       (`pointerup`), not pressing, as a user activation for touch — the timeline's "+" opened
       nothing on iPhone because it fired on `pointerdown`. Mouse still opens on press.
+120.  **Ducking is per item and computed in the mixer** (2026-10-19, v0.2 B1). `duck` (0…1) on a
+      music / sound / video item lowers it under everything that isn't itself ducked, after gain,
+      through a speech-band follower (150 Hz–4 kHz, 5 ms windows on timeline samples, −40…−30
+      dBFS knee, 300 ms hold, 40 / 450 ms attack / release, per-sample ramps). Block-size
+      independent and primed after a seek, so preview and export match (export-check: within
+      0.2 dB). No look-ahead (the dip starts ~45 ms after the voice). Rejected: precomputed
+      envelopes from the analyzer's peaks (main-thread data, not ready right after import).
+121.  **The music & sounds library is a host slot; the editor ships no catalogue** (2026-10-19,
+      v0.2 B2). `audioLibrary` (search / load with abort signals, categories, licence line).
+      Added sounds become ordinary assets with `credit`. `createStarterSounds()` is an opt-in
+      set of sound effects synthesised on the device from our own recipes (CC0, no files).
+122.  **Picture tools are uniform-driven stages of the one compositor shader** (2026-10-19, v0.2 C).
+      Green screen, LUT, blend modes and blurred areas extend the effect block (24 vec4, still one
+      512-byte WebGPU slot) plus two bindings: a copy of the pixels under the layer and a 3D LUT.
+      Layers that read what's underneath copy that rectangle mid-frame (WebGPU: end the pass,
+      copy the canvas; WebGL2: `copyTexSubImage2D`) into one texture that grows in 256 px steps.
+      Rejected: fixed-function blending (no overlay / soft light / difference); a render target
+      per layer (memory). Blend = W3C separable formulas in gamma space, lane items only.
+123.  **Green screen keys on BT.709 chroma distance**, ignoring brightness (shadows on the screen
+      key out too); "Pick from video" renders the item alone, unkeyed, in the worker and averages
+      5×5 px (the browser EyeDropper is Chrome-only and sees the keyed picture). **LUTs** are
+      `lut` assets stored like media and parsed in the worker (2–65 points, 0–1 input); items
+      keep `{ assetId, intensity }` — a 33-point file is ~1 MB, too big for project JSON.
+      **Blurred / pixelated areas** are a `region` item kind on picture layers; sizes scale with
+      the canvas so preview equals export.
+124.  **Capture & export** (2026-10-19, v0.2 D, B3). Presets never letterbox: when the shape
+      differs the dialog offers an undoable canvas change, else exports the project's shape. The
+      part to export is optional `settings.exportRange` (I / O keys, a band on the ruler),
+      clamped at export, never trimmed by edits. Sound only: M4A (AAC), Ogg (Opus — the standard
+      Opus file, not WebM audio), WAV; encoder delay measured per codec and container. A frame
+      picture renders at the project's size through the export renderer, encoded in the worker.
+      The camera recorder covers the editor (a capture mode): MP4/H.264 preferred, pieces stream
+      to storage, limits 10 / 20 / 30 min by tier (5 in memory), camera released during review.
+      Editor shortcuts pause while the camera or export dialog is open.

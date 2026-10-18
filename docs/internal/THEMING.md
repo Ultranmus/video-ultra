@@ -68,7 +68,12 @@ Video-specific sizes: `--vu-size-topbar` 48px, `--vu-size-rail` 72px, `--vu-size
 `-preset-tile`, `-asset`, `-swatch`, `-slider-track`, `-slider-thumb`, `-toast`, `-modal`) and
 `--vu-text-emoji`. Layers & organising (v0.2): `--vu-size-popover` 288px (History),
 `--vu-size-menu` 232px (context menu), `--vu-size-layer-row` 48px, `--vu-size-layer-thumb` 32px;
-`--vu-size-timeline-header` is 100px (room for a row's name and its lock). Element resets in editor.css use `:where()` (zero specificity) so component
+`--vu-size-timeline-header` is 100px (room for a row's name and its lock). Sound (v0.2 B):
+`--vu-size-audiolib-play` 36px, `--vu-size-audiolib-row` 52px. Picture tools (v0.2 C):
+`--vu-clip-region` (dark #9aa3b8 / light #5d6b8a), `--vu-size-handle-side` 8px,
+`--vu-size-region-swatch` 64px, `--vu-size-key-preset` 28px. Capture & export (v0.2 D):
+`--vu-size-record`, `-record-mark`, `-record-stop`, `-record-ring`, `--vu-size-camera-dot`,
+`--vu-size-range-track`, `--vu-size-range-thumb`, `--vu-camera-bg`, `--vu-record`. Element resets in editor.css use `:where()` (zero specificity) so component
 classes always win.
 
 ## `ThemeOverrides` (public, typed)

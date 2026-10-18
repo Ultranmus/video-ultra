@@ -366,3 +366,17 @@ calls started in one task, each 8–15 ms synchronous in Chrome, plus the WebGL2
   one accepted long task** (rule exception, measured). An early Play prepares it on the spot.
 
 Result: long tasks `['3281+116']` (the audio service only), none during startup or editing.
+
+## v0.2 sound, picture tools, capture & export (2026-10-19)
+
+- **Ducking DSP:** ~20 µs per 2048-frame block (0.05 % of real time); 600 s of audio in ~270 ms;
+  no allocation per block once warm; a project with nothing ducked skips it entirely. Mixing with
+  decode: ~4.0 ms per second of sound with ducking vs 2.4 ms without (audio lab).
+- **Picture tools, GPU ms per 1080×1920 frame** (effects-bench; "none" 0.38 on Chrome WebGL2):
+  green screen 0.42 / 0.29 (WebGL2 / WebGPU), WebKit 0.52; LUT 33 0.39 / 0.28, 0.47;
+  full-screen overlay blend 1.07 / 0.73, 1.33; blurred area 0.8×0.5 0.93 / 0.70, 1.18;
+  pixelated area 0.69 / 0.48, 0.70. `.cube` parse in the worker: 33-point 5.9 ms, 65-point
+  44.9 ms. Export with every tool on, 720p MP4 Firefox: 2.79× real time.
+- **Recording:** JS heap flat (22.3 → 21.1 MB over a 10 s take) — pieces stream to storage.
+- **Exports:** sound only 48–324× real time; a 3 s part exports in 0.5 s (Chrome); video export
+  speed unchanged (Chrome MP4 720p 8.15×).

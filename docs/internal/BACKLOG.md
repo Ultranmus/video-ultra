@@ -4,6 +4,19 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 
 ## Open
 
+- [ ] (v0.2 B) A ducking badge on timeline clips; optional look-ahead or a "listen to" choice so
+      short sound effects don't dip music; default ducking on for library music (owner's call);
+      show asset credits to the host at export.
+- [ ] (v0.2 C) LUT chips have no previews, no delete / rename; a LUT import with nothing selected
+      applies to nothing; "Apply to all clips" copies the filter only, not the LUT. Blend modes on
+      a 3D-turn animation copy only the flat bounding box — confirm with a golden frame. Region
+      items have no entrance / exit animations. Green screen not measured on budget phones.
+- [ ] (v0.2 D) Each frame capture creates a renderer (WebKit warns "too many WebGL contexts" in
+      export-check) — reuse one. Camera can't switch while recording; recording name uses the
+      locale time format; the range bar has no film strip; sound-only export is offered for a
+      silent part (the engine then refuses clearly).
+- [ ] WebKit logs "WebKitBlobResource error 1" console messages in editor-interact (not failures).
+
 - [ ] Copy / paste elements (⌘C / ⌘V, with a paste at the playhead) — image-ultra has it; not in
       v0.2's list.
 - [ ] Layers panel: drag-reorder on touch uses the grip only; a long-press-anywhere lift like the
