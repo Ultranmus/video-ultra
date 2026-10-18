@@ -4,6 +4,14 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 
 ## Open
 
+- [ ] Copy / paste elements (⌘C / ⌘V, with a paste at the playhead) — image-ultra has it; not in
+      v0.2's list.
+- [ ] Layers panel: drag-reorder on touch uses the grip only; a long-press-anywhere lift like the
+      timeline would feel more natural on phones.
+- [ ] Groups: resizing a group with rotated members scales positions around the box centre but
+      can't skew (by design); a true group transform (rotate the box itself) would need a group
+      object in the file format.
+
 - [x] Rust toolchain installed (rustup, 2026-10-17); `naga-cli` for WGSL → GLSL.
 - [ ] Verify real Safari (owner's iPhone + Mac Safari): WebGPU in workers (Safari 26),
       OPFS `createSyncAccessHandle`, WebCodecs audio, HEVC/HLG decode, export speed. Playwright's
@@ -84,7 +92,7 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       the project's sound is recorded too. Offer "mute while recording".
 - [ ] File handles (Chromium desktop): import still copies into OPFS; use `showOpenFilePicker` +
       `putMediaHandle` and a re-link flow.
-- [x] Timeline: lane header icons toggle mute (main/audio) / hide (visual lanes), with buttons in the accessible layer. Lock: not exposed yet.
+- [x] Timeline: lane header icons toggle mute (main/audio) / hide (visual lanes), with buttons in the accessible layer. Lock: the lock at a row name's right end (and in the accessible layer), v0.2 E.
 - [x] ~~Exported audio is ~0.05–0.1 s longer than video (AAC padding)~~ — audio trimmed to the
       video length and encoder priming compensated (DECISIONS #66).
 - [x] (fixed 2026-10-19: VP8 on Firefox, 2.6× real time) **Firefox WebM export is slower than real time** (VP9 software encoder, 0.71× at 720p;

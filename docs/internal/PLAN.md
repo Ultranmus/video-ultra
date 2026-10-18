@@ -123,7 +123,7 @@ Deferred to v0.2+: speed curves, reverse, text animations, templates, keyframes,
 
 ## Known tasks for later releases
 
-- [ ] 6.0 (moved into v0.2 as E0) Command registry — every action as a command with id, label, shortcut,
+- [x] 6.0 (done in v0.2 as E0) Command registry — every action as a command with id, label, shortcut,
       `enabled()` + reason, `run()`; toolbar, shortcuts, accessible layer and tests use it
       (DECISIONS #91)
 
@@ -142,14 +142,14 @@ meets the v0.1 definition of done (both GPU backends, golden frames, phone check
 
 _E. Layers & organising_ (as in image-ultra, DECISIONS #116)
 
-- [ ] E0 Command registry (6.0, pulled forward): every action once — id, label, shortcut,
+- [x] E0 Command registry (6.0, pulled forward): every action once — id, label, shortcut,
       `enabled()` + reason, `run()`; menus, Layers, shortcuts, accessible layer and tests use it
-- [ ] E1 History panel: TopBar button, "Original" + named steps, current step marked, tap to jump;
+- [x] E1 History panel: TopBar button, "Original" + named steps, current step marked, tap to jump;
       a drag = one step; every step label translatable
-- [ ] E2 Layers panel: elements at the playhead (video, photos, text, stickers) with thumbnail,
+- [x] E2 Layers panel: elements at the playhead (video, photos, text, stickers) with thumbnail,
       rename, show/hide, lock, up/down, drag to reorder, "⋯" menu; side panel / bottom sheet; keyboard + SR
-- [ ] E3 Lock: per element (selectable, can't move or edit) and per lane (BACKLOG lane lock)
-- [ ] E4 Multi-select + grouping: Shift-click, ⌘A, marquee; one box moves / scales / rotates; group
+- [x] E3 Lock: per element (selectable, can't move or edit) and per lane (BACKLOG lane lock)
+- [x] E4 Multi-select + grouping: Shift-click, ⌘A, marquee; one box moves / scales / rotates; group
       menu (align, distribute, front/back, lock all, hide all); Group keeps them together on the
       stage and in time (dragging the group on the timeline moves every member)
 

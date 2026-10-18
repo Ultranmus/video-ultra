@@ -122,6 +122,27 @@ the stage and everything drawn on it don't mirror. Text items in RTL scripts ren
 - The canvas has an accessible DOM layer: each clip is a focusable item with a label
   ("Clip 2, video, 0:04 to 0:09"); arrow keys move, Shift + arrows trim, Delete removes.
 
+## 5b. Layers & organising (v0.2, DECISIONS #116–117)
+
+- **Top bar:** ↶ Undo, ↷ Redo | 🕘 History, ▤ Layers. History is a popover: "Original" and every
+  step by name, the current one marked, later ones faded; tap any to go there (and back).
+- **Layers** (left panel on desktop / tablet, the sheet on phones): what's on screen at the
+  playhead, front first, the main video last. Row = grip, picture, name (double-click / F2 to
+  rename), Group badge, lock, eye, "⋯". Drag the grip (or Alt + ↑/↓) to restack. "Select
+  several" turns taps into multi-select (phones have no Shift).
+- **Selection:** Shift / ⌘-click (stage, timeline, Layers), ⌘A (everything on screen), a mouse
+  drag on empty stage draws a rectangle. Several = one upright box with a faint outline on each;
+  move / resize / rotate act on all, locked ones stay put. A group selects as one; double-click
+  picks one member.
+- **Context menu** (right-click, touch long-press on the stage or a still long-press on a clip,
+  "⋯" in Layers, Shift+F10): the selection's commands in groups; Align as a submenu.
+- **Arrange** (phone tool; desktop inspector section): Order (forward, backward, front, back),
+  Align (6; several also distribute), Lock, Hide. Several selected on desktop: the inspector
+  becomes the Group / Selection view (Group or Ungroup, Arrange, Duplicate, Delete).
+- **Locked** items show a dashed box without handles and a lock badge on the clip; their
+  settings show "Locked — unlock it to make changes" with Unlock and are dimmed. A row locks
+  from the lock at its name's right end.
+
 ## 6. Gestures
 
 - One finger on the stage: select / move an item. Two fingers: pinch-scale and rotate the

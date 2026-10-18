@@ -244,3 +244,21 @@ OPFS recovery, WebCodecs first, ranged reads.
 - F8 Toolbar edge fades, ruler label fade, emoji filtered to the device's font, voiceover mute.
 - F9 Stage view zoom (pinch, Ctrl/⌘ + wheel, pan, Fit), exact editing while zoomed.
 - Checks: verify (395 + 11), interaction × 3 (+ crash step), export-check × 3, axe 0, recovery.
+
+## 2026-10-19 · v0.2 — E. Layers & organising ✅ (owner tests all of v0.2 at the end)
+
+- Owner added group E to v0.2 and asked for one stretch with one test at the end (DECISIONS #116).
+- Core: file version 3 (optional `locked` / `hidden` / `groupId`), `setItemFlags`, `groupItems` /
+  `ungroupItems`, `shiftItems`, `arrangeItem`, `groupOf`, `editor.history()` / `goTo`; hidden
+  items skipped by the compositor. Property tests run the new ops in random sequences (3,000).
+- React: command registry (`commands.ts`, 6.0 pulled forward), multi-selection, group box on the
+  stage (move / scale / rotate / pinch, marquee, long-press menu), History popover, Layers panel
+  (rename, lock, hide, drag restack, select several), context menu with Align submenu, Arrange
+  tool / inspector section, Group inspector, locked notes, timeline group drag, row lock,
+  lock badges, shortcuts (⌘A, ⌘G, ⇧⌘G, ⇧⌘L, ⇧⌘H, [ ], ⌘[ ⌘], Shift+F10).
+- Owner's phone report fixed on the way: timeline "+" didn't open the picker on iPhone (#119),
+  its hint was cut off, the tab bar was see-through at its edges, and switching tools re-opened
+  the sheet (#118).
+- Checks: `scripts/organize-check.ts` 32/32 (Chrome desktop + WebKit phone, axe on Layers and
+  the menu); editor-interact 48/48 (Chrome, WebKit, Firefox); a11y-check 0 violations; core
+  402 tests, react 24.

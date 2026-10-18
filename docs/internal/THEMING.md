@@ -66,7 +66,9 @@ Video-specific sizes: `--vu-size-topbar` 48px, `--vu-size-rail` 72px, `--vu-size
 `--vu-size-sheet` 360px (max), `--vu-size-tool` 56px, `--vu-size-handle` 12px (touch 18px),
 `--vu-size-min-height` 480px, plus control sizes (`--vu-size-choice-lg`, `-preset`,
 `-preset-tile`, `-asset`, `-swatch`, `-slider-track`, `-slider-thumb`, `-toast`, `-modal`) and
-`--vu-text-emoji`. Element resets in editor.css use `:where()` (zero specificity) so component
+`--vu-text-emoji`. Layers & organising (v0.2): `--vu-size-popover` 288px (History),
+`--vu-size-menu` 232px (context menu), `--vu-size-layer-row` 48px, `--vu-size-layer-thumb` 32px;
+`--vu-size-timeline-header` is 100px (room for a row's name and its lock). Element resets in editor.css use `:where()` (zero specificity) so component
 classes always win.
 
 ## `ThemeOverrides` (public, typed)

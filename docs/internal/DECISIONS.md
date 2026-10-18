@@ -559,3 +559,27 @@ reason; when one changes, edit the entry and note the date.
       time as well as on the stage. The owner tests all of v0.2 together at the end instead of
       per-checkpoint; the A0 phone measurements become part of that test, and desktop numbers set
       conservative device gating until then.
+117.  **Layers & organising: how it works** (2026-10-19, v0.2 E). File version 3 adds optional
+      `locked`, `hidden` and `groupId` on items (no other changes; v1/v2 files migrate as-is).
+      **Lock** = selectable, not editable: every edit op refuses a locked item (`editable()`),
+      except flags, rename and duplicate (the copy is unlocked). **Hide** = not drawn in preview
+      or export (a video's sound still plays — mute is separate); hidden items are skipped by hit
+      tests but listed in Layers. **Groups** are lane items only (main-track clips are a sequence);
+      a group of one dissolves (`tidyGroups` after every lane change); a split member keeps both
+      halves in the group; picking a member selects the group, double-click picks one member.
+      A group moves together on the stage *and in time* (`shiftItems`: each member keeps its lane
+      when it fits). **Stacking** is lane order (later lanes draw on top): `arrangeItem` moves the
+      element's lane, or the element alone into a new lane when its lane holds others; the main
+      video is always at the back; "the stack" is what's on screen at the playhead. **History**
+      shows the in-memory undo steps (`editor.history()` / `goTo`), each jump logged as undo/redo
+      entries so autosave and crash recovery stay exact. **Commands** (`commands.ts`): one
+      definition per action (label, icon, shortcut, disabled reason, run) — the timeline bar,
+      phone toolbar, inspector, Arrange, context menu and keyboard all use it.
+118.  **The phone sheet stays open when switching tools** (owner, 2026-10-19). Picking another
+      tool or panel while the sheet is open swaps its contents with a 120 ms fade; it only slides
+      in when it was closed. A close that is under way is cancelled if something else opens.
+      The tab bar is solid; only its row of tools fades at the edges (the mask was making the bar
+      itself see-through over the sheet).
+119.  **File pickers open on touch release** (2026-10-19). Browsers only count a finger lifting
+      (`pointerup`), not pressing, as a user activation for touch — the timeline's "+" opened
+      nothing on iPhone because it fired on `pointerdown`. Mouse still opens on press.
