@@ -59,13 +59,16 @@ export function boxContains(box: Box, x: number, y: number, slop = 0): boolean {
   return Math.abs(lx) <= box.width / 2 + slop && Math.abs(ly) <= box.height / 2 + slop;
 }
 
-/** Visual items on screen at `t`, topmost first (lanes later in the list draw on top). */
+/**
+ * Visual items on screen at `t`, topmost first (lanes later in the list draw on top). Hidden items
+ * aren't on screen.
+ */
 export function visibleItemsAt(project: Project, t: Time): Item[] {
   const out: Item[] = [];
   for (const track of project.tracks) {
     if (track.hidden || track.kind === 'audio') continue;
     for (const item of track.items) {
-      if (item.start <= t && t < itemEnd(item)) out.push(item);
+      if (!item.hidden && item.start <= t && t < itemEnd(item)) out.push(item);
     }
   }
   return out.reverse();

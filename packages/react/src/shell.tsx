@@ -24,6 +24,13 @@ import { clampPps, MAX_PPS, MIN_PPS } from './timeline/geometry';
 import { TimelineView } from './timeline/view';
 import { CanvasTool, InspectorSections, ToolPanel } from './ToolPanel';
 import { toolsFor } from './tools';
+import {
+  ArrangeControls,
+  CommandButton,
+  HistoryPopover,
+  LockedNote,
+  SelectionInspector,
+} from './organize';
 
 // ── Top bar ─────────────────────────────────────────────────────────────────
 
@@ -39,6 +46,8 @@ export function TopBar({ onClose }: { onClose?: (() => void) | undefined }): Rea
   const save = useUi((s) => s.save);
   const readOnly = useUi((s) => s.readOnly);
   const layout = useUi((s) => s.layout);
+  const historyOpen = useUi((s) => s.historyOpen);
+  const layersOpen = useUi((s) => s.panel === 'layers' && (s.layout !== 'phone' || s.sheetPanel));
   const ratio = ratioOf(width, height);
   return (
     <header className="vu-topbar">
@@ -97,6 +106,24 @@ export function TopBar({ onClose }: { onClose?: (() => void) | undefined }): Rea
           shortcut="⇧⌘Z"
           disabledReason={history.canRedo ? null : l.nothingToRedo}
           onClick={() => ctl.redo()}
+        />
+        <span className="vu-topbar-divider" aria-hidden="true" />
+        <span className="vu-popover-anchor" data-history-toggle="">
+          <IconButton
+            icon="history"
+            label={l.history}
+            tip={l.tipHistory}
+            pressed={historyOpen}
+            onClick={() => ctl.ui.setState({ historyOpen: !historyOpen, menu: null })}
+          />
+          <HistoryPopover />
+        </span>
+        <IconButton
+          icon="layers"
+          label={l.layers}
+          tip={l.tipLayers}
+          pressed={layersOpen}
+          onClick={() => ctl.toggleLayers()}
         />
       </div>
       <div className="vu-topbar-end">
@@ -171,7 +198,7 @@ export function Panel(): ReactElement | null {
   const panel = useUi((s) => s.panel);
   if (!panel) return null;
   const entry = RAIL.find((r) => r.id === panel);
-  const title = entry ? l[entry.key] : l.canvas;
+  const title = entry ? l[entry.key] : panel === 'layers' ? l.layers : l.canvas;
   return (
     <aside className="vu-panel" aria-label={title}>
       <div className="vu-panel-head">
@@ -201,8 +228,14 @@ export function Inspector(): ReactElement {
   const ctl = useController();
   const l = useLabels();
   const selectedId = useUi((s) => s.selectedId);
+  const several = useUi((s) => s.selectedIds.length > 1);
   const item = useProject((p) => (selectedId ? (findItem(p, selectedId)?.item ?? null) : null));
+  const locked = useProject((p) => {
+    const found = selectedId ? findItem(p, selectedId) : null;
+    return !!found && (!!found.item.locked || found.track.locked);
+  });
   const clips = useProject((p) => p.tracks.reduce((n, t) => n + t.items.length, 0));
+  if (several) return <SelectionInspector />;
   if (!item) {
     return (
       <aside className="vu-inspector" aria-label={l.projectSettings}>
@@ -247,7 +280,17 @@ export function Inspector(): ReactElement {
         />
       </div>
       <div className="vu-panel-scroll" key={item.id}>
-        <InspectorSections item={item} />
+        <LockedNote item={item} />
+        <div
+          className="vu-inspector-body"
+          inert={locked || undefined}
+          data-locked={locked || undefined}
+        >
+          <InspectorSections item={item} />
+        </div>
+        <Section title={l.arrange}>
+          <ArrangeControls />
+        </Section>
       </div>
     </aside>
   );
@@ -304,7 +347,10 @@ function PlayButton() {
 export function TimelineBar(): ReactElement {
   const ctl = useController();
   const l = useLabels();
-  const targets = useTargets();
+  // Re-render when what the actions act on changes (the buttons compute their state then).
+  useTargets();
+  useUi((s) => s.selectedIds);
+  useProject((p) => p.tracks);
   const pps = useUi((s) => s.pxPerSecond);
   const desktop = useUi((s) => s.layout === 'desktop');
   // Zoom slider works on a log scale so both ends feel the same.
@@ -317,38 +363,10 @@ export function TimelineBar(): ReactElement {
       </div>
       {desktop ? (
         <div className="vu-bar-actions" role="toolbar" aria-label={l.clipActions}>
-          <Button
-            icon="split"
-            label={l.split}
-            tip={l.tipSplit}
-            shortcut="S"
-            disabledReason={targets.split.reason}
-            onClick={() => ctl.split()}
-          />
-          <Button
-            icon="duplicate"
-            label={l.duplicate}
-            tip={l.tipDuplicate}
-            shortcut="⌘D"
-            disabledReason={targets.selection.reason}
-            onClick={() => ctl.duplicateSelected()}
-          />
-          <Button
-            icon="freeze"
-            label={l.freeze}
-            tip={l.tipFreeze}
-            disabledReason={targets.freeze.reason}
-            onClick={() => ctl.freezeSelected()}
-          />
-          <Button
-            icon="delete"
-            label={l.delete}
-            tip={l.tipDelete}
-            shortcut="Del"
-            variant="danger"
-            disabledReason={targets.selection.reason}
-            onClick={() => ctl.deleteSelected()}
-          />
+          <CommandButton id="split" />
+          <CommandButton id="duplicate" />
+          <CommandButton id="freeze" />
+          <CommandButton id="delete" />
         </div>
       ) : null}
       <div className="vu-bar-end">
@@ -539,7 +557,9 @@ export function Toolbar(): ReactElement {
     sheetPanel: s.sheetPanel,
   }));
   const item = useProject((p) => (selectedId ? (findItem(p, selectedId)?.item ?? null) : null));
-  const entries = toolsFor(item, ctl.project, ctl, l, targets);
+  const count = useUi((s) => s.selectedIds.length);
+  useProject((p) => p); // lock / group state shows on the tools
+  const entries = toolsFor(item, ctl.project, ctl, l, targets, count);
   // Fades at the edges show there are more tools to scroll to (phones show ~6 at a time).
   const barRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -560,49 +580,57 @@ export function Toolbar(): ReactElement {
     };
   }, [entries.length, item?.id]);
   return (
-    <div
-      ref={barRef}
-      className="vu-toolbar"
-      role="toolbar"
-      aria-label={item ? itemTitle(item, ctl.project.assets) : l.addContent}
-    >
-      {item ? (
-        <>
-          <ToolButton
-            icon="back"
-            label={l.back}
-            tip={l.deselect}
-            onClick={() => ctl.select(null)}
-          />
-          <span className="vu-toolbar-divider" aria-hidden="true" />
-        </>
-      ) : null}
-      {entries.map((entry) => {
-        const active = entry.tool
-          ? tool === entry.tool
-          : entry.panel
-            ? sheetPanel && panel === entry.panel
-            : false;
-        return (
-          <ToolButton
-            key={entry.key}
-            icon={entry.icon}
-            label={entry.label}
-            {...(entry.tip ? { tip: entry.tip } : {})}
-            active={active}
-            danger={entry.danger ?? false}
-            disabledReason={entry.disabledReason ?? null}
-            onClick={() => {
-              if (entry.run) entry.run();
-              else if (entry.tool) ctl.openTool(entry.tool);
-              else if (entry.panel) {
-                const open = sheetPanel && panel === entry.panel;
-                ctl.ui.setState({ panel: entry.panel, tool: null, sheetPanel: !open });
-              }
-            }}
-          />
-        );
-      })}
+    <div className="vu-toolbar">
+      <div
+        ref={barRef}
+        className="vu-toolbar-scroll"
+        role="toolbar"
+        aria-label={
+          count > 1
+            ? l.selectedCount(count)
+            : item
+              ? itemTitle(item, ctl.project.assets)
+              : l.addContent
+        }
+      >
+        {item ? (
+          <>
+            <ToolButton
+              icon="back"
+              label={l.back}
+              tip={l.deselect}
+              onClick={() => ctl.select(null)}
+            />
+            <span className="vu-toolbar-divider" aria-hidden="true" />
+          </>
+        ) : null}
+        {entries.map((entry) => {
+          const active = entry.tool
+            ? tool === entry.tool
+            : entry.panel
+              ? sheetPanel && panel === entry.panel
+              : false;
+          return (
+            <ToolButton
+              key={entry.key}
+              icon={entry.icon}
+              label={entry.label}
+              {...(entry.tip ? { tip: entry.tip } : {})}
+              active={active}
+              danger={entry.danger ?? false}
+              disabledReason={entry.disabledReason ?? null}
+              onClick={() => {
+                if (entry.run) entry.run();
+                else if (entry.tool) ctl.openTool(entry.tool);
+                else if (entry.panel) {
+                  const open = sheetPanel && panel === entry.panel;
+                  ctl.ui.setState({ panel: entry.panel, tool: null, sheetPanel: !open });
+                }
+              }}
+            />
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -625,7 +653,8 @@ type TitleKey =
   | 'stickers'
   | 'audio'
   | 'media'
-  | 'animate';
+  | 'animate'
+  | 'arrange';
 
 const TOOL_TITLE: Record<ToolId, TitleKey> = {
   speed: 'speed',
@@ -646,6 +675,7 @@ const TOOL_TITLE: Record<ToolId, TitleKey> = {
   'add-audio': 'audio',
   'add-media': 'media',
   animate: 'animate',
+  arrange: 'arrange',
 };
 
 /**
@@ -658,8 +688,9 @@ export function Dock(): ReactElement | null {
   const sheetPanel = useUi((s) => s.sheetPanel);
   const showPanel = !tool && sheetPanel && panel;
   if (!tool && !showPanel) return null;
-  // A new tool is a fresh sheet (default height again).
-  return <Sheet key={tool ?? panel ?? ''} tool={tool} panel={panel} />;
+  // One sheet while it's open: picking another tool swaps its contents in place (a quick fade),
+  // it doesn't slide in again (owner, 2026-10-19).
+  return <Sheet tool={tool} panel={panel} />;
 }
 
 function Sheet({ tool, panel }: { tool: ToolId | null; panel: PanelId | null }): ReactElement {
@@ -687,7 +718,13 @@ function Sheet({ tool, panel }: { tool: ToolId | null; panel: PanelId | null }):
     return () => ro.disconnect();
   }, []);
   const entry = RAIL.find((r) => r.id === panel);
-  const title = tool ? l[TOOL_TITLE[tool]] : entry ? l[entry.key] : l.canvas;
+  const title = tool
+    ? l[TOOL_TITLE[tool]]
+    : entry
+      ? l[entry.key]
+      : panel === 'layers'
+        ? l.layers
+        : l.canvas;
 
   /**
    * The sheet is always full height and only ever moves with `transform` (no height animation,
@@ -698,11 +735,23 @@ function Sheet({ tool, panel }: { tool: ToolId | null; panel: PanelId | null }):
     const y = new DOMMatrixReadOnly(getComputedStyle(sheet).transform).m42;
     return Number.isFinite(y) ? y : 0;
   };
+  /** Cancels a close that's under way (another tool was picked while the sheet slid out). */
+  const cancelLeave = useRef<(() => void) | null>(null);
+  useLayoutEffect(() => {
+    cancelLeave.current?.();
+  }, [tool, panel]);
+  // Closed some other way meanwhile (Back, a selection): the late close mustn't shut what opens next.
+  useEffect(() => () => cancelLeave.current?.(), []);
   const dismiss = () => {
     const sheet = ref.current;
     if (!sheet || leaving.current) return;
     leaving.current = true;
-    const done = () => ctl.ui.setState({ tool: null, sheetPanel: false });
+    let cancelled = false;
+    const done = () => {
+      if (cancelled) return;
+      cancelled = true;
+      ctl.ui.setState({ tool: null, sheetPanel: false });
+    };
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return done();
     sheet.dataset.leaving = '';
     // Only the sheet's own slide counts (child hover transitions bubble up too).
@@ -713,7 +762,16 @@ function Sheet({ tool, panel }: { tool: ToolId | null; panel: PanelId | null }):
     };
     sheet.addEventListener('transitionend', onEnd);
     // Safety net if no transition runs (hidden tab, zero duration).
-    setTimeout(done, 400);
+    const timer = setTimeout(done, 400);
+    cancelLeave.current = () => {
+      cancelLeave.current = null;
+      if (cancelled) return;
+      cancelled = true;
+      clearTimeout(timer);
+      sheet.removeEventListener('transitionend', onEnd);
+      leaving.current = false;
+      delete sheet.dataset.leaving;
+    };
   };
 
   // Dragging the handle / header: down closes, up expands, a short drag springs back. The sheet
@@ -780,7 +838,7 @@ function Sheet({ tool, panel }: { tool: ToolId | null; panel: PanelId | null }):
           <span>{l.done}</span>
         </button>
       </div>
-      <div className="vu-dock-body">
+      <div className="vu-dock-body" key={tool ?? panel ?? ''}>
         {tool ? <ToolPanel tool={tool} /> : <AddPanel panel={panel!} />}
       </div>
     </section>
@@ -794,8 +852,10 @@ export function Toasts(): ReactElement {
   const l = useLabels();
   const toasts = useUi((s) => s.toasts);
   const readOnly = useUi((st) => st.readOnly);
+  const announcement = useUi((s) => s.announcement);
   return (
     <div className="vu-toasts" role="status" aria-live="polite">
+      <span className="vu-sr-only">{announcement}</span>
       {readOnly ? (
         <div className="vu-toast vu-banner" data-tone="error">
           <Icon name="warning" size={16} />

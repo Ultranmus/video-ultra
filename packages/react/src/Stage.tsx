@@ -1,36 +1,65 @@
-import { findItem, itemEnd, updateItem, type Item, type Transform } from '@video-ultra/core';
+import {
+  findItem,
+  itemEnd,
+  mainTrack,
+  updateItem,
+  type Item,
+  type Project,
+  type Transform,
+} from '@video-ultra/core';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactElement } from 'react';
 import { useController, useLabels, useProject, useUi } from './context';
 import { Button, EmptyState } from './controls';
 import { ScrubPreview } from './stage/ScrubPreview';
-import { hitStage, itemBox, snapCentre, type Box, type MeasureText } from './stage/geometry';
+import { boundsOf, unionBounds, type Bounds } from './stage/arrange';
+import {
+  boxContains,
+  hitStage,
+  itemBox,
+  snapCentre,
+  visibleItemsAt,
+  type Box,
+} from './stage/geometry';
+import { measureText as measure } from './stage/measure';
 
 /**
  * The preview. The canvas belongs to the engine worker (transferred); this component only sizes
  * it and draws the selection overlay. Direct manipulation (UI_VISION §2.3): drag to move, corner
- * handles to scale, the top handle to rotate, two fingers to pinch-scale and rotate. Drags preview
- * through the engine and commit one edit on release.
+ * handles to scale, the top handle to rotate, two fingers to pinch-scale and rotate. Several
+ * selected elements (or a group) share one box and move, scale and rotate together; locked ones
+ * stay put. Drags preview through the engine and commit one edit on release.
  */
 
-let measureCtx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null = null;
-const measure: MeasureText = (font, text) => {
-  measureCtx ??= new OffscreenCanvas(1, 1).getContext('2d');
-  if (!measureCtx) return text.length * 10;
-  measureCtx.font = font;
-  return measureCtx.measureText(text).width;
-};
+/** A selected element a gesture changes, with its transform when the gesture started. */
+interface Member {
+  id: string;
+  tf: Transform;
+}
 
 type StageDrag =
-  | { type: 'move'; id: number; item: Item; tf: Transform; x: number; y: number }
-  | { type: 'scale'; id: number; item: Item; tf: Transform; box: Box; startDist: number }
-  | { type: 'rotate'; id: number; item: Item; tf: Transform; box: Box; startAngle: number }
+  /** Move, scale, rotate or pinch the selection: a similarity transform around `centre`. */
+  | {
+      type: 'move' | 'scale' | 'rotate';
+      id: number;
+      members: Member[];
+      /** Canvas px: the selection box's centre and the press point. */
+      centre: { x: number; y: number };
+      x: number;
+      y: number;
+      startDist: number;
+      startAngle: number;
+      /** One element: rotation snaps to absolute 45° steps (several: the turn snaps). */
+      single: boolean;
+      moved: boolean;
+    }
   | {
       type: 'pinch';
-      item: Item;
-      tf: Transform;
+      members: Member[];
+      centre: { x: number; y: number };
       ids: [number, number];
       dist: number;
       angle: number;
+      mid: { x: number; y: number };
     }
   /** Two fingers with nothing selected: zoom the view (screen coordinates). */
   | {
@@ -43,7 +72,9 @@ type StageDrag =
       base: { x: number; y: number };
     }
   /** One finger on empty stage while zoomed in: pan the view. */
-  | { type: 'pan'; id: number; x: number; y: number; start: View; moved: boolean };
+  | { type: 'pan'; id: number; x: number; y: number; start: View; moved: boolean }
+  /** Mouse drag on empty stage: a selection rectangle (canvas px). */
+  | { type: 'marquee'; id: number; x: number; y: number; add: boolean; moved: boolean };
 
 /** How the stage view is zoomed and panned (CSS on the frame; the project doesn't change). */
 interface View {
@@ -52,6 +83,7 @@ interface View {
   y: number;
 }
 const MAX_ZOOM = 5;
+const LONG_PRESS_MS = 500;
 
 export function Stage(): ReactElement {
   const ctl = useController();
@@ -59,6 +91,8 @@ export function Stage(): ReactElement {
   const stageRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
+  const outlinesRef = useRef<HTMLDivElement>(null);
+  const marqueeRef = useRef<HTMLDivElement>(null);
   const guideX = useRef<HTMLDivElement>(null);
   const guideY = useRef<HTMLDivElement>(null);
   const { pw, ph } = useProject((p) => ({ pw: p.settings.width, ph: p.settings.height }));
@@ -148,49 +182,103 @@ export function Stage(): ReactElement {
 
   // ── selection overlay ────────────────────────────────────────────────
 
-  const selectedId = useUi((s) => s.selectedId);
-  const item = useProject((p) => (selectedId ? (findItem(p, selectedId)?.item ?? null) : null));
+  const selectedIds = useUi((s) => s.selectedIds);
+  // The selected items as they are in the project (re-renders when any of them changes).
+  const selected = useProject((p) =>
+    selectedIds.map((id) => findItem(p, id)?.item).filter((i): i is Item => !!i),
+  );
+  const lockedKey = useProject((p) =>
+    selectedIds.map((id) => (isLockedIn(p, id) ? '1' : '0')).join(''),
+  );
   const scale = frame.w / pw || 0;
 
-  const placeBox = (box: Box | null) => {
+  /** Boxes of the selected pictures on screen at `t` (canvas px). */
+  const boxesAt = (project: Project, items: readonly Item[], t: number) => {
+    const out: { item: Item; box: Box }[] = [];
+    for (const item of items) {
+      if (!('transform' in item) || item.hidden || t < item.start || t >= itemEnd(item)) continue;
+      const box = itemBox(item, project, pw, ph, measure);
+      if (box) out.push({ item, box });
+    }
+    return out;
+  };
+
+  /**
+   * Draws the selection: one element's own (rotated) box, or for several one upright box around
+   * them all plus a faint outline on each. Locked: dashed, no handles.
+   */
+  const placeBox = (entries: { item: Item; box: Box }[], locked: boolean) => {
     const el = boxRef.current;
-    if (!el) return;
-    if (!box) {
+    const outlines = outlinesRef.current;
+    if (!el || !outlines) return;
+    if (entries.length === 0) {
       el.hidden = true;
+      outlines.replaceChildren();
       return;
     }
     el.hidden = false;
+    el.toggleAttribute('data-locked', locked);
+    el.toggleAttribute('data-group', entries.length > 1);
     // A little air around the item so handles never sit on top of small text or stickers.
     const pad = 6;
+    const box: Box =
+      entries.length === 1
+        ? entries[0]!.box
+        : boundsBox(unionBounds(entries.map((e) => boundsOf(e.box))));
     const w = box.width * scale + pad * 2;
     const h = box.height * scale + pad * 2;
     el.style.width = `${w}px`;
     el.style.height = `${h}px`;
     el.style.transform = `translate(${box.cx * scale - w / 2}px, ${box.cy * scale - h / 2}px) rotate(${box.rotation}deg)`;
+    // Member outlines (several only), reusing the elements already there.
+    const need = entries.length > 1 ? entries.length : 0;
+    while (outlines.children.length > need) outlines.lastElementChild!.remove();
+    while (outlines.children.length < need) {
+      const o = document.createElement('div');
+      o.className = 'vu-member-outline';
+      outlines.append(o);
+    }
+    if (need)
+      entries.forEach(({ box: b }, i) => {
+        const o = outlines.children[i] as HTMLElement;
+        const ow = b.width * scale;
+        const oh = b.height * scale;
+        o.style.width = `${ow}px`;
+        o.style.height = `${oh}px`;
+        o.style.transform = `translate(${b.cx * scale - ow / 2}px, ${b.cy * scale - oh / 2}px) rotate(${b.rotation}deg)`;
+      });
   };
 
-  // Show the box only while the item is on screen (playhead subscription, no re-render per frame).
+  // Show the box only while the selection is on screen (playhead subscription, no re-render per
+  // frame).
   const previewMode = useUi((s) => s.previewMode);
   useEffect(() => {
-    if (!item || previewMode) {
-      placeBox(null);
+    if (selected.length === 0 || previewMode) {
+      placeBox([], false);
       return;
     }
-    const box = itemBox(item, ctl.project, pw, ph, measure);
+    const locked = lockedKey.includes('1') && !lockedKey.includes('0');
+    let shown = '';
     const update = (t: number) => {
-      const visible = t >= item.start && t < itemEnd(item);
-      placeBox(visible ? box : null);
+      const entries = boxesAt(ctl.project, selected, t);
+      const key = entries.map((e) => e.item.id).join('|');
+      if (key === shown && key !== '') return;
+      shown = key;
+      placeBox(entries, locked);
     };
     update(ctl.playhead.time);
     return ctl.playhead.subscribe(update);
-    // placeBox reads refs only.
+    // placeBox / boxesAt read refs only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ctl, item, pw, ph, scale, previewMode]);
+  }, [ctl, selected, lockedKey, pw, ph, scale, previewMode]);
 
   // ── gestures ─────────────────────────────────────────────────────────
 
   const drag = useRef<StageDrag | null>(null);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const longPress = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number } | null>(
+    null,
+  );
 
   // Project pixels under a screen point. Uses the frame's on-screen size, so it holds while the
   // view is zoomed or panned.
@@ -206,13 +294,76 @@ export function Stage(): ReactElement {
     if (guideY.current) guideY.current.hidden = !y;
   };
 
-  /** The transform the preview shows now — committed on release. */
-  const latestTf = useRef<Transform | null>(null);
-  const previewTransform = (target: Item, tf: Transform) => {
-    latestTf.current = tf;
-    const next = ctl.preview((d) => updateItem(d, target.id, { transform: tf }));
-    const moved = next ? findItem(next, target.id)?.item : null;
-    if (moved) placeBox(itemBox(moved, next!, pw, ph, measure));
+  /** The selection's members a gesture changes: unlocked, with a transform. */
+  const movable = (): Member[] =>
+    ctl
+      .selectedItems()
+      .filter((i): i is Extract<Item, { transform: Transform }> => 'transform' in i)
+      .filter((i) => !ctl.isLocked(i.id))
+      .map((i) => ({ id: i.id, tf: { ...i.transform } }));
+
+  /** The box gestures turn around: the selection box on screen now. */
+  const selectionBox = (): Box | null => {
+    const entries = boxesAt(ctl.project, ctl.selectedItems(), ctl.playhead.time);
+    if (entries.length === 0) return null;
+    return entries.length === 1
+      ? entries[0]!.box
+      : boundsBox(unionBounds(entries.map((e) => boundsOf(e.box))));
+  };
+
+  /**
+   * Applies a similarity transform (move by dx/dy, scale by k, turn by `turn` degrees around
+   * `centre`, canvas px) to every member; previews it, and returns the transforms to commit.
+   */
+  const latest = useRef<Map<string, Transform> | null>(null);
+  const previewMembers = (
+    members: Member[],
+    centre: { x: number; y: number },
+    dx: number,
+    dy: number,
+    k: number,
+    turn: number,
+  ) => {
+    const rad = (turn * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    const next = new Map<string, Transform>();
+    for (const m of members) {
+      const px = m.tf.x * pw - centre.x;
+      const py = m.tf.y * ph - centre.y;
+      const kk = clampScale(m.tf.scale * k) / m.tf.scale;
+      const x = centre.x + dx + (px * cos - py * sin) * kk;
+      const y = centre.y + dy + (px * sin + py * cos) * kk;
+      next.set(m.id, {
+        ...m.tf,
+        x: x / pw,
+        y: y / ph,
+        scale: m.tf.scale * kk,
+        rotation: normalizeAngle(m.tf.rotation + turn),
+      });
+    }
+    latest.current = next;
+    const project = ctl.preview((d) => {
+      for (const [id, tf] of next) updateItem(d, id, { transform: tf });
+    });
+    if (project) {
+      const items = ctl
+        .selectedItems()
+        .map((i) => findItem(project, i.id)?.item)
+        .filter((i): i is Item => !!i);
+      const entries = boxesAt(project, items, ctl.playhead.time);
+      placeBox(entries, false);
+    }
+  };
+
+  const rootPoint = (e: { clientX: number; clientY: number }) => {
+    const r = stageRef.current?.closest('.vu-root')?.getBoundingClientRect();
+    return { x: e.clientX - (r?.left ?? 0), y: e.clientY - (r?.top ?? 0) };
+  };
+
+  const cancelLongPress = () => {
+    if (longPress.current) clearTimeout(longPress.current.timer);
+    longPress.current = null;
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
@@ -222,6 +373,7 @@ export function Stage(): ReactElement {
       ctl.togglePlay();
       return;
     }
+    ctl.closeMenu();
     const p = toCanvas(e);
     pointers.current.set(e.pointerId, p);
     screen.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -230,10 +382,11 @@ export function Stage(): ReactElement {
     } catch {
       /* the pointer already ended */
     }
-    const current = ctl.selectedItem();
+    const members = movable();
 
     // Two fingers and nothing to transform: zoom the view around the fingers.
-    if (pointers.current.size === 2 && !(current && 'transform' in current)) {
+    if (pointers.current.size === 2 && members.length === 0) {
+      cancelLongPress();
       ctl.preview(null);
       const [a, b] = [...screen.current.values()];
       const r = frameRef.current!.getBoundingClientRect();
@@ -248,18 +401,21 @@ export function Stage(): ReactElement {
       return;
     }
 
-    if (pointers.current.size === 2 && current && 'transform' in current) {
-      latestTf.current = null;
-      ctl.preview(null);
+    if (pointers.current.size === 2) {
       // Second finger: cancel the one-finger drag, pinch-scale and rotate the selection.
+      cancelLongPress();
+      latest.current = null;
+      ctl.preview(null);
+      const box = selectionBox();
       const [a, b] = [...pointers.current.values()];
       drag.current = {
         type: 'pinch',
-        item: current,
-        tf: { ...current.transform },
+        members,
+        centre: box ? { x: box.cx, y: box.cy } : { x: (a!.x + b!.x) / 2, y: (a!.y + b!.y) / 2 },
         ids: [...pointers.current.keys()] as [number, number],
-        dist: Math.hypot(a!.x - b!.x, a!.y - b!.y),
+        dist: Math.max(1, Math.hypot(a!.x - b!.x, a!.y - b!.y)),
         angle: Math.atan2(b!.y - a!.y, b!.x - a!.x),
+        mid: { x: (a!.x + b!.x) / 2, y: (a!.y + b!.y) / 2 },
       };
       return;
     }
@@ -267,27 +423,20 @@ export function Stage(): ReactElement {
     if (ctl.ui.getState().playing) ctl.pause();
 
     const handle = (e.target as HTMLElement).dataset.handle;
-    if (handle && current && 'transform' in current) {
-      const box = itemBox(current, ctl.project, pw, ph, measure)!;
-      if (handle === 'rotate') {
-        drag.current = {
-          type: 'rotate',
-          id: e.pointerId,
-          item: current,
-          tf: { ...current.transform },
-          box,
-          startAngle: Math.atan2(p.y - box.cy, p.x - box.cx),
-        };
-      } else {
-        drag.current = {
-          type: 'scale',
-          id: e.pointerId,
-          item: current,
-          tf: { ...current.transform },
-          box,
-          startDist: Math.max(1, Math.hypot(p.x - box.cx, p.y - box.cy)),
-        };
-      }
+    const box = selectionBox();
+    if (handle && box && members.length) {
+      drag.current = {
+        type: handle === 'rotate' ? 'rotate' : 'scale',
+        id: e.pointerId,
+        members,
+        centre: { x: box.cx, y: box.cy },
+        x: p.x,
+        y: p.y,
+        startDist: Math.max(1, Math.hypot(p.x - box.cx, p.y - box.cy)),
+        startAngle: Math.atan2(p.y - box.cy, p.x - box.cx),
+        single: members.length === 1,
+        moved: false,
+      };
       return;
     }
     const touch = e.pointerType !== 'mouse';
@@ -301,52 +450,76 @@ export function Stage(): ReactElement {
       measure,
       (touch ? 12 : 4) / (scale * view.current.z),
     );
-    // Keep the current selection when tapping inside it (it may be under another layer).
-    const keep =
-      current && 'transform' in current && itemBox(current, ctl.project, pw, ph, measure);
-    const target =
-      keep &&
-      current &&
-      ctl.playhead.time >= current.start &&
-      ctl.playhead.time < itemEnd(current) &&
-      hitInside(keep, p)
-        ? current
-        : hit;
-    // Zoomed in, a drag on empty stage pans the view (a tap still clears the selection).
-    if (!target && view.current.z > 1) {
-      drag.current = {
-        type: 'pan',
-        id: e.pointerId,
-        x: e.clientX,
-        y: e.clientY,
-        start: { ...view.current },
-        moved: false,
-      };
+    // Keep the current selection when pressing inside its box (it may be under another layer).
+    const inside = box && boxContains(box, p.x, p.y);
+    const additive = e.shiftKey || e.metaKey || e.ctrlKey;
+    if (additive && hit) {
+      ctl.select(hit.id, { add: true });
       return;
     }
-    ctl.select(target?.id ?? null);
-    if (target && 'transform' in target && !isLocked(target)) {
+    const target = inside && ctl.selectedItems().length ? ctl.selectedItem() : hit;
+    if (!target) {
+      // Zoomed in, a drag on empty stage pans the view; with a mouse it draws a selection
+      // rectangle. A plain tap clears the selection.
+      if (view.current.z > 1) {
+        drag.current = {
+          type: 'pan',
+          id: e.pointerId,
+          x: e.clientX,
+          y: e.clientY,
+          start: { ...view.current },
+          moved: false,
+        };
+        return;
+      }
+      if (!touch) {
+        drag.current = {
+          type: 'marquee',
+          id: e.pointerId,
+          x: p.x,
+          y: p.y,
+          add: additive,
+          moved: false,
+        };
+        return;
+      }
+      ctl.select(null);
+      return;
+    }
+    if (!inside) ctl.select(target.id);
+    const now = movable();
+    const nowBox = selectionBox();
+    if (now.length && nowBox) {
       drag.current = {
         type: 'move',
         id: e.pointerId,
-        item: target,
-        tf: { ...target.transform },
+        members: now,
+        centre: { x: nowBox.cx, y: nowBox.cy },
         x: p.x,
         y: p.y,
+        startDist: 1,
+        startAngle: 0,
+        single: now.length === 1,
+        moved: false,
       };
     }
-  };
-
-  const isLocked = (target: Item) =>
-    ctl.project.tracks.some((t) => t.locked && t.items.some((i) => i.id === target.id));
-  const hitInside = (box: Box, p: { x: number; y: number }) => {
-    const rad = (-box.rotation * Math.PI) / 180;
-    const dx = p.x - box.cx;
-    const dy = p.y - box.cy;
-    return (
-      Math.abs(dx * Math.cos(rad) - dy * Math.sin(rad)) <= box.width / 2 &&
-      Math.abs(dx * Math.sin(rad) + dy * Math.cos(rad)) <= box.height / 2
-    );
+    // Touch: hold still to open the menu for what's under the finger.
+    if (touch) {
+      const at = rootPoint(e);
+      longPress.current = {
+        x: e.clientX,
+        y: e.clientY,
+        timer: setTimeout(() => {
+          longPress.current = null;
+          drag.current = null;
+          latest.current = null;
+          ctl.preview(null);
+          showGuides(false, false);
+          navigator.vibrate?.(8);
+          ctl.openMenu(at.x, at.y);
+        }, LONG_PRESS_MS),
+      };
+    }
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
@@ -354,6 +527,8 @@ export function Stage(): ReactElement {
     const p = toCanvas(e);
     pointers.current.set(e.pointerId, p);
     screen.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const lp = longPress.current;
+    if (lp && Math.hypot(e.clientX - lp.x, e.clientY - lp.y) > 8) cancelLongPress();
     const d = drag.current;
     if (!d) return;
     if (d.type === 'view') {
@@ -384,44 +559,85 @@ export function Stage(): ReactElement {
       applyView({ ...d.start, x: d.start.x + dx, y: d.start.y + dy });
       return;
     }
+    if (d.type === 'marquee') {
+      if (d.id !== e.pointerId) return;
+      const k = scale * view.current.z;
+      if (!d.moved && Math.hypot(p.x - d.x, p.y - d.y) * k < 4) return;
+      d.moved = true;
+      placeMarquee({
+        left: Math.min(d.x, p.x),
+        top: Math.min(d.y, p.y),
+        right: Math.max(d.x, p.x),
+        bottom: Math.max(d.y, p.y),
+      });
+      return;
+    }
     if (d.type === 'pinch') {
       const a = pointers.current.get(d.ids[0]);
       const b = pointers.current.get(d.ids[1]);
-      if (!a || !b) return;
+      if (!a || !b || d.members.length === 0) return;
       const dist = Math.hypot(a.x - b.x, a.y - b.y);
       const angle = Math.atan2(b.y - a.y, b.x - a.x);
-      const tf = {
-        ...d.tf,
-        scale: clampScale(d.tf.scale * (dist / Math.max(1, d.dist))),
-        rotation: d.tf.rotation + ((angle - d.angle) * 180) / Math.PI,
-      };
-      previewTransform(d.item, tf);
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      previewMembers(
+        d.members,
+        d.centre,
+        d.members.length > 1 ? mid.x - d.mid.x : 0,
+        d.members.length > 1 ? mid.y - d.mid.y : 0,
+        dist / d.dist,
+        ((angle - d.angle) * 180) / Math.PI,
+      );
       return;
     }
     if (d.id !== e.pointerId) return;
+    const k = scale * view.current.z;
+    if (!d.moved && Math.hypot(p.x - d.x, p.y - d.y) * k < 2) return;
+    d.moved = true;
     if (d.type === 'move') {
-      const k = scale * view.current.z;
-      const sx = snapCentre(d.tf.x + (p.x - d.x) / pw, 6 / k / pw);
-      const sy = snapCentre(d.tf.y + (p.y - d.y) / ph, 6 / k / ph);
+      // The selection's centre snaps to the frame's centre lines.
+      const sx = snapCentre((d.centre.x + p.x - d.x) / pw, 6 / k / pw);
+      const sy = snapCentre((d.centre.y + p.y - d.y) / ph, 6 / k / ph);
       showGuides(sx.snapped, sy.snapped);
-      previewTransform(d.item, { ...d.tf, x: sx.value, y: sy.value });
+      previewMembers(
+        d.members,
+        d.centre,
+        sx.value * pw - d.centre.x,
+        sy.value * ph - d.centre.y,
+        1,
+        0,
+      );
     } else if (d.type === 'scale') {
-      const dist = Math.hypot(p.x - d.box.cx, p.y - d.box.cy);
-      previewTransform(d.item, { ...d.tf, scale: clampScale(d.tf.scale * (dist / d.startDist)) });
+      const dist = Math.hypot(p.x - d.centre.x, p.y - d.centre.y);
+      previewMembers(d.members, d.centre, 0, 0, dist / d.startDist, 0);
     } else {
-      const angle = Math.atan2(p.y - d.box.cy, p.x - d.box.cx);
-      let rotation = d.tf.rotation + ((angle - d.startAngle) * 180) / Math.PI;
-      rotation = ((rotation + 540) % 360) - 180;
-      // Snap to the nearest 45° within 4°.
-      const nearest = Math.round(rotation / 45) * 45;
-      if (Math.abs(rotation - nearest) < 4) rotation = nearest;
-      previewTransform(d.item, { ...d.tf, rotation });
+      const angle = Math.atan2(p.y - d.centre.y, p.x - d.centre.x);
+      let turn = ((angle - d.startAngle) * 180) / Math.PI;
+      // Snap to 45°: one element by its own angle, several by how far they turn.
+      const base = d.single ? d.members[0]!.tf.rotation : 0;
+      const total = normalizeAngle(base + turn);
+      const nearest = Math.round(total / 45) * 45;
+      if (Math.abs(total - nearest) < 4) turn += nearest - total;
+      previewMembers(d.members, d.centre, 0, 0, 1, turn);
     }
+  };
+
+  const placeMarquee = (b: Bounds | null) => {
+    const el = marqueeRef.current;
+    if (!el) return;
+    if (!b) {
+      el.hidden = true;
+      return;
+    }
+    el.hidden = false;
+    el.style.width = `${(b.right - b.left) * scale}px`;
+    el.style.height = `${(b.bottom - b.top) * scale}px`;
+    el.style.transform = `translate(${b.left * scale}px, ${b.top * scale}px)`;
   };
 
   const finish = (e: React.PointerEvent, cancelled: boolean) => {
     pointers.current.delete(e.pointerId);
     screen.current.delete(e.pointerId);
+    cancelLongPress();
     const d = drag.current;
     if (!d) return;
     if (d.type === 'view') {
@@ -436,18 +652,78 @@ export function Stage(): ReactElement {
       if (!d.moved) ctl.select(null);
       return;
     }
+    if (d.type === 'marquee') {
+      if (d.id !== e.pointerId) return;
+      drag.current = null;
+      placeMarquee(null);
+      if (cancelled) return;
+      if (!d.moved) {
+        if (!d.add) ctl.select(null);
+        return;
+      }
+      const p = toCanvas(e);
+      const rect = {
+        left: Math.min(d.x, p.x),
+        top: Math.min(d.y, p.y),
+        right: Math.max(d.x, p.x),
+        bottom: Math.max(d.y, p.y),
+      };
+      selectInRect(rect, d.add);
+      return;
+    }
     if (d.type === 'pinch') {
       if (pointers.current.size >= 2) return;
     } else if (d.id !== e.pointerId) return;
     drag.current = null;
     showGuides(false, false);
-    const latest = latestTf.current;
-    latestTf.current = null;
-    if (cancelled || !latest) {
+    const next = latest.current;
+    latest.current = null;
+    if (cancelled || !next) {
       ctl.preview(null);
       return;
     }
-    ctl.run(l.edit, (draft) => updateItem(draft, d.item.id, { transform: latest }));
+    const label =
+      d.type === 'move'
+        ? l.move
+        : d.type === 'scale'
+          ? l.resize
+          : d.type === 'rotate'
+            ? l.rotate
+            : l.edit;
+    ctl.run(label, (draft) => {
+      for (const [id, tf] of next) updateItem(draft, id, { transform: tf });
+    });
+  };
+
+  /** Selects the on-screen elements touching a rectangle (canvas px); Shift adds to the selection. */
+  const selectInRect = (rect: Bounds, add: boolean) => {
+    const project = ctl.project;
+    const main = mainTrack(project);
+    const hits = visibleItemsAt(project, ctl.playhead.time)
+      .filter((i) => !main.items.includes(i))
+      .filter((i) => {
+        const box = itemBox(i, project, pw, ph, measure);
+        if (!box) return false;
+        const b = boundsOf(box);
+        return (
+          b.left < rect.right && b.right > rect.left && b.top < rect.bottom && b.bottom > rect.top
+        );
+      })
+      .reverse();
+    const state = ctl.ui.getState();
+    const ids = [...(add ? state.selectedIds : [])];
+    for (const item of hits) {
+      if (item.groupId) {
+        for (const track of project.tracks)
+          for (const other of track.items)
+            if (other.groupId === item.groupId && !ids.includes(other.id)) ids.push(other.id);
+      } else if (!ids.includes(item.id)) ids.push(item.id);
+    }
+    if (ids.length === 0) {
+      ctl.select(null);
+      return;
+    }
+    ctl.ui.setState({ selectedId: ids[ids.length - 1]!, selectedIds: ids, tool: null });
   };
 
   // Desktop: Ctrl/⌘ + wheel (or a trackpad pinch) zooms the view around the pointer.
@@ -482,6 +758,22 @@ export function Stage(): ReactElement {
       onPointerMove={onPointerMove}
       onPointerUp={(e) => finish(e, false)}
       onPointerCancel={(e) => finish(e, true)}
+      onDoubleClick={(e) => {
+        // Double-click a group member to pick just that one.
+        if (scale === 0 || ctl.ui.getState().selectedIds.length < 2) return;
+        const p = toCanvas(e);
+        const hit = hitStage(ctl.project, ctl.playhead.time, pw, ph, p.x, p.y, measure, 4 / scale);
+        if (hit) ctl.select(hit.id, { only: true });
+      }}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        if (scale === 0 || ctl.ui.getState().previewMode) return;
+        const p = toCanvas(e);
+        const hit = hitStage(ctl.project, ctl.playhead.time, pw, ph, p.x, p.y, measure, 4 / scale);
+        if (hit && !ctl.ui.getState().selectedIds.includes(hit.id)) ctl.select(hit.id);
+        const at = rootPoint(e);
+        ctl.openMenu(at.x, at.y);
+      }}
     >
       <div
         ref={frameRef}
@@ -510,6 +802,8 @@ export function Stage(): ReactElement {
         ) : null}
         <div ref={guideX} className="vu-guide vu-guide-x" hidden />
         <div ref={guideY} className="vu-guide vu-guide-y" hidden />
+        <div ref={outlinesRef} className="vu-member-outlines" aria-hidden="true" />
+        <div ref={marqueeRef} className="vu-marquee" aria-hidden="true" hidden />
         <div ref={boxRef} className="vu-selection-box" hidden>
           <span className="vu-handle" data-handle="nw" />
           <span className="vu-handle" data-handle="ne" />
@@ -531,6 +825,26 @@ export function Stage(): ReactElement {
       ) : null}
     </div>
   );
+}
+
+function isLockedIn(project: Project, itemId: string): boolean {
+  const found = findItem(project, itemId);
+  return !!found && (!!found.item.locked || found.track.locked);
+}
+
+/** An upright box from a rectangle. */
+function boundsBox(b: Bounds): Box {
+  return {
+    cx: (b.left + b.right) / 2,
+    cy: (b.top + b.bottom) / 2,
+    width: b.right - b.left,
+    height: b.bottom - b.top,
+    rotation: 0,
+  };
+}
+
+function normalizeAngle(deg: number): number {
+  return ((((deg + 180) % 360) + 360) % 360) - 180;
 }
 
 function clampScale(s: number): number {

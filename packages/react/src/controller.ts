@@ -1,6 +1,7 @@
 import {
   addAsset,
   addToLane,
+  arrangeItem,
   createEditor,
   createProject,
   deleteItem,
@@ -8,16 +9,21 @@ import {
   EditError,
   findItem,
   freezeFrame,
+  groupItems,
+  groupOf,
   insertMain,
   mainTrack,
   parseProject,
   projectDuration,
   projectFrame,
   randomId,
+  setItemFlags,
   setTrackFlags,
   setTransition,
   splitItem,
+  ungroupItems,
   updateItem,
+  type ArrangeTo,
   type Asset,
   type Capabilities,
   type Editor,
@@ -48,6 +54,9 @@ import { audioItem, itemTitle, stickerItem, visualItem } from './items';
 import { computeTargets, type Targets } from './targets';
 import type { Labels } from './labels';
 import { createUiStore, Playhead, type LayoutMode, type PanelId, type ToolId } from './state';
+import { alignOffsets, distributeOffsets, type AlignEdge } from './stage/arrange';
+import { itemBox, visibleItemsAt, type Box } from './stage/geometry';
+import { measureText } from './stage/measure';
 
 /** Options the `<VideoEditor />` passes to its controller. */
 export interface ControllerOptions {
@@ -101,8 +110,12 @@ export class EditorController {
       this.editor.store.subscribe((state, prev) => {
         if (state.project === prev.project) return;
         if (!this.#previewProject) void this.engine?.setProject(state.project).catch(() => {});
-        const selected = this.ui.getState().selectedId;
-        if (selected && !findItem(state.project, selected)) this.select(null);
+        const { selectedId, selectedIds } = this.ui.getState();
+        if (selectedId && !findItem(state.project, selectedId)) this.select(null);
+        else if (selectedIds.some((id) => !findItem(state.project, id)))
+          this.ui.setState({
+            selectedIds: selectedIds.filter((id) => findItem(state.project, id)),
+          });
         if (this.playhead.time > projectDuration(state.project))
           this.seek(projectDuration(state.project));
       }),
@@ -447,20 +460,350 @@ export class EditorController {
     this.editor.redo();
   }
 
+  /** History panel: undoes or redoes until `position` steps are applied (0 = as opened). */
+  jumpToHistory(position: number): void {
+    const { labels } = this.editor.history();
+    if (!this.editor.goTo(position)) return;
+    this.#announce(
+      this.labels.historyJumped(
+        position === 0 ? this.labels.historyOriginal : labels[position - 1]!,
+      ),
+    );
+  }
+
   /**
    * Selects an item (closing any open tool, since tools belong to the selection). `keepPanel`
    * keeps the open panel/tool — used when a panel selects the clip it is about to act on.
+   * Picking a group member selects the whole group (`only` picks just that member); `add`
+   * toggles the item (and its group) in a multi-selection (Shift-click, Layers "Select several").
    */
-  select(itemId: string | null, options: { keepPanel?: boolean } = {}): void {
+  select(
+    itemId: string | null,
+    options: { keepPanel?: boolean; add?: boolean; only?: boolean } = {},
+  ): void {
     const state = this.ui.getState();
-    if (state.selectedId === itemId) return;
-    if (options.keepPanel) this.ui.setState({ selectedId: itemId });
-    else this.ui.setState({ selectedId: itemId, tool: null, sheetPanel: false });
+    let ids: readonly string[];
+    let primary = itemId;
+    if (itemId === null) ids = [];
+    else if (options.add) {
+      const members = groupOf(this.project, itemId);
+      const on = state.selectedIds.includes(itemId);
+      ids = on
+        ? state.selectedIds.filter((id) => !members.includes(id))
+        : [...state.selectedIds, ...members.filter((id) => !state.selectedIds.includes(id))];
+      primary = on ? (ids[ids.length - 1] ?? null) : itemId;
+    } else if (options.only) ids = [itemId];
+    else if (state.selectedIds.includes(itemId) && state.selectedIds.length > 1)
+      ids = state.selectedIds; // pressing inside a multi-selection keeps it (to drag it)
+    else ids = groupOf(this.project, itemId);
+    if (
+      state.selectedId === primary &&
+      ids.length === state.selectedIds.length &&
+      ids.every((id, i) => state.selectedIds[i] === id)
+    )
+      return;
+    const multi = ids.length > 1;
+    const wasMulti = state.selectedIds.length > 1;
+    if (options.keepPanel || (multi && wasMulti))
+      this.ui.setState({ selectedId: primary, selectedIds: ids });
+    else this.ui.setState({ selectedId: primary, selectedIds: ids, tool: null, sheetPanel: false });
   }
 
   selectedItem(): Item | null {
     const id = this.ui.getState().selectedId;
     return id ? (findItem(this.project, id)?.item ?? null) : null;
+  }
+
+  /** Everything selected (one item, a group, or a multi-selection). */
+  selectedItems(): Item[] {
+    const out: Item[] = [];
+    for (const id of this.ui.getState().selectedIds) {
+      const item = findItem(this.project, id)?.item;
+      if (item) out.push(item);
+    }
+    return out;
+  }
+
+  /** Whether an item can't be changed: locked itself, or on a locked row. */
+  isLocked(itemId: string): boolean {
+    const found = findItem(this.project, itemId);
+    return !!found && (!!found.item.locked || found.track.locked);
+  }
+
+  /** ⌘A: every element on screen at the playhead (not the main video, not hidden ones). */
+  selectAll(): void {
+    const main = mainTrack(this.project);
+    const ids = visibleItemsAt(this.project, this.playhead.time)
+      .filter((item) => !main.items.includes(item))
+      .map((item) => item.id)
+      .reverse();
+    if (ids.length === 0) {
+      this.toast(this.labels.nothingOnScreen, 'info');
+      return;
+    }
+    this.ui.setState({ selectedId: ids[ids.length - 1]!, selectedIds: ids, tool: null });
+  }
+
+  // ── organising: lock, hide, group, arrange, align ──────────────────────
+
+  /** Locks or unlocks the selection (all locked → unlock all). */
+  toggleLockSelected(): void {
+    const items = this.selectedItems();
+    if (items.length === 0) return;
+    const lock = !items.every((i) => i.locked);
+    this.run(lock ? this.labels.lock : this.labels.unlock, (d) => {
+      for (const item of items) setItemFlags(d, item.id, { locked: lock });
+    });
+    this.#announce(lock ? this.labels.lock : this.labels.unlock);
+  }
+
+  /** Hides or shows the selection (all hidden → show all). */
+  toggleHideSelected(): void {
+    const items = this.selectedItems().filter((i) => i.kind !== 'audio');
+    if (items.length === 0) return;
+    const hide = !items.every((i) => i.hidden);
+    this.run(hide ? this.labels.hide : this.labels.show, (d) => {
+      for (const item of items) setItemFlags(d, item.id, { hidden: hide });
+    });
+  }
+
+  /** One row of the Layers panel: lock / hide / rename a single item. */
+  setItemLocked(itemId: string, locked: boolean): void {
+    this.run(locked ? this.labels.lock : this.labels.unlock, (d) =>
+      setItemFlags(d, itemId, { locked }),
+    );
+  }
+
+  setItemHidden(itemId: string, hidden: boolean): void {
+    this.run(hidden ? this.labels.hide : this.labels.show, (d) =>
+      setItemFlags(d, itemId, { hidden }),
+    );
+  }
+
+  renameItem(itemId: string, name: string): void {
+    const value = name.trim().slice(0, 120);
+    const found = findItem(this.project, itemId);
+    if (!found || (found.item.name ?? '') === value) return;
+    this.run(this.labels.rename, (d) => {
+      // Renaming works on locked items too (it changes nothing on screen).
+      const target = findItem(d, itemId)!.item;
+      if (value) target.name = value;
+      else delete target.name;
+    });
+  }
+
+  /** Lane header: locks or unlocks a whole row. */
+  toggleTrackLock(trackId: string): void {
+    const track = this.project.tracks.find((t) => t.id === trackId);
+    if (!track) return;
+    this.run(track.locked ? this.labels.unlockLane : this.labels.lockLane, (d) =>
+      setTrackFlags(d, trackId, { locked: !track.locked }),
+    );
+  }
+
+  /** Why the selection can't be grouped (null = it can). */
+  groupReason(): string | null {
+    const items = this.selectedItems();
+    if (items.length < 2) return this.labels.groupNeedsTwo;
+    const main = mainTrack(this.project);
+    if (items.some((i) => main.items.includes(i))) return this.labels.groupNoMainVideo;
+    const group = items[0]!.groupId;
+    if (group && items.every((i) => i.groupId === group)) return this.labels.groupNeedsTwo;
+    return null;
+  }
+
+  groupSelected(): void {
+    const reason = this.groupReason();
+    if (reason) {
+      this.toast(reason, 'info');
+      return;
+    }
+    const ids = this.ui.getState().selectedIds;
+    const done = this.run(this.labels.group, (d, ctx) => groupItems(d, ids, ctx.ids));
+    if (done) this.#announce(this.labels.groupedDone(ids.length));
+  }
+
+  /** The group the selection is (null when it isn't exactly one group). */
+  selectedGroup(): string | null {
+    const items = this.selectedItems();
+    const group = items[0]?.groupId;
+    return group && items.every((i) => i.groupId === group) ? group : null;
+  }
+
+  ungroupSelected(): void {
+    const group = this.selectedGroup();
+    if (!group) return;
+    this.run(this.labels.ungroup, (d) => ungroupItems(d, group));
+    this.#announce(this.labels.ungroupedDone);
+  }
+
+  /** Why the selection can't move in the stack (null = it can). */
+  arrangeReason(to: ArrangeTo): string | null {
+    const items = this.selectedItems();
+    if (items.length === 0) return this.labels.selectFirst;
+    const main = mainTrack(this.project);
+    if (items.every((i) => main.items.includes(i))) return this.labels.arrangeMainVideo;
+    if (items.every((i) => i.kind === 'audio')) return this.labels.arrangeSound;
+    if (items.some((i) => this.isLocked(i.id))) return this.labels.lockedReason;
+    const probe = produce(this.project, (d) => {
+      this.#arrangeDraft(d, items, to);
+    });
+    if (probe === this.project)
+      return to === 'forward' || to === 'front' ? this.labels.atFront : this.labels.atBack;
+    return null;
+  }
+
+  #arrangeDraft(d: Project, items: readonly Item[], to: ArrangeTo): void {
+    const t = this.playhead.time;
+    // Keep the selection's own order: going up, move the top one first; going down, the bottom.
+    const z = (id: string) => d.tracks.findIndex((tr) => tr.items.some((i) => i.id === id));
+    const lanes = items
+      .filter((i) => i.kind !== 'audio' && z(i.id) > 0)
+      .sort((a, b) => z(a.id) - z(b.id));
+    const up = to === 'forward' || to === 'front';
+    for (const item of up ? lanes.reverse() : lanes) {
+      try {
+        arrangeItem(d, item.id, to, t, randomId);
+      } catch {
+        // Already at that end: the others still move.
+      }
+    }
+  }
+
+  arrangeSelected(to: ArrangeTo): void {
+    const reason = this.arrangeReason(to);
+    if (reason) {
+      this.toast(reason, 'info');
+      return;
+    }
+    const items = this.selectedItems();
+    this.run(this.labels.arrangeStep, (d) => this.#arrangeDraft(d, items, to));
+  }
+
+  /**
+   * Layers panel drag: puts an element at `toIndex` in the on-screen stack (0 = front), one step
+   * at a time so lanes stay tidy. One undo step.
+   */
+  moveInStack(itemId: string, toIndex: number): void {
+    const stack = () =>
+      visibleItemsAt(this.project, this.playhead.time).filter(
+        (i) => !mainTrack(this.project).items.includes(i),
+      );
+    const from = stack().findIndex((i) => i.id === itemId);
+    if (from === -1 || from === toIndex) return;
+    const t = this.playhead.time;
+    this.run(this.labels.arrangeStep, (d, ctx) => {
+      const steps = Math.abs(toIndex - from);
+      for (let n = 0; n < steps; n++)
+        arrangeItem(d, itemId, toIndex < from ? 'forward' : 'backward', t, ctx.ids);
+    });
+  }
+
+  /** Boxes of the selected on-screen pictures (canvas px), for align / distribute. */
+  #selectedBoxes(): { item: Item; box: Box }[] {
+    const { width, height } = this.project.settings;
+    const out: { item: Item; box: Box }[] = [];
+    for (const item of this.selectedItems()) {
+      if (!('transform' in item) || this.isLocked(item.id)) continue;
+      const box = itemBox(item, this.project, width, height, measureText);
+      if (box) out.push({ item, box });
+    }
+    return out;
+  }
+
+  alignReason(): string | null {
+    const items = this.selectedItems();
+    if (items.length === 0 || items.every((i) => !('transform' in i)))
+      return this.labels.alignNeedsPicture;
+    if (items.some((i) => this.isLocked(i.id))) return this.labels.lockedReason;
+    return null;
+  }
+
+  distributeReason(): string | null {
+    return (
+      this.alignReason() ??
+      (this.#selectedBoxes().length < 3 ? this.labels.distributeNeedsThree : null)
+    );
+  }
+
+  /** Lines up the selection: one element against the frame, several against each other. */
+  align(edge: AlignEdge): void {
+    const reason = this.alignReason();
+    if (reason) {
+      this.toast(reason, 'info');
+      return;
+    }
+    const { width, height } = this.project.settings;
+    const list = this.#selectedBoxes();
+    const offsets = alignOffsets(
+      list.map((e) => e.box),
+      edge,
+      width,
+      height,
+    );
+    this.#nudge(list, offsets);
+  }
+
+  distribute(axis: 'x' | 'y'): void {
+    const reason = this.distributeReason();
+    if (reason) {
+      this.toast(reason, 'info');
+      return;
+    }
+    const list = this.#selectedBoxes();
+    this.#nudge(
+      list,
+      distributeOffsets(
+        list.map((e) => e.box),
+        axis,
+      ),
+    );
+  }
+
+  #nudge(list: { item: Item; box: Box }[], offsets: { dx: number; dy: number }[]): void {
+    const { width, height } = this.project.settings;
+    this.run(this.labels.alignStep, (d) => {
+      list.forEach(({ item }, i) => {
+        const o = offsets[i]!;
+        if (!('transform' in item) || (o.dx === 0 && o.dy === 0)) return;
+        updateItem(d, item.id, {
+          transform: {
+            ...item.transform,
+            x: item.transform.x + o.dx / width,
+            y: item.transform.y + o.dy / height,
+          },
+        });
+      });
+    });
+  }
+
+  /** Opens or closes the Layers panel (left panel on desktop / tablet, the sheet on phones). */
+  toggleLayers(): void {
+    const s = this.ui.getState();
+    if (s.layout !== 'phone') {
+      this.ui.setState({
+        panel: s.panel === 'layers' ? null : 'layers',
+        tool: null,
+        layersSelecting: false,
+      });
+      return;
+    }
+    const open = s.panel === 'layers' && s.sheetPanel;
+    this.ui.setState({ panel: 'layers', sheetPanel: !open, tool: null, layersSelecting: false });
+  }
+
+  /** Opens the context menu for the selection at a point in the editor root (px). */
+  openMenu(x: number, y: number): void {
+    this.ui.setState({ menu: { x, y }, historyOpen: false });
+  }
+
+  closeMenu(): void {
+    if (this.ui.getState().menu) this.ui.setState({ menu: null });
+  }
+
+  /** Screen-reader announcement (the toasts' live region would also show it, so a quiet one). */
+  #announce(text: string): void {
+    this.ui.setState({ announcement: text });
   }
 
   openTool(tool: ToolId | null): void {
@@ -541,11 +884,21 @@ export class EditorController {
   }
 
   deleteSelected(): void {
-    const item = this.selectedItem();
+    const items = this.selectedItems();
+    const item = items[items.length - 1];
     if (!item) return;
-    const name = itemTitle(item, this.project.assets);
-    this.run(this.labels.delete, (d) => deleteItem(d, item.id));
-    if (findItem(this.project, item.id)) return; // refused (e.g. locked track): run() said why
+    if (items.some((i) => this.isLocked(i.id))) {
+      this.toast(this.labels.lockedReason, 'info');
+      return;
+    }
+    const name =
+      items.length > 1
+        ? this.labels.selectedCount(items.length)
+        : itemTitle(item, this.project.assets);
+    this.run(this.labels.delete, (d) => {
+      for (const i of items) deleteItem(d, i.id);
+    });
+    if (findItem(this.project, item.id)) return; // refused: run() said why
     this.toast(this.labels.deletedDone(name), 'info', {
       label: this.labels.undo,
       run: () => this.undo(),
@@ -553,8 +906,26 @@ export class EditorController {
   }
 
   duplicateSelected(): void {
-    const item = this.selectedItem();
-    if (!item) return;
+    const items = this.selectedItems();
+    if (items.length === 0) return;
+    if (items.length > 1) {
+      // Several: copies of all of them, kept together as a group when they were one.
+      const grouped = this.selectedGroup() !== null;
+      const ids = this.run(this.labels.duplicate, (d, ctx) => {
+        const made = items.map((i) => duplicateItem(d, i.id, ctx.ids));
+        const lanes = made.filter((id) => !mainTrack(d).items.some((m) => m.id === id));
+        if (grouped && lanes.length > 1) groupItems(d, lanes, ctx.ids);
+        return made;
+      });
+      if (!ids) return;
+      this.ui.setState({ selectedId: ids[ids.length - 1]!, selectedIds: ids });
+      this.toast(this.labels.duplicatedDone, 'success', {
+        label: this.labels.undo,
+        run: () => this.undo(),
+      });
+      return;
+    }
+    const item = items[0]!;
     const id = this.run(this.labels.duplicate, (d, ctx) => duplicateItem(d, item.id, ctx.ids));
     if (!id) return;
     this.select(id);

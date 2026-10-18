@@ -5,7 +5,7 @@ export type LayoutMode = 'phone' | 'tablet' | 'desktop';
 
 /** Add-content categories (rail on desktop, add tools on phones). */
 export type PanelId =
-  'media' | 'text' | 'audio' | 'stickers' | 'canvas' | 'filters' | 'transitions';
+  'media' | 'text' | 'audio' | 'stickers' | 'canvas' | 'filters' | 'transitions' | 'layers';
 
 /** Tools whose controls open in the sheet (phone/tablet) or the inspector (desktop). */
 export type ToolId =
@@ -22,6 +22,7 @@ export type ToolId =
   | 'opacity'
   | 'duration'
   | 'animate'
+  | 'arrange'
   | 'canvas'
   | 'add-text'
   | 'add-sticker'
@@ -49,7 +50,21 @@ export interface UiState {
   status: 'loading' | 'ready' | 'unsupported' | 'error' | 'stopped';
   statusMessage: string | null;
   layout: LayoutMode;
+  /** The selected item the tools act on (the last one picked). */
   selectedId: string | null;
+  /**
+   * Everything selected, `selectedId` included (several after Shift-click, Select all, or picking
+   * a group). Empty when nothing is selected.
+   */
+  selectedIds: readonly string[];
+  /** The History popover is open. */
+  historyOpen: boolean;
+  /** Layers panel: tapping rows adds to the selection (phones have no Shift key). */
+  layersSelecting: boolean;
+  /** The context menu, at a point in the editor root (px). */
+  menu: { x: number; y: number } | null;
+  /** Last screen-reader announcement (a polite live region reads it). */
+  announcement: string;
   panel: PanelId | null;
   tool: ToolId | null;
   /** Phone/tablet: the add panel is open in the sheet. */
@@ -76,6 +91,11 @@ export function createUiStore() {
     statusMessage: null,
     layout: 'desktop',
     selectedId: null,
+    selectedIds: [],
+    historyOpen: false,
+    layersSelecting: false,
+    menu: null,
+    announcement: '',
     panel: 'media',
     tool: null,
     sheetPanel: false,

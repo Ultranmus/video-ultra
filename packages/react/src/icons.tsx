@@ -64,6 +64,29 @@ const paths = {
   alignLeft: 'M4 6h16M4 10h10M4 14h16M4 18h10',
   alignCenter: 'M4 6h16M7 10h10M4 14h16M7 18h10',
   alignRight: 'M4 6h16M10 10h10M4 14h16M10 18h10',
+  // Layers & organising (v0.2)
+  lock: 'M6.5 11h11v9h-11zM8.5 11V8a3.5 3.5 0 017 0v3M12 14.5v2',
+  unlock: 'M6.5 11h11v9h-11zM8.5 11V8a3.5 3.5 0 016.8-1.2M12 14.5v2',
+  eye: 'M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12zM12 9.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5z',
+  eyeOff:
+    'M4 4l16 16M10 6c.6-.3 1.3-.5 2-.5 6 0 9.5 6.5 9.5 6.5a17 17 0 01-2.6 3.4M14.5 17.9c-.8.4-1.6.6-2.5.6-6 0-9.5-6.5-9.5-6.5a17 17 0 013.2-3.9M10.2 10.2a2.5 2.5 0 003.6 3.6',
+  layers: 'M12 3.5l9 4.5-9 4.5L3 8zM3 12l9 4.5 9-4.5M3 16l9 4.5 9-4.5',
+  history: 'M3.5 12a8.5 8.5 0 102.5-6M3.5 4v4h4M12 7.5V12l3 2',
+  group: 'M4 4h4M16 4h4M4 20h4M16 20h4M4 4v4M20 4v4M4 16v4M20 16v4M8 8h5v5H8zM11 11h5v5h-5z',
+  ungroup: 'M4 4h7v7H4zM13 13h7v7h-7zM15 4h5v5M4 15v5h5',
+  forward: 'M8 9h11v11H8zM5 15V4h11',
+  backward: 'M5 4h11v11H5zM8 19.5h11v-11',
+  toFront: 'M8 8h8v8H8zM4 4h3M4 4v3M20 4h-3M20 4v3M4 20h3M4 20v-3M20 20h-3M20 20v-3',
+  toBack: 'M4 4h16v16H4zM9 9h6v6H9',
+  alignToLeft: 'M4 3v18M8 7h12v4H8zM8 14h7v4H8z',
+  alignToCenter: 'M12 3v18M6 7h12v4H6zM8.5 14h7v4h-7z',
+  alignToRight: 'M20 3v18M4 7h12v4H4zM9 14h7v4H9z',
+  alignToTop: 'M3 4h18M7 8v12h4V8zM14 8v7h4V8z',
+  alignToMiddle: 'M3 12h18M7 6v12h4V6zM14 8.5v7h4v-7z',
+  alignToBottom: 'M3 20h18M7 4v12h4V4zM14 9v7h4V9z',
+  distributeH: 'M4 3v18M20 3v18M9.5 7h5v10h-5z',
+  distributeV: 'M3 4h18M3 20h18M7 9.5h10v5H7z',
+  select: 'M5 4l13 6.5-5.5 1.5L10.5 18z',
 } as const;
 
 /** Name of an editor icon. */

@@ -2584,6 +2584,18 @@
     }
   }
 
+  /* Switching tools while the sheet is open: the contents change with a short fade. */
+  .vu-dock-body {
+    animation: vu-dock-swap var(--vu-duration-fast) var(--vu-ease-out);
+  }
+
+  @keyframes vu-dock-swap {
+    from {
+      opacity: 0;
+      transform: translateY(var(--vu-space-2));
+    }
+  }
+
   /* The tab bar stays on top: the sheet slides in and out underneath it. */
   .vu-toolbar {
     position: relative;
@@ -2711,28 +2723,33 @@
     visibility: hidden;
   }
 
+  /* The tab bar: a solid bar (the sheet slides underneath it); only the row of tools inside
+     scrolls and fades at its edges when there are more to see. */
   .vu-toolbar {
-    display: flex;
-    align-items: center;
-    gap: var(--vu-space-1);
-    min-height: var(--vu-size-toolbar);
-    padding: var(--vu-space-1) var(--vu-space-2)
-      calc(var(--vu-space-1) + env(safe-area-inset-bottom));
-    overflow-x: auto;
-    scrollbar-width: none;
+    padding: var(--vu-space-1) 0 calc(var(--vu-space-1) + env(safe-area-inset-bottom));
     border-top: 1px solid var(--vu-border);
     background: var(--vu-bg);
   }
 
-  .vu-toolbar[data-more-end] {
+  .vu-toolbar-scroll {
+    display: flex;
+    align-items: center;
+    gap: var(--vu-space-1);
+    min-height: calc(var(--vu-size-toolbar) - 2 * var(--vu-space-1));
+    padding: 0 var(--vu-space-2);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .vu-toolbar-scroll[data-more-end] {
     mask-image: linear-gradient(to left, transparent, black var(--vu-space-8));
   }
 
-  .vu-toolbar[data-more-start] {
+  .vu-toolbar-scroll[data-more-start] {
     mask-image: linear-gradient(to right, transparent, black var(--vu-space-8));
   }
 
-  .vu-toolbar[data-more-start][data-more-end] {
+  .vu-toolbar-scroll[data-more-start][data-more-end] {
     mask-image: linear-gradient(
       to right,
       transparent,
@@ -2742,7 +2759,7 @@
     );
   }
 
-  .vu-toolbar::-webkit-scrollbar {
+  .vu-toolbar-scroll::-webkit-scrollbar {
     display: none;
   }
 

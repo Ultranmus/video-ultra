@@ -1,3 +1,4 @@
+import { LayersPanel } from './organize';
 import {
   findItem,
   FLICKS_PER_SECOND,
@@ -33,6 +34,8 @@ export function AddPanel({ panel }: { panel: PanelId }): ReactElement {
       return <FilterStrip />;
     case 'transitions':
       return <TransitionGrid />;
+    case 'layers':
+      return <LayersPanel />;
   }
 }
 

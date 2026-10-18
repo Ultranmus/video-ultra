@@ -26,6 +26,8 @@ import {
   TopBar,
 } from './shell';
 import { Tooltips } from './Tooltips';
+import { commandForKey, runCommand } from './commands';
+import { ContextMenu } from './organize';
 import { Stage } from './Stage';
 import type { LayoutMode } from './state';
 import { themeOverridesToStyle, type ThemeMode, type ThemeOverrides } from './theme';
@@ -314,6 +316,7 @@ function Shell({
         </div>
       ) : null}
       <Toasts />
+      <ContextMenu />
       <ExportDialog />
       <HelpSheet />
       <Tooltips root={rootRef} />
@@ -330,32 +333,40 @@ function useKeyboard(rootRef: React.RefObject<HTMLDivElement | null>) {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target.closest('input, textarea, select, [contenteditable="true"]')) return;
+      // Menus and the Layers list handle their own keys.
+      if (target.closest('.vu-menu, .vu-layer-list')) return;
       if (
         target.closest('[role="option"]') &&
         ['ArrowLeft', 'ArrowRight', 'Delete', 'Backspace'].includes(e.key)
       )
         return;
-      const mod = e.metaKey || e.ctrlKey;
-      if (mod && e.key.toLowerCase() === 'z') {
+      const state = ctl.ui.getState();
+      // Shift+F10 / the Menu key: the selection's menu, next to it.
+      if ((e.key === 'F10' && e.shiftKey) || e.key === 'ContextMenu') {
         e.preventDefault();
-        if (e.shiftKey) ctl.redo();
-        else ctl.undo();
-      } else if (mod && e.key.toLowerCase() === 'y') {
-        e.preventDefault();
-        ctl.redo();
-      } else if (mod && e.key.toLowerCase() === 'd') {
-        e.preventDefault();
-        ctl.duplicateSelected();
-      } else if (mod) {
+        const frame = root.querySelector('.vu-stage-frame')?.getBoundingClientRect();
+        const r = root.getBoundingClientRect();
+        ctl.openMenu(
+          frame ? frame.left + frame.width / 2 - r.left : r.width / 2,
+          frame ? frame.top + frame.height / 2 - r.top : r.height / 2,
+        );
         return;
-      } else if (e.key === ' ' || e.key === 'k') {
+      }
+      const command = commandForKey(e);
+      // Delete with nothing selected does nothing (no toast for a stray Backspace).
+      if (command === 'delete' && state.selectedIds.length === 0) return;
+      if (command) {
+        // Plain keys over a focused button belong to it (Space / Enter click it).
+        e.preventDefault();
+        runCommand(ctl, command);
+        return;
+      }
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod) return;
+      if (e.key === ' ' || e.key === 'k') {
         if (target.closest('button') && e.key === ' ') return; // let buttons click
         e.preventDefault();
         ctl.togglePlay();
-      } else if (e.key === 's') {
-        ctl.split();
-      } else if (e.key === 'Delete' || e.key === 'Backspace') {
-        ctl.deleteSelected();
       } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         e.preventDefault();
         ctl.step((e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 10 : 1));
@@ -364,7 +375,9 @@ function useKeyboard(rootRef: React.RefObject<HTMLDivElement | null>) {
       } else if (e.key === 'End') {
         ctl.seek(Number.MAX_SAFE_INTEGER);
       } else if (e.key === 'Escape') {
-        if (ctl.ui.getState().previewMode) ctl.setPreviewMode(false);
+        if (state.menu) ctl.closeMenu();
+        else if (state.historyOpen) ctl.ui.setState({ historyOpen: false });
+        else if (state.previewMode) ctl.setPreviewMode(false);
         else ctl.select(null);
       } else if (e.key === '?') {
         ctl.ui.setState({ helpOpen: true });

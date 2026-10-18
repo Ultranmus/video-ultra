@@ -447,8 +447,13 @@ export class TimelineView {
 
     switch (hit.type) {
       case 'add':
-        this.#hooks.onAddMedia();
-        return;
+        // A file picker may only open from a real activation: for touch that's the finger
+        // lifting (pointerup), not pressing — on phones the "+" opens on release.
+        if (!this.#touch) {
+          this.#hooks.onAddMedia();
+          return;
+        }
+        break;
       case 'transition':
         this.#ctl.select(hit.item.id);
         if (this.#ctl.ui.getState().layout === 'desktop') this.#ctl.openPanel('transitions');
@@ -743,6 +748,7 @@ export class TimelineView {
         if (drag.timer) clearTimeout(drag.timer);
         if (drag.hit.type === 'row' || drag.hit.type === 'empty') this.#ctl.select(null);
         if (drag.hit.type === 'ruler' && this.#phone) this.#ctl.seek(drag.hit.time);
+        if (drag.hit.type === 'add') this.#hooks.onAddMedia();
         break;
       case 'pan':
         if (this.#phone && drag.axis === 'x') this.#fling(drag.samples);
@@ -1247,7 +1253,14 @@ export class TimelineView {
       ctx.fillStyle = c.muted;
       ctx.font = `13px ${c.font}`;
       ctx.textBaseline = 'middle';
-      ctx.fillText(this.#ctl.labels.emptyTimeline, add.x + add.size + 12, cy);
+      // The hint fits the room right of the "+" (a phone's centred playhead leaves half the
+      // width): the full sentence, else the short one, never cut off mid-word.
+      const x = add.x + add.size + 12;
+      const room = this.#width - x - 12;
+      const l = this.#ctl.labels;
+      const text =
+        ctx.measureText(l.emptyTimeline).width <= room ? l.emptyTimeline : l.emptyTimelineShort;
+      if (ctx.measureText(text).width <= room) ctx.fillText(text, x, cy);
     }
   }
 

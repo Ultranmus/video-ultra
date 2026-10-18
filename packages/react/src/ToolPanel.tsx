@@ -24,6 +24,7 @@ import { Icon } from './icons';
 import { RATIOS, ratioOf } from './items';
 import { AnimatePanel, FilterStrip, TransitionGrid } from './looks';
 import type { ToolId } from './state';
+import { ArrangeControls, LockedNote } from './organize';
 
 const seconds = (t: number) => t / FLICKS_PER_SECOND;
 const fmtSeconds = (s: number) => `${s.toFixed(1)} s`;
@@ -41,11 +42,33 @@ export function ToolPanel({ tool }: { tool: ToolId }): ReactElement | null {
   const l = useLabels();
   const selectedId = useUi((s) => s.selectedId);
   const item = useProject((p) => (selectedId ? (findItem(p, selectedId)?.item ?? null) : null));
+  const locked = useProject((p) => {
+    const found = selectedId ? findItem(p, selectedId) : null;
+    return !!found && (!!found.item.locked || found.track.locked);
+  });
   if (tool === 'canvas') return <CanvasTool />;
   if (tool === 'filter') return <FilterStrip />;
   if (tool === 'transition') return <TransitionGrid />;
   if (tool === 'animate') return <AnimatePanel />;
+  if (tool === 'arrange')
+    return (
+      <>
+        {item ? <LockedNote item={item} /> : null}
+        <ArrangeControls compact />
+      </>
+    );
   if (!item) return <p className="vu-hint">{l.nothingSelected}</p>;
+  return (
+    <>
+      <LockedNote item={item} />
+      <div inert={locked || undefined} data-locked={locked || undefined}>
+        <ItemTool tool={tool} item={item} />
+      </div>
+    </>
+  );
+}
+
+function ItemTool({ tool, item }: { tool: ToolId; item: Item }): ReactElement | null {
   switch (tool) {
     case 'speed':
       return <SpeedTool item={item} />;

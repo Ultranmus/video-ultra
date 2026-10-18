@@ -1,4 +1,5 @@
-import type { Item, Project } from '@video-ultra/core';
+import { findItem, type Item, type Project } from '@video-ultra/core';
+import { getCommand, type CommandId } from './commands';
 import type { EditorController } from './controller';
 import type { IconName } from './icons';
 import type { Labels } from './labels';
@@ -33,6 +34,56 @@ export function toolsFor(
   ctl: EditorController,
   l: Labels,
   targets: Targets,
+  /** How many items are selected (several: the selection's tools). */
+  count = item ? 1 : 0,
+): ToolEntry[] {
+  const command = (id: CommandId, key = id): ToolEntry => {
+    const c = getCommand(ctl, id);
+    return {
+      key,
+      icon: c.icon,
+      label: c.label,
+      ...(c.tip ? { tip: c.tip } : {}),
+      run: c.run,
+      ...(c.danger ? { danger: true } : {}),
+      disabledReason: c.disabledReason,
+    };
+  };
+  const arrange: ToolEntry = {
+    key: 'arrange',
+    icon: 'layers',
+    label: l.arrange,
+    tip: l.tipArrange,
+    tool: 'arrange',
+  };
+  if (count > 1) {
+    return [
+      command(ctl.selectedGroup() ? 'ungroup' : 'group', 'group'),
+      arrange,
+      command('lock'),
+      command('hide'),
+      command('duplicate'),
+      command('delete'),
+    ];
+  }
+  const entries = singleTools(item, project, ctl, l, targets, arrange);
+  if (!item) return entries;
+  // A locked item: only what doesn't change it (arrange holds Unlock; duplicate makes an unlocked copy).
+  const found = findItem(project, item.id);
+  const locked = !!found && (!!found.item.locked || found.track.locked);
+  if (!locked) return entries;
+  return entries.map((e) =>
+    e.key === 'arrange' || e.key === 'duplicate' ? e : { ...e, disabledReason: l.lockedReason },
+  );
+}
+
+function singleTools(
+  item: Item | null,
+  project: Project,
+  ctl: EditorController,
+  l: Labels,
+  targets: Targets,
+  arrange: ToolEntry,
 ): ToolEntry[] {
   const split: ToolEntry = {
     key: 'split',
@@ -135,6 +186,7 @@ export function toolsFor(
           : []),
         ...animate,
         ...opacity,
+        arrange,
         duplicate,
         remove,
       ];
@@ -147,6 +199,7 @@ export function toolsFor(
         ...transition,
         ...animate,
         ...opacity,
+        arrange,
         duplicate,
         remove,
       ];
@@ -162,6 +215,7 @@ export function toolsFor(
         },
         { key: 'fade', icon: 'fade', label: l.fade, tip: l.tipFade, tool: 'fade' },
         { key: 'speed', icon: 'speed', label: l.speed, tip: l.tipSpeed, tool: 'speed' },
+        arrange,
         duplicate,
         remove,
       ];
@@ -174,6 +228,7 @@ export function toolsFor(
         look[1]!,
         { key: 'transform', icon: 'rotate', label: l.rotate, tip: l.tipRotate, tool: 'transform' },
         { key: 'opacity', icon: 'opacity', label: l.opacity, tip: l.tipOpacity, tool: 'opacity' },
+        arrange,
         split,
         duplicate,
         remove,
@@ -185,6 +240,7 @@ export function toolsFor(
         look[1]!,
         { key: 'transform', icon: 'rotate', label: l.rotate, tip: l.tipRotate, tool: 'transform' },
         { key: 'opacity', icon: 'opacity', label: l.opacity, tip: l.tipOpacity, tool: 'opacity' },
+        arrange,
         split,
         duplicate,
         remove,
