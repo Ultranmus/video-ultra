@@ -2,6 +2,47 @@
 
 Where the last session stopped and what comes next. Update before ending every session.
 
+## 2026-10-19 (end of day — owner's list for tomorrow)
+
+Pushed to origin (main d4ae1c8). Do these first, then continue the captions calibration:
+
+1. **Desktop: Align doesn't open in the context menu** (the submenu).
+2. **Desktop: panels share their scroll position** — scroll Filters, open Stickers: it opens
+   scrolled to the same point. Each panel should start at the top (or keep its own place).
+3. **Text isn't editable on the canvas** (tap / double-click a text on the stage to type).
+4. **Desktop: some button labels are cut off** (e.g. Transitions panel "Play previ…",
+   "Apply to …"). Check every panel at desktop width.
+5. **Phone: timeline starts with 0:00 in the centre** — at the start, show the add button to
+   the left as well (no empty left half).
+6. **Desktop: the frame lane (film strip) flickers** when changing the item selected in Layers.
+7. **Captions — "No speech was heard" on the owner's iPhone for a video with speech** (Hindi
+   and Detect). Findings so far: the sound path is faithful (checked on iPhone footage); clean
+   real Hindi (LibriVox, public domain, in test-media/files/real/) captions well with `small`;
+   speech under loud background makes the model itself hear almost nothing. Next: measure real
+   Hindi at realistic levels (speech ~15 dB over background), retune the guards from DECISIONS
+   #130 if they drop real speech, and ask the owner for the clip. The phone was on plain http
+   (AudioWorklet missing → "Audio unavailable" toast): test over https
+   (`pnpm --filter playground dev:https`), make that toast the calm "needs a secure page" note
+   (Safari has `audioWorklet` but it's undefined on http), and make captions say plainly when
+   the browser can't read the sound instead of "no speech".
+8. Give the owner the full v0.2 test list (below) again.
+
+**v0.2 test list (what's new and how to try it):**
+- Layers & organising: History (clock icon), Layers (stack icon); Shift-click / ⌘A / drag a box
+  to select several; ⌘G group, ⇧⌘G ungroup; ⇧⌘L lock, ⇧⌘H hide; ] [ ⌘] ⌘[ order; right-click
+  or long-press for the menu; Arrange tool (phone) / Arrange section (desktop) for align.
+- Captions: Captions tab → language → Make captions; import / download .srt / .vtt; Add a
+  caption; styles, highlight modes, position, size; edit in the list; drag one caption.
+- Sound: select music → Volume / Sound → "Lower under voice"; Audio panel → music & sounds
+  library (search, ▶, + Add).
+- Picture tools: select a video/photo → Green screen (switch on, green/blue, "Pick from video"
+  then tap the screen colour on the stage; Range, Edge softness, Clean edges) — try a clip shot
+  against a green or blue screen; Filters panel → LUT looks → Import .cube; Blur tab → Blur /
+  Pixelate box or oval, drag over a face; select a layer/text/sticker → Blend chips.
+- Capture & export: Media → Record with camera (front/back, mic) → Add to video / as a layer;
+  Export → Video (Whole / Part with I/O keys, presets 9:16 / 16:9 / 1:1), Sound only
+  (M4A / Ogg / WAV), Picture (PNG / JPEG of the frame at the playhead).
+
 ## 2026-10-19 (made-up captions fixed — DECISIONS #130)
 
 Auto captions no longer invent sentences when nobody is speaking; default model is `base` (more
