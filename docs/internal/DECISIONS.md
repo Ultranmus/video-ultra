@@ -731,3 +731,17 @@ reason; when one changes, edit the entry and note the date.
       a11y-check page with high contrast, dark and light.
 137.  **Release after v0.4** (owner, 2026-10-19): v0.1 isn't published on its own; v0.3 and v0.4
       are built first, then the Day 7 packaging and the owner's publish.
+138.  **Animated and vector stickers** (v0.3). (a) GIF, animated WebP and APNG stickers and photos
+      play: the engine worker opens them with WebCodecs `ImageDecoder`, times every frame once
+      (each closed at once), then decodes only the frame on screen per item, by the item's own
+      time (it loops) — one bitmap per item, the old one's GPU copy released when it changes, so
+      memory stays flat for any length. No `ImageDecoder` (older Safari): the first frame, as
+      before. Same time → same frame (exports are exact). (b) An **Animated** sticker tab: the
+      611 Noto Emoji Animation emoji (Google, CC BY 4.0) that match our emoji list, shown as the
+      device's own emoji glyphs (cheap); a tap fetches `<library><code>/512.webp` (~370 KB) and
+      stores it in the project with the licence line on the asset. `animatedStickerLibrary` (a
+      base URL or `false`) lets hosts self-host or hide it; default Google's public copy.
+      (c) SVG files (upload, drop, sticker upload) are drawn once on import into a PNG of up to
+      2048 px on the longest side, keeping their aspect (the engine worker can't decode SVG).
+      Lottie files: not supported (needs a Lottie runtime; the animated WebP library covers the
+      common case) — BACKLOG.

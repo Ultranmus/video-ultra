@@ -4,12 +4,26 @@ import { CategoryBrowser } from '../browse';
 import { Button, Segmented } from '../controls';
 import { Icon } from '../icons';
 import { stickerItem } from '../items';
+import type * as AnimatedEmoji from './animated-emoji.generated';
 import type { EmojiRow } from './emoji.generated';
 import { SHAPE_STICKERS, shapeSvg, type ShapeSticker } from './shapes';
 
 /** Default home of the 3D sticker art (MIT), pinned so files never change under a project. */
 export const DEFAULT_STICKER_LIBRARY =
   'https://cdn.jsdelivr.net/npm/@lobehub/fluent-emoji-3d@1.1.0/assets/';
+
+/** Default home of the animated emoji (Noto Emoji Animation, CC BY 4.0): `<code>/512.webp`. */
+export const DEFAULT_ANIMATED_STICKER_LIBRARY = 'https://fonts.gstatic.com/s/e/notoemoji/latest/';
+
+type AnimatedModule = typeof AnimatedEmoji;
+let animatedPromise: Promise<AnimatedModule> | null = null;
+/** Which emoji animate (≈ 6 KB gzipped), loaded with the Animated tab. */
+function loadAnimated(): Promise<AnimatedModule> {
+  animatedPromise ??= import('./animated-emoji.generated');
+  return animatedPromise;
+}
+
+const plainEmoji = (emoji: string) => emoji.replace(/\uFE0F/g, '');
 
 const GROUPS = [
   'smileys',
@@ -103,18 +117,27 @@ async function rasterise(shape: ShapeSticker, size = 512): Promise<Blob> {
   }
 }
 
-type Tab = '3d' | 'emoji' | 'shapes';
+type Tab = '3d' | 'animated' | 'emoji' | 'shapes';
 
 /**
- * Stickers: 3D art, every Unicode emoji (by category, with search), our own shapes, and your own
- * images. Placed at the playhead and selected, so they can be moved straight away.
+ * Stickers: 3D art, animated emoji, every Unicode emoji (by category, with search), our own
+ * shapes, and your own images. Placed at the playhead and selected, so they can be moved
+ * straight away.
  */
 export function StickersPanel(): ReactElement {
   const ctl = useController();
   const l = useLabels();
   const library =
     ctl.options.stickerLibrary === undefined ? DEFAULT_STICKER_LIBRARY : ctl.options.stickerLibrary;
+  const animatedLibrary =
+    ctl.options.animatedStickerLibrary === undefined
+      ? DEFAULT_ANIMATED_STICKER_LIBRARY
+      : ctl.options.animatedStickerLibrary;
   const [tab, setTab] = useState<Tab>(library ? '3d' : 'emoji');
+  const [animated, setAnimated] = useState<{
+    codes: ReadonlyMap<string, string>;
+    credit: string;
+  } | null>(null);
   const [query, setQuery] = useState('');
   const [rows, setRows] = useState<readonly EmojiRow[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -126,6 +149,10 @@ export function StickersPanel(): ReactElement {
       void loadEmoji().then((r) => {
         if (live) setRows(r);
       });
+    if (tab === 'animated')
+      void loadAnimated().then((m) => {
+        if (live) setAnimated({ codes: m.ANIMATED_EMOJI, credit: m.ANIMATED_EMOJI_CREDIT });
+      });
     return () => {
       live = false;
     };
@@ -136,8 +163,12 @@ export function StickersPanel(): ReactElement {
     if (!rows) return [];
     if (tab === '3d') return rows.filter((r) => r[4]);
     const max = supportedEmojiVersion();
+    if (tab === 'animated') {
+      if (!animated) return [];
+      return rows.filter((r) => r[5] <= max && animated.codes.has(plainEmoji(r[0])));
+    }
     return rows.filter((r) => r[5] <= max);
-  }, [rows, tab]);
+  }, [rows, tab, animated]);
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return pool;
@@ -156,12 +187,15 @@ export function StickersPanel(): ReactElement {
   const addEmoji = (emoji: string) =>
     ctl.addLaneItem(l.stickers, (id, start) => stickerItem(id, start, { emoji }));
 
-  const addFile = async (key: string, make: () => Promise<Blob>, name: string) => {
+  const addFile = async (key: string, make: () => Promise<Blob>, name: string, credit?: string) => {
     if (busy) return;
     setBusy(key);
     try {
       const blob = await make();
-      await ctl.importFiles([new File([blob], name, { type: blob.type })], { asSticker: true });
+      await ctl.importFiles([new File([blob], name, { type: blob.type })], {
+        asSticker: true,
+        ...(credit ? { credit } : {}),
+      });
     } catch {
       ctl.toast(l.stickerFailed, 'error');
     } finally {
@@ -173,7 +207,32 @@ export function StickersPanel(): ReactElement {
     <ul className={tab === '3d' ? 'vu-sticker-grid' : 'vu-emoji-grid'} aria-label={label}>
       {list.map(([emoji, name, , , file]) => (
         <li key={emoji}>
-          {tab === '3d' && library ? (
+          {tab === 'animated' && animated && animatedLibrary ? (
+            <button
+              type="button"
+              className="vu-emoji vu-emoji-animated"
+              aria-label={l.animatedSticker(name)}
+              data-tooltip={l.animatedSticker(name)}
+              aria-busy={busy === emoji || undefined}
+              onClick={() => {
+                const code = animated.codes.get(plainEmoji(emoji));
+                if (!code) return;
+                void addFile(
+                  emoji,
+                  async () => {
+                    const res = await fetch(`${animatedLibrary}${code}/512.webp`);
+                    if (!res.ok) throw new Error(String(res.status));
+                    // The server may not say the type; the engine needs it to animate.
+                    return new Blob([await res.arrayBuffer()], { type: 'image/webp' });
+                  },
+                  `${name}.webp`,
+                  animated.credit,
+                );
+              }}
+            >
+              {emoji}
+            </button>
+          ) : tab === '3d' && library ? (
             <button
               type="button"
               className="vu-sticker"
@@ -224,6 +283,7 @@ export function StickersPanel(): ReactElement {
         value={tab}
         options={[
           ...(library ? [{ value: '3d' as const, label: l.stickers3d }] : []),
+          ...(animatedLibrary ? [{ value: 'animated' as const, label: l.stickersAnimated }] : []),
           { value: 'emoji' as const, label: l.emoji },
           { value: 'shapes' as const, label: l.shapes },
         ]}
@@ -275,7 +335,7 @@ export function StickersPanel(): ReactElement {
             </li>
           ))}
         </ul>
-      ) : !rows ? (
+      ) : !rows || (tab === 'animated' && !animated) ? (
         <p className="vu-hint">{l.loading}</p>
       ) : shown.length === 0 ? (
         <p className="vu-hint">{l.noStickersFound}</p>
@@ -294,7 +354,7 @@ export function StickersPanel(): ReactElement {
       <input
         ref={uploadRef}
         type="file"
-        accept="image/png,image/webp,image/gif,image/jpeg"
+        accept="image/png,image/webp,image/gif,image/jpeg,image/svg+xml,.svg"
         hidden
         onChange={(e) => {
           const files = [...(e.currentTarget.files ?? [])];

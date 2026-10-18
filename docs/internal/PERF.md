@@ -435,3 +435,11 @@ After the guards: no captions from any no-speech clip; speech clips unchanged.
   bytes (WebGPU slot 512 → 768 bytes, ×16 layers = 12 KB).
 - Picker tiles: 126 × 40×40 alpha images, drawn in ≤ 6 ms slices per frame and cached for the page.
   shapes-check: opening the picker adds no main-thread task over 50 ms (Chrome, 4-core Linux).
+
+## Animated stickers (v0.3, 2026-10-19)
+
+- Memory: one decoded frame per animated item (a 512 px WebP frame = 1 MB RGBA) + the decoder's
+  own state; never the whole animation. Opening times every frame once in the worker (each frame
+  closed at once): 20-frame test GIF a few ms.
+- stickers-check: GIF sticker frames 0.5 s apart differ (0.87 mean / 255 over the frame; the old
+  build 0.00); the same time twice is identical (exact export).

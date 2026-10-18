@@ -9,6 +9,7 @@ import { createWebGL2Renderer } from '../render/webgl2';
 import { createWebGPURenderer } from '../render/webgpu';
 import { Mixer, type AudioTrackSource } from '../audio/mixer';
 import { AudioOutput } from './audio-output';
+import { openAnimatedImage } from './animated';
 import { Composer, type MediaLibrary, type VideoMedia } from './compose';
 import {
   cleanStaleExports,
@@ -63,7 +64,12 @@ let pool = new DecoderPool(DECODER_BUDGET.mid);
 let project: Project | null = null;
 let viewW = 1280;
 let viewH = 720;
-const media: MediaLibrary = { videos: new Map(), images: new Map(), luts: new Map() };
+const media: MediaLibrary = {
+  videos: new Map(),
+  images: new Map(),
+  luts: new Map(),
+  animations: new Map(),
+};
 /** Audio tracks by asset (videos with sound and audio files), once loaded. */
 const audioTracks = new Map<string, AudioTrackSource>();
 const audioLoads = new Map<string, Promise<void>>();
@@ -164,11 +170,16 @@ function loadAudio(assetId: string, blob: Blob): void {
   audioLoads.set(assetId, loading.catch(reportError));
 }
 
-function loadImage(assetId: string, blob: Blob): void {
+function loadImage(assetId: string, blob: Blob, mimeType: string): void {
   // Straight alpha: the renderer contract (render/types.ts, DECISIONS #39).
   const loading = createImageBitmap(blob, { premultiplyAlpha: 'none' });
   loading.catch(reportError);
   media.images.set(assetId, loading);
+  // GIF / animated WebP / APNG: frames by time (a still image resolves to null).
+  if (/^image\/(gif|webp|png|apng)$/.test(mimeType)) {
+    const animation = openAnimatedImage(blob, mimeType).catch(() => null);
+    media.animations!.set(assetId, animation);
+  }
 }
 
 function loadLut(assetId: string, blob: Blob): void {
@@ -418,6 +429,8 @@ async function mediaReady(p: Project): Promise<void> {
     if (v) waits.push(v.catch(() => undefined));
     const i = media.images.get(id);
     if (i) waits.push(i.catch(() => undefined));
+    const anim = media.animations?.get(id);
+    if (anim) waits.push(anim);
     const a = audioLoads.get(id);
     if (a) waits.push(a.catch(() => undefined));
     const l = media.luts.get(id);
@@ -1004,7 +1017,7 @@ async function handle(
       return { type: 'ok' };
     case 'media': {
       const asset = project?.assets[request.assetId];
-      if (asset?.kind === 'image') loadImage(request.assetId, request.blob);
+      if (asset?.kind === 'image') loadImage(request.assetId, request.blob, asset.mimeType);
       else if (asset?.kind === 'audio') loadAudio(request.assetId, request.blob);
       else if (asset?.kind === 'lut') loadLut(request.assetId, request.blob);
       else loadVideo(request.assetId, request.blob);

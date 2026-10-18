@@ -114,6 +114,12 @@ export interface ControllerOptions {
   autosave?: boolean;
   /** Base URL of the 3D sticker art (self-host it), or `false` to hide 3D stickers. */
   stickerLibrary?: string | false;
+  /**
+   * Where animated emoji stickers come from (Noto Emoji Animation, CC BY 4.0): a base URL whose
+   * `<code>/512.webp` files are the animations, or `false` to hide the Animated tab. Default:
+   * Google's public copy. Placed stickers are stored in the project.
+   */
+  animatedStickerLibrary?: string | false;
   /** The host's music & sound-effects source for the Audio panel. */
   audioLibrary?: AudioLibrary;
   /** Turns speech into timed words for auto captions (on-device or the host's service). */
@@ -130,6 +136,40 @@ export interface ControllerOptions {
  * another (with the media it uses). Plain objects from the project — never mutated.
  */
 let clipboard: { items: CopiedItem[]; assets: Record<string, Asset> } | null = null;
+
+/** An SVG file (by type or name — some systems send SVGs without a type). */
+function isSvg(file: File): boolean {
+  return file.type === 'image/svg+xml' || /\.svg$/i.test(file.name);
+}
+
+/** Longest side of an SVG drawn into a PNG (crisp at full-screen 4K, small enough to keep). */
+const SVG_RASTER_PX = 2048;
+
+/**
+ * Draws an SVG into a PNG with transparency, at up to {@link SVG_RASTER_PX} on its longest side
+ * (its own aspect; 1024 px square when it has no size).
+ */
+async function svgToPng(file: File): Promise<File> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = url;
+    await img.decode();
+    const w = img.naturalWidth || 1024;
+    const h = img.naturalHeight || 1024;
+    const k = SVG_RASTER_PX / Math.max(w, h);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(w * k));
+    canvas.height = Math.max(1, Math.round(h * k));
+    canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+    if (!blob) throw new Error('SVG could not be drawn');
+    return new File([blob], file.name.replace(/\.svg$/i, '') + '.png', { type: 'image/png' });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
 
 export class EditorController {
   readonly editor: Editor;
@@ -1204,8 +1244,28 @@ export class EditorController {
     } = {},
   ): Promise<void> {
     const addToTimeline = options.addToTimeline ?? true;
-    for (const file of files) {
+    for (const original of files) {
       const rowId = randomId();
+      // SVG: drawn once into a PNG here (the engine worker can't decode SVG).
+      let file = original;
+      if (isSvg(original)) {
+        try {
+          file = await svgToPng(original);
+        } catch {
+          this.ui.setState((s) => ({
+            imports: [
+              ...s.imports,
+              {
+                id: rowId,
+                name: original.name,
+                status: 'error',
+                message: this.labels.svgFailed(original.name),
+              },
+            ],
+          }));
+          continue;
+        }
+      }
       this.ui.setState((s) => ({
         imports: [...s.imports, { id: rowId, name: file.name, status: 'working' }],
       }));

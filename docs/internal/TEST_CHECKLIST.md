@@ -37,3 +37,9 @@ Open the branch's Vercel preview (or `pnpm --filter playground dev`), then **`/e
 - [ ] **High contrast / touch sizes.** `/editor?contrast=high` and `?contrast=high&theme=light`:
       everything readable, stronger borders and focus rings. `?density=touch` on the Mac: bigger
       handles and controls. _Checked here:_ axe 0 violations in both contrast themes.
+- [ ] **Animated stickers.** Stickers → **Animated** tab (600+ animated emoji): tap a few — they
+      move in the preview and in the exported video. Upload your own GIF as a sticker → it plays
+      (before tonight it was still). Upload an `.svg` → crisp sticker. **On the iPhone:** do the
+      animated stickers move? (If Safari lacks `ImageDecoder` they stay still — tell me.)
+      _Checked here:_ stickers-check (GIF plays and is exact; SVG → 2048 px PNG; animated emoji
+      added with its licence and plays).

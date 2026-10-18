@@ -64,6 +64,12 @@ export interface VideoEditorProps {
    */
   stickerLibrary?: string | false;
   /**
+   * Where animated emoji stickers come from (Noto Emoji Animation, CC BY 4.0): a base URL whose
+   * `<code>/512.webp` files are the animations, or `false` to hide the Animated tab. Default:
+   * Google's public copy. Placed stickers are stored in the project.
+   */
+  animatedStickerLibrary?: string | false;
+  /**
    * A music & sound-effects source for the Audio panel: search, categories, a ▶ preview and the
    * licence line per sound, and Add (at the playhead). The picked file is stored in the project
    * like an import (its licence line on the asset as `credit`), so exports never depend on the
@@ -104,7 +110,7 @@ export interface VideoEditorProps {
   style?: CSSProperties;
 }
 
-const ACCEPT = 'video/*,audio/*,image/*,.mov,.mkv,.heic,.heif,.m4a,.mp3,.wav';
+const ACCEPT = 'video/*,audio/*,image/*,.mov,.mkv,.heic,.heif,.m4a,.mp3,.wav,.svg';
 
 /**
  * The video editor. Drop it anywhere — it fills its container and picks the phone, tablet or
@@ -132,6 +138,9 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
         ...(props.resolveMedia ? { resolveMedia: props.resolveMedia } : {}),
         ...(props.autosave !== undefined ? { autosave: props.autosave } : {}),
         ...(props.stickerLibrary !== undefined ? { stickerLibrary: props.stickerLibrary } : {}),
+        ...(props.animatedStickerLibrary !== undefined
+          ? { animatedStickerLibrary: props.animatedStickerLibrary }
+          : {}),
         ...(props.audioLibrary ? { audioLibrary: props.audioLibrary } : {}),
         ...(props.transcriber ? { transcriber: props.transcriber } : {}),
       },

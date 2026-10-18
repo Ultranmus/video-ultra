@@ -1,5 +1,6 @@
 import type { Input, InputVideoTrack, VideoSample } from 'mediabunny';
 import { shapePreset } from '../effects/shapes';
+import { frameIndexAt, type AnimatedImage } from './animated';
 import {
   animationState,
   resetState,
@@ -99,6 +100,8 @@ export interface MediaLibrary {
   images: Map<string, Promise<ImageBitmap>>;
   /** Parsed `.cube` LUT files by asset id. */
   luts: Map<string, Promise<CubeLut>>;
+  /** Animated images (GIF, animated WebP / PNG) by asset id; null = a still image. */
+  animations?: Map<string, Promise<AnimatedImage | null>>;
 }
 
 /** Result of one {@link Composer.render}. */
@@ -201,6 +204,8 @@ export class Composer {
 
   /** One frame source per timeline item (each needs its own decode position). */
   readonly sources = new Map<string, FrameSource>();
+  /** Animated images: the frame each item shows now (one bitmap per item). */
+  private readonly animFrames = new Map<string, { index: number; bitmap: ImageBitmap }>();
   /** Last frame drawn per item (reused when the next one isn't decoded in time). */
   readonly lastFrames = new Map<string, VideoSample>();
   readonly rasters: RasterCache;
@@ -285,6 +290,7 @@ export class Composer {
 
   /** Frees decoders and frames of items not in `alive`. */
   prune(alive: Set<string>): void {
+    for (const id of [...this.animFrames.keys()]) if (!alive.has(id)) this.dropAnimFrame(id);
     for (const [id, source] of this.sources) {
       if (alive.has(id)) continue;
       source.destroy();
@@ -312,8 +318,46 @@ export class Composer {
     for (const sample of this.lastFrames.values()) sample.close();
     this.lastFrames.clear();
     this.rasters.clear();
+    for (const id of [...this.animFrames.keys()]) this.dropAnimFrame(id);
     if (this.solid) this.renderer.release(this.solid);
     this.solid = null;
+  }
+
+  /**
+   * The picture of an image asset at an item's local time: its bitmap, or — for an animation —
+   * the frame showing then. Each item holds its own current frame (two items with one GIF can
+   * be at different frames in the same render); the old frame's GPU copy goes when it changes.
+   */
+  private async pictureAt(
+    itemId: string,
+    assetId: string,
+    localTime: Time,
+  ): Promise<ImageBitmap | null> {
+    const animation = await this.media.animations?.get(assetId);
+    if (!animation) return (await this.media.images.get(assetId)) ?? null;
+    const index = frameIndexAt(
+      animation.starts,
+      animation.total,
+      (localTime / FLICKS_PER_SECOND) * 1000,
+    );
+    const held = this.animFrames.get(itemId);
+    if (held?.index === index) return held.bitmap;
+    const bitmap = await animation.frame(index);
+    if (this.destroyed) {
+      bitmap.close();
+      return null;
+    }
+    this.dropAnimFrame(itemId);
+    this.animFrames.set(itemId, { index, bitmap });
+    return bitmap;
+  }
+
+  private dropAnimFrame(itemId: string): void {
+    const held = this.animFrames.get(itemId);
+    if (!held) return;
+    this.renderer.release(held.bitmap);
+    held.bitmap.close();
+    this.animFrames.delete(itemId);
   }
 
   private slot(index: number): Slot {
@@ -730,7 +774,7 @@ export class Composer {
 
     switch (item.kind) {
       case 'image': {
-        const bitmap = await this.media.images.get(item.assetId);
+        const bitmap = await this.pictureAt(item.id, item.assetId, layer.localTime);
         if (!bitmap) return null;
         const media: LayerMedia = {
           width: bitmap.width,
@@ -817,7 +861,7 @@ export class Composer {
           const emoji = item.emoji;
           source = this.rasters.get(item.id, `${px}|${emoji}`, () => rasterizeEmoji(emoji, px));
         } else if (item.assetId) {
-          const bitmap = await this.media.images.get(item.assetId);
+          const bitmap = await this.pictureAt(item.id, item.assetId, layer.localTime);
           if (!bitmap) return null;
           source = bitmap;
         } else {

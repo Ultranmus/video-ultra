@@ -25,8 +25,11 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       silent part (the engine then refuses clearly).
 - [ ] WebKit logs "WebKitBlobResource error 1" console messages in editor-interact (not failures).
 
-- [ ] Copy / paste elements (⌘C / ⌘V, with a paste at the playhead) — image-ultra has it; not in
+- [x] (done 2026-10-19, #134) Copy / paste elements (⌘C / ⌘V, with a paste at the playhead) — image-ultra has it; not in
       v0.2's list.
+- [ ] Lottie stickers (.json / .lottie): need a Lottie runtime in the engine worker (#138).
+- [ ] Animated stickers in Safari without `ImageDecoder` show their first frame: decode GIF /
+      WebP frames ourselves (small WASM decoder) if the owner's iPhone lacks it (#138).
 - [ ] Layers panel: drag-reorder on touch uses the grip only; a long-press-anywhere lift like the
       timeline would feel more natural on phones.
 - [ ] Groups: resizing a group with rotated members scales positions around the box centre but
@@ -149,7 +152,7 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [ ] Blur transition uses a 13-tap disc on the full-size frame: at full strength rings can show
       on high-contrast edges. Use the backdrop's downscale path if it looks bad on real footage.
 - [x] (fixed 2026-10-19, #113) Transitions are not crossfaded in audio.
-- [ ] Image stickers that are animated GIFs show the first frame only.
+- [x] (fixed 2026-10-19, #138: ImageDecoder, frame per item) Image stickers that are animated GIFs show the first frame only.
 - [ ] WebKit (Playwright) logs `AudioEncoder encode failed: InternalAudioEncoderCocoa encoding failed` during `scripts/export-check.ts` (around the cancel step) — the check passes; make
       cancel close the encoder without an unhandled error.
 - [ ] Real-iPhone check of the second UI pass: keyboard lift (visualViewport) while editing text,
