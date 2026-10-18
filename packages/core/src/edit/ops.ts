@@ -20,6 +20,7 @@ import type {
   BlendMode,
   ChromaKey,
   Crop,
+  Cutout,
   Filter,
   FreezeItem,
   Item,
@@ -743,6 +744,11 @@ export function pasteItems(
       if (!asset) throw new EditError('invalid', 'The copied media is no longer available');
       project.assets[asset.id] = copy(asset);
     }
+    if ('cutout' in item && item.cutout && !project.assets[item.cutout.assetId]) {
+      const cut = assets[item.cutout.assetId];
+      if (cut) project.assets[cut.id] = copy(cut);
+      else delete item.cutout;
+    }
     if ('lut' in item && item.lut && !project.assets[item.lut.assetId]) {
       const lut = assets[item.lut.assetId];
       if (lut) project.assets[lut.id] = copy(lut);
@@ -870,6 +876,8 @@ export interface ItemPatch {
   blend?: BlendMode | null;
   /** Pictures: shape mask (the shape must be one of `SHAPE_PRESETS`); `null` removes it. */
   mask?: ShapeMask | null;
+  /** Photos and image stickers: background removed (an image asset); `null` restores it. */
+  cutout?: Cutout | null;
   /** Blurred areas. */
   effect?: RegionItem['effect'];
   shape?: RegionItem['shape'];
@@ -879,7 +887,7 @@ export interface ItemPatch {
 }
 
 /** Fields that `null` (or `blend: 'normal'`) removes instead of setting. */
-const REMOVABLE = new Set(['key', 'lut', 'blend', 'mask']);
+const REMOVABLE = new Set(['key', 'lut', 'blend', 'mask', 'cutout']);
 /** Size limits of a blurred area's box (fractions of the canvas). */
 const REGION_MIN = 0.01;
 const REGION_MAX = 4;
@@ -903,11 +911,23 @@ const FIELDS_BY_KIND: Record<Item['kind'], readonly string[]> = {
     'blend',
     'mask',
   ],
-  image: ['name', 'transform', 'crop', 'fit', 'filter', 'adjust', 'key', 'lut', 'blend', 'mask'],
+  image: [
+    'name',
+    'transform',
+    'crop',
+    'fit',
+    'filter',
+    'adjust',
+    'key',
+    'lut',
+    'blend',
+    'mask',
+    'cutout',
+  ],
   freeze: ['name', 'transform', 'crop', 'fit', 'filter', 'adjust', 'key', 'lut', 'blend', 'mask'],
   audio: ['name', 'volume', 'muted', 'fadeIn', 'fadeOut', 'duck'],
   text: ['name', 'text', 'style', 'transform', 'filter', 'adjust', 'blend'],
-  sticker: ['name', 'transform', 'emoji', 'filter', 'adjust', 'blend'],
+  sticker: ['name', 'transform', 'emoji', 'filter', 'adjust', 'blend', 'cutout'],
   region: ['name', 'transform', 'effect', 'shape', 'amount', 'width', 'height'],
 };
 
@@ -916,6 +936,11 @@ export function updateItem(project: Project, itemId: string, patch: ItemPatch): 
   const { item } = editable(project, itemId);
   const allowed = FIELDS_BY_KIND[item.kind];
   const target = item as Record<string, unknown>;
+  if (patch.cutout) {
+    const asset = project.assets[patch.cutout.assetId];
+    if (!asset || asset.kind !== 'image')
+      throw new EditError('not-found', `No image ${patch.cutout.assetId}`);
+  }
   if (patch.mask && !shapePreset(patch.mask.shape))
     throw new EditError('invalid', `No mask shape ${patch.mask.shape}`);
   if (patch.lut) {

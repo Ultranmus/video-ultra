@@ -45,7 +45,9 @@ export type ToolId =
   | 'blend'
   | 'region'
   // v0.3 Shape masks
-  | 'mask';
+  | 'mask'
+  // v0.3 Background removal
+  | 'cutout';
 
 export interface ImportRow {
   id: string;
@@ -88,6 +90,8 @@ export interface UiState {
     loaded?: number;
     total?: number;
   } | null;
+  /** Background removal running (v0.3): for which item, what it's doing, how far. */
+  cutoutJob: { itemId: string; stage: 'download' | 'work'; fraction: number } | null;
   /** A caption whose text box should take focus in the Captions panel. */
   captionEditing: string | null;
   /** Last screen-reader announcement (a polite live region reads it). */
@@ -128,6 +132,7 @@ export function createUiStore() {
     menu: null,
     announcement: '',
     captionJob: null,
+    cutoutJob: null,
     captionEditing: null,
     panel: 'media',
     tool: null,

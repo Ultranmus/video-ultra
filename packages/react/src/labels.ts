@@ -788,6 +788,17 @@ export const DEFAULT_LABELS = {
   captionsOnDevice: (mb: number) =>
     `Runs on this device, nothing is uploaded · about ${Math.round(mb)} MB to download the first time`,
   captionsOnDeviceCached: 'Runs on this device, nothing is uploaded',
+  // v0.3 Background removal
+  removeBackground: 'Remove background',
+  restoreBackground: 'Restore background',
+  tipRemoveBackground: 'Keep only the subject — the background becomes see-through',
+  backgroundRemoved: 'Background removed',
+  removingBackground: 'Removing the background…',
+  backgroundFailed: (why: string) => `Couldn't remove the background: ${why}`,
+  backgroundOnDevice: (mb: number) =>
+    `Runs on this device, nothing is uploaded · one-time ${Math.round(mb)} MB download`,
+  backgroundUnavailable: 'Background removal isn’t available here.',
+  photoOnly: 'Works on photos and image stickers.',
   // v0.3 Templates
   templates: 'Templates',
   tipTemplates: 'Ready-made titles, name tags, quotes and more',

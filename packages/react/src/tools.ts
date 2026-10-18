@@ -187,6 +187,20 @@ function singleTools(
     tip: l.tipShape,
     tool: 'mask',
   };
+  // v0.3 Background removal (photos, image stickers; when the host gave a remover).
+  const cutout: ToolEntry[] =
+    ctl.options.backgroundRemover &&
+    (item.kind === 'image' || (item.kind === 'sticker' && item.assetId))
+      ? [
+          {
+            key: 'cutout',
+            icon: 'cutout',
+            label: l.removeBackground,
+            tip: l.tipRemoveBackground,
+            tool: 'cutout',
+          },
+        ]
+      : [];
   const blend: ToolEntry[] = onMain
     ? []
     : [{ key: 'blend', icon: 'blend', label: l.blend, tip: l.tipBlend, tool: 'blend' }];
@@ -231,6 +245,7 @@ function singleTools(
       return [
         split,
         { key: 'duration', icon: 'speed', label: l.duration, tip: l.duration, tool: 'duration' },
+        ...cutout,
         ...look,
         mask,
         greenScreen,
@@ -296,6 +311,7 @@ function singleTools(
       ];
     case 'sticker':
       return [
+        ...cutout,
         ...animate,
         look[0]!,
         look[1]!,

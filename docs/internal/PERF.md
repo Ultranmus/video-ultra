@@ -443,3 +443,16 @@ After the guards: no captions from any no-speech clip; speech clips unchanged.
   closed at once): 20-frame test GIF a few ms.
 - stickers-check: GIF sticker frames 0.5 s apart differ (0.87 mean / 255 over the frame; the old
   build 0.00); the same time twice is identical (exact export).
+
+## Background removal (v0.3, 2026-10-19, Linux 4 cores, Chrome 155, `scripts/cutout-check.ts`)
+
+A 1024×683 portrait on a 16:9 project, first run (includes the model download):
+
+| Model                 | Download | Time   | Renderer (page + workers) peak | After |
+| --------------------- | -------- | ------ | ------------------------------ | ----- |
+| people (MODNet 8-bit) | 6.6 MB   | 5.1 s  | 362 → 621 MB (+260)            | 368   |
+| objects (ormbg 8-bit) | 44 MB    | 15.1 s | 361 → 1077 MB (+716)           | 297   |
+
+Both: background fully removed (exported left fifth luma 113 → 0), the person unchanged (116 →
+116). objects has cleaner edges (people left a faint smudge by the backpack). Phones: `people`
+(DECISIONS #140) — not measured on a phone yet.

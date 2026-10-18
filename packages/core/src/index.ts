@@ -126,6 +126,12 @@ export {
   type ShapePreset,
 } from './effects/shapes';
 export type { CaptionPreset } from './captions/presets';
+// Background removal: the remover interface (a picture in, the same with no background out)
+export type {
+  BackgroundRemover,
+  BackgroundRemovalRequest,
+  BackgroundRemoverCheck,
+} from './ai/background';
 // Captions: the transcriber interface (audio in, timed words out)
 export { TRANSCRIBE_SAMPLE_RATE } from './captions/transcriber';
 export type {

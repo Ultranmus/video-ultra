@@ -47,6 +47,8 @@ import {
   type CaptionLookPatch,
   type SubtitleCue,
   type Transcriber,
+  type BackgroundRemover,
+  type BackgroundRemoverCheck,
   type TranscriberCheck,
   type Asset,
   type RegionItem,
@@ -126,6 +128,8 @@ export interface ControllerOptions {
   audioLibrary?: AudioLibrary;
   /** Turns speech into timed words for auto captions (on-device or the host's service). */
   transcriber?: Transcriber;
+  /** Removes photo backgrounds (`createBackgroundRemover()` from `@video-ultra/ai`, or yours). */
+  backgroundRemover?: BackgroundRemover;
 }
 
 /**
@@ -1041,6 +1045,7 @@ export class EditorController {
       const ids = [
         'assetId' in item ? item.assetId : null,
         'lut' in item && item.lut ? item.lut.assetId : null,
+        'cutout' in item && item.cutout ? item.cutout.assetId : null,
       ];
       for (const id of ids) if (id && this.project.assets[id]) assets[id] = this.project.assets[id];
     }
@@ -1697,6 +1702,91 @@ export class EditorController {
     return result.ok
       ? { project: result.project, error: null }
       : { project: null, error: result.error };
+  }
+
+  // ── background removal (v0.3) ────────────────────────────────────────────
+
+  #cutoutAbort: AbortController | null = null;
+
+  /** Whether background removal can run here (null: the host gave no remover). */
+  async checkBackgroundRemoval(): Promise<BackgroundRemoverCheck | null> {
+    const r = this.options.backgroundRemover;
+    if (!r) return null;
+    return (await r.check?.().catch(() => null)) ?? { available: true, onDevice: false };
+  }
+
+  /**
+   * Removes the background of a photo or image sticker: the remover makes a transparent copy,
+   * stored as a new image the item shows instead (its own image stays: Restore takes the copy
+   * away). One undo step. Progress is in `ui.cutoutJob`; `cancelBackgroundRemoval()` stops it.
+   */
+  async removeBackground(itemId: string): Promise<void> {
+    const remover = this.options.backgroundRemover;
+    const l = this.labels;
+    const found = findItem(this.project, itemId)?.item;
+    const assetId =
+      found && (found.kind === 'image' || found.kind === 'sticker') ? found.assetId : null;
+    const asset = assetId ? this.project.assets[assetId] : undefined;
+    if (!remover || !asset || !this.storage) return;
+    const blob =
+      this.media.get(asset.id) ??
+      (await this.options.resolveMedia?.(asset).catch(() => null)) ??
+      (await this.storage.getMedia(asset).catch(() => null));
+    if (!blob) {
+      this.toast(l.mediaMissing(asset.name), 'error');
+      return;
+    }
+    this.#cutoutAbort?.abort();
+    const abort = new AbortController();
+    this.#cutoutAbort = abort;
+    this.ui.setState({ cutoutJob: { itemId, stage: 'work', fraction: 0 } });
+    try {
+      const png = await remover.remove({
+        image: blob,
+        signal: abort.signal,
+        onProgress: (p) =>
+          this.ui.setState({ cutoutJob: { itemId, stage: p.stage, fraction: p.fraction } }),
+      });
+      if (abort.signal.aborted) return;
+      const name = `${asset.name.replace(/\.[^.]+$/, '')} (no background).png`;
+      const file = new File([png], name, { type: 'image/png' });
+      const probe = await this.analyzer!.probe(file, name);
+      if (!probe.ok) throw new Error(probe.message);
+      const cutId = randomId();
+      const source = await this.storage.putMedia(cutId, file);
+      const cutAsset = assetFromProbe(probe.media, cutId, source);
+      this.run(l.removeBackground, (d) => {
+        addAsset(d, cutAsset);
+        updateItem(d, itemId, { cutout: { assetId: cutId } });
+      });
+      this.#registerMedia(cutAsset, file);
+      this.toast(l.backgroundRemoved, 'success', { label: l.undo, run: () => this.undo() });
+    } catch (error) {
+      if (abort.signal.aborted || (error instanceof DOMException && error.name === 'AbortError'))
+        return;
+      this.toast(
+        error instanceof StorageFullError
+          ? l.storageFull
+          : l.backgroundFailed(error instanceof Error ? error.message : String(error)),
+        'error',
+      );
+    } finally {
+      if (this.#cutoutAbort === abort) {
+        this.#cutoutAbort = null;
+        this.ui.setState({ cutoutJob: null });
+      }
+    }
+  }
+
+  cancelBackgroundRemoval(): void {
+    this.#cutoutAbort?.abort();
+    this.#cutoutAbort = null;
+    this.ui.setState({ cutoutJob: null });
+  }
+
+  /** Shows the photo's own background again. */
+  restoreBackground(itemId: string): void {
+    this.run(this.labels.restoreBackground, (d) => updateItem(d, itemId, { cutout: null }));
   }
 
   // ── captions (v0.2 A) ──────────────────────────────────────────────────

@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@video-ultra/ai": "workspace:*",
     "@video-ultra/captions": "workspace:*",
     "@video-ultra/core": "workspace:*",
     "@video-ultra/react": "workspace:*",

@@ -757,3 +757,16 @@ reason; when one changes, edit the entry and note the date.
       invisible). Media placeholders ("drop your clip here") are not in this round — BACKLOG.
       Headings in every library browser are `h3` now (they were `h4` under the panel's `h2`: an
       axe heading-order issue).
+140.  **Background removal** (v0.3; photos and image stickers; video is v0.4). A
+      `BackgroundRemover` interface in core (like the transcriber) and an on-device one in the new
+      optional package `@video-ultra/ai`: a segmentation model in a worker (single-threaded
+      WebAssembly, no cross-origin isolation), downloaded once into Cache Storage (streamed, as
+      #132). Two Apache-2.0 models: `people` = MODNet 8-bit (6.6 MB, shorter side 512) and
+      `objects` = ormbg / ISNet 8-bit (44 MB, 1024²). Measured (PERF.md): people 5 s / +260 MB,
+      objects 15 s / +716 MB, both back to baseline after (the worker closes). So phones and
+      tablets (coarse pointer) and devices under 4 GB use `people`; computers use `objects`
+      (cleaner edges, any subject). The matte is scaled up by the canvas while it cuts the
+      full-size photo (`destination-in`) — no full-size matte copy; results are capped at 4096 px.
+      Non-destructive: the transparent PNG is a new image asset and the item gets
+      `cutout: { assetId }` (file version 4); the engine draws it instead; Restore removes the
+      field. Copy / paste carries the cutout asset.

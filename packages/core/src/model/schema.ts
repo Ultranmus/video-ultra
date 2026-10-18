@@ -278,11 +278,20 @@ export const VideoItemSchema = z.object({
   speed: z.number().check(z.gte(0.05), z.lte(100)),
 });
 
+/**
+ * A picture with its background removed (file version 4+): the engine draws this image asset
+ * (same size, transparent background) instead of the item's own. The original stays, so
+ * restoring the background is removing this.
+ */
+export const CutoutSchema = z.object({ assetId: id });
+
 export const ImageItemSchema = z.object({
   ...base,
   ...visual,
   kind: z.literal('image'),
   assetId: id,
+  /** Background removed (file version 4+). */
+  cutout: z.optional(CutoutSchema),
 });
 
 /** A still frame taken from a video at `sourceTime`. */
@@ -352,6 +361,8 @@ export const StickerItemSchema = z.object({
   animation: z.optional(ItemAnimationSchema),
   /** How the sticker mixes with what's under it (file version 3+). Missing = normal. */
   blend: z.optional(BlendModeSchema),
+  /** Image stickers: background removed (file version 4+). */
+  cutout: z.optional(CutoutSchema),
 });
 
 /**
@@ -508,6 +519,8 @@ export type ChromaKey = z.infer<typeof ChromaKeySchema>;
 export type LutRef = z.infer<typeof LutRefSchema>;
 /** How a layer mixes with what's under it. */
 export type BlendMode = z.infer<typeof BlendModeSchema>;
+/** A picture with its background removed. */
+export type Cutout = z.infer<typeof CutoutSchema>;
 /** A picture's shape mask. */
 export type ShapeMask = z.infer<typeof ShapeMaskSchema>;
 /** Anything that sits on a track. */

@@ -4,6 +4,7 @@ import {
   type Capabilities,
   type Project,
   type Transcriber,
+  type BackgroundRemover,
   type ExportResult,
   type AudioExportResult,
   type FrameImage,
@@ -84,6 +85,12 @@ export interface VideoEditorProps {
    * service. Without it, captions can still be imported (.srt / .vtt) or typed.
    */
   transcriber?: Transcriber;
+  /**
+   * Removes photo backgrounds: `createBackgroundRemover()` from the optional `@video-ultra/ai`
+   * package (runs on the device, nothing uploaded), or your own service. Without it the option
+   * isn't shown.
+   */
+  backgroundRemover?: BackgroundRemover;
   /** `dark` (default), `light` or `auto` (follow the OS). */
   theme?: ThemeMode;
   /** Typed overrides for the common theme tokens. */
@@ -143,6 +150,7 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
           : {}),
         ...(props.audioLibrary ? { audioLibrary: props.audioLibrary } : {}),
         ...(props.transcriber ? { transcriber: props.transcriber } : {}),
+        ...(props.backgroundRemover ? { backgroundRemover: props.backgroundRemover } : {}),
       },
       parsed?.project ?? undefined,
     );

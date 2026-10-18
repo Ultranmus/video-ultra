@@ -774,7 +774,11 @@ export class Composer {
 
     switch (item.kind) {
       case 'image': {
-        const bitmap = await this.pictureAt(item.id, item.assetId, layer.localTime);
+        const bitmap = await this.pictureAt(
+          item.id,
+          item.cutout?.assetId ?? item.assetId,
+          layer.localTime,
+        );
         if (!bitmap) return null;
         const media: LayerMedia = {
           width: bitmap.width,
@@ -861,7 +865,11 @@ export class Composer {
           const emoji = item.emoji;
           source = this.rasters.get(item.id, `${px}|${emoji}`, () => rasterizeEmoji(emoji, px));
         } else if (item.assetId) {
-          const bitmap = await this.pictureAt(item.id, item.assetId, layer.localTime);
+          const bitmap = await this.pictureAt(
+            item.id,
+            item.cutout?.assetId ?? item.assetId,
+            layer.localTime,
+          );
           if (!bitmap) return null;
           source = bitmap;
         } else {

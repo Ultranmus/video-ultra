@@ -28,6 +28,7 @@ import { DEFAULT_DUCK, isSounding, RATIOS, ratioOf } from './items';
 import { AnimatePanel, FilterStrip, TransitionGrid } from './looks';
 import type { ToolId } from './state';
 import { ArrangeControls, LockedNote } from './organize';
+import { BackgroundTool } from './cutout';
 import { MaskTool } from './mask';
 import { BlendTool, GreenScreenTool, RegionTool } from './picture';
 
@@ -107,6 +108,8 @@ function ItemTool({ tool, item }: { tool: ToolId; item: Item }): ReactElement | 
       return <RegionTool item={item} />;
     case 'mask':
       return <MaskTool item={item} />;
+    case 'cutout':
+      return <BackgroundTool item={item} />;
     default:
       return null;
   }
@@ -118,6 +121,7 @@ function ItemTool({ tool, item }: { tool: ToolId; item: Item }): ReactElement | 
  * no duplicates — owner, 2026-10-19); this is the detail view.
  */
 export function InspectorSections({ item }: { item: Item }): ReactElement {
+  const ctl = useController();
   const l = useLabels();
   const index = useProject((p) => mainTrack(p).items.findIndex((i) => i.id === item.id));
   const onMain = index !== -1;
@@ -166,6 +170,11 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
           <Section title={l.timing}>
             <DurationTool item={item} />
           </Section>
+          {item.kind === 'image' && ctl.options.backgroundRemover ? (
+            <Section title={l.removeBackground}>
+              <BackgroundTool item={item} />
+            </Section>
+          ) : null}
           {picture}
         </>
       );
@@ -203,6 +212,11 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
     case 'sticker':
       return (
         <>
+          {item.assetId && ctl.options.backgroundRemover ? (
+            <Section title={l.removeBackground}>
+              <BackgroundTool item={item} />
+            </Section>
+          ) : null}
           <Section title={l.adjust} collapsible defaultOpen={false}>
             <AdjustTool item={item} />
           </Section>

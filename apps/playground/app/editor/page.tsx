@@ -12,6 +12,7 @@ import { VideoEditor } from '@video-ultra/react';
 import '@video-ultra/react/styles.css';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
+import { createBackgroundRemover } from '@video-ultra/ai';
 import { createOnDeviceTranscriber } from '@video-ultra/captions';
 import { createDemoSounds } from './demo-sounds';
 import { createFakeTranscriber } from './fake-transcriber';
@@ -40,6 +41,11 @@ function Editor() {
   const [transcriber] = useState(() =>
     params.get('transcriber') === 'fake' ? createFakeTranscriber() : createOnDeviceTranscriber(),
   );
+  // Background removal on this device (`?cutout=0`: none; `=people` / `=objects`: that model).
+  const [backgroundRemover] = useState(() => {
+    const model = params.get('cutout');
+    return createBackgroundRemover(model === 'people' || model === 'objects' ? { model } : {});
+  });
   const [wide, setWide] = useState(false);
   const [room, setRoom] = useState(0);
   useEffect(() => {
@@ -90,6 +96,7 @@ function Editor() {
       autosave={params.get('autosave') !== '0'}
       {...(params.get('sounds') !== '0' ? { audioLibrary: sounds } : {})}
       {...(params.get('transcriber') !== '0' ? { transcriber } : {})}
+      {...(params.get('cutout') !== '0' ? { backgroundRemover } : {})}
       onReady={(controller) => {
         (window as unknown as { vuEditor: unknown }).vuEditor = controller;
       }}

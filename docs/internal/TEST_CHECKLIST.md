@@ -49,3 +49,9 @@ Open the branch's Vercel preview (or `pnpm --filter playground dev`), then **`/e
       Play it — entrances and exits animate. Try the same template on 16:9 and 1:1 too.
       _Checked here:_ every template is valid and grouped (unit test over all 192);
       templates-check (form, your words, group, undo, countdown, phone, axe).
+- [ ] **Remove background (photos).** Add a photo of a person → select it → **Remove background**
+      (inspector on desktop, toolbar on the phone). First time downloads the model (phone 7 MB,
+      computer 44 MB). Background disappears; **Restore background** brings it back. Try a pet or
+      product photo on the computer too. **On the iPhone:** time it, and does the tab survive?
+      Also works on an image sticker. _Checked here:_ cutout-check with both models (pixels:
+      background gone, person kept; restore; undo; memory back to normal after).
