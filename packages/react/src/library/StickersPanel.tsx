@@ -31,6 +31,56 @@ function loadEmoji(): Promise<readonly EmojiRow[]> {
   return emojiPromise;
 }
 
+/** One emoji per Unicode emoji version, newest first, to find what this device's font can draw. */
+const PROBES: readonly [number, string][] = [
+  [15.1, '\u{1F642}\u200D\u2194\uFE0F'],
+  [15, '\u{1FAE8}'],
+  [14, '\u{1FAE0}'],
+  [13.1, '\u{1F62E}\u200D\u{1F4A8}'],
+  [13, '\u{1F972}'],
+  [12, '\u{1F971}'],
+  [11, '\u{1F970}'],
+];
+
+let supported: number | null = null;
+/**
+ * The newest emoji version this device draws (a colour glyph of one emoji's width — not a grey
+ * box, and not a sequence falling apart into its parts). Checked once, on a tiny canvas.
+ */
+function supportedEmojiVersion(): number {
+  if (supported !== null) return supported;
+  supported = Infinity; // can't tell: show everything
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 32;
+    const g = canvas.getContext('2d', { willReadFrequently: true });
+    if (!g) return supported;
+    g.font = '24px sans-serif';
+    g.textBaseline = 'top';
+    const base = g.measureText('\u{1F642}').width;
+    const draws = (emoji: string) => {
+      if (g.measureText(emoji).width > base * 1.4) return false; // fell apart into parts
+      g.clearRect(0, 0, 32, 32);
+      g.fillText(emoji, 2, 2);
+      const px = g.getImageData(0, 0, 32, 32).data;
+      for (let i = 0; i < px.length; i += 4) {
+        // Any clearly coloured pixel: a colour emoji, not a monochrome "missing glyph" box.
+        if (
+          px[i + 3]! > 0 &&
+          Math.max(px[i]!, px[i + 1]!, px[i + 2]!) - Math.min(px[i]!, px[i + 1]!, px[i + 2]!) > 40
+        )
+          return true;
+      }
+      return false;
+    };
+    const hit = PROBES.find(([, emoji]) => draws(emoji));
+    supported = hit ? hit[0] : PROBES[PROBES.length - 1]![0];
+  } catch {
+    /* no canvas: show everything */
+  }
+  return supported;
+}
+
 /** Draws an SVG sticker to a PNG (the engine worker can't decode SVG). */
 async function rasterise(shape: ShapeSticker, size = 512): Promise<Blob> {
   const url = URL.createObjectURL(new Blob([shapeSvg(shape)], { type: 'image/svg+xml' }));
@@ -81,10 +131,13 @@ export function StickersPanel(): ReactElement {
     };
   }, [tab]);
 
-  const pool = useMemo(
-    () => (rows ? (tab === '3d' ? rows.filter((r) => r[4]) : rows) : []),
-    [rows, tab],
-  );
+  // The 3D tab draws images; the emoji tab only shows what this device's font can draw.
+  const pool = useMemo(() => {
+    if (!rows) return [];
+    if (tab === '3d') return rows.filter((r) => r[4]);
+    const max = supportedEmojiVersion();
+    return rows.filter((r) => r[5] <= max);
+  }, [rows, tab]);
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return pool;

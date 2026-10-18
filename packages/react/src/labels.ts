@@ -250,8 +250,8 @@ export const DEFAULT_LABELS = {
   importFailed: (name: string, reason: string) => `${name}: ${reason}`,
   storageFull:
     "There's no space left to store this file. Free up space on this device or remove media you don't use.",
-  notPersistent:
-    'This browser may clear unsaved work after a few days. Save or export to keep it safe.',
+  notPersistent: 'This browser may clear your work after a while — export to keep it.',
+  muteWhileRecording: 'Mute the video’s sound while recording',
   saved: 'Saved',
   readOnlyBanner: 'This video is open in another tab. Changes here aren’t saved.',
   takeOver: 'Use it here',

@@ -80,7 +80,7 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       mount (production build; none in WebKit/Firefox, none while editing or playing). Likely the
       AudioContext + worklet setup (#44) and the capability probe. Profile and split.
 - [ ] Stage: pinch with nothing selected should zoom the view (UI_VISION §6) — not built yet.
-- [ ] Voiceover plays the project while recording (so the speaker can follow); without headphones
+- [x] (fixed 2026-10-19) Voiceover plays the project while recording (so the speaker can follow); without headphones
       the project's sound is recorded too. Offer "mute while recording".
 - [ ] File handles (Chromium desktop): import still copies into OPFS; use `showOpenFilePicker` +
       `putMediaHandle` and a re-link flow.
@@ -128,7 +128,7 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [ ] Stage view pinch-zoom (nothing selected) — still not built.
 - [ ] Inspector: "Appearance" buttons stack one per row in a narrow inspector; consider an icon
       row (rotate / flip H / flip V) like image-ultra's adjust bar.
-- [ ] Ruler labels under the playhead capsule are hidden; a nicer approach would fade them.
+- [x] (fixed 2026-10-19) Ruler labels under the playhead capsule are hidden; a nicer approach would fade them.
 - [ ] Real-device pass of the effects library: iPhone (WebGPU) and a low-end Android (WebGL2):
       play the blur family (spin-blur, motion-blur, zoom-blur), the 3D family and a typewriter
       title; watch late frames and preview-quality drops. Tune `cheapEffects` / tap counts.
@@ -150,7 +150,7 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [ ] Owner reported a transition "zoom" affecting stickers too; not reproduced in the engine
       (golden check proves lanes are untouched across 30 families). Ask for a screen recording if
       it shows up again on the new build.
-- [ ] A few emoji draw as boxes where the OS font lacks them (headless Chrome on macOS); the 3D
+- [x] (fixed 2026-10-19) A few emoji draw as boxes where the OS font lacks them (headless Chrome on macOS); the 3D
       tab doesn't have this. Consider hiding emoji the platform can't draw.
 - [ ] Playground `window` test API + URL debug flags (DECISIONS #92). Small; helps phone debugging.
 - [x] (done 2026-10-19: engine onFatal → stopped screen; covered by editor-interact) Fatal engine error screen with Reload (DECISIONS #93): catch worker `error` /
@@ -166,7 +166,7 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [ ] Waveform for video clips needs the clip tall enough (≥ 40 px); phone main track checks.
 - [ ] Same-height sheets leave empty space under quick tools (Edit text, Speed, Volume): fill it
       usefully (e.g. quick styles under Edit) or let the sheet hug short content (owner call).
-- [ ] Phone toolbar scrolls sideways with no hint that more tools are off-screen (Rotate,
+- [x] (fixed 2026-10-19) Phone toolbar scrolls sideways with no hint that more tools are off-screen (Rotate,
       Opacity, Split… on text): add an edge fade or a "More" entry.
-- [ ] The "browser may clear unsaved work" toast is large on phones and covers the stage.
+- [x] (fixed 2026-10-19) The "browser may clear unsaved work" toast is large on phones and covers the stage.
 - [ ] Device frames bigger than the window scroll (zooming the frame breaks canvas pointer maths).

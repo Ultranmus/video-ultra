@@ -111,7 +111,7 @@ Deferred to v0.2+: speed curves, reverse, text animations, templates, keyframes,
 - [x] F5 Orphaned media sweep (`sweepMedia`, 10 s after start, owner tab only)
 - [x] F6 Chrome startup long tasks: probe split; first AudioContext (unavoidable 125 ms) moved to a quiet moment
 - [x] F7 Audio crossfade under video transitions (equal power, uses media handles)
-- [ ] F8 UI polish: toolbar overflow hint, compact storage note, ruler labels fade, hide undrawable emoji, voiceover "mute while recording"
+- [x] F8 UI polish: toolbar overflow hint, compact storage note, ruler labels fade, hide undrawable emoji, voiceover "mute while recording"
 - [ ] F9 Stage pinch-zoom (nothing selected)
 
 ### Day 7 — Release v0.1 (on hold)

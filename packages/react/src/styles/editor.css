@@ -1126,6 +1126,23 @@
     padding: 0 var(--vu-space-3) var(--vu-space-3);
   }
 
+  /* A setting with a switch on the right (e.g. "mute while recording"). */
+  .vu-switch-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--vu-space-3);
+    width: 100%;
+    min-height: var(--vu-size-touch);
+    color: var(--vu-text-muted);
+    font-size: var(--vu-text-sm);
+    text-align: start;
+  }
+
+  .vu-switch-row:disabled {
+    opacity: 0.5;
+  }
+
   /* On/off switch */
   .vu-switch {
     position: relative;
@@ -2683,6 +2700,24 @@
     scrollbar-width: none;
     border-top: 1px solid var(--vu-border);
     background: var(--vu-bg);
+  }
+
+  .vu-toolbar[data-more-end] {
+    mask-image: linear-gradient(to left, transparent, black var(--vu-space-8));
+  }
+
+  .vu-toolbar[data-more-start] {
+    mask-image: linear-gradient(to right, transparent, black var(--vu-space-8));
+  }
+
+  .vu-toolbar[data-more-start][data-more-end] {
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      black var(--vu-space-8),
+      black calc(100% - var(--vu-space-8)),
+      transparent
+    );
   }
 
   .vu-toolbar::-webkit-scrollbar {

@@ -306,6 +306,14 @@ function Voiceover() {
   const recording = useUi((s) => s.recording);
   const recorder = useRef<MediaRecorder | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Without headphones the video's sound would be recorded too: muted while recording by default.
+  const [muteWhile, setMuteWhile] = useState(() => {
+    try {
+      return localStorage.getItem('video-ultra:voiceover-mute') !== '0';
+    } catch {
+      return true;
+    }
+  });
   useEffect(() => () => recorder.current?.stop(), []);
 
   const start = async () => {
@@ -330,6 +338,7 @@ function Voiceover() {
     };
     rec.onstop = () => {
       for (const track of stream.getTracks()) track.stop();
+      ctl.engine?.setOutputMuted(false);
       ctl.ui.setState({ recording: false });
       ctl.pause();
       const mime = rec.mimeType || type || 'audio/webm';
@@ -344,8 +353,8 @@ function Voiceover() {
     recorder.current = rec;
     rec.start(1000);
     ctl.ui.setState({ recording: true });
-    // Play along so the speaker can follow the video (sound would leak into the mic: muted engine
-    // audio is a later improvement).
+    // Play along so the speaker can follow the video — silently unless they chose to hear it.
+    ctl.engine?.setOutputMuted(muteWhile);
     ctl.play();
   };
 
@@ -379,6 +388,27 @@ function Voiceover() {
           {error}
         </p>
       ) : null}
+      <button
+        type="button"
+        role="switch"
+        aria-checked={muteWhile}
+        className="vu-switch-row"
+        disabled={recording}
+        onClick={() => {
+          const next = !muteWhile;
+          setMuteWhile(next);
+          try {
+            localStorage.setItem('video-ultra:voiceover-mute', next ? '1' : '0');
+          } catch {
+            /* not remembered */
+          }
+        }}
+      >
+        <span>{l.muteWhileRecording}</span>
+        <span className="vu-switch" aria-hidden="true">
+          <span className="vu-switch-knob" />
+        </span>
+      </button>
     </div>
   );
 }

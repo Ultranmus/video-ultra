@@ -540,8 +540,28 @@ export function Toolbar(): ReactElement {
   }));
   const item = useProject((p) => (selectedId ? (findItem(p, selectedId)?.item ?? null) : null));
   const entries = toolsFor(item, ctl.project, ctl, l, targets);
+  // Fades at the edges show there are more tools to scroll to (phones show ~6 at a time).
+  const barRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const bar = barRef.current;
+    if (!bar) return;
+    const update = () => {
+      const max = bar.scrollWidth - bar.clientWidth;
+      bar.toggleAttribute('data-more-start', bar.scrollLeft > 2);
+      bar.toggleAttribute('data-more-end', bar.scrollLeft < max - 2);
+    };
+    update();
+    bar.addEventListener('scroll', update, { passive: true });
+    const ro = new ResizeObserver(update);
+    ro.observe(bar);
+    return () => {
+      bar.removeEventListener('scroll', update);
+      ro.disconnect();
+    };
+  }, [entries.length, item?.id]);
   return (
     <div
+      ref={barRef}
       className="vu-toolbar"
       role="toolbar"
       aria-label={item ? itemTitle(item, ctl.project.assets) : l.addContent}

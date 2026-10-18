@@ -81,6 +81,11 @@ export interface Engine {
     height: number,
     background: string,
   ): Promise<ImageBitmap[]>;
+  /**
+   * Silences (or restores) the engine's sound output without touching playback timing — e.g.
+   * while recording a voiceover without headphones.
+   */
+  setOutputMuted(muted: boolean): void;
   /** Playhead updates (every frame while playing). */
   onTime: ((time: Time, playing: boolean) => void) | null;
   onEnded: (() => void) | null;
@@ -205,6 +210,9 @@ export async function createEngine(
   // start inside a user gesture, so the context is created and resumed synchronously there.
   // `context` is null when this browser can't play sound here (see onAudioUnavailable).
   let audio: { context: AudioContext | null; ready: Promise<void> } | null = null;
+  /** Between the worklet and the speakers: 0 mutes the output (the clock keeps running). */
+  let outputGain: GainNode | null = null;
+  let outputMuted = false;
   // Set by destroy(): late idle callbacks then do nothing (no context created after the end).
   let destroyed = false;
   // Building the AudioContext and loading the worklet costs ~100 ms of main-thread time in Chrome, so
@@ -231,7 +239,9 @@ export async function createEngine(
         numberOfInputs: 0,
         outputChannelCount: [2],
       });
-      node.connect(context.destination);
+      outputGain = context.createGain();
+      outputGain.gain.value = outputMuted ? 0 : 1;
+      node.connect(outputGain).connect(context.destination);
       const channel = new MessageChannel();
       node.port.postMessage({ type: 'port', port: channel.port1 }, [channel.port1]);
       const latency = (context.outputLatency || 0) + (context.baseLatency || 0);
@@ -290,6 +300,11 @@ export async function createEngine(
   }
 
   return Object.assign(handlers, {
+    setOutputMuted(muted: boolean) {
+      outputMuted = muted;
+      if (outputGain && audio?.context)
+        outputGain.gain.setTargetAtTime(muted ? 0 : 1, audio.context.currentTime, 0.02);
+    },
     crashForTest() {
       void send({ type: 'crash-for-test' }).catch(() => {});
     },

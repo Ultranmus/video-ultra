@@ -1835,7 +1835,14 @@ export class TimelineView {
       if (isMajor) {
         const label = tickLabel(t, major);
         const lw = ctx.measureText(label).width;
-        if (x + 4 + lw < ph - 36 || x + 4 > ph + 36) ctx.fillText(label, x + 4, m.ruler / 2 - 1);
+        // Labels fade out as the playhead's time capsule comes near (no text on text, no pop).
+        const gap = Math.max(x + 4 - (ph + 36), ph - 36 - (x + 4 + lw));
+        const fade = Math.min(1, Math.max(0, gap / 24));
+        if (fade > 0) {
+          ctx.globalAlpha = fade;
+          ctx.fillText(label, x + 4, m.ruler / 2 - 1);
+          ctx.globalAlpha = 1;
+        }
       }
     }
     ctx.stroke();
