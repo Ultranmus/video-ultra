@@ -43,6 +43,8 @@ const MIGRATIONS: Record<number, (old: Record<string, unknown>) => Record<string
         })
       : old.tracks,
   }),
+  /** 2 → 3: items may be locked, hidden and grouped (all optional, none yet). */
+  2: (old) => ({ ...old, version: 3 }),
 };
 
 /**
@@ -154,6 +156,7 @@ export function repairProject(project: Project, ids: IdFactory = randomId): stri
     return true;
   };
   main.items = main.items.filter(usable(main));
+  for (const item of main.items) delete item.groupId;
   for (const lane of lanes) lane.items = lane.items.filter(usable(lane));
 
   // Main track: back to back from 0.

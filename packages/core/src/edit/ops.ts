@@ -74,6 +74,13 @@ function editable(project: Project, itemId: string) {
   const found = findItem(project, itemId);
   if (!found) throw new EditError('not-found', `No item ${itemId}`);
   if (found.track.locked) throw new EditError('locked', 'That track is locked');
+  if (found.item.locked) throw new EditError('locked', 'That element is locked');
+  return found;
+}
+
+function existing(project: Project, itemId: string) {
+  const found = findItem(project, itemId);
+  if (!found) throw new EditError('not-found', `No item ${itemId}`);
   return found;
 }
 
@@ -195,7 +202,23 @@ function tidyLaneTransitions(project: Project): void {
 
 function removeEmptyLanes(project: Project): void {
   tidyLaneTransitions(project);
+  tidyGroups(project);
   project.tracks = project.tracks.filter((t) => t.kind === 'main' || t.items.length > 0);
+}
+
+/** A group needs two members on lanes: a lone member (or a main-track clip) leaves its group. */
+function tidyGroups(project: Project): void {
+  const count = new Map<string, number>();
+  for (const track of project.tracks) {
+    for (const item of track.items) {
+      if (!item.groupId) continue;
+      if (track.kind === 'main') delete item.groupId;
+      else count.set(item.groupId, (count.get(item.groupId) ?? 0) + 1);
+    }
+  }
+  for (const track of project.tracks)
+    for (const item of track.items)
+      if (item.groupId && (count.get(item.groupId) ?? 0) < 2) delete item.groupId;
 }
 
 /** Moves an item to another lane if it now overlaps its neighbours. */
@@ -354,6 +377,7 @@ export function moveMainToLane(
   track.items.splice(index, 1);
   layoutMain(project);
   if ('transitionIn' in item) item.transitionIn = null;
+  delete item.groupId;
   item.start = snap(project, start);
   if ('transform' in item) {
     const t = item.transform;
@@ -386,9 +410,152 @@ export function moveLaneToMain(project: Project, itemId: string, toIndex: number
   if (main.locked) throw new EditError('locked', 'That track is locked');
   track.items.splice(index, 1);
   if ('transitionIn' in item) item.transitionIn = null;
+  delete item.groupId;
   main.items.splice(Math.max(0, Math.min(Math.round(toIndex), main.items.length)), 0, item);
   layoutMain(project);
   removeEmptyLanes(project);
+}
+
+/**
+ * Moves several lane items in time by the same amount — a group, or a selection dragged together.
+ * Clamped so none starts before 0. Each keeps its lane when it fits there (the moved items never
+ * block each other); one that would overlap a neighbour moves to a free lane of its kind.
+ * Returns the applied shift.
+ */
+export function shiftItems(
+  project: Project,
+  itemIds: readonly string[],
+  delta: Time,
+  ids: IdFactory,
+): Time {
+  const found = [...new Set(itemIds)].map((id) => editable(project, id));
+  if (found.some((f) => f.track.kind === 'main'))
+    throw new EditError('invalid', 'Main-track clips move by reordering');
+  if (found.length === 0) return 0;
+  const earliest = Math.min(...found.map((f) => f.item.start));
+  const shift = Math.max(-earliest, snapToFrame(delta, project.settings.frameRate));
+  if (shift === 0) return 0;
+  for (const { track, item } of found) track.items.splice(track.items.indexOf(item), 1);
+  for (const { track, item } of found) {
+    item.start = snap(project, item.start + shift);
+    placeInLane(project, item, ids, track.id);
+  }
+  removeEmptyLanes(project);
+  return shift;
+}
+
+/** Where {@link arrangeItem} moves an element in the stack. */
+export type ArrangeTo = 'forward' | 'backward' | 'front' | 'back';
+
+/**
+ * Moves an element up or down the stack of what is on screen at `t` (Bring forward / Send
+ * backward / Bring to front / Send to back). Stacking follows lane order (later lanes draw on
+ * top), so the element's lane moves — or, when the lane holds other items too, the element moves
+ * to a new lane at that place and the others stay where they are. The main video is always at
+ * the back. Throws when there is nowhere to go.
+ */
+export function arrangeItem(
+  project: Project,
+  itemId: string,
+  to: ArrangeTo,
+  t: Time,
+  ids: IdFactory,
+): void {
+  const { track, item } = editable(project, itemId);
+  if (track.kind === 'main' || track.kind === 'audio')
+    throw new EditError('invalid', 'Only elements over the video can change order');
+  // The stack at t, bottom to top: tracks with a visual item there (this element counts even if
+  // the playhead isn't on it, so arranging from the timeline works too).
+  const stack = project.tracks.filter(
+    (tr) =>
+      tr === track ||
+      (tr.kind !== 'audio' &&
+        tr.items.some((i) => i.kind !== 'audio' && i.start <= t && t < itemEnd(i))),
+  );
+  const at = stack.indexOf(track);
+  const firstLane = stack.findIndex((tr) => tr.kind !== 'main');
+  const target =
+    to === 'forward'
+      ? stack[at + 1]
+      : to === 'front'
+        ? at < stack.length - 1
+          ? stack[stack.length - 1]
+          : undefined
+        : to === 'backward'
+          ? at - 1 >= firstLane
+            ? stack[at - 1]
+            : undefined
+          : at > firstLane
+            ? stack[firstLane]
+            : undefined;
+  if (!target || target === track) {
+    throw new EditError(
+      'invalid',
+      to === 'forward' || to === 'front' ? 'Already at the front' : 'Already at the back',
+    );
+  }
+  const above = to === 'forward' || to === 'front';
+  let lane: Track;
+  if (track.items.length === 1) {
+    project.tracks.splice(project.tracks.indexOf(track), 1);
+    lane = track;
+  } else {
+    track.items.splice(track.items.indexOf(item), 1);
+    lane = {
+      id: ids(),
+      kind: track.kind,
+      muted: false,
+      hidden: false,
+      locked: false,
+      items: [item],
+    };
+  }
+  const targetIndex = project.tracks.indexOf(target);
+  project.tracks.splice(Math.max(1, above ? targetIndex + 1 : targetIndex), 0, lane);
+  removeEmptyLanes(project);
+}
+
+// ── lock, hide, group ─────────────────────────────────────────────────────
+
+/**
+ * Locks (can be selected, not moved or edited) or hides (not drawn) an item. Works on locked
+ * items — it's how they are unlocked.
+ */
+export function setItemFlags(
+  project: Project,
+  itemId: string,
+  flags: { locked?: boolean; hidden?: boolean },
+): void {
+  const { item } = existing(project, itemId);
+  if (flags.locked !== undefined) {
+    if (flags.locked) item.locked = true;
+    else delete item.locked;
+  }
+  if (flags.hidden !== undefined) {
+    if (flags.hidden) item.hidden = true;
+    else delete item.hidden;
+  }
+}
+
+/**
+ * Groups lane items (two or more) so they select, move and scale together. Members of other
+ * groups join the new one. Locked items can join (they still don't move). Returns the group id.
+ */
+export function groupItems(project: Project, itemIds: readonly string[], ids: IdFactory): string {
+  const found = [...new Set(itemIds)].map((id) => existing(project, id));
+  if (found.length < 2) throw new EditError('invalid', 'Select two or more elements to group');
+  if (found.some((f) => f.track.kind === 'main'))
+    throw new EditError('invalid', 'Clips in the main video can’t be grouped');
+  const groupId = ids();
+  for (const { item } of found) item.groupId = groupId;
+  tidyGroups(project);
+  return groupId;
+}
+
+/** Ungroups: the members become separate elements again (they stay where they are). */
+export function ungroupItems(project: Project, groupId: string): void {
+  for (const track of project.tracks)
+    for (const item of track.items) if (item.groupId === groupId) delete item.groupId;
 }
 
 // ── trimming, splitting, speed ─────────────────────────────────────────────
@@ -481,12 +648,18 @@ export function deleteItem(project: Project, itemId: string): void {
   removeEmptyLanes(project);
 }
 
-/** Duplicates an item right after itself. Returns the new id. */
+/**
+ * Duplicates an item right after itself. Returns the new id. A locked item can be duplicated; the
+ * copy is unlocked and outside any group.
+ */
 export function duplicateItem(project: Project, itemId: string, ids: IdFactory): string {
-  const { track, item, index } = editable(project, itemId);
+  const { track, item, index } = existing(project, itemId);
+  if (track.locked) throw new EditError('locked', 'That track is locked');
   const dup = copy(item) as Item;
   dup.id = ids();
   dup.start = itemEnd(item);
+  delete dup.locked;
+  delete dup.groupId;
   if (track.kind === 'main') {
     if ('transitionIn' in dup) dup.transitionIn = null;
     track.items.splice(index + 1, 0, dup);

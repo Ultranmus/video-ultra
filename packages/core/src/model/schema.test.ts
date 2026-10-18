@@ -123,10 +123,10 @@ function clip(id: string, start: number, transitionIn: unknown, filter: unknown)
 }
 
 describe('project file back-compat', () => {
-  /** What a version-1 file becomes: version 2, text and stickers gain an empty look. */
+  /** What a version-1 file becomes: version 3, text and stickers gain an empty look. */
   const upgraded = (data: ReturnType<typeof JSON.parse>) => {
     const out = structuredClone(data);
-    out.version = 2;
+    out.version = 3;
     for (const track of out.tracks)
       for (const item of track.items)
         if (item.kind === 'text' || item.kind === 'sticker') {
@@ -136,8 +136,23 @@ describe('project file back-compat', () => {
     return out;
   };
 
-  it('is file version 2 (1 → 2: text and stickers take a look)', () => {
-    expect(PROJECT_VERSION).toBe(2);
+  it('is file version 3 (1 → 2: text and stickers take a look; 2 → 3: lock, hide, group)', () => {
+    expect(PROJECT_VERSION).toBe(3);
+  });
+
+  it('a version-3 project keeps locked, hidden and grouped items; main clips leave groups', () => {
+    const data = upgraded(JSON.parse(V01_PROJECT));
+    data.tracks[1].items[0].locked = true;
+    data.tracks[1].items[0].hidden = true;
+    data.tracks[1].items[0].groupId = 'g1';
+    data.tracks[2].items[0].groupId = 'g1';
+    const result = parseProject(data);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.project).toEqual(data);
+    data.tracks[0].items[0].groupId = 'g1';
+    const repaired = parseProject(data);
+    expect(repaired.ok && repaired.project.tracks[0]!.items[0]!.groupId).toBeUndefined();
   });
 
   it('opens a v0.1 (version 1) project, changing nothing but the new look fields', () => {
@@ -179,10 +194,11 @@ describe('project file back-compat', () => {
       .flatMap((t: { items: { kind: string }[] }) => t.items)
       .find((i: { kind: string }) => i.kind === 'text');
     text.filter = { id: 'warm', intensity: 0.5 };
+    data.version = 2;
     const result = parseProject(data);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.project).toEqual(data);
+    expect(result.project).toEqual({ ...data, version: 3 });
   });
 
   it('rejects bad transition options and animations', () => {

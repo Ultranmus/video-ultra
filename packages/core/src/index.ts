@@ -13,6 +13,7 @@ export {
   createProject,
   projectDuration,
   findItem,
+  groupOf,
   mainTrack,
   itemEnd,
   projectFrame,
@@ -38,6 +39,7 @@ export type {
   EditContext,
   ApplyOptions,
   LogEntry,
+  HistoryView,
 } from './edit/history';
 
 // Effects catalogues (filters, transitions, animations, adjustments, stickers, text styles)

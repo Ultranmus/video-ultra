@@ -144,6 +144,20 @@ export function findItem(
   return null;
 }
 
+/**
+ * The ids an item moves and selects with: every member of its group, or just the item itself
+ * when it isn't grouped.
+ */
+export function groupOf(project: Project, itemId: string): string[] {
+  const item = findItem(project, itemId)?.item;
+  if (!item) return [];
+  if (!item.groupId) return [item.id];
+  const ids: string[] = [];
+  for (const track of project.tracks)
+    for (const other of track.items) if (other.groupId === item.groupId) ids.push(other.id);
+  return ids;
+}
+
 /** One frame of the project's frame rate, in flicks. */
 export function projectFrame(project: Project): Time {
   return frameDuration(project.settings.frameRate);

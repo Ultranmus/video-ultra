@@ -23,6 +23,30 @@ describe('editor history', () => {
     expect(editor.getProject()).toEqual(after);
   });
 
+  it('lists the steps and jumps to any of them (the History panel)', () => {
+    const editor = createEditor(startProject(), { ids: sequentialIds('h') });
+    const original = editor.getProject();
+    editor.apply('Split', (d, ctx) => splitItem(d, 'a', s(2), ctx.ids));
+    const split = editor.getProject();
+    editor.apply('Add text', (d, ctx) => addToLane(d, textItem('t', 0, 2), ctx.ids));
+    editor.apply('Speed', (d, ctx) => setSpeed(d, 'a', 2, ctx.ids));
+    const latest = editor.getProject();
+    expect(editor.history()).toEqual({ labels: ['Split', 'Add text', 'Speed'], position: 3 });
+    expect(editor.goTo(1)).toBe(true);
+    expect(editor.getProject()).toEqual(split);
+    expect(editor.history()).toEqual({ labels: ['Split', 'Add text', 'Speed'], position: 1 });
+    expect(editor.goTo(0)).toBe(true);
+    expect(editor.getProject()).toEqual(original);
+    expect(editor.goTo(3)).toBe(true);
+    expect(editor.getProject()).toEqual(latest);
+    expect(editor.goTo(4)).toBe(false);
+    expect(editor.goTo(-1)).toBe(false);
+    // A new edit after jumping back drops the steps after it.
+    editor.goTo(1);
+    editor.apply('Speed', (d, ctx) => setSpeed(d, 'a', 0.5, ctx.ids));
+    expect(editor.history()).toEqual({ labels: ['Split', 'Speed'], position: 2 });
+  });
+
   it('leaves the project untouched when an edit fails', () => {
     const editor = createEditor(startProject());
     const before = editor.getProject();

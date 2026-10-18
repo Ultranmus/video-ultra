@@ -3,16 +3,21 @@ import type { Editor } from '../edit/history';
 import {
   EditError,
   addToLane,
+  arrangeItem,
   deleteItem,
   duplicateItem,
   freezeFrame,
+  groupItems,
   insertMain,
   moveItem,
   reorderMain,
+  setItemFlags,
   setSpeed,
   setTransition,
+  shiftItems,
   splitItem,
   trimItem,
+  ungroupItems,
 } from '../edit/ops';
 import type { Project } from '../model/schema';
 import { fromSeconds as s } from '../model/time';
@@ -40,6 +45,12 @@ export type Op =
   | { op: 'transition'; pick: number; duration: number }
   | { op: 'addMain'; kind: 'video' | 'image'; seconds: number; sourceIn: number }
   | { op: 'addLane'; kind: 'text' | 'audio' | 'sticker'; start: number; seconds: number }
+  | { op: 'flags'; pick: number; locked: boolean; hidden: boolean }
+  | { op: 'group'; pick: number; other: number }
+  | { op: 'ungroup'; pick: number }
+  | { op: 'shift'; pick: number; other: number; delta: number }
+  | { op: 'arrange'; pick: number; to: 'forward' | 'backward' | 'front' | 'back'; at: number }
+  | { op: 'goTo'; position: number }
   | { op: 'undo' }
   | { op: 'redo' };
 
@@ -83,6 +94,27 @@ export const opArb: fc.Arbitrary<Op> = fc.oneof(
     start: fc.double({ min: 0, max: 20, noNaN: true }),
     seconds: fc.double({ min: 0.05, max: 8, noNaN: true }),
   }),
+  fc.record({
+    op: fc.constant('flags' as const),
+    pick: fc.nat(),
+    locked: fc.boolean(),
+    hidden: fc.boolean(),
+  }),
+  fc.record({ op: fc.constant('group' as const), pick: fc.nat(), other: fc.nat() }),
+  fc.record({ op: fc.constant('ungroup' as const), pick: fc.nat() }),
+  fc.record({
+    op: fc.constant('shift' as const),
+    pick: fc.nat(),
+    other: fc.nat(),
+    delta: fc.double({ min: -10, max: 10, noNaN: true }),
+  }),
+  fc.record({
+    op: fc.constant('arrange' as const),
+    pick: fc.nat(),
+    to: fc.constantFrom('forward' as const, 'backward' as const, 'front' as const, 'back' as const),
+    at: fc.double({ min: 0, max: 20, noNaN: true }),
+  }),
+  fc.record({ op: fc.constant('goTo' as const), position: fc.nat({ max: 12 }) }),
   fc.constant({ op: 'undo' as const }),
   fc.constant({ op: 'redo' as const }),
 );
@@ -101,6 +133,9 @@ export function run(editor: Editor, step: Op, newId: () => string): void {
         return;
       case 'redo':
         editor.redo();
+        return;
+      case 'goTo':
+        editor.goTo(Math.min(step.position, editor.history().labels.length));
         return;
       case 'addMain': {
         const item =
@@ -152,6 +187,29 @@ export function run(editor: Editor, step: Op, newId: () => string): void {
         editor.apply('Freeze', (d, ctx) =>
           freezeFrame(d, item.id, item.start + Math.round(item.duration * step.at), ctx.ids, s(1)),
         );
+        break;
+      case 'flags':
+        editor.apply('Lock', (d) =>
+          setItemFlags(d, item.id, { locked: step.locked, hidden: step.hidden }),
+        );
+        break;
+      case 'group': {
+        const other = pickItem(step.other)!;
+        editor.apply('Group', (d, ctx) => groupItems(d, [item.id, other.id], ctx.ids));
+        break;
+      }
+      case 'ungroup':
+        if (item.groupId) editor.apply('Ungroup', (d) => ungroupItems(d, item.groupId!));
+        break;
+      case 'shift': {
+        const other = pickItem(step.other)!;
+        editor.apply('Move', (d, ctx) =>
+          shiftItems(d, [item.id, other.id], s(step.delta), ctx.ids),
+        );
+        break;
+      }
+      case 'arrange':
+        editor.apply('Arrange', (d, ctx) => arrangeItem(d, item.id, step.to, s(step.at), ctx.ids));
         break;
       case 'transition':
         editor.apply('Transition', (d) =>

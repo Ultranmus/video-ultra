@@ -156,8 +156,8 @@ function trackLayers(project: Project, track: Track, t: Time, out: ActiveLayer[]
     if (length > 0 && t >= windowStart && 'transitionIn' in next && next.transitionIn) {
       const progress = (t - windowStart) / length;
       const tr = next.transitionIn;
-      out.push(layer(project, track, item, t, transitionInfo(tr, progress, 'out')));
-      out.push(layer(project, track, next, t, transitionInfo(tr, progress, 'in')));
+      pushLayer(out, project, track, item, t, transitionInfo(tr, progress, 'out'));
+      pushLayer(out, project, track, next, t, transitionInfo(tr, progress, 'in'));
       return;
     }
   }
@@ -169,18 +169,30 @@ function trackLayers(project: Project, track: Track, t: Time, out: ActiveLayer[]
     if (length > 0 && t < windowStart + length) {
       const progress = (t - windowStart) / length;
       const tr = item.transitionIn;
-      out.push(layer(project, track, previous, t, transitionInfo(tr, progress, 'out')));
-      out.push(layer(project, track, item, t, transitionInfo(tr, progress, 'in')));
+      pushLayer(out, project, track, previous, t, transitionInfo(tr, progress, 'out'));
+      pushLayer(out, project, track, item, t, transitionInfo(tr, progress, 'in'));
       return;
     }
   }
-  out.push(layer(project, track, item, t, null));
+  pushLayer(out, project, track, item, t, null);
+}
+
+/** Adds a layer unless the item is hidden (a hidden clip still takes its place in a transition). */
+function pushLayer(
+  out: ActiveLayer[],
+  project: Project,
+  track: Track,
+  item: VisualItem,
+  t: Time,
+  transition: LayerTransition | null,
+): void {
+  if (!item.hidden) out.push(layer(project, track, item, t, transition));
 }
 
 /**
  * The visual layers at `t`, bottom to top: the main track first (two clips during a transition,
- * the outgoing one below), then lanes in track order (later tracks draw on top). Hidden tracks and
- * audio are skipped.
+ * the outgoing one below), then lanes in track order (later tracks draw on top). Hidden tracks,
+ * hidden items and audio are skipped.
  */
 export function activeLayers(project: Project, t: Time, out: ActiveLayer[] = []): ActiveLayer[] {
   out.length = 0;
@@ -194,7 +206,7 @@ export function activeLayers(project: Project, t: Time, out: ActiveLayer[] = [])
     if (index === -1) continue;
     const item = track.items[index]!;
     if (!isVisual(item)) continue;
-    out.push(layer(project, track, item, t, null));
+    pushLayer(out, project, track, item, t, null);
   }
   return out;
 }
@@ -227,7 +239,7 @@ export function upcomingVideo(project: Project, t: Time, ahead: Time): UpcomingI
       const item = items[i]!;
       // Main-track items can show up to half a transition early, never more than their length.
       if (item.start - item.duration >= end) break;
-      if (item.kind !== 'video' && item.kind !== 'freeze') continue;
+      if ((item.kind !== 'video' && item.kind !== 'freeze') || item.hidden) continue;
       const span = visibleSpan(track, i);
       if (span.start >= end || span.end <= t) continue;
       const visibleFrom = Math.max(span.start, t);

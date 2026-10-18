@@ -43,6 +43,17 @@ export interface ApplyOptions {
   coalesceMs?: number;
 }
 
+/** The undo history as a list (the History panel). */
+export interface HistoryView {
+  /** Step labels, oldest first: the undoable steps, then the redoable ones. */
+  labels: readonly string[];
+  /**
+   * How many steps are applied: 0 = the project as opened ("Original"), `labels.length` = latest.
+   * Steps after it are the ones redo would bring back.
+   */
+  position: number;
+}
+
 /** The editor's state container: project + undo/redo + operation log. */
 export interface Editor {
   readonly store: StoreApi<EditorState>;
@@ -58,6 +69,13 @@ export interface Editor {
   ): R;
   undo(): boolean;
   redo(): boolean;
+  /** The history as a list, for showing it. */
+  history(): HistoryView;
+  /**
+   * Undoes or redoes until `position` steps are applied (see {@link HistoryView}). Each step is
+   * logged as its own undo / redo. Returns false if `position` is out of range.
+   */
+  goTo(position: number): boolean;
   /** Replaces the project (e.g. opening another one); clears history. */
   load(project: Project): void;
   /** Called after every commit, undo and redo — persist the entry for autosave/crash recovery. */
@@ -104,7 +122,7 @@ export function createEditor(project: Project, options: EditorOptions = {}): Edi
     for (const listener of listeners) listener(full, next);
   };
 
-  return {
+  const editor: Editor = {
     store,
     getProject: () => store.getState().project,
 
@@ -159,6 +177,20 @@ export function createEditor(project: Project, options: EditorOptions = {}): Edi
       return true;
     },
 
+    history() {
+      const labels = past.map((step) => step.label);
+      for (let i = future.length - 1; i >= 0; i--) labels.push(future[i]!.label);
+      return { labels, position: past.length };
+    },
+
+    goTo(position) {
+      if (!Number.isInteger(position) || position < 0 || position > past.length + future.length)
+        return false;
+      while (past.length > position) editor.undo();
+      while (past.length < position) editor.redo();
+      return true;
+    },
+
     load(next) {
       past = [];
       future = [];
@@ -170,6 +202,7 @@ export function createEditor(project: Project, options: EditorOptions = {}): Edi
       return () => listeners.delete(listener);
     },
   };
+  return editor;
 }
 
 /**

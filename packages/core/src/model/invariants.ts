@@ -37,6 +37,8 @@ export function checkInvariants(project: Project): string[] {
         problems.push(`${where}: overlaps the previous item`);
       }
       cursor = itemEnd(item);
+      if (track.kind === 'main' && item.groupId)
+        problems.push(`${where}: main-track clip in a group`);
 
       // Asset references
       const assetId = 'assetId' in item ? item.assetId : null;

@@ -30,7 +30,13 @@ import {
   moveMainToLane,
   moveLaneToMain,
   LAYER_SCALE,
+  setItemFlags,
+  groupItems,
+  ungroupItems,
+  shiftItems,
+  arrangeItem,
 } from './ops';
+import { groupOf } from '../model/project';
 
 const frame = frameDuration({ num: 30, den: 1 });
 
@@ -420,6 +426,118 @@ describe('setAnimation', () => {
       out: { type: 'drop-out', duration: s(0.5) },
       loop: { type: 'float' },
     });
+    expect(checkInvariants(project)).toEqual([]);
+  });
+});
+
+describe('lock, hide, group (file version 3)', () => {
+  function layers() {
+    const { project, ids } = setup();
+    addToLane(project, textItem('t', 1, 3), ids);
+    addToLane(project, stickerItem('st', 0, 2), ids);
+    addToLane(project, stickerItem('st2', 1, 2), ids); // overlaps st → second sticker lane
+    return { project, ids };
+  }
+  const lane = (project: ReturnType<typeof layers>['project'], id: string) =>
+    findItem(project, id)!.track.id;
+
+  it('a locked element refuses edits but can be unlocked, hidden and duplicated', () => {
+    const { project, ids } = layers();
+    setItemFlags(project, 'st', { locked: true });
+    expect(() => updateItem(project, 'st', { name: 'x' })).toThrow(EditError);
+    expect(() => deleteItem(project, 'st')).toThrow(EditError);
+    expect(() => moveItem(project, 'st', s(3), ids)).toThrow(EditError);
+    expect(() => trimItem(project, 'st', 'end', s(1))).toThrow(EditError);
+    setItemFlags(project, 'st', { hidden: true });
+    expect(findItem(project, 'st')!.item.hidden).toBe(true);
+    const copy = duplicateItem(project, 'st', ids);
+    expect(findItem(project, copy)!.item.locked).toBeUndefined();
+    setItemFlags(project, 'st', { locked: false, hidden: false });
+    expect(findItem(project, 'st')!.item).not.toHaveProperty('locked');
+    expect(findItem(project, 'st')!.item).not.toHaveProperty('hidden');
+    updateItem(project, 'st', { name: 'x' });
+    expect(checkInvariants(project)).toEqual([]);
+  });
+
+  it('groups lane items; a group of one dissolves; main clips never join', () => {
+    const { project, ids } = layers();
+    expect(() => groupItems(project, ['t'], ids)).toThrow(EditError);
+    expect(() => groupItems(project, ['t', 'a'], ids)).toThrow(EditError);
+    const g = groupItems(project, ['t', 'st'], ids);
+    expect(groupOf(project, 'st').sort()).toEqual(['st', 't']);
+    expect(groupOf(project, 'st2')).toEqual(['st2']);
+    // A duplicate stays outside the group; deleting one of two members dissolves the group.
+    const copy = duplicateItem(project, 't', ids);
+    expect(findItem(project, copy)!.item.groupId).toBeUndefined();
+    deleteItem(project, 'st');
+    expect(findItem(project, 't')!.item.groupId).toBeUndefined();
+    expect(g).toBeTruthy();
+    const g2 = groupItems(project, ['t', 'st2'], ids);
+    ungroupItems(project, g2);
+    expect(groupOf(project, 't')).toEqual(['t']);
+    expect(checkInvariants(project)).toEqual([]);
+  });
+
+  it('a split member keeps both halves in the group; lifting into the main video leaves it', () => {
+    const { project, ids } = setup();
+    addToLane(project, imageItem('p', 4), ids);
+    addToLane(project, textItem('t', 0, 4), ids);
+    groupItems(project, ['p', 't'], ids);
+    const half = splitItem(project, 't', s(2), ids);
+    expect(groupOf(project, 'p').sort()).toEqual(['p', half, 't'].sort());
+    moveLaneToMain(project, 'p', 0);
+    expect(findItem(project, 'p')!.item.groupId).toBeUndefined();
+    expect(groupOf(project, 't').sort()).toEqual([half, 't'].sort());
+    expect(checkInvariants(project)).toEqual([]);
+  });
+
+  it('shiftItems moves several lane items by one amount, clamped at 0', () => {
+    const { project, ids } = layers();
+    const lanes = ['t', 'st', 'st2'].map((id) => lane(project, id));
+    expect(shiftItems(project, ['t', 'st', 'st2'], s(2), ids)).toBe(s(2));
+    expect(['t', 'st', 'st2'].map((id) => findItem(project, id)!.item.start)).toEqual([
+      s(3),
+      s(2),
+      s(3),
+    ]);
+    expect(['t', 'st', 'st2'].map((id) => lane(project, id))).toEqual(lanes);
+    expect(shiftItems(project, ['t', 'st'], -s(10), ids)).toBe(-s(2)); // st hits 0
+    expect(findItem(project, 'st')!.item.start).toBe(0);
+    expect(() => shiftItems(project, ['t', 'a'], s(1), ids)).toThrow(EditError);
+    expect(checkInvariants(project)).toEqual([]);
+  });
+
+  it('arrangeItem changes the stack at the playhead, never below the main video', () => {
+    const { project, ids } = layers();
+    const order = () =>
+      project.tracks
+        .filter((t) => t.kind !== 'main')
+        .map((t) => t.items.map((i) => i.id).join('+'));
+    // Lanes in the order they were made; later lanes draw on top.
+    expect(order()).toEqual(['t', 'st', 'st2']);
+    arrangeItem(project, 'st', 'front', s(1.5), ids);
+    expect(order()).toEqual(['t', 'st2', 'st']);
+    arrangeItem(project, 'st', 'backward', s(1.5), ids);
+    expect(order()).toEqual(['t', 'st', 'st2']);
+    arrangeItem(project, 'st2', 'back', s(1.5), ids);
+    expect(order()).toEqual(['st2', 't', 'st']);
+    expect(() => arrangeItem(project, 'st2', 'backward', s(1.5), ids)).toThrow(EditError);
+    expect(() => arrangeItem(project, 'st', 'forward', s(1.5), ids)).toThrow(EditError);
+    expect(() => arrangeItem(project, 'a', 'forward', s(1.5), ids)).toThrow(EditError);
+    expect(project.tracks[0]!.kind).toBe('main');
+    expect(checkInvariants(project)).toEqual([]);
+  });
+
+  it('arranging an element that shares its lane moves only that element', () => {
+    const { project, ids } = setup();
+    addToLane(project, stickerItem('x', 0, 2), ids);
+    addToLane(project, stickerItem('y', 3, 2), ids); // same lane as x
+    addToLane(project, textItem('t', 0, 5), ids);
+    expect(lane(project, 'x')).toBe(lane(project, 'y'));
+    arrangeItem(project, 'x', 'front', s(1), ids);
+    expect(lane(project, 'x')).not.toBe(lane(project, 'y'));
+    const kinds = project.tracks.map((t) => t.items.map((i) => i.id).join('+'));
+    expect(kinds.slice(1)).toEqual(['y', 't', 'x']);
     expect(checkInvariants(project)).toEqual([]);
   });
 });

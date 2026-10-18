@@ -10,7 +10,7 @@ import * as z from 'zod/mini';
  *   that fits the item inside the canvas, so changing the aspect ratio keeps layouts sensible.
  */
 
-export const PROJECT_VERSION = 2;
+export const PROJECT_VERSION = 3;
 
 const time = z.int().check(z.nonnegative());
 const positiveTime = z.int().check(z.positive());
@@ -169,6 +169,15 @@ const base = {
   /** How long it lasts on the timeline. */
   duration: positiveTime,
   name: z.optional(z.string()),
+  /** Can be selected but not moved, trimmed or edited until unlocked (file version 3+). */
+  locked: z.optional(z.boolean()),
+  /** Not drawn in the preview or the export; a video's sound still plays (file version 3+). */
+  hidden: z.optional(z.boolean()),
+  /**
+   * Lane items sharing a group id select, move (on the stage and in time) and scale together
+   * (file version 3+). Main-track clips are never grouped.
+   */
+  groupId: z.optional(id),
 };
 
 const visual = {
