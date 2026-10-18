@@ -551,3 +551,11 @@ reason; when one changes, edit the entry and note the date.
       smallest model that captions well; the A0 spike picks it from measurements (tiny multilingual
       vs an English-only fast model for English, Hindi accuracy checked). Low-tier phones get auto
       captions only through a host transcriber; import and typed captions work everywhere.
+116.  **v0.2 adds layers & organising, built first; v0.2 ships as one test** (owner, 2026-10-19).
+      Group E — command registry (6.0 pulled forward), History panel, Layers panel, lock (element
+      + lane), multi-select + grouping — as in image-ultra. It comes before captions because it is
+      shared plumbing (one action definition for menus, Layers, shortcuts, a11y; named history
+      steps) and doesn't wait on the speech-model numbers. Video twist: a group moves together in
+      time as well as on the stage. The owner tests all of v0.2 together at the end instead of
+      per-checkpoint; the A0 phone measurements become part of that test, and desktop numbers set
+      conservative device gating until then.
