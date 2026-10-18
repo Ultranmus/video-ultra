@@ -681,3 +681,9 @@ reason; when one changes, edit the entry and note the date.
       English (2–5 % WER) and Hindi (72 words) unchanged. Default model is now `base` (amends
       #128): it hears real recordings clearly better than `tiny`; `tiny` only where the device
       reports < 6 GB.
+
+131.  **Speech runtime pinned exactly** (Vercel deploy failed, 2026-10-19). `onnxruntime-web` is
+      pinned to `1.31.0-dev.20260914-8d85527a0`, the build every caption measurement and iPhone
+      test ran on. The old `^1.30.0` range had resolved to that pre-release, which the range does
+      not allow, so `pnpm install --frozen-lockfile` refused the lockfile. Move to the next
+      stable release only after re-running the caption checks on it.

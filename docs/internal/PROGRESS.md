@@ -284,3 +284,9 @@ merged and re-verified on main; A (captions) and E (layers) here.
   arrange / align, context menu.
 - Owner's phone report fixed on the way (#118, #119).
 - Checks on main: see HANDOFF for the full list and results.
+
+## 2026-10-19 · Vercel deploy fixed
+
+- The playground deploy failed at install: the lockfile held `onnxruntime-web`
+  `1.31.0-dev.20260914`, outside `^1.30.0`. Pinned that exact version (#131); frozen install and
+  the playground build (14 routes) pass.
