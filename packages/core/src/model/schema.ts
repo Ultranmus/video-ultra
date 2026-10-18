@@ -288,6 +288,13 @@ export const AudioItemSchema = z.object({
   speed: z.number().check(z.gte(0.05), z.lte(100)),
 });
 
+/** One spoken word of a caption: its text and when it's said, relative to the caption's start. */
+export const CaptionWordSchema = z.object({
+  text: z.string(),
+  start: time,
+  end: time,
+});
+
 export const TextItemSchema = z.object({
   ...base,
   kind: z.literal('text'),
@@ -301,6 +308,11 @@ export const TextItemSchema = z.object({
   animation: z.optional(ItemAnimationSchema),
   /** How the text mixes with what's under it (file version 3+). Missing = normal. */
   blend: z.optional(BlendModeSchema),
+  /**
+   * Captions: each spoken word and its time from the caption's start (file version 3+). Drives
+   * word highlighting; captions typed or imported without it share their time evenly.
+   */
+  words: z.optional(z.array(CaptionWordSchema)),
 });
 
 export const StickerItemSchema = z.object({
@@ -351,18 +363,38 @@ export const ItemSchema = z.discriminatedUnion('kind', [
   RegionItemSchema,
 ]);
 
+/**
+ * How a caption row looks beyond each caption's own text style (file version 3+): the style
+ * preset it came from, and the word highlight (karaoke) as words are spoken.
+ */
+export const CaptionLookSchema = z.object({
+  /** Caption style preset id (`CAPTION_PRESETS`), for the picker. */
+  preset: z.string(),
+  /**
+   * `none`; `word`: the word being said changes colour; `box`: it gets a box behind it; `fill`:
+   * words fill with colour letter by letter as they're said; `reveal`: words appear as they're
+   * said; `type`: letters appear as they're said.
+   */
+  highlight: z.enum(['none', 'word', 'box', 'fill', 'reveal', 'type']),
+  /** Colour of the highlight (text colour, or the box). */
+  highlightColor: z.string(),
+});
+
 export const TrackSchema = z.object({
   id,
   /**
    * `main`: the story — items back to back from 0, no gaps (exactly one main track).
    * `overlay`: picture-in-picture video/images/stickers and blurred areas. `text`: titles. `audio`: music, sfx, voice.
+   * `caption`: captions — text items in time order with one look (file version 3+).
    * Items within one track never overlap.
    */
-  kind: z.enum(['main', 'overlay', 'text', 'audio']),
+  kind: z.enum(['main', 'overlay', 'text', 'audio', 'caption']),
   muted: z.boolean(),
   hidden: z.boolean(),
   locked: z.boolean(),
   items: z.array(ItemSchema),
+  /** Caption rows only: their look (file version 3+). */
+  caption: z.optional(CaptionLookSchema),
 });
 
 export const AssetSchema = z.object({
@@ -438,6 +470,10 @@ export type AnimationLoop = z.infer<typeof AnimationLoopSchema>;
 export type ItemAnimation = z.infer<typeof ItemAnimationSchema>;
 export type Background = z.infer<typeof BackgroundSchema>;
 export type TextStyle = z.infer<typeof TextStyleSchema>;
+/** One spoken word of a caption (times relative to the caption's start). */
+export type CaptionWord = z.infer<typeof CaptionWordSchema>;
+/** A caption row's look: preset and word highlight. */
+export type CaptionLook = z.infer<typeof CaptionLookSchema>;
 export type VideoItem = z.infer<typeof VideoItemSchema>;
 export type ImageItem = z.infer<typeof ImageItemSchema>;
 export type FreezeItem = z.infer<typeof FreezeItemSchema>;

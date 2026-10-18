@@ -96,6 +96,15 @@ export type {
 } from './engine/export-plan';
 
 /** The package version. */
+// Captions: subtitle files, words → captions, speech timing, style presets
+export { parseSubtitles, formatSrt, formatVtt } from './captions/subtitles';
+export type { SubtitleCue } from './captions/subtitles';
+export { groupCaptions } from './captions/group';
+export type { GroupOptions, GroupedCaption } from './captions/group';
+export { captionWords, captionWordTimes, speechAt } from './captions/timing';
+export type { SpeechPosition } from './captions/timing';
+export { CAPTION_PRESETS, DEFAULT_CAPTION_PRESET, lookFromPreset } from './captions/presets';
+export type { CaptionPreset } from './captions/presets';
 // Captions: the transcriber interface (audio in, timed words out)
 export { TRANSCRIBE_SAMPLE_RATE } from './captions/transcriber';
 export type {

@@ -107,6 +107,7 @@ export const ALLOWED_KINDS: Record<TrackKind, readonly ItemKind[]> = {
   overlay: ['video', 'image', 'freeze', 'sticker', 'region'],
   text: ['text'],
   audio: ['audio'],
+  caption: ['text'],
 };
 
 /** End of an item on the timeline. */

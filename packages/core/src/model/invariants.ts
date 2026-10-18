@@ -22,6 +22,8 @@ export function checkInvariants(project: Project): string[] {
   for (const track of project.tracks) {
     seen(track.id, 'track');
     if (track.kind !== 'main' && track.items.length === 0) problems.push(`empty lane ${track.id}`);
+    if (track.caption && track.kind !== 'caption')
+      problems.push(`caption look on ${track.kind} track`);
     let cursor = 0;
     track.items.forEach((item, index) => {
       seen(item.id, 'item');

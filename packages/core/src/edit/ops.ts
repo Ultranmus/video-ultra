@@ -32,6 +32,9 @@ import type {
   Transition,
 } from '../model/schema';
 import { fromSeconds, snapToFrame, type Time } from '../model/time';
+import type { CaptionLook, CaptionWord, TextItem } from '../model/schema';
+import { captionWords, captionWordTimes } from '../captions/timing';
+import { DEFAULT_CAPTION_PRESET, lookFromPreset, type CaptionPreset } from '../captions/presets';
 
 /**
  * Edit operations. Each one mutates a draft `Project` in place (the history wraps them in Immer)
@@ -607,7 +610,9 @@ export function trimItem(
     item.duration -= shift;
     // The main track re-lays itself out; lane items keep their end and move their start.
     if (!isMain) item.start += shift;
+    clampWords(item, shift);
   }
+  if (edge === 'end') clampWords(item, 0);
   clampFades(item);
   if (isMain) layoutMain(project);
   else tidyLaneTransitions(project);
@@ -639,12 +644,35 @@ export function splitItem(project: Project, itemId: string, at: Time, ids: IdFac
     delete item.animation.out;
     delete second.animation.in;
   }
+  // Captions (and any text with spoken words): each part keeps the words said in it.
+  if (item.kind === 'text' && second.kind === 'text' && (item.words || track.kind === 'caption')) {
+    const times = captionWordTimes({ ...item, duration: item.duration + second.duration });
+    const before = times.filter((w) => w.start < offset);
+    const after = times.filter((w) => w.start >= offset);
+    if (before.length && after.length) {
+      item.text = before.map((w) => w.text).join(' ');
+      second.text = after.map((w) => w.text).join(' ');
+      if (item.words) {
+        item.words = before.map((w) => ({ ...w, end: Math.min(w.end, offset) }));
+        second.words = after.map((w) => ({ ...w, start: w.start - offset, end: w.end - offset }));
+      }
+    }
+  }
   clampFades(item);
   clampFades(second);
   track.items.splice(index + 1, 0, second);
   if (track.kind === 'main') layoutMain(project);
   else tidyLaneTransitions(project);
   return second.id;
+}
+
+/** Keeps a caption's word times inside it after its start moved by `shift` or its length changed. */
+function clampWords(item: Item, shift: Time): void {
+  if (item.kind !== 'text' || !item.words) return;
+  item.words = item.words
+    .map((w) => ({ ...w, start: w.start - shift, end: w.end - shift }))
+    .filter((w) => w.end > 0 && w.start < item.duration)
+    .map((w) => ({ ...w, start: Math.max(0, w.start), end: Math.min(item.duration, w.end) }));
 }
 
 /** Deletes an item. The main track closes the gap; empty lanes disappear. */
@@ -1001,4 +1029,151 @@ export function setTrackFlags(
 /** Renames the project. */
 export function renameProject(project: Project, name: string): void {
   project.name = name.trim().slice(0, 200) || 'Untitled video';
+}
+
+// ── captions (v0.2 A) ─────────────────────────────────────────────────────
+
+/** A caption to add: when it shows, its text, and (optionally) its words' times within it. */
+export interface CaptionInput {
+  start: Time;
+  end: Time;
+  text: string;
+  words?: CaptionWord[];
+}
+
+/** The project's caption row, if it has one. */
+export function captionTrack(project: Project): Track | null {
+  return project.tracks.find((t) => t.kind === 'caption') ?? null;
+}
+
+/**
+ * Adds captions to the caption row (made on first use, on top of everything). `replace` clears
+ * the row first (new auto captions or an imported file). Captions are snapped to frames and
+ * never overlap; new ones take the row's current look (or `preset` for a new row). Returns the
+ * row's id.
+ */
+export function addCaptions(
+  project: Project,
+  captions: readonly CaptionInput[],
+  ids: IdFactory,
+  options: { replace?: boolean; preset?: CaptionPreset } = {},
+): string {
+  let track = captionTrack(project);
+  if (track?.locked) throw new EditError('locked', 'The captions are locked');
+  const preset = options.preset ?? DEFAULT_CAPTION_PRESET;
+  const template = track?.items[0];
+  if (!track) {
+    track = {
+      id: ids(),
+      kind: 'caption',
+      muted: false,
+      hidden: false,
+      locked: false,
+      items: [],
+      caption: lookFromPreset(preset),
+    };
+    project.tracks.push(track);
+  }
+  if (options.replace) track.items = [];
+  const frame = projectFrame(project);
+  const sorted = [...captions]
+    .map((c) => ({ ...c, start: snap(project, c.start), end: snap(project, c.end) }))
+    .filter((c) => c.text.trim())
+    .sort((a, b) => a.start - b.start);
+  for (const c of sorted) {
+    const end = Math.max(c.end, c.start + frame);
+    if (!fits(track, c.start, end)) continue;
+    const item: TextItem = {
+      id: ids(),
+      kind: 'text',
+      start: c.start,
+      duration: end - c.start,
+      text: c.text.trim(),
+      style: copy(template?.kind === 'text' ? template.style : preset.style),
+      transform: copy(
+        template && 'transform' in template
+          ? template.transform
+          : { ...DEFAULT_TRANSFORM, y: preset.y },
+      ),
+      filter: null,
+      adjust: {},
+      ...(c.words?.length ? { words: copy(c.words) } : {}),
+    };
+    insertSorted(track, item);
+  }
+  if (track.items.length === 0) {
+    project.tracks.splice(project.tracks.indexOf(track), 1);
+    throw new EditError('invalid', 'There were no captions to add');
+  }
+  return track.id;
+}
+
+/** A change to every caption's look at once. */
+export interface CaptionLookPatch {
+  /** Apply a preset (text style, place and highlight). */
+  preset?: CaptionPreset;
+  highlight?: CaptionLook['highlight'];
+  highlightColor?: string;
+  style?: Partial<TextStyle>;
+  /** Where captions sit (centre, fractions of the canvas) and their size. */
+  x?: number;
+  y?: number;
+  scale?: number;
+}
+
+/** Restyles all captions (they share one look, DECISIONS #125). */
+export function setCaptionLook(project: Project, patch: CaptionLookPatch): void {
+  const track = captionTrack(project);
+  if (!track) throw new EditError('not-found', 'There are no captions');
+  if (track.locked) throw new EditError('locked', 'The captions are locked');
+  const look = track.caption ?? lookFromPreset(DEFAULT_CAPTION_PRESET);
+  if (patch.preset) Object.assign(look, lookFromPreset(patch.preset));
+  if (patch.highlight) look.highlight = patch.highlight;
+  if (patch.highlightColor) look.highlightColor = patch.highlightColor;
+  track.caption = look;
+  for (const item of track.items) {
+    if (item.kind !== 'text') continue;
+    if (patch.preset) {
+      item.style = copy(patch.preset.style);
+      item.transform = { ...item.transform, x: 0.5, y: patch.preset.y, scale: 1, rotation: 0 };
+    }
+    if (patch.style) item.style = { ...item.style, ...copy(patch.style) };
+    if (patch.x !== undefined) item.transform.x = patch.x;
+    if (patch.y !== undefined) item.transform.y = patch.y;
+    if (patch.scale !== undefined) item.transform.scale = Math.min(4, Math.max(0.2, patch.scale));
+  }
+}
+
+/** Changes one caption's text; its word times stay when the words still line up. */
+export function setCaptionText(project: Project, itemId: string, text: string): void {
+  const { item } = editable(project, itemId);
+  if (item.kind !== 'text') throw new EditError('invalid', 'Only captions have text');
+  const next = text.replace(/\s+/g, ' ').trim();
+  if (!next) throw new EditError('invalid', 'A caption needs some text');
+  const before = captionWords(item.text);
+  const after = captionWords(next);
+  if (item.words && before.length === after.length && item.words.length === before.length)
+    item.words = item.words.map((w, i) => ({ ...w, text: after[i]! }));
+  else delete item.words;
+  item.text = next;
+}
+
+/** Joins a caption with the next one on its row (text, time and words). */
+export function mergeCaptionWithNext(project: Project, itemId: string): void {
+  const { track, item, index } = editable(project, itemId);
+  const next = track.items[index + 1];
+  if (!next || item.kind !== 'text' || next.kind !== 'text')
+    throw new EditError('invalid', 'There is no caption after this one');
+  if (next.locked) throw new EditError('locked', 'That element is locked');
+  const gap = next.start - item.start;
+  const ownTimes = item.words ? item.words : captionWordTimes(item);
+  const nextTimes = next.words ? next.words : captionWordTimes(next);
+  const words =
+    item.words || next.words
+      ? [...ownTimes, ...nextTimes.map((w) => ({ ...w, start: w.start + gap, end: w.end + gap }))]
+      : undefined;
+  item.text = `${item.text} ${next.text}`.trim();
+  item.duration = itemEnd(next) - item.start;
+  if (words) item.words = words;
+  track.items.splice(index + 1, 1);
 }

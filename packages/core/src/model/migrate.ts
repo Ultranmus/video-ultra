@@ -162,6 +162,7 @@ export function repairProject(project: Project, ids: IdFactory = randomId): stri
   };
   main.items = main.items.filter(usable(main));
   for (const item of main.items) delete item.groupId;
+  for (const track of project.tracks) if (track.kind !== 'caption') delete track.caption;
   for (const lane of lanes) lane.items = lane.items.filter(usable(lane));
 
   // Main track: back to back from 0.
@@ -196,8 +197,10 @@ export function repairProject(project: Project, ids: IdFactory = randomId): stri
     return !last || itemEnd(last) <= item.start;
   };
   for (const { item, laneId } of pending) {
-    const kind = laneKindFor(item.kind);
     const own = laneId ? laneById.get(laneId) : undefined;
+    // Stay on its own row when that row can hold it (captions are text on a caption row).
+    const kind =
+      own && ALLOWED_KINDS[own.kind].includes(item.kind) ? own.kind : laneKindFor(item.kind);
     let target = own && own.kind === kind && fitsAtEnd(own, item) ? own : undefined;
     if (!target) {
       target = fixedLanes.find((t) => t.kind === kind && fitsAtEnd(t, item));

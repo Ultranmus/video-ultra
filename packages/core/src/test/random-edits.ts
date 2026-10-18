@@ -2,8 +2,11 @@ import fc from 'fast-check';
 import type { Editor } from '../edit/history';
 import {
   EditError,
+  addCaptions,
   addToLane,
   arrangeItem,
+  mergeCaptionWithNext,
+  setCaptionText,
   deleteItem,
   duplicateItem,
   freezeFrame,
@@ -67,6 +70,9 @@ export type Op =
   | { op: 'arrange'; pick: number; to: 'forward' | 'backward' | 'front' | 'back'; at: number }
   | { op: 'duck'; pick: number; amount: number }
   | { op: 'goTo'; position: number }
+  | { op: 'captions'; start: number; count: number; replace: boolean }
+  | { op: 'captionText'; pick: number; words: number }
+  | { op: 'mergeCaption'; pick: number }
   | { op: 'undo' }
   | { op: 'redo' };
 
@@ -147,6 +153,18 @@ export const opArb: fc.Arbitrary<Op> = fc.oneof(
     ),
   }),
   fc.record({ op: fc.constant('goTo' as const), position: fc.nat({ max: 12 }) }),
+  fc.record({
+    op: fc.constant('captions' as const),
+    start: fc.double({ min: 0, max: 15, noNaN: true }),
+    count: fc.integer({ min: 1, max: 5 }),
+    replace: fc.boolean(),
+  }),
+  fc.record({
+    op: fc.constant('captionText' as const),
+    pick: fc.nat(),
+    words: fc.integer({ min: 1, max: 4 }),
+  }),
+  fc.record({ op: fc.constant('mergeCaption' as const), pick: fc.nat() }),
   fc.constant({ op: 'undo' as const }),
   fc.constant({ op: 'redo' as const }),
 );
@@ -166,6 +184,22 @@ export function run(editor: Editor, step: Op, newId: () => string): void {
       case 'redo':
         editor.redo();
         return;
+      case 'captions': {
+        const cues = Array.from({ length: step.count }, (_, i) => ({
+          start: s(step.start + i * 1.5),
+          end: s(step.start + i * 1.5 + 1.2),
+          text: `word${i} more words`,
+          words: [
+            { text: `word${i}`, start: 0, end: s(0.4) },
+            { text: 'more', start: s(0.5), end: s(0.8) },
+            { text: 'words', start: s(0.85), end: s(1.2) },
+          ],
+        }));
+        editor.apply('Captions', (d, ctx) =>
+          addCaptions(d, cues, ctx.ids, { replace: step.replace }),
+        );
+        return;
+      }
       case 'goTo':
         editor.goTo(Math.min(step.position, editor.history().labels.length));
         return;
@@ -264,6 +298,19 @@ export function run(editor: Editor, step: Op, newId: () => string): void {
                     : { key: null, lut: null, blend: null },
           ),
         );
+        break;
+      case 'captionText':
+        if (item.kind === 'text')
+          editor.apply('Caption', (d) =>
+            setCaptionText(
+              d,
+              item.id,
+              Array.from({ length: step.words }, (_, i) => `w${i}`).join(' '),
+            ),
+          );
+        break;
+      case 'mergeCaption':
+        editor.apply('Merge', (d) => mergeCaptionWithNext(d, item.id));
         break;
       case 'transition':
         editor.apply('Transition', (d) =>
