@@ -50,7 +50,8 @@ import {
   type ProjectStorage,
 } from '@video-ultra/core/internal';
 import { produce } from 'immer';
-import { audioItem, itemTitle, stickerItem, visualItem } from './items';
+import { audioItem, DEFAULT_DUCK, isSounding, itemTitle, stickerItem, visualItem } from './items';
+import { audioExtension, type AudioLibrary, type AudioLibraryTrack } from './library/audio-library';
 import { computeTargets, type Targets } from './targets';
 import type { Labels } from './labels';
 import { createUiStore, Playhead, type LayoutMode, type PanelId, type ToolId } from './state';
@@ -72,6 +73,8 @@ export interface ControllerOptions {
   autosave?: boolean;
   /** Base URL of the 3D sticker art (self-host it), or `false` to hide 3D stickers. */
   stickerLibrary?: string | false;
+  /** The host's music & sound-effects source for the Audio panel. */
+  audioLibrary?: AudioLibrary;
 }
 
 /**
@@ -1085,7 +1088,16 @@ export class EditorController {
    */
   async importFiles(
     files: readonly File[],
-    options: { addToTimeline?: boolean; asSticker?: boolean } = {},
+    options: {
+      addToTimeline?: boolean;
+      asSticker?: boolean;
+      /** Licence / attribution line kept on the asset (library sounds). */
+      credit?: string;
+      /** Display name instead of the file name (library sounds: their title). */
+      name?: string;
+      /** Select the added sound clip (library sounds: its settings show next). */
+      selectSound?: boolean;
+    } = {},
   ): Promise<void> {
     const addToTimeline = options.addToTimeline ?? true;
     for (const file of files) {
@@ -1108,16 +1120,20 @@ export class EditorController {
         const assetId = randomId();
         const source = await this.storage!.putMedia(assetId, file);
         const asset = assetFromProbe(probe.media, assetId, source);
-        let stickerId: string | null = null;
+        if (options.credit) asset.credit = options.credit.slice(0, 500);
+        if (options.name) asset.name = options.name;
+        let selectId: string | null = null;
         this.run(this.labels.addMedia, (d, ctx) => {
           addAsset(d, asset);
           if (!addToTimeline) return;
           if (options.asSticker && asset.kind === 'image') {
             const sticker = stickerItem(ctx.ids(), this.playhead.time, { assetId: asset.id });
             addToLane(d, sticker, ctx.ids);
-            stickerId = sticker.id;
+            selectId = sticker.id;
           } else if (asset.kind === 'audio') {
-            addToLane(d, audioItem(asset, ctx.ids(), this.playhead.time), ctx.ids);
+            const sound = audioItem(asset, ctx.ids(), this.playhead.time);
+            addToLane(d, sound, ctx.ids);
+            if (options.selectSound) selectId = sound.id;
           } else {
             const main = mainTrack(d).items;
             const under = itemIndexAt(main, this.playhead.time);
@@ -1125,7 +1141,7 @@ export class EditorController {
           }
         });
         this.#registerMedia(asset, file);
-        if (stickerId) this.select(stickerId);
+        if (selectId) this.select(selectId);
         this.ui.setState((s) => ({ imports: s.imports.filter((r) => r.id !== rowId) }));
       } catch (error) {
         fail(
@@ -1156,6 +1172,81 @@ export class EditorController {
 
   dismissImport(rowId: string): void {
     this.ui.setState((s) => ({ imports: s.imports.filter((r) => r.id !== rowId) }));
+  }
+
+  // ── sound: ducking, music & sounds library (v0.2 B) ────────────────────
+
+  /** Why "Lower under voice" can't act on the selection now (null: it can). */
+  duckReason(): string | null {
+    const l = this.labels;
+    const items = this.selectedItems();
+    if (items.length === 0)
+      return this.project.tracks.some((t) => t.items.length) ? l.duckNeedsSound : l.needClips;
+    const sounding = items.filter(isSounding);
+    if (sounding.length === 0) return l.duckNeedsSound;
+    if (sounding.some((i) => this.isLocked(i.id))) return l.lockedReason;
+    if (sounding.every((i) => i.muted)) return l.duckMuted;
+    return null;
+  }
+
+  /** Turns "Lower under voice" on (default amount) or off for the selected music, sounds, clips. */
+  toggleDuckSelected(): void {
+    const items = this.selectedItems().filter(isSounding);
+    if (items.length === 0 || this.duckReason()) return;
+    const on = !items.every((i) => i.duck);
+    this.run(this.labels.duck, (d) => {
+      for (const item of items) updateItem(d, item.id, { duck: on ? DEFAULT_DUCK : 0 });
+    });
+    this.#announce(on ? this.labels.duckOn : this.labels.duckOff);
+  }
+
+  /**
+   * Whether anything in the project can be heard for ducked items to lower under: a sounding
+   * item (not `exceptId`, not itself ducked, not muted) whose media has sound.
+   */
+  hasVoiceFor(exceptId: string, project: Project = this.project): boolean {
+    const p = project;
+    return p.tracks.some(
+      (t) =>
+        !t.muted &&
+        t.items.some(
+          (i) =>
+            isSounding(i) &&
+            i.id !== exceptId &&
+            !i.duck &&
+            !i.muted &&
+            i.volume > 0 &&
+            p.assets[i.assetId]?.hasAudio !== false,
+        ),
+    );
+  }
+
+  /**
+   * Adds a sound from the host's library at the playhead (on a sound lane) and selects it. The
+   * file is stored in the project like an import; its licence line goes on the asset.
+   */
+  async addLibrarySound(track: AudioLibraryTrack, signal?: AbortSignal): Promise<boolean> {
+    const library = this.options.audioLibrary;
+    if (!library) return false;
+    try {
+      const blob = await library.load(track, signal ?? new AbortController().signal);
+      if (signal?.aborted) return false;
+      const safe = track.title.replace(/[\\/:*?"<>|]+/g, ' ').trim() || 'Sound';
+      const file = new File([blob], `${safe}.${audioExtension(blob.type)}`, {
+        type: blob.type || 'audio/mpeg',
+      });
+      await this.importFiles([file], {
+        name: track.title.slice(0, 200),
+        ...(track.credit ? { credit: track.credit } : {}),
+        selectSound: true,
+      });
+      return true;
+    } catch (error) {
+      if (signal?.aborted || (error instanceof DOMException && error.name === 'AbortError'))
+        return false;
+      this.toast(this.labels.soundFailed(track.title), 'error');
+      return false;
+    }
   }
 
   // ── export ─────────────────────────────────────────────────────────────

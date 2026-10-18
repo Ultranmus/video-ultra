@@ -10,6 +10,15 @@ export { useController, useUi, useProject, useHistory, useLabels } from './conte
 export { DEFAULT_LABELS } from './labels';
 export type { Labels } from './labels';
 export type { UiState, LayoutMode, PanelId, ToolId } from './state';
+export { createStarterSounds } from './library/starter-sounds';
+export type { StarterSoundLabels } from './library/starter-sounds';
+export type {
+  AudioLibrary,
+  AudioLibraryCategory,
+  AudioLibraryPage,
+  AudioLibraryQuery,
+  AudioLibraryTrack,
+} from './library/audio-library';
 export { themeOverridesToStyle } from './theme';
 export type { ThemeMode, ThemeOverrides } from './theme';
 export { VERSION, detectCapabilities } from '@video-ultra/core';

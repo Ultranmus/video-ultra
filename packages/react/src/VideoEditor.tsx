@@ -11,6 +11,7 @@ import { EditorController } from './controller';
 import { ExportDialog } from './ExportDialog';
 import { Icon } from './icons';
 import { DEFAULT_LABELS, type Labels } from './labels';
+import type { AudioLibrary } from './library/audio-library';
 import {
   Dock,
   HelpSheet,
@@ -54,6 +55,15 @@ export interface VideoEditorProps {
    * stored in the project, so exports never depend on it.
    */
   stickerLibrary?: string | false;
+  /**
+   * A music & sound-effects source for the Audio panel: search, categories, a ▶ preview and the
+   * licence line per sound, and Add (at the playhead). The picked file is stored in the project
+   * like an import (its licence line on the asset as `credit`), so exports never depend on the
+   * source. Without it the Audio panel offers the user's own files and voiceover only — the
+   * editor ships no catalogue. `createStarterSounds()` is a small built-in set of synthesised,
+   * CC0 sound effects. Read once, like `initialProject`.
+   */
+  audioLibrary?: AudioLibrary;
   /** `dark` (default), `light` or `auto` (follow the OS). */
   theme?: ThemeMode;
   /** Typed overrides for the common theme tokens. */
@@ -96,6 +106,7 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
         ...(props.resolveMedia ? { resolveMedia: props.resolveMedia } : {}),
         ...(props.autosave !== undefined ? { autosave: props.autosave } : {}),
         ...(props.stickerLibrary !== undefined ? { stickerLibrary: props.stickerLibrary } : {}),
+        ...(props.audioLibrary ? { audioLibrary: props.audioLibrary } : {}),
       },
       parsed?.project ?? undefined,
     );

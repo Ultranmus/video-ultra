@@ -12,6 +12,7 @@ import { Icon } from './icons';
 import { textItem } from './items';
 import type { PanelId } from './state';
 import { StickersPanel } from './library/StickersPanel';
+import { AudioLibraryPanel } from './library/AudioLibraryPanel';
 import { CategoryBrowser } from './browse';
 import { TEXT_STYLE_CATEGORIES, TEXT_STYLE_PRESETS } from './library/textStyles';
 import { FilterStrip, TransitionGrid } from './looks';
@@ -255,6 +256,7 @@ function AudioPanel() {
   const l = useLabels();
   const assets = useProject((p) => Object.values(p.assets).filter((a) => a.kind === 'audio'));
   const inputRef = useRef<HTMLInputElement>(null);
+  const library = ctl.options.audioLibrary;
   return (
     <div className="vu-panel-body">
       <button
@@ -281,13 +283,15 @@ function AudioPanel() {
       />
       <Voiceover />
       <ImportRows />
+      {assets.length && library ? <h3 className="vu-audiolib-title">{l.yourAudio}</h3> : null}
       {assets.length ? (
-        <ul className="vu-list">
+        <ul className="vu-list" aria-label={l.yourAudio}>
           {assets.map((asset) => (
             <li key={asset.id}>
               <button
                 type="button"
                 className="vu-list-item"
+                data-tooltip={asset.credit ? `${l.addToTimeline} · ${asset.credit}` : undefined}
                 onClick={() => ctl.addAssetToTimeline(asset.id)}
               >
                 <Icon name="audio" size={16} />
@@ -298,6 +302,7 @@ function AudioPanel() {
           ))}
         </ul>
       ) : null}
+      {library ? <AudioLibraryPanel library={library} /> : null}
     </div>
   );
 }

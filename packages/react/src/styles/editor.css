@@ -3820,4 +3820,165 @@
   .vu-tool-body[data-locked] {
     opacity: 0.5;
   }
+
+  /* ── v0.2 B. Sound ── */
+
+  /* Lower under voice: a switch row, then the amount when on. */
+  .vu-duck {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-2);
+  }
+
+  .vu-duck-switch {
+    padding: 0 var(--vu-space-1);
+    border-radius: var(--vu-radius-md);
+    color: var(--vu-text);
+  }
+
+  /* Hover fills only where there is a pointer (a tap would leave them stuck on touch screens). */
+  @media (hover: hover) {
+    .vu-duck-switch:hover,
+    .vu-audiolib-row:hover {
+      background: var(--vu-surface-2);
+    }
+
+    .vu-audiolib-play:hover {
+      background: var(--vu-border-strong);
+    }
+
+    .vu-audiolib-add:hover {
+      background: var(--vu-surface-3);
+    }
+  }
+
+  .vu-duck-switch[aria-disabled='true'] {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .vu-duck-label {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vu-space-2);
+  }
+
+  .vu-duck-label > .vu-icon {
+    color: var(--vu-text-muted);
+  }
+
+  .vu-duck-hint {
+    padding: var(--vu-space-2) var(--vu-space-3);
+    border-radius: var(--vu-radius-md);
+    background: var(--vu-surface-2);
+  }
+
+  /* Music & sounds library (host-provided) in the Audio panel. */
+  .vu-audiolib {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-3);
+    padding-top: var(--vu-space-2);
+    border-top: 1px solid var(--vu-border);
+  }
+
+  .vu-audiolib-title {
+    color: var(--vu-text-muted);
+    font-size: var(--vu-text-sm);
+    font-weight: var(--vu-weight-medium);
+  }
+
+  .vu-audiolib-status {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--vu-space-2);
+    padding: var(--vu-space-3);
+    border-radius: var(--vu-radius-md);
+    background: var(--vu-surface-2);
+    color: var(--vu-text-muted);
+    font-size: var(--vu-text-sm);
+  }
+
+  .vu-audiolib-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-1);
+    padding: 0;
+    list-style: none;
+  }
+
+  .vu-audiolib-row {
+    display: flex;
+    align-items: center;
+    gap: var(--vu-space-2);
+    min-height: var(--vu-size-audiolib-row);
+    padding: var(--vu-space-1) var(--vu-space-2) var(--vu-space-1) var(--vu-space-1);
+    border-radius: var(--vu-radius-md);
+    transition: background-color var(--vu-duration-fast) var(--vu-ease);
+  }
+
+  .vu-audiolib-row[data-playing] {
+    background: var(--vu-surface-2);
+  }
+
+  .vu-audiolib-play {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: var(--vu-size-audiolib-play);
+    height: var(--vu-size-audiolib-play);
+    border-radius: var(--vu-radius-full);
+    background: var(--vu-surface-3);
+    color: var(--vu-text);
+    transition: background-color var(--vu-duration-fast) var(--vu-ease);
+  }
+
+  .vu-audiolib-play[aria-pressed='true'] {
+    background: var(--vu-accent);
+    color: var(--vu-accent-contrast);
+  }
+
+  .vu-audiolib-text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .vu-audiolib-name,
+  .vu-audiolib-meta {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .vu-audiolib-meta {
+    color: var(--vu-text-muted);
+    font-size: var(--vu-text-xs);
+  }
+
+  .vu-audiolib-add {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: var(--vu-space-1);
+    height: var(--vu-size-choice);
+    padding: 0 var(--vu-space-3) 0 var(--vu-space-2);
+    border: 1px solid var(--vu-border-strong);
+    border-radius: var(--vu-radius-full);
+    color: var(--vu-text);
+    font-size: var(--vu-text-sm);
+    font-weight: var(--vu-weight-medium);
+    transition: background-color var(--vu-duration-fast) var(--vu-ease);
+  }
+
+  .vu-audiolib-add[aria-disabled='true'] {
+    opacity: 0.5;
+  }
+
+  .vu-audiolib-notice {
+    color: var(--vu-text-muted);
+    font-size: var(--vu-text-xs);
+  }
 }

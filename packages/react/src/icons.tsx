@@ -88,6 +88,8 @@ const paths = {
   distributeV: 'M3 4h18M3 20h18M7 9.5h10v5H7z',
   select: 'M5 4l13 6.5-5.5 1.5L10.5 18z',
   grip: 'M9 6.5v.01M15 6.5v.01M9 12v.01M15 12v.01M9 17.5v.01M15 17.5v.01',
+  // v0.2 B. Sound: a speaker that dips (ducking)
+  duck: 'M3.5 9.5H7L11 5.5v13l-4-4H3.5zM18 5v10M14.5 11.5L18 15l3.5-3.5',
 } as const;
 
 /** Name of an editor icon. */

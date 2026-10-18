@@ -196,6 +196,9 @@
     --vu-size-export-option: 96px;
     --vu-size-export-go: 48px;
     --vu-size-export-check: 64px;
+    /* v0.2 B. Sound */
+    --vu-size-audiolib-play: 36px;
+    --vu-size-audiolib-row: 52px;
     --vu-text-emoji: 24px;
 
     /* Layers */
