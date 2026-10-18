@@ -1,0 +1,58 @@
+import { describe, expect, it } from 'vitest';
+import { keepWords, ownedSpan, windowsOf } from './windows';
+
+async function* pieces(total: number, size: number, rate: number) {
+  let left = total;
+  let t = 0;
+  while (left > 0) {
+    const n = Math.min(size, left);
+    const p = new Float32Array(n);
+    for (let i = 0; i < n; i++) p[i] = (t + i) / rate; // value = time in s
+    t += n;
+    left -= n;
+    yield p;
+  }
+}
+
+describe('windows', () => {
+  it('cuts long sound into 30 s windows overlapping by 2 s, any piece size', async () => {
+    const rate = 100;
+    const out = [];
+    for await (const w of windowsOf(pieces(65 * rate, 7 * rate, rate), rate)) out.push(w);
+    expect(out.map((w) => [w.index, w.audio.length, w.isLast])).toEqual([
+      [0, 3000, false],
+      [1, 3000, false],
+      [2, 900, true],
+    ]);
+    // Window 1 starts at 28 s, window 2 at 56 s.
+    expect(out[1]!.audio[0]).toBeCloseTo(28);
+    expect(out[2]!.audio[0]).toBeCloseTo(56);
+    expect(out[2]!.audio.at(-1)).toBeCloseTo(64.99);
+  });
+
+  it('short sound is one window; an exact 30 s too', async () => {
+    const rate = 100;
+    const one = [];
+    for await (const w of windowsOf(pieces(12 * rate, 30 * rate, rate), rate)) one.push(w);
+    expect(one.map((w) => [w.index, w.audio.length, w.isLast])).toEqual([[0, 1200, true]]);
+    const exact = [];
+    for await (const w of windowsOf(pieces(30 * rate, 30 * rate, rate), rate)) exact.push(w);
+    expect(exact.map((w) => [w.index, w.audio.length, w.isLast])).toEqual([[0, 3000, true]]);
+  });
+
+  it('keeps each word once, from the window that owns it', () => {
+    expect(ownedSpan(0, false)).toEqual({ from: 0, to: 29 });
+    expect(ownedSpan(1, true)).toEqual({ from: 29, to: Infinity });
+    // A word at 28.5 s (both windows hear it): window 0 keeps it, window 1 drops it.
+    const w0 = keepWords([{ text: ' cup', start: 28.4, end: 28.7 }], 0, false);
+    const w1 = keepWords([{ text: 'cup', start: 0.4, end: 0.7 }], 1, true);
+    expect(w0).toEqual([{ text: 'cup', start: 28.4, end: 28.7 }]);
+    expect(w1).toEqual([]);
+    // Words "heard" past a short window's real sound are dropped; ends are clamped to it.
+    expect(keepWords([{ text: 'ghost', start: 5, end: 6 }], 2, true, 2.4)).toEqual([]);
+    expect(keepWords([{ text: 'end', start: 2, end: 9 }], 2, true, 2.4)[0]!.end).toBeCloseTo(58.4);
+    // Empty and broken entries are tidied.
+    expect(keepWords([{ text: '  ', start: 1, end: 2 }], 0, true)).toEqual([]);
+    expect(keepWords([{ text: 'x', start: 3, end: 2 }], 0, true)[0]!.end).toBeCloseTo(3.01);
+  });
+});

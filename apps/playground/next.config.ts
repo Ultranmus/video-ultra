@@ -14,6 +14,19 @@ const config: NextConfig = {
   // Agent instructions live in the repo-root CLAUDE.md + docs/internal.
   agentRules: false,
   allowedDevOrigins: [...lanAddresses, '*.local', '*.trycloudflare.com'],
+  // Captions lab with ?isolated: cross-origin isolation, only so the memory breakdown API
+  // (measureUserAgentSpecificMemory) works there. The editor itself never needs it (CLAUDE.md).
+  async headers() {
+    return [
+      {
+        source: '/lab/captions-isolated',
+        headers: [
+          { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+          { key: 'Cross-Origin-Embedder-Policy', value: 'require-corp' },
+        ],
+      },
+    ];
+  },
 };
 
 export default config;

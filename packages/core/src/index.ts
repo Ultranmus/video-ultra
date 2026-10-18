@@ -85,4 +85,14 @@ export type {
 } from './engine/export-plan';
 
 /** The package version. */
+// Captions: the transcriber interface (audio in, timed words out)
+export { TRANSCRIBE_SAMPLE_RATE } from './captions/transcriber';
+export type {
+  Transcriber,
+  TranscribeRequest,
+  TranscribeResult,
+  TranscribeProgress,
+  TranscriptWord,
+} from './captions/transcriber';
+
 export const VERSION = '0.0.0';

@@ -1,0 +1,58 @@
+{
+  "name": "@video-ultra/captions",
+  "version": "0.0.0",
+  "description": "Optional on-device auto-captions for video-ultra: speech to timed words in a worker, nothing uploaded.",
+  "license": "MIT",
+  "author": "Ultranmus",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ultranmus/video-ultra.git",
+    "directory": "packages/captions"
+  },
+  "bugs": {
+    "url": "https://github.com/Ultranmus/video-ultra/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "video-editor",
+    "captions",
+    "subtitles",
+    "speech-to-text",
+    "whisper",
+    "webgpu"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "peerDependencies": {
+    "@video-ultra/core": "workspace:*"
+  },
+  "dependencies": {
+    "onnxruntime-web": "^1.30.0"
+  },
+  "devDependencies": {
+    "@video-ultra/core": "workspace:*",
+    "@webgpu/types": "^0.1.74",
+    "tsup": "^8.5.1",
+    "typescript": "6.0.3",
+    "vitest": "^5.0.5"
+  }
+}
