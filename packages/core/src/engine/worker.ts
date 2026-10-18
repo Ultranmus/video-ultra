@@ -942,6 +942,34 @@ async function transitionPreview(
   return { data: { type: 'transition-preview', bitmaps }, transfer: bitmaps };
 }
 
+// ── listening (captions) ──────────────────────────────────────────────────
+
+/** Sound being handed to a transcriber, one piece at a time (pulled: flat memory). */
+const listening = new Map<number, { mixer: Mixer; project: Project; right: Float32Array }>();
+
+async function listen(
+  request: Extract<EngineRequest, { type: 'listen' }>,
+): Promise<{ data: EngineResponseData; transfer: Transferable[] }> {
+  let session = listening.get(request.session);
+  if (!session) {
+    if (!request.project) throw new Error('Listening session has ended');
+    await mediaReady(request.project);
+    session = {
+      mixer: new Mixer(request.sampleRate, (assetId) => audioTracks.get(assetId) ?? null),
+      project: request.project,
+      right: new Float32Array(0),
+    };
+    listening.set(request.session, session);
+  }
+  const frames = Math.max(0, Math.floor(request.frames));
+  const left = new Float32Array(frames);
+  if (session.right.length < frames) session.right = new Float32Array(frames);
+  const right = session.right.subarray(0, frames);
+  await session.mixer.render(session.project, request.start, frames, left, right);
+  for (let i = 0; i < frames; i++) left[i] = (left[i]! + right[i]!) * 0.5;
+  return { data: { type: 'listen', pcm: left }, transfer: [left.buffer] };
+}
+
 // ── messages ─────────────────────────────────────────────────────────────
 
 async function handle(
@@ -1072,6 +1100,13 @@ async function handle(
       return capture(request);
     case 'export-audio':
       return startAudioExport(request);
+    case 'listen':
+      return listen(request);
+    case 'listen-end': {
+      listening.get(request.session)?.mixer.dispose();
+      listening.delete(request.session);
+      return { type: 'ok' };
+    }
     case 'capture-image':
       return captureImage(request);
     case 'filter-previews':

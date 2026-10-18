@@ -1,5 +1,16 @@
 import type { Input, InputVideoTrack, VideoSample } from 'mediabunny';
-import { animationState, restingState, type AnimationState } from '../effects/animations';
+import {
+  animationState,
+  resetState,
+  restingState,
+  type AnimationState,
+} from '../effects/animations';
+import {
+  captionWordTimes,
+  charsWithSpaces,
+  speechAt,
+  type SpeechPosition,
+} from '../captions/timing';
 import {
   BLEND_IDS,
   colourParams,
@@ -29,7 +40,16 @@ import {
   type TransitionOptions,
 } from '../effects/transitions';
 import { NO_CROP } from '../model/project';
-import type { Adjust, Item, ItemAnimation, Project, TextStyle, Transform } from '../model/schema';
+import type {
+  Adjust,
+  CaptionWord,
+  Item,
+  ItemAnimation,
+  Project,
+  TextItem,
+  TextStyle,
+  Transform,
+} from '../model/schema';
 import { FLICKS_PER_SECOND, frameIndex, type Time } from '../model/time';
 import {
   fullCanvasGeometry,
@@ -49,6 +69,7 @@ import {
   revealCuts,
   textFontPx,
   type RevealCuts,
+  type TextHighlight,
   type TextRevealLayout,
 } from './text';
 import { activeLayers, type ActiveLayer } from './timeline';
@@ -150,6 +171,33 @@ type Draft =
     };
 
 export class Composer {
+  /** Captions: word times per caption (items are immutable, so per object), reused objects. */
+  private readonly wordTimes = new WeakMap<TextItem, CaptionWord[]>();
+  private readonly graphemeCache = new WeakMap<TextItem, string[]>();
+  private readonly speech: SpeechPosition = { word: -1, progress: 0, chars: 0, totalChars: 0 };
+  private readonly highlight: TextHighlight = { mode: 'word', color: '', word: 0, chars: 0 };
+
+  private captionTimes(item: TextItem): CaptionWord[] {
+    let t = this.wordTimes.get(item);
+    if (!t) this.wordTimes.set(item, (t = captionWordTimes(item)));
+    return t;
+  }
+
+  private captionGraphemes(item: TextItem): string[] {
+    let g = this.graphemeCache.get(item);
+    if (!g) {
+      const Seg = (Intl as { Segmenter?: typeof Intl.Segmenter }).Segmenter;
+      g = Seg
+        ? Array.from(
+            new Seg(undefined, { granularity: 'grapheme' }).segment(item.text),
+            (x) => x.segment,
+          )
+        : Array.from(item.text);
+      this.graphemeCache.set(item, g);
+    }
+    return g;
+  }
+
   /** One frame source per timeline item (each needs its own decode position). */
   readonly sources = new Map<string, FrameSource>();
   /** Last frame drawn per item (reused when the next one isn't decoded in time). */
@@ -623,9 +671,40 @@ export class Composer {
       : null;
     // Animations play on lane items only (main-track clips have transitions instead).
     const animation = layer.track.kind !== 'main' ? itemAnimation(item) : undefined;
-    const anim = animation
+    let anim = animation
       ? animationState(animation, layer.localTime, item.duration, item.kind === 'text', slot.anim)
       : null;
+    // Captions follow the speech (v0.2 A6): words appear (reveal / type) through the text reveal
+    // mask, or the raster marks the word being said (word / box / fill).
+    let highlight: TextHighlight | null = null;
+    const captionLook = layer.track.kind === 'caption' ? layer.track.caption : undefined;
+    if (item.kind === 'text' && captionLook && captionLook.highlight !== 'none') {
+      const speech = speechAt(this.captionTimes(item), layer.localTime, this.speech);
+      const mode = captionLook.highlight;
+      if (mode === 'reveal' || mode === 'type') {
+        anim ??= resetState(slot.anim);
+        if (mode === 'reveal') {
+          const words = this.captionTimes(item).length || 1;
+          anim.revealBy = 'word';
+          anim.reveal = speech.word < 0 ? 0 : (speech.word + speech.progress) / words;
+        } else {
+          const g = this.captionGraphemes(item);
+          anim.revealBy = 'char';
+          anim.reveal = g.length ? charsWithSpaces(g, speech.chars) / g.length : 1;
+        }
+      } else if (speech.word >= 0) {
+        // Fill: half-letter steps (smooth enough, few re-rasters).
+        const chars =
+          mode === 'fill'
+            ? Math.round(charsWithSpaces(this.captionGraphemes(item), speech.chars) * 2) / 2
+            : 0;
+        highlight = this.highlight;
+        highlight.mode = mode;
+        highlight.color = captionLook.highlightColor;
+        highlight.word = speech.word;
+        highlight.chars = chars;
+      }
+    }
     const hidden = (look !== null && !look.visible) || (anim !== null && anim.opacity <= 0);
     const opacity = (look?.opacity ?? 1) * (anim?.opacity ?? 1);
     const finish = () => {
@@ -674,9 +753,12 @@ export class Composer {
         const rasterPx = rasterSize(fontPx, this.exact);
         const k = fontPx / rasterPx;
         const withLayout = anim?.revealBy != null;
-        const key = `${rasterPx}|${height}|${withLayout ? 'L' : ''}|${item.text}|${styleKey(item.style)}`;
+        const marked = highlight
+          ? `|${highlight.mode}:${highlight.mode === 'fill' ? highlight.chars : highlight.word}:${highlight.color}`
+          : '';
+        const key = `${rasterPx}|${height}|${withLayout ? 'L' : ''}|${item.text}|${styleKey(item.style)}${marked}`;
         const canvas = this.rasters.get(item.id, key, () => {
-          const raster = rasterizeText(item, rasterPx, height, k, withLayout);
+          const raster = rasterizeText(item, rasterPx, height, k, withLayout, highlight);
           if (raster.layout) this.textLayouts.set(raster.canvas, raster.layout);
           return raster.canvas;
         });

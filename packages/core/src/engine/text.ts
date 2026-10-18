@@ -244,12 +244,24 @@ const MAX_RASTER = 4096;
  * output canvas height (for the shadow's units); `displayScale` = shown px / raster px.
  * Straight alpha comes from the GPU upload (canvas sources un-premultiply), DECISIONS #39.
  */
+/**
+ * Caption word highlight drawn into the raster (v0.2 A6): `word` recolours word `word`, `box`
+ * puts a box behind it, `fill` recolours the first `chars` characters (spaces included).
+ */
+export interface TextHighlight {
+  mode: 'word' | 'box' | 'fill';
+  color: string;
+  word: number;
+  chars: number;
+}
+
 export function rasterizeText(
   item: TextItem,
   fontPx: number,
   canvasH: number,
   displayScale: number,
   withLayout = false,
+  highlight: TextHighlight | null = null,
 ): TextRaster {
   const style = item.style;
   const probe = new OffscreenCanvas(1, 1).getContext('2d')!;
@@ -288,6 +300,25 @@ export function rasterizeText(
   }
 
   const contentW = block.width - 2 * block.padding;
+  const rtl = RTL.test(item.text);
+  // Where each word and character sits (for the highlight; also returned as the layout).
+  const spacing = style.letterSpacing * fontPx;
+  const layoutOf = () =>
+    measureReveal(
+      block.lines,
+      block.lines.map((_, i) => lineLeft(i)),
+      block.widths,
+      textFont(style, fontPx),
+      spacing,
+      measure,
+      {
+        width: w,
+        height: h,
+        top: margin + block.padding,
+        lineHeight: block.lineHeightPx,
+        rtl,
+      },
+    );
   const lineLeft = (i: number) => {
     const free = contentW - block.widths[i]!;
     return (
@@ -324,6 +355,49 @@ export function rasterizeText(
     }
   };
 
+  const layout = withLayout || (highlight && !rtl) ? layoutOf() : null;
+  // Which line and x-range (px) the highlight covers on each line: [from, to] or null.
+  const ranges: ([number, number] | null)[] = block.lines.map(() => null);
+  if (highlight && layout) {
+    let wordsBefore = 0;
+    let charsBefore = 0;
+    layout.lines.forEach((ln, i) => {
+      const n = ln.wordStart.length;
+      const c = ln.charStart.length;
+      if (highlight.mode === 'fill') {
+        const k = highlight.chars - charsBefore;
+        if (k >= c) ranges[i] = [ln.left, ln.right];
+        else if (k > 0) {
+          const whole = Math.floor(k);
+          const x0 = whole > 0 ? ln.charEnd[whole - 1]! : 0;
+          const x1 = whole < c ? ln.charEnd[whole]! : x0;
+          ranges[i] = [ln.left, ln.left + x0 + (x1 - x0) * (k - whole)];
+        }
+      } else {
+        const k = highlight.word - wordsBefore;
+        if (k >= 0 && k < n) ranges[i] = [ln.left + ln.wordStart[k]!, ln.left + ln.wordEnd[k]!];
+      }
+      wordsBefore += n;
+      charsBefore += c;
+    });
+  }
+  if (highlight?.mode === 'box') {
+    ctx.fillStyle = highlight.color;
+    ranges.forEach((r, i) => {
+      if (!r) return;
+      const pad = fontPx * 0.14;
+      const top =
+        margin + block.padding + i * block.lineHeightPx + (block.lineHeightPx - fontPx) / 2;
+      ctx.beginPath();
+      const bw = r[1] - r[0] + 2 * pad;
+      const bh = fontPx + 2 * pad * 0.6;
+      if (typeof ctx.roundRect === 'function')
+        ctx.roundRect(r[0] - pad, top - pad * 0.6, bw, bh, fontPx * 0.18);
+      else ctx.rect(r[0] - pad, top - pad * 0.6, bw, bh);
+      ctx.fill();
+    });
+  }
+
   block.lines.forEach((line, i) => {
     const x = lineLeft(i);
     const y = margin + block.padding + (i + 0.5) * block.lineHeightPx;
@@ -341,25 +415,20 @@ export function rasterizeText(
     ctx.fillStyle = style.color;
     drawLine(line, x, y, false);
     setShadow(false);
+    // Word / fill highlight: the same glyphs again in the highlight colour, clipped to its range.
+    const r = ranges[i];
+    if (r && highlight && highlight.mode !== 'box') {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(r[0], y - block.lineHeightPx, r[1] - r[0], block.lineHeightPx * 2);
+      ctx.clip();
+      ctx.fillStyle = highlight.color;
+      drawLine(line, x, y, false);
+      ctx.restore();
+    }
   });
   const raster: TextRaster = { canvas, margin, boxWidth: block.width, boxHeight: block.height };
-  if (withLayout) {
-    raster.layout = measureReveal(
-      block.lines,
-      block.lines.map((_, i) => lineLeft(i)),
-      block.widths,
-      textFont(style, fontPx),
-      spacingPx,
-      measure,
-      {
-        width: w,
-        height: h,
-        top: margin + block.padding,
-        lineHeight: block.lineHeightPx,
-        rtl: RTL.test(item.text),
-      },
-    );
-  }
+  if (withLayout) raster.layout = layout ?? layoutOf();
   return raster;
 }
 

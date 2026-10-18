@@ -92,6 +92,19 @@ export type EngineRequest =
   | { type: 'export-audio'; jobId: number; options: AudioExportOptions }
   /** One frame as a PNG / JPEG file, drawn like the export. */
   | { type: 'capture-image'; time: number; options: FrameImageOptions }
+  /**
+   * Captions (v0.2 A4): the next piece of a project's sound, mixed to mono at `sampleRate`.
+   * `project` comes with the first piece of a session; `end` frees the session's mixer.
+   */
+  | {
+      type: 'listen';
+      session: number;
+      project?: Project;
+      sampleRate: number;
+      start: number;
+      frames: number;
+    }
+  | { type: 'listen-end'; session: number }
   | {
       type: 'capture';
       time: number;
@@ -152,6 +165,7 @@ export type EngineResponseData =
       stats: { audioMs: number; audioDelaySamples: number };
     }
   | { type: 'capture-image'; image: FrameImage }
+  | { type: 'listen'; pcm: Float32Array }
   | { type: 'filter-previews'; bitmaps: ImageBitmap[] }
   | { type: 'transition-preview'; bitmaps: ImageBitmap[] }
   | { type: 'item-preview'; bitmaps: ImageBitmap[] }

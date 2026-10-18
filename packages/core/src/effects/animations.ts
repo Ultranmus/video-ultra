@@ -46,7 +46,8 @@ export function restingState(): AnimationState {
   return resetState({ fx: noFx() } as AnimationState);
 }
 
-function resetState(s: AnimationState): AnimationState {
+/** Resets a state to nothing animated, in place (no allocation). */
+export function resetState(s: AnimationState): AnimationState {
   s.dx = 0;
   s.dy = 0;
   s.scale = 1;

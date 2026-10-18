@@ -41,7 +41,11 @@ export interface SpeechPosition {
   totalChars: number;
 }
 
-export function speechAt(times: readonly CaptionWord[], local: Time): SpeechPosition {
+export function speechAt(
+  times: readonly CaptionWord[],
+  local: Time,
+  out: SpeechPosition = { word: -1, progress: 0, chars: 0, totalChars: 0 },
+): SpeechPosition {
   let word = -1;
   let progress = 0;
   let chars = 0;
@@ -60,5 +64,23 @@ export function speechAt(times: readonly CaptionWord[], local: Time): SpeechPosi
       break;
     }
   }
-  return { word, progress, chars, totalChars };
+  out.word = word;
+  out.progress = progress;
+  out.chars = chars;
+  out.totalChars = totalChars;
+  return out;
+}
+
+/**
+ * How many characters of `text` (spaces included, as the screen lays them out) cover `chars`
+ * spoken letters — for letter-by-letter highlights.
+ */
+export function charsWithSpaces(graphemes: readonly string[], chars: number): number {
+  let letters = 0;
+  for (let i = 0; i < graphemes.length; i++) {
+    if (/^\s+$/.test(graphemes[i]!)) continue;
+    if (letters + 1 > chars) return i + (chars - letters);
+    letters++;
+  }
+  return graphemes.length;
 }

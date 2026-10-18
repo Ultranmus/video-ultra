@@ -1,7 +1,7 @@
 import type { DeviceTier } from '../capabilities';
 import type { BackendChoice } from '../lab/protocol';
 import type { ItemAnimation, Project, Transition } from '../model/schema';
-import type { Time } from '../model/time';
+import { FLICKS_PER_SECOND, type Time } from '../model/time';
 import type { RenderBackend } from '../render/types';
 import type {
   AudioExportOptions,
@@ -20,6 +20,9 @@ import type {
   EngineResponseData,
   EngineStats,
 } from './protocol';
+
+/** Listening sessions (captions), numbered per page. */
+let listenSessions = 0;
 
 /** Drives the engine worker from the main thread. The UI never touches video frames. */
 export interface Engine {
@@ -55,6 +58,19 @@ export interface Engine {
     onProgress?: (progress: ExportProgress) => void,
     signal?: AbortSignal,
   ): Promise<AudioExportResult>;
+  /**
+   * A project's sound (`from`…`to`) as mono PCM at `sampleRate`, in pieces of `pieceSeconds`,
+   * mixed by the same mixer as export. Pulled one piece at a time, so memory stays flat. Used to
+   * hand speech to a transcriber (pass a project without the music to help it).
+   */
+  listen(
+    project: Project,
+    from: Time,
+    to: Time,
+    sampleRate: number,
+    signal: AbortSignal,
+    pieceSeconds?: number,
+  ): AsyncIterable<Float32Array>;
   /**
    * One frame at `time` saved as a PNG or JPEG file, at the project's own size by default, drawn
    * by the same compositor path as the export (so it matches the exported video).
@@ -404,6 +420,35 @@ export async function createEngine(
           return data.result;
         },
       );
+    },
+    async *listen(
+      listenProject: Project,
+      from: Time,
+      to: Time,
+      sampleRate: number,
+      signal: AbortSignal,
+      pieceSeconds = 10,
+    ) {
+      const session = ++listenSessions;
+      const step = Math.max(1, Math.round(pieceSeconds * sampleRate));
+      const total = Math.max(0, Math.round(((to - from) / FLICKS_PER_SECOND) * sampleRate));
+      try {
+        for (let done = 0; done < total; done += step) {
+          if (signal.aborted) throw new DOMException('Cancelled', 'AbortError');
+          const data = await send({
+            type: 'listen',
+            session,
+            ...(done === 0 ? { project: listenProject } : {}),
+            sampleRate,
+            start: from + Math.round((done / sampleRate) * FLICKS_PER_SECOND),
+            frames: Math.min(step, total - done),
+          });
+          if (data.type !== 'listen') throw new Error('Unexpected engine response');
+          yield data.pcm;
+        }
+      } finally {
+        void send({ type: 'listen-end', session }).catch(() => {});
+      }
     },
     async captureImage(time: Time, options: FrameImageOptions) {
       const data = await send({ type: 'capture-image', time, options: { ...options } });
