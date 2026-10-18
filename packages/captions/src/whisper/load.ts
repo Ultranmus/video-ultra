@@ -16,44 +16,98 @@ export interface ModelFiles {
 
 const CACHE = 'video-ultra-captions-v1';
 
-/** Fetches a file, from the cache when it's there; reports bytes as they arrive. */
-async function fetchCached(
+/**
+ * Makes sure a file is downloaded. Memory: the download streams straight into the cache
+ * (nothing held while it arrives), so a file later costs its size once when read — not three
+ * times (chunks + joined copy + cache copy), which ran a phone out of memory on the ~300 MB
+ * model (DECISIONS #132). Returns the bytes only when they couldn't be cached (then they're
+ * already in memory); `null` means "read it from the cache".
+ */
+async function download(
   url: string,
   onBytes: (loaded: number, total: number) => void,
-): Promise<ArrayBuffer> {
-  const cache = typeof caches !== 'undefined' ? await caches.open(CACHE).catch(() => null) : null;
-  const hit = await cache?.match(url);
-  if (hit) {
-    const buffer = await hit.arrayBuffer();
-    onBytes(buffer.byteLength, buffer.byteLength);
-    return buffer;
+): Promise<ArrayBuffer | null> {
+  const cache = await openCache();
+  if (cache) {
+    const size = await cachedSize(cache, url);
+    if (size !== null) {
+      onBytes(size, size);
+      return null;
+    }
   }
   const response = await fetch(url);
   if (!response.ok)
     throw new Error(`Couldn't download ${url.split('/').pop()} (${response.status})`);
   const total = Number(response.headers.get('content-length')) || 0;
-  const reader = response.body!.getReader();
-  const parts: Uint8Array[] = [];
   let loaded = 0;
+  const counted = response.body!.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        loaded += chunk.length;
+        onBytes(loaded, total || loaded);
+        controller.enqueue(chunk);
+      },
+    }),
+  );
+  if (!cache) return readAll(counted, total);
+  try {
+    await cache.put(
+      url,
+      new Response(counted, {
+        headers: { 'content-type': 'application/octet-stream', 'x-vu-size': String(total) },
+      }),
+    );
+    return null;
+  } catch {
+    // Full disk (or no streaming put): download again, into memory this time.
+    const again = await fetch(url);
+    if (!again.ok) throw new Error(`Couldn't download ${url.split('/').pop()} (${again.status})`);
+    return readAll(again.body!, total);
+  }
+}
+
+function openCache(): Promise<Cache | null> {
+  return typeof caches !== 'undefined'
+    ? caches.open(CACHE).catch(() => null)
+    : Promise.resolve(null);
+}
+
+/**
+ * Size of a cached file, or null when it isn't cached. `cache.put` stores a file only once its
+ * whole body arrived, so a cached file is always complete.
+ */
+async function cachedSize(cache: Cache, url: string): Promise<number | null> {
+  const file = await cache.match(url).catch(() => undefined);
+  if (!file) return null;
+  void file.body?.cancel();
+  return Number(file.headers.get('x-vu-size') ?? file.headers.get('content-length')) || 1;
+}
+
+/** Reads a cached file (one copy in memory). */
+async function readCached(url: string): Promise<ArrayBuffer> {
+  const hit = await (await openCache())?.match(url).catch(() => undefined);
+  if (!hit) throw new Error(`The speech model file ${url.split('/').pop()} went missing`);
+  return hit.arrayBuffer();
+}
+
+/** Reads a stream into one buffer, sized up front when the length is known (one copy). */
+async function readAll(body: ReadableStream<Uint8Array>, total: number): Promise<ArrayBuffer> {
+  const reader = body.getReader();
+  let bytes = new Uint8Array(total || 1 << 20);
+  let at = 0;
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
-    parts.push(value);
-    loaded += value.length;
-    onBytes(loaded, total || loaded);
+    if (at + value.length > bytes.length) {
+      // Unknown or wrong length: grow by half (rare — the model host sends a length).
+      const grown = new Uint8Array(Math.max(at + value.length, Math.ceil(bytes.length * 1.5)));
+      grown.set(bytes.subarray(0, at));
+      bytes = grown;
+    }
+    bytes.set(value, at);
+    at += value.length;
   }
-  const bytes = new Uint8Array(loaded);
-  let at = 0;
-  for (const p of parts) {
-    bytes.set(p, at);
-    at += p.length;
-  }
-  parts.length = 0;
-  // Keep it for next time (best effort: a full disk just means downloading again).
-  await cache
-    ?.put(url, new Response(bytes, { headers: { 'content-type': 'application/octet-stream' } }))
-    .catch(() => {});
-  return bytes.buffer;
+  return at === bytes.length ? bytes.buffer : bytes.slice(0, at).buffer;
 }
 
 export async function loadWhisper(
@@ -61,6 +115,7 @@ export async function loadWhisper(
   files: ModelFiles,
   executionProvider: 'webgpu' | 'wasm',
   onProgress: (loaded: number, total: number) => void,
+  onBuilding: () => void,
   sessionOptions: Ort.InferenceSession.SessionOptions = {},
 ): Promise<WhisperRunner> {
   const names = [
@@ -80,12 +135,16 @@ export async function loadWhisper(
     }
     onProgress(loaded, total);
   };
-  const get = (name: string) =>
-    fetchCached(files.base + name, (l, t) => {
+  /** Downloads a file; its bytes when they're in memory already, else null (in the cache). */
+  const fetchFile = (name: string) =>
+    download(files.base + name, (l, t) => {
       progress.set(name, [l, t]);
       report();
     });
-  const json = async (name: string) => JSON.parse(new TextDecoder().decode(await get(name)));
+  const read = async (name: string, held: ArrayBuffer | null) =>
+    held ?? readCached(files.base + name);
+  const json = async (name: string) =>
+    JSON.parse(new TextDecoder().decode(await read(name, await fetchFile(name))));
   const [config, generation, tokenizerJson] = await Promise.all(names.slice(0, 3).map(json));
   const tokenizer = new WhisperTokenizer(tokenizerJson);
   const options: Ort.InferenceSession.SessionOptions = {
@@ -93,9 +152,24 @@ export async function loadWhisper(
     graphOptimizationLevel: 'all',
     ...sessionOptions,
   };
-  // One model at a time: each file's bytes are dropped as soon as its session holds them.
-  const encoder = await ort.InferenceSession.create(new Uint8Array(await get(names[3]!)), options);
-  const decoder = await ort.InferenceSession.create(new Uint8Array(await get(names[4]!)), options);
+  // Download both first (into the cache, not memory), then build one model at a time: each
+  // file's bytes are read back just before its session takes them and dropped right after.
+  // Without a cache the bytes come back in memory: then one file at a time, as before.
+  const cacheable = (await openCache()) !== null;
+  const held: (ArrayBuffer | null)[] = cacheable
+    ? await Promise.all([fetchFile(names[3]!), fetchFile(names[4]!)])
+    : [await fetchFile(names[3]!), null];
+  onBuilding();
+  // The bytes are only referenced inside `build`, so each copy can go as soon as its session has it.
+  const build = async (name: string, bytes: ArrayBuffer | null) =>
+    ort.InferenceSession.create(new Uint8Array(await read(name, bytes)), options);
+  const encoder = await build(names[3]!, held[0] ?? null);
+  held[0] = null;
+  const decoder = await build(
+    names[4]!,
+    cacheable ? (held[1] ?? null) : await fetchFile(names[4]!),
+  );
+  held[1] = null;
   const cfg: WhisperConfig = {
     decoderLayers: config.decoder_layers,
     decoderHeads: config.decoder_attention_heads,

@@ -21,6 +21,8 @@ export type ToWorker =
 
 export type FromWorker =
   | { type: 'download'; loaded: number; total: number }
+  /** Downloaded; the model is being built in memory (the step most likely to run out of it). */
+  | { type: 'building' }
   | { type: 'ready'; device: 'webgpu' | 'wasm' }
   | {
       type: 'words';
