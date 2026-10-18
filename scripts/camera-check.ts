@@ -111,7 +111,8 @@ if (shots) await page.screenshot({ path: `${shots}/camera-live.png` });
 const heap0 = await page.evaluate(() => (performance as any).memory?.usedJSHeapSize ?? 0);
 const shown = await record(page, seconds);
 const heap1 = await page.evaluate(() => (performance as any).memory?.usedJSHeapSize ?? 0);
-check(/^0:0\d$/.test(shown), `recording clock shows ${shown}`);
+const [m, ss] = shown.split(':').map(Number);
+check(Math.abs(m! * 60 + ss! - seconds) <= 1, `recording clock shows ${shown} after ${seconds} s`);
 check(
   (await liveTracks(page)).length === 0,
   `camera and microphone released while reviewing (${(await liveTracks(page)).join(', ') || 'none live'})`,

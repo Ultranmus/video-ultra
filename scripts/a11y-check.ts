@@ -14,7 +14,10 @@ const arg = (name: string) =>
 const port = arg('port') ?? '3200';
 const theme = arg('theme') ?? 'dark';
 let total = 0;
-const browser = await chromium.launch({ channel: 'chrome' });
+const browser = await chromium.launch({
+  channel: 'chrome',
+  args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'],
+});
 for (const [size, viewport] of [
   ['phone', { width: 390, height: 844 }],
   ['desktop', { width: 1440, height: 900 }],
@@ -55,6 +58,21 @@ for (const [size, viewport] of [
   await page.locator('.vu-topbar .vu-btn', { hasText: 'Export' }).first().click();
   await page.waitForTimeout(200);
   await audit('export dialog');
+  for (const kind of ['Sound only', 'Picture']) {
+    await page.locator('.vu-modal .vu-segment', { hasText: kind }).click();
+    await audit(`export dialog · ${kind}`);
+  }
+  await page.locator('.vu-modal .vu-segment', { hasText: 'Video' }).click();
+  await page.locator('.vu-modal .vu-segment', { hasText: 'Part' }).click();
+  await audit('export dialog · part');
+  await page.keyboard.press('Escape');
+  await page.evaluate(() =>
+    (window as unknown as { vuEditor: { setCameraOpen(o: boolean): void } }).vuEditor.setCameraOpen(
+      true,
+    ),
+  );
+  await page.locator('.vu-camera[data-phase="live"]').waitFor({ timeout: 20000 });
+  await audit('camera');
   await page.close();
 }
 await browser.close();
