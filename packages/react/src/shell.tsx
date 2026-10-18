@@ -641,10 +641,37 @@ function Sheet({ tool, panel }: { tool: ToolId | null; panel: PanelId | null }):
   const l = useLabels();
   const [expanded, setExpanded] = useState(false);
   const ref = useRef<HTMLElement>(null);
-  const drag = useRef<{ id: number; y: number; t: number; h: number; dy: number } | null>(null);
-  const close = () => ctl.ui.setState({ tool: null, sheetPanel: false });
+  const drag = useRef<{ id: number; y: number; t: number; base: number; dy: number } | null>(null);
+  const leaving = useRef(false);
   const entry = RAIL.find((r) => r.id === panel);
   const title = tool ? l[TOOL_TITLE[tool]] : entry ? l[entry.key] : l.canvas;
+
+  /**
+   * The sheet is always full height and only ever moves with `transform` (no height animation,
+   * no layout per frame): "open" shows its top part, "expanded" all of it. `--vu-sheet-y` is how
+   * far it is pushed down; CSS computes it from the two heights.
+   */
+  const offsetOf = (sheet: HTMLElement) => {
+    const y = new DOMMatrixReadOnly(getComputedStyle(sheet).transform).m42;
+    return Number.isFinite(y) ? y : 0;
+  };
+  const dismiss = () => {
+    const sheet = ref.current;
+    if (!sheet || leaving.current) return;
+    leaving.current = true;
+    const done = () => ctl.ui.setState({ tool: null, sheetPanel: false });
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return done();
+    sheet.dataset.leaving = '';
+    // Only the sheet's own slide counts (child hover transitions bubble up too).
+    const onEnd = (e: TransitionEvent) => {
+      if (e.target !== sheet || e.propertyName !== 'transform') return;
+      sheet.removeEventListener('transitionend', onEnd);
+      done();
+    };
+    sheet.addEventListener('transitionend', onEnd);
+    // Safety net if no transition runs (hidden tab, zero duration).
+    setTimeout(done, 400);
+  };
 
   // Dragging the handle / header: down closes, up expands, a short drag springs back. The sheet
   // follows the finger through inline styles only (no React render per move).
@@ -661,7 +688,7 @@ function Sheet({ tool, panel }: { tool: ToolId | null; panel: PanelId | null }):
       id: e.pointerId,
       y: e.clientY,
       t: performance.now(),
-      h: sheet.getBoundingClientRect().height,
+      base: offsetOf(sheet),
       dy: 0,
     };
     sheet.dataset.dragging = '';
@@ -671,14 +698,9 @@ function Sheet({ tool, panel }: { tool: ToolId | null; panel: PanelId | null }):
     const sheet = ref.current;
     if (!d || d.id !== e.pointerId || !sheet) return;
     d.dy = e.clientY - d.y;
-    if (d.dy >= 0) {
-      sheet.style.transform = `translateY(${d.dy}px)`;
-      sheet.style.height = '';
-    } else {
-      // Pulling up grows the sheet (to the expanded height at most).
-      sheet.style.transform = '';
-      sheet.style.height = `${d.h - d.dy}px`;
-    }
+    // Can't go above fully expanded; a little give past it.
+    const y = Math.max(-12, d.base + d.dy);
+    sheet.style.transform = `translateY(${y}px)`;
   };
   const onUp = (e: React.PointerEvent) => {
     const d = drag.current;
@@ -686,25 +708,17 @@ function Sheet({ tool, panel }: { tool: ToolId | null; panel: PanelId | null }):
     if (!d || d.id !== e.pointerId || !sheet) return;
     drag.current = null;
     delete sheet.dataset.dragging;
+    sheet.style.transform = '';
     const speed = d.dy / Math.max(1, performance.now() - d.t); // px per ms
-    sheet.style.height = '';
-    if (d.dy > d.h * 0.25 || (d.dy > 24 && speed > 0.5)) {
-      if (expanded && d.dy < d.h * 0.5 && speed <= 0.5) {
-        sheet.style.transform = '';
-        setExpanded(false);
-        return;
-      }
-      sheet.style.transform = 'translateY(100%)';
-      const done = () => {
-        sheet.style.transform = '';
-        close();
-      };
-      if (matchMedia('(prefers-reduced-motion: reduce)').matches) done();
-      else sheet.addEventListener('transitionend', done, { once: true });
+    const shown = sheet.getBoundingClientRect().height - d.base; // visible height at the start
+    const flickDown = d.dy > 24 && speed > 0.5;
+    if (expanded) {
+      if (d.dy > shown * 0.5 && flickDown) dismiss();
+      else if (d.dy > 64 || flickDown) setExpanded(false);
       return;
     }
-    sheet.style.transform = '';
-    if (d.dy < -48) setExpanded(true);
+    if (d.dy > shown * 0.25 || flickDown) dismiss();
+    else if (d.dy < -48) setExpanded(true);
   };
 
   return (
@@ -718,8 +732,8 @@ function Sheet({ tool, panel }: { tool: ToolId | null; panel: PanelId | null }):
       >
         <span className="vu-dock-grab" aria-hidden="true" />
         <h2 className="vu-dock-title">{title}</h2>
-        <button type="button" className="vu-done" onClick={close}>
-          <Icon name="check" size={18} />
+        <button type="button" className="vu-done" onClick={dismiss}>
+          <Icon name="check" size={16} />
           <span>{l.done}</span>
         </button>
       </div>

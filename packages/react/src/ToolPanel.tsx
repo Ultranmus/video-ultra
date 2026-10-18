@@ -1,7 +1,6 @@
 import {
   ADJUST_KEYS,
   DEFAULT_TRANSFORM,
-  FILTER_PRESETS,
   findItem,
   FLICKS_PER_SECOND,
   FONT_PRESETS,
@@ -11,8 +10,6 @@ import {
   setBackground,
   setCanvasSize,
   setSpeed,
-  setTransition,
-  findTransitionPreset,
   trimItem,
   updateItem,
   type Adjust,
@@ -24,7 +21,6 @@ import { useState, type ReactElement } from 'react';
 import { useController, useLabels, useProject, useUi } from './context';
 import { Button, ColorField, EditSlider, IconButton, Section, Segmented } from './controls';
 import { Icon } from './icons';
-import { hasCutInto } from './targets';
 import { RATIOS, ratioOf } from './items';
 import { AnimatePanel, FilterStrip, TransitionGrid } from './looks';
 import type { ToolId } from './state';
@@ -80,65 +76,17 @@ export function ToolPanel({ tool }: { tool: ToolId }): ReactElement | null {
   }
 }
 
-/** Desktop inspector: the selected item's settings as titled sections, most used first. */
+/**
+ * Desktop inspector: the selected item's settings as titled sections, most used first. Filters,
+ * transitions and animations are not here: the left menu has them for every element (one place,
+ * no duplicates — owner, 2026-10-19); this is the detail view.
+ */
 export function InspectorSections({ item }: { item: Item }): ReactElement {
   const l = useLabels();
-  const ctl = useController();
   const index = useProject((p) => mainTrack(p).items.findIndex((i) => i.id === item.id));
   const onMain = index !== -1;
-  const cutInto = useProject((p) => hasCutInto(p, item.id));
-  const filterName =
-    'filter' in item && item.filter
-      ? (FILTER_PRESETS.find((f) => f.id === item.filter!.id)?.label ?? item.filter.id)
-      : l.none;
-  const transitionName =
-    'transitionIn' in item && item.transitionIn
-      ? (findTransitionPreset(item.transitionIn.type)?.label ?? item.transitionIn.type)
-      : l.none;
-  const change = (panel: 'filters' | 'transitions', tip: string) => (
-    <Button label={l.change} variant="secondary" tip={tip} onClick={() => ctl.openPanel(panel)} />
-  );
-
-  const look =
-    'filter' in item ? (
-      <Section title={l.look}>
-        <div className="vu-current">
-          <span className="vu-current-label">{l.filter}</span>
-          <span className="vu-current-value">{filterName}</span>
-          {change('filters', l.changeFilterTip)}
-        </div>
-        {item.filter ? (
-          <EditSlider
-            label={l.intensity}
-            value={item.filter.intensity}
-            min={0}
-            max={1}
-            step={0.01}
-            format={percent}
-            defaultValue={1}
-            recipe={(d, v) =>
-              updateItem(d, item.id, { filter: { id: item.filter!.id, intensity: v } })
-            }
-            commitLabel={l.filter}
-            coalesceKey={`filter:${item.id}`}
-          />
-        ) : null}
-      </Section>
-    ) : null;
-  const transition =
-    cutInto && 'transitionIn' in item ? (
-      <Section title={l.transition}>
-        <div className="vu-current">
-          <span className="vu-current-label">{l.transitionShort}</span>
-          <span className="vu-current-value">{transitionName}</span>
-          {change('transitions', l.changeTransitionTip)}
-        </div>
-        <TransitionDuration item={item} />
-      </Section>
-    ) : null;
   const picture = (
     <>
-      {look}
       <Section title={l.adjust} collapsible defaultOpen={false}>
         <AdjustTool item={item} />
       </Section>
@@ -146,15 +94,9 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
         <TransformTool item={item} />
         <CropTool item={item} />
       </Section>
-      {transition}
       {onMain ? null : (
         <Section title={l.opacity}>
           <OpacityTool item={item} />
-        </Section>
-      )}
-      {onMain ? null : (
-        <Section title={l.animate} collapsible defaultOpen={false}>
-          <AnimatePanel />
         </Section>
       )}
     </>
@@ -205,10 +147,6 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
           <Section title={l.style}>
             <TextStyleTool item={item} />
           </Section>
-          <Section title={l.animate}>
-            <AnimatePanel />
-          </Section>
-          {look}
           <Section title={l.adjust} collapsible defaultOpen={false}>
             <AdjustTool item={item} />
           </Section>
@@ -221,10 +159,6 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
     case 'sticker':
       return (
         <>
-          <Section title={l.animate}>
-            <AnimatePanel />
-          </Section>
-          {look}
           <Section title={l.adjust} collapsible defaultOpen={false}>
             <AdjustTool item={item} />
           </Section>
@@ -235,26 +169,6 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
         </>
       );
   }
-}
-
-function TransitionDuration({ item }: { item: Item }) {
-  const l = useLabels();
-  if (!('transitionIn' in item) || !item.transitionIn) return null;
-  const current = item.transitionIn;
-  return (
-    <EditSlider
-      label={l.duration}
-      value={seconds(current.duration)}
-      min={0.1}
-      max={2}
-      step={0.1}
-      format={fmtSeconds}
-      defaultValue={0.5}
-      recipe={(d, v) => setTransition(d, item.id, { type: current.type, duration: fromSeconds(v) })}
-      commitLabel={l.transition}
-      coalesceKey={`transition:${item.id}`}
-    />
-  );
 }
 
 function SpeedTool({ item }: { item: Item }) {

@@ -93,6 +93,9 @@
     --vu-duration-slow: 320ms;
     --vu-ease: cubic-bezier(0.2, 0, 0, 1);
     --vu-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    /* Sheets: a quick, soft settle (like a native bottom sheet). */
+    --vu-ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+    --vu-duration-sheet: 380ms;
 
     /* Sizes */
     --vu-size-topbar: 48px;
@@ -293,6 +296,7 @@
       --vu-duration-fast: 0ms;
       --vu-duration-base: 0ms;
       --vu-duration-slow: 0ms;
+      --vu-duration-sheet: 0ms;
     }
   }
 

@@ -504,3 +504,11 @@ reason; when one changes, edit the entry and note the date.
 106.  **While paused, the playhead belongs to the UI** (2026-10-19). The engine's echo of a seek
       arrives a frame late; applying it pulled a scrubbing phone timeline back and made it
       jitter. Engine time is applied only while playing and when playback stops.
+107.  **The sheet moves only with `transform`** (owner: "not smooth", 2026-10-19). It is always
+      full height (to the top of the editor) and pushed down to show its top 460 px; expanding,
+      dragging, opening and closing (Done animates out too) only change `translateY`, so no
+      layout runs per frame. It slides under the bottom tab bar (the tab bar stacks above it);
+      the part pushed off-screen is body padding, so a list's end still scrolls into view.
+108.  **No duplicate controls on desktop** (owner, 2026-10-19): Filters, Transitions and
+      animations live only in the left menu; the inspector is the detail view (text, style,
+      speed, sound, adjust, crop, opacity…). Phones keep them in the toolbar (no left menu there).

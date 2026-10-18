@@ -2315,9 +2315,15 @@
 
   /*
    * Phones and tablets: every tool opens in one bottom sheet, always the same height, over the
-   * timeline (the stage stays in view above it). Drag the handle down to close, up to expand.
+   * timeline (the stage stays in view above it). It is always full height and only moves with
+   * `transform` (GPU, no layout per frame): open = pushed down so its top 460 px show; expanded =
+   * up to the top of the editor. Drag the handle down to close, up to expand. It slides in and
+   * out under the bottom tab bar.
    */
   .vu-dock {
+    --vu-sheet-full: calc(100cqh - var(--vu-size-toolbar) - env(safe-area-inset-bottom));
+    --vu-sheet-open: min(var(--vu-size-sheet), calc(var(--vu-sheet-full) - var(--vu-size-topbar)));
+    --vu-sheet-y: calc(var(--vu-sheet-full) - var(--vu-sheet-open));
     position: absolute;
     right: 0;
     bottom: 0;
@@ -2325,36 +2331,49 @@
     z-index: var(--vu-z-overlay);
     display: flex;
     flex-direction: column;
-    height: min(var(--vu-size-sheet), var(--vu-sheet-max));
+    height: var(--vu-sheet-full);
     border-top: 1px solid var(--vu-border-strong);
     border-radius: var(--vu-radius-lg) var(--vu-radius-lg) 0 0;
     background: var(--vu-surface-1);
     box-shadow: var(--vu-shadow-popover);
-    animation: vu-dock-in var(--vu-duration-slow) var(--vu-ease-out);
-    transition:
-      transform var(--vu-duration-slow) var(--vu-ease-out),
-      height var(--vu-duration-slow) var(--vu-ease-out);
-    --vu-sheet-max: calc(
-      100cqh - var(--vu-size-topbar) - var(--vu-size-toolbar) - var(--vu-space-8)
-    );
+    transform: translateY(var(--vu-sheet-y));
+    will-change: transform;
+    animation: vu-dock-in var(--vu-duration-sheet) var(--vu-ease-sheet);
+    transition: transform var(--vu-duration-sheet) var(--vu-ease-sheet);
   }
 
   .vu-dock[data-expanded] {
-    height: var(--vu-sheet-max);
+    --vu-sheet-y: 0px;
+    border-radius: 0;
+  }
+
+  /* Expanded to the top: keep the header clear of a phone's status bar / notch. */
+  .vu-dock[data-expanded] .vu-dock-head {
+    padding-top: calc(var(--vu-space-5) + env(safe-area-inset-top));
+  }
+
+  .vu-dock[data-leaving] {
+    transform: translateY(100%);
   }
 
   .vu-dock[data-dragging] {
     transition: none;
   }
 
-  .vu-dock .vu-textstyle-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
   @keyframes vu-dock-in {
     from {
       transform: translateY(100%);
     }
+  }
+
+  /* The tab bar stays on top: the sheet slides in and out underneath it. */
+  .vu-toolbar {
+    position: relative;
+    z-index: calc(var(--vu-z-overlay) + 1);
+  }
+
+  .vu-dock .vu-textstyle-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .vu-dock-head {
@@ -2391,8 +2410,8 @@
     display: inline-flex;
     align-items: center;
     gap: var(--vu-space-1);
-    min-height: var(--vu-size-touch);
-    padding: 0 var(--vu-space-4);
+    min-height: var(--vu-size-choice-lg);
+    padding: 0 var(--vu-space-3);
     border-radius: var(--vu-radius-full);
     background: var(--vu-accent);
     color: var(--vu-accent-contrast);
@@ -2408,7 +2427,9 @@
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
-    padding: var(--vu-space-3) var(--vu-space-4) var(--vu-space-4);
+    /* The part pushed below the screen (sheet not expanded) is padding, so the end of the list
+       can still be scrolled into view. */
+    padding: var(--vu-space-3) var(--vu-space-4) calc(var(--vu-sheet-y) + var(--vu-space-4));
     --vu-scroll-pad-top: var(--vu-space-3);
   }
 
