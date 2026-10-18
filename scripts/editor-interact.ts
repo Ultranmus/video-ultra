@@ -101,8 +101,15 @@ for (const name of browsers) {
   // Seek: click the ruler at 2 s.
   const canvas = page.locator('.vu-timeline-canvas canvas');
   const box = (await canvas.boundingBox())!;
-  // Row names column (84 px) + 16 px lead-in.
-  const x0 = box.x + 84 + 16;
+  // Row names column (--vu-size-timeline-header) + 16 px lead-in.
+  const header = await page.evaluate(() =>
+    parseFloat(
+      getComputedStyle(document.querySelector('.vu-root')!).getPropertyValue(
+        '--vu-size-timeline-header',
+      ),
+    ),
+  );
+  const x0 = box.x + header + 16;
   await page.mouse.click(x0 + 2 * s.pps, box.y + 10);
   await page.waitForTimeout(100);
   s = await state(page);

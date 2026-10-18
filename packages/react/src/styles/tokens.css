@@ -107,7 +107,7 @@
     --vu-size-toolbar: 64px;
     --vu-size-track: 44px;
     --vu-size-timeline-slot: 30px;
-    --vu-size-timeline-header: 84px;
+    --vu-size-timeline-header: 100px;
     --vu-size-dock: 280px;
     --vu-size-filter-tile: 72px;
     --vu-size-bar: 52px;
@@ -183,6 +183,11 @@
     --vu-size-handle: 12px;
     --vu-size-toast: 420px;
     --vu-size-modal: 440px;
+    /* Layers & organising (v0.2) */
+    --vu-size-popover: 288px;
+    --vu-size-menu: 232px;
+    --vu-size-layer-row: 48px;
+    --vu-size-layer-thumb: 32px;
     --vu-size-screen-text: 420px;
     --vu-size-modal-wide: 760px;
     --vu-size-export-poster: 460px;

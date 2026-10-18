@@ -3306,4 +3306,518 @@
       padding-bottom: calc(var(--vu-space-5) + env(safe-area-inset-bottom));
     }
   }
+
+  /* ── Layers & organising (v0.2) ─────────────────────────────────────── */
+
+  .vu-topbar-divider {
+    flex: none;
+    width: 1px;
+    height: var(--vu-space-5);
+    margin: 0 var(--vu-space-1);
+    background: var(--vu-border);
+  }
+
+  .vu-popover-anchor {
+    position: relative;
+    display: inline-flex;
+  }
+
+  .vu-popover {
+    position: absolute;
+    top: calc(100% + var(--vu-space-2));
+    left: 50%;
+    z-index: var(--vu-z-popover);
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-2);
+    width: min(var(--vu-size-popover), 92cqi);
+    max-height: min(60vh, var(--vu-size-sheet));
+    padding: var(--vu-space-3);
+    border: 1px solid var(--vu-border);
+    border-radius: var(--vu-radius-lg);
+    background: var(--vu-surface-1);
+    box-shadow: var(--vu-shadow-popover);
+    transform: translateX(-50%);
+    animation: vu-dock-swap var(--vu-duration-fast) var(--vu-ease-out);
+  }
+
+  .vu-popover-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--vu-space-2);
+  }
+
+  .vu-popover-title {
+    margin: 0;
+    color: var(--vu-text);
+    font-size: var(--vu-text-md);
+    font-weight: var(--vu-weight-semibold);
+  }
+
+  .vu-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-1);
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    list-style: none;
+  }
+
+  .vu-history-step {
+    display: flex;
+    align-items: center;
+    gap: var(--vu-space-3);
+    width: 100%;
+    min-height: var(--vu-size-touch);
+    padding: 0 var(--vu-space-3);
+    border: 0;
+    border-radius: var(--vu-radius-md);
+    background: transparent;
+    color: var(--vu-text);
+    font: inherit;
+    font-size: var(--vu-text-sm);
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .vu-history-step:hover {
+    background: var(--vu-surface-2);
+  }
+
+  .vu-history-step:focus-visible {
+    outline: 2px solid var(--vu-focus-ring);
+    outline-offset: -2px;
+  }
+
+  .vu-history-step[data-undone] {
+    color: var(--vu-text-subtle);
+  }
+
+  .vu-history-step[data-current] {
+    background: var(--vu-accent-soft);
+    color: var(--vu-accent-text);
+    font-weight: var(--vu-weight-semibold);
+  }
+
+  .vu-history-dot {
+    flex: none;
+    width: var(--vu-space-2);
+    height: var(--vu-space-2);
+    border-radius: var(--vu-radius-full);
+    background: currentColor;
+    opacity: 0.6;
+  }
+
+  .vu-history-step[data-current] .vu-history-dot {
+    opacity: 1;
+  }
+
+  .vu-history-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Layers panel */
+  .vu-layers {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-3);
+  }
+
+  .vu-layers-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--vu-space-2);
+  }
+
+  .vu-layer-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .vu-layer {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--vu-space-2);
+    min-height: var(--vu-size-layer-row);
+    padding: 0 var(--vu-space-1) 0 0;
+    border-radius: var(--vu-radius-md);
+    background: var(--vu-surface-2);
+    color: var(--vu-text);
+    font-size: var(--vu-text-sm);
+    cursor: pointer;
+    transition: transform var(--vu-duration-fast) var(--vu-ease-out);
+  }
+
+  .vu-layer:hover {
+    background: var(--vu-surface-3);
+  }
+
+  .vu-layer[data-selected] {
+    box-shadow: inset 0 0 0 2px var(--vu-selection);
+    background: var(--vu-accent-soft);
+  }
+
+  .vu-layer[data-dragging] {
+    z-index: 1;
+    box-shadow: var(--vu-shadow-popover);
+    transition: none;
+  }
+
+  .vu-layer[data-hidden] .vu-layer-thumb,
+  .vu-layer[data-hidden] .vu-layer-name {
+    opacity: 0.45;
+  }
+
+  .vu-layer-grip {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: var(--vu-space-6);
+    align-self: stretch;
+    color: var(--vu-text-subtle);
+    cursor: grab;
+    touch-action: none;
+  }
+
+  .vu-layer-grip:empty {
+    cursor: default;
+  }
+
+  .vu-layer-check {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: var(--vu-space-5);
+    height: var(--vu-space-5);
+    border: 1.5px solid var(--vu-border-strong);
+    border-radius: var(--vu-radius-sm);
+    color: var(--vu-accent-contrast);
+  }
+
+  .vu-layer-check[data-on] {
+    border-color: var(--vu-accent);
+    background: var(--vu-accent);
+  }
+
+  .vu-layer-thumb {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: var(--vu-size-layer-thumb);
+    height: var(--vu-size-layer-thumb);
+    overflow: hidden;
+    border-radius: var(--vu-radius-sm);
+    background: var(--vu-surface-3);
+    color: var(--vu-text-muted);
+  }
+
+  .vu-layer-thumb canvas {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .vu-layer-thumb[data-kind='text'] {
+    color: var(--vu-clip-text);
+  }
+
+  .vu-layer-thumb[data-kind='sticker'] {
+    color: var(--vu-clip-sticker);
+  }
+
+  .vu-layer-main {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: var(--vu-space-2);
+    min-width: 0;
+    min-height: var(--vu-size-layer-row);
+    padding: 0;
+    border: 0;
+    border-radius: var(--vu-radius-sm);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .vu-layer-main:focus-visible {
+    outline: 2px solid var(--vu-focus-ring);
+    outline-offset: 2px;
+  }
+
+  .vu-layer-name {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: var(--vu-space-2);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .vu-layer-badge {
+    flex: none;
+    padding: 0 var(--vu-space-2);
+    border-radius: var(--vu-radius-full);
+    background: var(--vu-surface-3);
+    color: var(--vu-text-muted);
+    font-size: var(--vu-text-xs);
+  }
+
+  .vu-layer-rename {
+    flex: 1;
+    min-width: 0;
+    min-height: var(--vu-size-choice);
+    padding: 0 var(--vu-space-2);
+    border: 1px solid var(--vu-accent);
+    border-radius: var(--vu-radius-sm);
+    background: var(--vu-bg);
+    color: var(--vu-text);
+    font: inherit;
+  }
+
+  /* Row buttons are compact so the name keeps its room. */
+  .vu-layer .vu-layer-toggle {
+    flex: none;
+    width: var(--vu-size-choice);
+    min-width: 0;
+    height: var(--vu-size-choice);
+    min-height: 0;
+  }
+
+  .vu-layer-grip .vu-icon {
+    stroke-width: 3;
+  }
+
+  .vu-layer .vu-btn[aria-pressed='true'] {
+    color: var(--vu-accent-text);
+  }
+
+  /* Context menu */
+  .vu-menu {
+    position: absolute;
+    z-index: var(--vu-z-popover);
+    display: flex;
+    flex-direction: column;
+    min-width: var(--vu-size-menu);
+    padding: var(--vu-space-1);
+    border: 1px solid var(--vu-border);
+    border-radius: var(--vu-radius-md);
+    background: var(--vu-surface-1);
+    box-shadow: var(--vu-shadow-popover);
+    font-size: var(--vu-text-sm);
+  }
+
+  .vu-menu-heading {
+    padding: var(--vu-space-2) var(--vu-space-3) var(--vu-space-1);
+    color: var(--vu-text-muted);
+    font-size: var(--vu-text-xs);
+    font-weight: var(--vu-weight-semibold);
+  }
+
+  .vu-menu-group {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .vu-menu-group + .vu-menu-group {
+    margin-top: var(--vu-space-1);
+    padding-top: var(--vu-space-1);
+    border-top: 1px solid var(--vu-border);
+  }
+
+  .vu-menu-item {
+    display: flex;
+    align-items: center;
+    gap: var(--vu-space-3);
+    min-height: var(--vu-size-choice);
+    padding: 0 var(--vu-space-3);
+    border-radius: var(--vu-radius-sm);
+    color: var(--vu-text);
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .vu-menu-item:hover,
+  .vu-menu-item:focus-visible,
+  .vu-menu-item[aria-expanded='true'] {
+    outline: none;
+    background: var(--vu-surface-2);
+  }
+
+  .vu-menu-item[data-danger] {
+    color: var(--vu-danger);
+  }
+
+  .vu-menu-item[aria-disabled='true'] {
+    color: var(--vu-text-subtle);
+    cursor: default;
+  }
+
+  .vu-menu-label {
+    flex: 1;
+  }
+
+  .vu-menu-key {
+    color: var(--vu-text-subtle);
+    font: inherit;
+    font-size: var(--vu-text-xs);
+  }
+
+  .vu-menu-sub {
+    position: relative;
+  }
+
+  .vu-submenu {
+    top: calc(-1 * var(--vu-space-1));
+    left: calc(100% + var(--vu-space-1));
+  }
+
+  /* No room on the right (phones): the submenu opens below its item. */
+  @container (max-width: 767px) {
+    .vu-submenu {
+      top: 100%;
+      left: var(--vu-space-4);
+    }
+  }
+
+  /* Several selected: one upright box, a faint outline on each member, and the drag rectangle. */
+  .vu-selection-box[data-group] {
+    box-shadow:
+      0 0 0 calc(1.5px / var(--vu-stage-zoom, 1)) var(--vu-selection),
+      0 0 0 calc(2.5px / var(--vu-stage-zoom, 1)) var(--vu-overlay);
+  }
+
+  .vu-selection-box[data-locked] {
+    box-shadow: none;
+    outline: calc(1.5px / var(--vu-stage-zoom, 1)) dashed var(--vu-selection);
+  }
+
+  .vu-selection-box[data-locked] .vu-handle,
+  .vu-selection-box[data-locked] .vu-rotate-stem {
+    display: none;
+  }
+
+  .vu-member-outlines {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .vu-member-outline {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-origin: center;
+    box-shadow: 0 0 0 calc(1px / var(--vu-stage-zoom, 1)) var(--vu-accent-soft);
+    outline: calc(1px / var(--vu-stage-zoom, 1)) dashed var(--vu-selection);
+    outline-offset: 0;
+    opacity: 0.7;
+  }
+
+  .vu-marquee {
+    position: absolute;
+    top: 0;
+    left: 0;
+    border: 1px solid var(--vu-selection);
+    background: var(--vu-accent-soft);
+    pointer-events: none;
+  }
+
+  /* Arrange controls */
+  .vu-arrange {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-3);
+  }
+
+  .vu-arrange-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--vu-space-2);
+  }
+
+  .vu-arrange-label {
+    flex: 0 0 100%;
+    color: var(--vu-text-muted);
+    font-size: var(--vu-text-xs);
+    font-weight: var(--vu-weight-semibold);
+  }
+
+  .vu-arrange-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--vu-space-1);
+  }
+
+  /* Phones: even columns, labels under the icons wrap instead of pushing a button to a new row. */
+  .vu-arrange[data-compact] .vu-arrange-buttons {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(var(--vu-size-tool), 1fr));
+    width: 100%;
+  }
+
+  .vu-arrange[data-compact] .vu-btn[data-layout='stack'] {
+    min-width: 0;
+    white-space: normal;
+    text-align: center;
+  }
+
+  @media (pointer: coarse) {
+    .vu-menu-key {
+      display: none;
+    }
+  }
+
+  .vu-arrange-toggles .vu-btn {
+    flex: 1 1 auto;
+  }
+
+  /* A locked item's settings: a note with Unlock above controls that can't be used. */
+  .vu-locked-note {
+    display: flex;
+    align-items: center;
+    gap: var(--vu-space-2);
+    margin: 0 0 var(--vu-space-3);
+    padding: var(--vu-space-2) var(--vu-space-3);
+    border-radius: var(--vu-radius-md);
+    background: var(--vu-surface-2);
+    color: var(--vu-text-muted);
+    font-size: var(--vu-text-sm);
+  }
+
+  .vu-locked-note > span {
+    flex: 1;
+  }
+
+  .vu-tool-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-4);
+  }
+
+  .vu-inspector-body {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .vu-inspector-body[data-locked],
+  .vu-tool-body[data-locked] {
+    opacity: 0.5;
+  }
 }

@@ -61,7 +61,7 @@ export function ToolPanel({ tool }: { tool: ToolId }): ReactElement | null {
   return (
     <>
       <LockedNote item={item} />
-      <div inert={locked || undefined} data-locked={locked || undefined}>
+      <div className="vu-tool-body" inert={locked || undefined} data-locked={locked || undefined}>
         <ItemTool tool={tool} item={item} />
       </div>
     </>

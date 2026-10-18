@@ -259,7 +259,7 @@ export function LayersPanel(): ReactElement {
   };
 
   return (
-    <div className="vu-layers">
+    <div className="vu-panel-body vu-layers">
       <div className="vu-layers-head">
         <p className="vu-hint">{l.layersAt(formatClock(t))}</p>
         <Button
@@ -272,13 +272,7 @@ export function LayersPanel(): ReactElement {
         />
       </div>
       {stack.length === 0 ? <p className="vu-hint">{l.layersEmpty}</p> : null}
-      <ul
-        ref={listRef}
-        className="vu-layer-list"
-        role="listbox"
-        aria-label={l.layers}
-        aria-multiselectable="true"
-      >
+      <ul ref={listRef} className="vu-layer-list" aria-label={l.layers}>
         {stack.map(({ item, main }) => {
           const index = elements.findIndex((e) => e.item.id === item.id);
           return (
@@ -354,41 +348,9 @@ function LayerRow({
       data-element={main ? undefined : ''}
       data-selected={selected || undefined}
       data-hidden={hidden || undefined}
-      role="option"
-      aria-selected={selected}
-      tabIndex={selected ? 0 : -1}
-      aria-label={`${l.kindName(item.kind)}: ${shown}${locked ? `, ${l.lockedState}` : ''}${hidden ? `, ${l.hiddenState}` : ''}`}
-      onClick={(e) => {
-        if ((e.target as HTMLElement).closest('button, input')) return;
-        onPick(e.shiftKey || e.metaKey || e.ctrlKey);
-      }}
-      onDoubleClick={(e) => {
-        if ((e.target as HTMLElement).closest('button')) return;
-        setRenaming(true);
-      }}
       onContextMenu={(e) => {
         e.preventDefault();
         openMenu(e);
-      }}
-      onKeyDown={(e) => {
-        if (renaming || (e.target as HTMLElement).closest('input, button')) return;
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onPick(e.shiftKey);
-        } else if (e.key === 'F2') {
-          e.preventDefault();
-          setRenaming(true);
-        } else if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
-          e.preventDefault();
-          if (!main) onMove(e.key === 'ArrowUp' ? -1 : 1);
-        } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-          e.preventDefault();
-          const rows = [
-            ...(e.currentTarget.parentElement?.querySelectorAll<HTMLElement>('.vu-layer') ?? []),
-          ];
-          const i = rows.indexOf(e.currentTarget);
-          rows[i + (e.key === 'ArrowUp' ? -1 : 1)]?.focus();
-        }
       }}
     >
       {grip ? (
@@ -398,40 +360,68 @@ function LayerRow({
           data-tooltip={l.layersDragHint}
           {...grip}
         >
-          <Icon name="more" size={16} />
+          <Icon name="grip" size={16} />
         </span>
       ) : (
         <span className="vu-layer-grip" aria-hidden="true" />
       )}
-      {selecting ? (
-        <span className="vu-layer-check" data-on={selected || undefined} aria-hidden="true">
-          {selected ? <Icon name="check" size={14} /> : null}
-        </span>
-      ) : null}
-      <LayerThumb item={item} />
       {renaming ? (
-        <input
-          className="vu-layer-rename"
-          aria-label={l.rename}
-          defaultValue={item.name ?? ''}
-          placeholder={shown}
-          autoFocus
-          onBlur={(e) => {
-            ctl.renameItem(item.id, e.currentTarget.value);
-            setRenaming(false);
-          }}
-          onKeyDown={(e) => {
-            e.stopPropagation();
-            if (e.key === 'Enter') e.currentTarget.blur();
-            if (e.key === 'Escape') setRenaming(false);
-          }}
-        />
-      ) : (
-        <span className="vu-layer-name" data-tooltip={l.renameTipLayer}>
-          {item.kind === 'sticker' && item.emoji ? `${item.emoji} ` : ''}
-          {shown}
-          {item.groupId ? <span className="vu-layer-badge">{l.groupBadge}</span> : null}
+        <span className="vu-layer-main">
+          <LayerThumb item={item} />
+          <input
+            className="vu-layer-rename"
+            aria-label={l.rename}
+            defaultValue={item.name ?? ''}
+            placeholder={shown}
+            autoFocus
+            onBlur={(e) => {
+              ctl.renameItem(item.id, e.currentTarget.value);
+              setRenaming(false);
+            }}
+            onKeyDown={(e) => {
+              e.stopPropagation();
+              if (e.key === 'Enter') e.currentTarget.blur();
+              if (e.key === 'Escape') setRenaming(false);
+            }}
+          />
         </span>
+      ) : (
+        <button
+          type="button"
+          className="vu-layer-main"
+          aria-pressed={selected}
+          aria-label={`${l.kindName(item.kind)}: ${shown}${locked ? `, ${l.lockedState}` : ''}${hidden ? `, ${l.hiddenState}` : ''}`}
+          data-tooltip={l.renameTipLayer}
+          onClick={(e) => onPick(e.shiftKey || e.metaKey || e.ctrlKey)}
+          onDoubleClick={() => setRenaming(true)}
+          onKeyDown={(e) => {
+            if (e.key === 'F2') {
+              e.preventDefault();
+              setRenaming(true);
+            } else if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+              e.preventDefault();
+              if (!main) onMove(e.key === 'ArrowUp' ? -1 : 1);
+            } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+              e.preventDefault();
+              const list = rowRef.current?.parentElement;
+              const mains = [...(list?.querySelectorAll<HTMLElement>('.vu-layer-main') ?? [])];
+              const i = mains.indexOf(e.currentTarget);
+              mains[i + (e.key === 'ArrowUp' ? -1 : 1)]?.focus();
+            }
+          }}
+        >
+          {selecting ? (
+            <span className="vu-layer-check" data-on={selected || undefined} aria-hidden="true">
+              {selected ? <Icon name="check" size={14} /> : null}
+            </span>
+          ) : null}
+          <LayerThumb item={item} />
+          <span className="vu-layer-name">
+            {item.kind === 'sticker' && item.emoji ? `${item.emoji} ` : ''}
+            {shown}
+          </span>
+          {item.groupId ? <span className="vu-layer-badge">{l.groupBadge}</span> : null}
+        </button>
       )}
       <IconButton
         icon={locked ? 'lock' : 'unlock'}
@@ -452,6 +442,7 @@ function LayerRow({
       <IconButton
         icon="more"
         label={l.moreActions}
+        className="vu-layer-toggle"
         onClick={() => {
           const b = rowRef.current?.getBoundingClientRect();
           openMenu({ clientX: b ? b.right - 200 : 0, clientY: b ? b.bottom : 0 });
@@ -689,7 +680,7 @@ export function ArrangeControls({ compact = false }: { compact?: boolean }): Rea
   const visual = items.some((i) => i.kind !== 'audio');
   const layout = compact ? 'stack' : 'icon';
   return (
-    <div className="vu-arrange">
+    <div className="vu-arrange" data-compact={compact || undefined}>
       {visual && !onMain ? (
         <div className="vu-arrange-row" role="group" aria-label={l.order}>
           <span className="vu-arrange-label">{l.order}</span>
@@ -723,9 +714,6 @@ export function ArrangeControls({ compact = false }: { compact?: boolean }): Rea
       <div className="vu-arrange-row vu-arrange-toggles">
         <CommandButton id="lock" variant="secondary" />
         {visual ? <CommandButton id="hide" variant="secondary" /> : null}
-        {several ? (
-          <CommandButton id={ctl.selectedGroup() ? 'ungroup' : 'group'} variant="secondary" />
-        ) : null}
       </div>
     </div>
   );

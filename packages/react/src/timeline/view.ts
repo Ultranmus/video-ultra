@@ -7,6 +7,7 @@ import {
   moveLaneToMain,
   moveMainToLane,
   projectDuration,
+  shiftItems,
   projectFrame,
   reorderMain,
   TRANSITION_PRESETS,
@@ -123,6 +124,11 @@ type Drag =
       pointer: { x: number; y: number };
       start: Time;
       target: DropTarget;
+      /** Other selected lane items that move along by the same time (a group or selection). */
+      others: Item[];
+      /** Where the lift happened; `moved` once the pointer left it (a still lift opens the menu). */
+      origin: { x: number; y: number };
+      moved: boolean;
     }
   | { type: 'pinch'; ids: [number, number]; distance: number; pps: number };
 
@@ -136,6 +142,10 @@ type DropTarget =
   | { type: 'main'; index: number };
 
 const LONG_PRESS_MS = 350;
+/** Width of the lock button at the right end of a row's name (px). */
+const LOCK_ZONE = 24;
+const LOCK_PATH = 'M6.5 11h11v9h-11zM8.5 11V8a3.5 3.5 0 017 0v3M12 14.5v2';
+const UNLOCK_PATH = 'M6.5 11h11v9h-11zM8.5 11V8a3.5 3.5 0 016.8-1.2M12 14.5v2';
 /** Distance from an edge (px) where a drag starts scrolling the timeline, and the top speed. */
 const EDGE_ZONE = 48;
 const EDGE_SPEED = 14;
@@ -229,6 +239,7 @@ export class TimelineView {
       ctl.ui.subscribe((s, prev) => {
         if (
           s.selectedId !== prev.selectedId ||
+          s.selectedIds !== prev.selectedIds ||
           s.pxPerSecond !== prev.pxPerSecond ||
           s.layout !== prev.layout
         ) {
@@ -252,7 +263,7 @@ export class TimelineView {
     listen('pointerleave', () => this.#leave());
     listen('lostpointercapture', (e) => this.#pointers.delete(e.pointerId));
     listen('wheel', (e) => this.#onWheel(e), { passive: false });
-    listen('contextmenu', (e) => e.preventDefault());
+    listen('contextmenu', (e) => this.#contextMenu(e));
     // iOS: stop the long-press callout, text selection and page scroll fighting our gestures.
     listen('touchstart', (e) => e.preventDefault(), { passive: false });
     this.#applyLayout();
@@ -396,15 +407,31 @@ export class TimelineView {
   }
 
   #hit(x: number, y: number): Hit {
-    return hitTest(
-      this.#rows(),
-      this.#m,
-      this.#scale(),
-      x,
-      y,
-      this.#ctl.ui.getState().selectedId,
-      this.#touch,
-    );
+    return hitTest(this.#rows(), this.#m, this.#scale(), x, y, this.#trimTarget(), this.#touch);
+  }
+
+  /** The clip with trim handles: the one selected clip, unless it's locked. */
+  #trimTarget(): string | null {
+    const { selectedId, selectedIds } = this.#ctl.ui.getState();
+    if (!selectedId || selectedIds.length > 1 || this.#ctl.isLocked(selectedId)) return null;
+    return selectedId;
+  }
+
+  /** Right-click (mouse): the menu for the clip under the pointer (selecting it first). */
+  #contextMenu(e: MouseEvent): void {
+    e.preventDefault();
+    if (this.#touch) return; // touch: a still long-press opens it (see #up)
+    const p = this.#local(e as PointerEvent);
+    const hit = this.#hit(p.x, p.y);
+    if (hit.type === 'item' || hit.type === 'trim') {
+      if (!this.#ctl.ui.getState().selectedIds.includes(hit.item.id)) this.#ctl.select(hit.item.id);
+      this.#openMenuAt(e.clientX, e.clientY);
+    }
+  }
+
+  #openMenuAt(clientX: number, clientY: number): void {
+    const r = this.#root.getBoundingClientRect();
+    this.#ctl.openMenu(clientX - r.left, clientY - r.top);
   }
 
   #rowAt(y: number, project: Project = this.#ctl.project): Row | undefined {
@@ -435,10 +462,12 @@ export class TimelineView {
     }
     if (this.#pointers.size > 2 || e.button > 0) return;
 
-    // Lane header icons toggle mute (sound) / hide (pictures).
+    // Lane header: the lock at its right end locks the row; elsewhere it toggles mute (sound) /
+    // hide (pictures).
     if (p.x < this.#m.header && p.y > this.#m.ruler) {
       const row = this.#rowAt(p.y);
-      if (row) this.#ctl.toggleTrack(row.track.id);
+      if (row && p.x >= this.#m.header - LOCK_ZONE) this.#ctl.toggleTrackLock(row.track.id);
+      else if (row) this.#ctl.toggleTrack(row.track.id);
       return;
     }
 
@@ -495,6 +524,11 @@ export class TimelineView {
       timer: null,
     };
     if (hit.type === 'item') {
+      // Shift / ⌘-click adds to (or takes from) the selection; nothing moves.
+      if (e.shiftKey || e.metaKey || e.ctrlKey) {
+        this.#ctl.select(hit.item.id, { add: true });
+        return;
+      }
       this.#ctl.select(hit.item.id);
       if (this.#touch) {
         // Long-press lifts a clip to move/reorder it; a plain drag scrolls the timeline.
@@ -509,11 +543,31 @@ export class TimelineView {
   }
 
   #startItemDrag(pending: Extract<Drag, { type: 'pending' }>, x: number, y: number): void {
-    if (pending.hit.type !== 'item' || pending.hit.row.track.locked) return;
+    if (pending.hit.type !== 'item') return;
     const item = pending.hit.item;
     const row = pending.hit.row;
+    if (this.#ctl.isLocked(item.id)) {
+      // Say why it doesn't move; a still long-press still opens the menu (with Unlock).
+      if (this.#touch) this.#openMenuAt(...this.#client(x, y));
+      else this.#ctl.toast(this.#ctl.labels.lockedReason, 'info');
+      this.#drag = null;
+      return;
+    }
     const left = timeToX(this.#scale(), item.start);
     const fromMain = row.track.kind === 'main';
+    // The rest of a group / multi-selection on lanes moves along (by time; each keeps its lane).
+    const { selectedIds } = this.#ctl.ui.getState();
+    const others =
+      fromMain || !selectedIds.includes(item.id)
+        ? []
+        : this.#ctl
+            .selectedItems()
+            .filter(
+              (i) =>
+                i.id !== item.id &&
+                !mainTrack(this.#ctl.project).items.includes(i) &&
+                !this.#ctl.isLocked(i.id),
+            );
     this.#drag = {
       type: 'move',
       id: pending.id,
@@ -526,6 +580,9 @@ export class TimelineView {
       target: fromMain
         ? { type: 'main', index: row.track.items.findIndex((i) => i.id === item.id) }
         : { type: 'lane', trackId: row.track.id },
+      others,
+      origin: { x, y },
+      moved: false,
     };
     this.#canvas.style.cursor = 'grabbing';
     this.invalidate();
@@ -720,6 +777,7 @@ export class TimelineView {
       }
       case 'move':
         drag.pointer = p;
+        if (Math.hypot(p.x - drag.origin.x, p.y - drag.origin.y) > TOUCH_SLOP) drag.moved = true;
         this.#updateMove(drag);
         this.#edgeScroll();
         return;
@@ -764,7 +822,23 @@ export class TimelineView {
       case 'move': {
         cancelAnimationFrame(this.#edgeFrame);
         this.#edgeFrame = 0;
-        const { item, start, target, fromMain } = drag;
+        const { item, start, target, fromMain, others } = drag;
+        // A long-press lift that never moved: the clip's menu instead.
+        if (this.#touch && !drag.moved) {
+          this.#openMenuAt(...this.#client(drag.origin.x, drag.origin.y));
+          break;
+        }
+        if (others.length && target.type === 'lane') {
+          const delta = start - item.start;
+          const trackId = target.trackId;
+          if (delta !== 0 || trackId !== this.#trackOf(item.id))
+            this.#ctl.run(l.move, (d, ctx) => {
+              const shift = shiftItems(d, [item.id, ...others.map((o) => o.id)], delta, ctx.ids);
+              if (trackId !== this.#trackOf(item.id))
+                moveItem(d, item.id, item.start + shift, ctx.ids, trackId);
+            });
+          break;
+        }
         if (target.type === 'main') {
           if (fromMain) {
             const from = mainTrack(this.#ctl.project).items.findIndex((i) => i.id === item.id);
@@ -871,6 +945,12 @@ export class TimelineView {
     return groupEnd();
   }
 
+  /** Canvas-local point → client coordinates. */
+  #client(x: number, y: number): [number, number] {
+    const r = this.#canvas.getBoundingClientRect();
+    return [x + r.left, y + r.top];
+  }
+
   #trackOf(itemId: string): string | undefined {
     return this.#ctl.project.tracks.find((t) => t.items.some((i) => i.id === itemId))?.id;
   }
@@ -943,7 +1023,12 @@ export class TimelineView {
         hoverHeader = row.track.id;
         cursor = 'pointer';
         const sound = row.track.kind === 'main' || row.track.kind === 'audio';
-        tip = sound ? l.tipLaneMute(row.track.muted) : l.tipLaneHide(row.track.hidden);
+        tip =
+          x >= this.#m.header - LOCK_ZONE
+            ? l.tipLaneLock(row.track.locked)
+            : sound
+              ? l.tipLaneMute(row.track.muted)
+              : l.tipLaneHide(row.track.hidden);
       }
     } else {
       const hit = this.#hit(x, y);
@@ -1069,7 +1154,8 @@ export class TimelineView {
     const project = this.#project();
     const scale = this.#scale();
     const rows = this.#rows(project);
-    const selectedId = this.#ctl.ui.getState().selectedId;
+    const selectedIds = this.#ctl.ui.getState().selectedIds;
+    const trimId = this.#trimTarget();
     const contentLeft = m.header;
     const drag = this.#drag;
 
@@ -1087,7 +1173,7 @@ export class TimelineView {
       this.#roundRect(contentLeft + 4, row.top, w - contentLeft - 8, row.height, this.#radius + 2);
       ctx.fill();
       if (m.header === 0) this.#drawRowNames([row], rows);
-      this.#drawRow(row, scale, project, selectedId);
+      this.#drawRow(row, scale, project, selectedIds, trimId);
     }
     if (drag?.type === 'move') this.#drawDrop(drag, scale, rows, project);
     this.#drawFlashes(scale);
@@ -1167,7 +1253,29 @@ export class TimelineView {
       if (off) ctx.stroke(this.#icon('off', icons.off!));
       ctx.restore();
       ctx.fillStyle = off ? c.subtle : row.track.kind === 'main' ? c.label : c.muted;
-      ctx.fillText(this.#ellipsize(this.#rowName(row, rows), m.header - 38), 32, cy + 0.5);
+      const showLock = row.track.locked || this.#hoverHeader === row.track.id;
+      ctx.fillText(
+        this.#ellipsize(this.#rowName(row, rows), m.header - 38 - (showLock ? LOCK_ZONE - 8 : 0)),
+        32,
+        cy + 0.5,
+      );
+      // The row's lock: always shown when locked, on hover otherwise.
+      if (showLock) {
+        ctx.save();
+        ctx.translate(m.header - LOCK_ZONE + 6, cy - 7);
+        ctx.scale(14 / 24, 14 / 24);
+        ctx.strokeStyle = row.track.locked ? c.selection : c.subtle;
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.stroke(
+          this.#icon(
+            row.track.locked ? 'lock' : 'unlock',
+            row.track.locked ? LOCK_PATH : UNLOCK_PATH,
+          ),
+        );
+        ctx.restore();
+      }
     }
     ctx.restore();
   }
@@ -1184,7 +1292,13 @@ export class TimelineView {
     ctx.restore();
   }
 
-  #drawRow(row: Row, scale: TimeScale, project: Project, selectedId: string | null): void {
+  #drawRow(
+    row: Row,
+    scale: TimeScale,
+    project: Project,
+    selectedIds: readonly string[],
+    trimId: string | null,
+  ): void {
     const ctx = this.#ctx;
     const c = this.#c;
     const items = row.track.items;
@@ -1197,8 +1311,22 @@ export class TimelineView {
       const x2 = timeToX(scale, itemEnd(item));
       if (x2 < left || x1 > this.#width) continue;
       // The lifted clip stays as a faint placeholder; its floating copy follows the pointer.
-      const alpha = item.id === lifted ? 0.3 : row.track.hidden ? 0.45 : 1;
-      this.#drawItem(item, x1, x2, row, project, item.id === selectedId && !lifted, alpha);
+      const moving =
+        drag?.type === 'move' &&
+        drag.target.type === 'lane' &&
+        drag.others.some((o) => o.id === item.id);
+      const alpha = item.id === lifted || moving ? 0.3 : row.track.hidden || item.hidden ? 0.45 : 1;
+      this.#drawItem(
+        item,
+        x1,
+        x2,
+        row,
+        project,
+        selectedIds.includes(item.id) && !lifted,
+        alpha,
+        false,
+        item.id === trimId,
+      );
     }
     if (row.track.kind !== 'main' && row.track.kind !== 'overlay') return;
     // Transition markers on cuts (main track; touching pictures on a layer).
@@ -1343,6 +1471,18 @@ export class TimelineView {
         ctx.setLineDash([5, 4]);
         ctx.stroke();
       }
+      // The rest of the group lands the same distance along, each on its own row.
+      const delta = drag.start - drag.item.start;
+      for (const other of drag.others) {
+        const r = rows.find((row) => row.track.items.some((i) => i.id === other.id));
+        if (!r) continue;
+        const o1 = timeToX(scale, Math.max(0, other.start + delta));
+        const o2 = timeToX(scale, Math.max(0, other.start + delta) + other.duration);
+        ctx.fillStyle = c.accentSoft;
+        this.#roundRect(o1 + 1, r.top + 3, o2 - o1 - 2, r.height - 6, this.#radius);
+        ctx.fill();
+        ctx.stroke();
+      }
     } else if (target.type === 'new') {
       const slot = slotRect(this.#m, this.#scrollY);
       if (Math.abs(target.y - (slot.top + slot.height / 2)) >= 1) {
@@ -1482,6 +1622,7 @@ export class TimelineView {
     selected: boolean,
     alpha: number,
     lifted = false,
+    handles = false,
   ): void {
     const ctx = this.#ctx;
     const c = this.#c;
@@ -1635,6 +1776,19 @@ export class TimelineView {
         ctx.restore();
       }
     }
+    if ((item.locked || row.track.locked) && bw > 28) {
+      ctx.fillStyle = c.overlay;
+      this.#roundRect(bx + bw - 21, top + 4, 17, 17, 5);
+      ctx.fill();
+      ctx.save();
+      ctx.translate(bx + bw - 18.5, top + 6.5);
+      ctx.scale(12 / 24, 12 / 24);
+      ctx.strokeStyle = c.onMedia;
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.stroke(this.#icon('lock', LOCK_PATH));
+      ctx.restore();
+    }
     ctx.restore(); // clip
 
     if (selected) {
@@ -1646,7 +1800,7 @@ export class TimelineView {
       this.#roundRect(bx + 1, top + 1, bw - 2, height - 2, this.#radius);
       ctx.stroke();
       ctx.restore();
-      if (alpha > 0.9 && !row.track.locked) this.#drawTrimHandles(bx, bw, top, height);
+      if (alpha > 0.9 && handles) this.#drawTrimHandles(bx, bw, top, height);
     } else if (lifted) {
       ctx.strokeStyle = c.selection;
       ctx.lineWidth = 2;

@@ -87,6 +87,7 @@ const paths = {
   distributeH: 'M4 3v18M20 3v18M9.5 7h5v10h-5z',
   distributeV: 'M3 4h18M3 20h18M7 9.5h10v5H7z',
   select: 'M5 4l13 6.5-5.5 1.5L10.5 18z',
+  grip: 'M9 6.5v.01M15 6.5v.01M9 12v.01M15 12v.01M9 17.5v.01M15 17.5v.01',
 } as const;
 
 /** Name of an editor icon. */

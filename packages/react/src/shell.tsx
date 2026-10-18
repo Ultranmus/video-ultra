@@ -516,6 +516,13 @@ function TimelineA11y({ onReveal }: { onReveal: (item: Item) => void }): ReactEl
             >
               {sound ? l.muteTrack(name) : l.hideTrack(name)}
             </button>
+            <button
+              type="button"
+              aria-pressed={track.locked}
+              onClick={() => ctl.toggleTrackLock(track.id)}
+            >
+              {`${l.lockLane}: ${name}`}
+            </button>
             <div role="listbox" aria-label={name}>
               {track.items.map((item, index) => {
                 n++;
@@ -525,7 +532,7 @@ function TimelineA11y({ onReveal }: { onReveal: (item: Item) => void }): ReactEl
                     role="option"
                     tabIndex={selectedId === item.id || (selectedId === null && n === 1) ? 0 : -1}
                     aria-selected={selectedId === item.id}
-                    aria-label={`${l.clipLabel(index + 1, l.kind[item.kind] ?? item.kind, formatTime(item.start), formatTime(itemEnd(item)))}: ${itemTitle(item, assets)}`}
+                    aria-label={`${l.clipLabel(index + 1, l.kind[item.kind] ?? item.kind, formatTime(item.start), formatTime(itemEnd(item)))}: ${itemTitle(item, assets)}${item.locked || track.locked ? `, ${l.lockedState}` : ''}${item.hidden ? `, ${l.hiddenState}` : ''}`}
                     onFocus={() => {
                       ctl.select(item.id);
                       ctl.seek(item.start);
