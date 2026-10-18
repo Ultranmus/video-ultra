@@ -102,6 +102,12 @@ export interface ProjectStorage extends WaveformCache {
   getMedia(asset: Asset): Promise<Blob | null>;
   /** Removes an asset's stored bytes, handle and cached waveform. */
   deleteMedia(assetId: string): Promise<void>;
+  /**
+   * Removes stored media that no saved project uses and that is older than `maxAgeMs` (default a
+   * day; 0 = any age) — files left when a crash came between an import and the next save. Keeps everything if
+   * any project can't be read (better a stray file than a lost one). Returns how many went.
+   */
+  sweepMedia(maxAgeMs?: number): Promise<number>;
   /** Projects saved locally, newest first. */
   listProjects(): Promise<StoredProjectInfo[]>;
   /**
@@ -285,6 +291,27 @@ export function createProjectStorageOn(
       await files.remove(mediaPath(assetId));
       await files.remove(`${mediaPath(assetId)}.peaks`);
       await handles.delete(assetId).catch(() => undefined);
+    },
+
+    async sweepMedia(maxAgeMs = 24 * 60 * 60 * 1000) {
+      const used = new Set<string>();
+      for (const info of await storage.listProjects()) {
+        const loaded = await storage.loadProject(info.id).catch(() => null);
+        if (!loaded) return 0;
+        for (const id of Object.keys(loaded.project.assets)) used.add(id);
+      }
+      const now = Date.now();
+      let removed = 0;
+      for (const name of await files.list('media')) {
+        if (name.endsWith('.peaks')) continue;
+        const id = decodeURIComponent(name);
+        if (used.has(id)) continue;
+        const file = await files.read(mediaPath(id));
+        if (!file || (maxAgeMs > 0 && now - file.lastModified < maxAgeMs)) continue;
+        await storage.deleteMedia(id);
+        removed++;
+      }
+      return removed;
     },
 
     async getWaveform(assetId) {

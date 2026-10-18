@@ -98,6 +98,25 @@ describe('project storage', () => {
     ]);
   });
 
+  it('sweeps media no saved project uses, but only when it is old enough', async () => {
+    const files = new MemoryFileStore();
+    const storage = createProjectStorageOn(files);
+    const editor = createEditor(startProject());
+    const autosave = attachAutosave(editor, storage, MANUAL);
+    edit(editor, 1);
+    await autosave.flush();
+    const used = Object.keys(editor.getProject().assets)[0]!;
+    await storage.putMedia(used, new Blob(['in use']));
+    await storage.putMedia('orphan', new Blob(['left by a crash']));
+    // Fresh files are never touched (an import may be in progress).
+    expect(await storage.sweepMedia()).toBe(0);
+    expect(await storage.sweepMedia(0)).toBe(1);
+    const left = (await files.list('media')).map((n) => decodeURIComponent(n));
+    expect(left).toContain(used);
+    expect(left).not.toContain('orphan');
+    autosave.detach();
+  });
+
   it('compacts: a snapshot every N entries replaces the older snapshot and log', async () => {
     const files = new MemoryFileStore();
     const storage = createProjectStorageOn(files);

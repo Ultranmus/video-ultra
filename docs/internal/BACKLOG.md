@@ -66,7 +66,7 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       `UrlSource`) in the engine/analyzer, or stream it into OPFS once.
 - [ ] File handles: `requestPermission` only works inside a user gesture → the UI needs a
       "re-link / allow access" prompt when `getMedia` returns null for a `handle` source.
-- [ ] Orphaned media: a crash between `putMedia` and the next snapshot leaves `media/<id>` that no
+- [x] (fixed 2026-10-19: `storage.sweepMedia()`) Orphaned media: a crash between `putMedia` and the next snapshot leaves `media/<id>` that no
       project lists. Add a sweep (media not referenced by any project's meta, older than a day).
 - [ ] HDR thumbnails show the browser's own HDR → SDR conversion (too bright, DECISIONS #33): the
       2D-canvas path has no correction. Fine for a strip; revisit if it looks wrong on iPhone.

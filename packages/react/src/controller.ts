@@ -159,6 +159,12 @@ export class EditorController {
       if (generation !== this.#generation) return;
     }
     void this.storage.status().then((s) => this.ui.setState({ persistent: s.persistent }));
+    // Media a crash left behind (imported, never saved into a project): tidy once, later, and only
+    // from the tab that owns the project (another tab may be mid-import).
+    setTimeout(() => {
+      if (generation === this.#generation && this.#lock)
+        void this.storage?.sweepMedia().catch(() => 0);
+    }, 10_000);
     // Tell once (per browser) that local storage may be cleared — after the first real edit, when
     // there is work to lose, not on an empty editor.
     const off = this.editor.onCommit(() => {
