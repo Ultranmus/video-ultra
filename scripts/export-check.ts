@@ -3,7 +3,9 @@
  * adjustment and three transitions, PIP video, PNG, a title, an emoji sticker, blurred background)
  * through `engine.export` and verifies every file with ffprobe + a full ffmpeg decode: streams,
  * size, frame count, duration, audio trimmed to the video. Also checks cancelling (AbortError, no
- * file left in OPFS).
+ * file left in OPFS). Then the ducking scene (`/lab/engine?duck=1`): the exported music dips by
+ * the set amount under the voice and matches the preview mix window by window (`--no-duck` skips
+ * it).
  *
  * Usage: playground running, then
  *   node scripts/export-check.ts [--browsers chrome,webkit,firefox] [--formats mp4,webm]
@@ -354,6 +356,108 @@ for (const name of browsers) {
     await browser.close();
   }
 }
+// ── Ducking (B1): music lowered under a voice, measured in the exported file ──
+/** The file's left channel as 48 kHz float samples (ffmpeg; a mono downmix would scale levels). */
+function decodeAudio(file: string): Float32Array {
+  const raw = execFileSync(
+    'ffmpeg',
+    ['-v', 'error', '-i', file, '-vn', '-af', 'pan=mono|c0=c0', '-ar', '48000', '-f', 'f32le', '-'],
+    { maxBuffer: 256 * 1024 * 1024 },
+  );
+  return new Float32Array(raw.buffer, raw.byteOffset, raw.byteLength / 4);
+}
+/** Level of `freq` (Goertzel; a full-scale sine ≈ 1) per `windowS` window. */
+function toneLevels(x: Float32Array, freq: number, windowS: number): number[] {
+  const rate = 48000;
+  const size = Math.round(windowS * rate);
+  const c = 2 * Math.cos((2 * Math.PI * freq) / rate);
+  const out: number[] = [];
+  for (let at = 0; at + size <= x.length; at += size) {
+    let s1 = 0;
+    let s2 = 0;
+    for (let i = at; i < at + size; i++) {
+      const s0 = x[i]! + c * s1 - s2;
+      s2 = s1;
+      s1 = s0;
+    }
+    out.push((2 * Math.sqrt(Math.max(0, s1 * s1 + s2 * s2 - c * s1 * s2))) / size);
+  }
+  return out;
+}
+if (!process.argv.includes('--no-duck')) {
+  for (const name of browsers) {
+    const browser = await launch[name as keyof typeof launch]();
+    const page = await browser.newPage({ viewport: { width: 600, height: 900 } });
+    await page.goto(`${BASE}/lab/engine?duck=1`);
+    await page.waitForFunction(
+      () => /^Ready|FAILED/.test(document.getElementById('status')!.textContent!),
+      null,
+      { timeout: 90000 },
+    );
+    console.log(`\n===== ${name} · ducking (voice 2–4 s, music −75 % under it)`);
+    const W = 0.1;
+    const preview = await page.evaluate((w) => window.engineLab!.previewLevels(330, w), W);
+    for (const format of formats) {
+      let out: Awaited<ReturnType<NonNullable<Window['engineLab']>['exportVideo']>>;
+      try {
+        out = await page.evaluate((o) => window.engineLab!.exportVideo(o), {
+          format,
+          height: 360,
+          fps: 30,
+          quality: 'medium',
+        } as const);
+      } catch (error) {
+        check(false, `${format}: ducking export failed — ${String(error).slice(0, 300)}`);
+        continue;
+      }
+      if (!out.result.audioCodec) {
+        console.log(`  ${format}: no audio encoder here — skipped`);
+        continue;
+      }
+      const file = join(dir, `${name}-duck.${out.result.extension}`);
+      writeFileSync(file, Buffer.from(out.base64, 'base64'));
+      const pcm = decodeAudio(file);
+      const music = toneLevels(pcm, 330, W);
+      const voice = toneLevels(pcm, 220, W);
+      const avg = (a: number[], from: number, to: number) => {
+        const s = a.slice(Math.round(from / W), Math.round(to / W));
+        return s.reduce((x, y) => x + y, 0) / s.length;
+      };
+      const full = avg(music, 0.5, 1.9);
+      const ducked = avg(music, 2.3, 3.9);
+      const db = (x: number) => 20 * Math.log10(x);
+      console.log(
+        `  ${format}: music ${full.toFixed(4)} before the voice, ${ducked.toFixed(4)} under it; voice ${avg(voice, 2.3, 3.9).toFixed(4)}`,
+      );
+      check(
+        Math.abs(db(ducked / full) - db(0.25)) < 0.7,
+        `${format}: music dips ${db(ducked / full).toFixed(1)} dB under the voice (set: 75 % = −12.0 dB)`,
+      );
+      const recovered = avg(music, 5.8, 6.8) / full;
+      check(
+        recovered > 0.95,
+        `${format}: music back to ${(recovered * 100).toFixed(0)} % after the voice`,
+      );
+      // Export = preview, window by window (0.1 s), across the dip, hold and release.
+      let worst = 0;
+      let worstAt = 0;
+      for (let i = Math.round(0.3 / W); i < Math.min(preview.length, music.length) - 1; i++) {
+        const diff = Math.abs(db(music[i]! / preview[i]!));
+        if (diff > worst) {
+          worst = diff;
+          worstAt = i * W;
+        }
+      }
+      // AAC / Opus at "medium" keep a pure tone's level within a few tenths of a dB.
+      check(
+        worst < 0.8,
+        `${format}: export matches the preview mix in every 0.1 s window (worst ${worst.toFixed(2)} dB at ${worstAt.toFixed(1)} s)`,
+      );
+    }
+    await browser.close();
+  }
+}
+
 console.log(`\nFiles in ${dir}`);
 console.log(failures ? `${failures} check(s) failed` : 'All export checks passed');
 process.exitCode = failures ? 1 : 0;

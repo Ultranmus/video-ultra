@@ -144,6 +144,7 @@ export function repairProject(project: Project, ids: IdFactory = randomId): stri
       warnings.push(`Removed "${item.name ?? item.kind}": shorter than one frame.`);
       return false;
     }
+    if ('duck' in item && item.duck !== undefined && !(item.duck > 0)) delete item.duck;
     if ('fadeIn' in item) {
       item.fadeIn = Math.min(item.fadeIn, item.duration);
       item.fadeOut = Math.min(item.fadeOut, item.duration - item.fadeIn);

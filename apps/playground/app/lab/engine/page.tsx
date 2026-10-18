@@ -10,7 +10,8 @@
  * `?golden=1` instead renders fixed golden frames through both GPU backends for
  * scripts/composite-check.ts (filters, adjustments, a sample of every transition family with
  * overlays on lanes, element animations). `?bench=1` measures the GPU draw cost of the heaviest
- * transitions on both backends. `?bg=color` turns the blurred background off.
+ * transitions on both backends. `?bg=color` turns the blurred background off. `?duck=1` builds the
+ * ducking scene instead of the demo.
  */
 import {
   addAsset,
@@ -19,6 +20,7 @@ import {
   DEFAULT_TEXT_STYLE,
   DEFAULT_TRANSFORM,
   detectCapabilities,
+  FLICKS_PER_SECOND,
   fromSeconds,
   insertMain,
   NO_CROP,
@@ -27,6 +29,7 @@ import {
   setBackground,
   setTransition,
   toSeconds,
+  type AudioItem,
   type Direction,
   type ExportOptions,
   type ExportResult,
@@ -46,6 +49,7 @@ import {
   fullCanvasGeometry,
   identityColour,
   layerGeometry,
+  Mixer,
   moveOnCanvas,
   plainLook,
   noOverlay,
@@ -53,12 +57,14 @@ import {
   transitionLook,
   transitionOverlay,
   writeEffects,
+  type AudioTrackSource,
   type EngineInternal,
   type EngineStats,
   type ExportRunInfo,
   type LayerDraw,
   type Renderer,
 } from '@video-ultra/core/internal';
+import { ALL_FORMATS, BlobSource, Input } from 'mediabunny';
 import { useEffect, useRef, useState } from 'react';
 
 const MAIN: { file: string; seconds: number; from?: number }[] = [
@@ -217,6 +223,94 @@ async function buildDemo(
   setAnimation(project, logo.id, 'in', { type: 'slide-left-in', duration: fromSeconds(0.6) });
   setAnimation(project, pip.id, 'in', { type: 'flip-in', duration: fromSeconds(0.6) });
   return { project, blobs };
+}
+
+/**
+ * `?duck=1`: ducking scene for export-check. A photo for 7 s; a "voice" (voice.m4a, 220 Hz) on a
+ * lane from 2 to 4 s; music (music.mp3, 330 Hz) from 0 to 7 s at volume 0.5, set to lower under
+ * voice by 75 %. `previewLevels` mixes it like preview playback does, for comparison.
+ */
+async function buildDuckScene(): Promise<{ project: Project; blobs: Blobs }> {
+  const project = createProject({ name: 'Ducking', width: 640, height: 360 });
+  const blobs: Blobs = new Map();
+  const photo = await loadAsset(project, blobs, 'photo.jpg');
+  insertMain(project, {
+    id: 'photo',
+    kind: 'image',
+    assetId: photo,
+    start: 0,
+    duration: fromSeconds(7),
+    ...look(),
+  });
+  const sound = async (id: string, file: string, startS: number, seconds: number) => {
+    const item: AudioItem = {
+      id,
+      kind: 'audio',
+      assetId: await loadAsset(project, blobs, file),
+      start: fromSeconds(startS),
+      duration: fromSeconds(seconds),
+      sourceIn: 0,
+      speed: 1,
+      volume: 1,
+      muted: false,
+      fadeIn: 0,
+      fadeOut: 0,
+    };
+    return item;
+  };
+  addToLane(project, await sound('voice', 'voice.m4a', 2, 2), () => 'lane-voice');
+  const music = await sound('music', 'music.mp3', 0, 7);
+  addToLane(project, { ...music, volume: 0.5, duck: 0.75 }, () => 'lane-music');
+  return { project, blobs };
+}
+
+/** Level of `freq` (Goertzel, a full-scale sine ≈ 1) in `x`. */
+function toneLevel(x: Float32Array, freq: number, rate: number): number {
+  const c = 2 * Math.cos((2 * Math.PI * freq) / rate);
+  let s1 = 0;
+  let s2 = 0;
+  for (let i = 0; i < x.length; i++) {
+    const s0 = x[i]! + c * s1 - s2;
+    s2 = s1;
+    s1 = s0;
+  }
+  return (2 * Math.sqrt(Math.max(0, s1 * s1 + s2 * s2 - c * s1 * s2))) / x.length;
+}
+
+/** Mixes `project` on the page like preview playback does (2048-frame blocks, 48 kHz). */
+async function previewLevels(
+  project: Project,
+  blobs: Blobs,
+  freq: number,
+  windowS: number,
+): Promise<number[]> {
+  const rate = 48000;
+  const sources = new Map<string, AudioTrackSource>();
+  for (const [assetId, blob] of blobs) {
+    if (project.assets[assetId]?.kind !== 'audio') continue;
+    const track = await new Input({
+      formats: ALL_FORMATS,
+      source: new BlobSource(blob),
+    }).getPrimaryAudioTrack();
+    if (track) sources.set(assetId, { track, sampleRate: await track.getSampleRate() });
+  }
+  const mixer = new Mixer(rate, (id) => sources.get(id) ?? null);
+  const total = Math.round(toSeconds(projectDuration(project)) * rate);
+  const left = new Float32Array(total);
+  const block = 2048;
+  const l = new Float32Array(block);
+  const r = new Float32Array(block);
+  for (let f = 0; f < total; f += block) {
+    const n = Math.min(block, total - f);
+    await mixer.render(project, (f * FLICKS_PER_SECOND) / rate, n, l, r);
+    left.set(l.subarray(0, n), f);
+  }
+  mixer.dispose();
+  const size = Math.round(windowS * rate);
+  const levels: number[] = [];
+  for (let at = 0; at + size <= total; at += size)
+    levels.push(toneLevel(left.subarray(at, at + size), freq, rate));
+  return levels;
 }
 
 /**
@@ -617,6 +711,8 @@ declare global {
         backend?: 'webgpu' | 'webgl2',
       ): Promise<{ result: Omit<ExportResult, 'blob'>; info: ExportRunInfo; base64: string }>;
       cancelAfter(ms: number, options: ExportOptions): Promise<string>;
+      /** Level of `freq` per `windowS` window, mixed on the page like preview playback does. */
+      previewLevels(freq: number, windowS: number): Promise<number[]>;
       /** One exact frame (the export's compositor path) as base64 RGBA. */
       captureFrame(
         s: number,
@@ -691,10 +787,12 @@ export default function EngineLab() {
         setStatus('Golden done');
         return;
       }
-      const { project, blobs } = await buildDemo(
-        params.get('bg') !== 'color',
-        Math.max(1, Number(params.get('repeat') ?? 1)),
-      );
+      const { project, blobs } = params.get('duck')
+        ? await buildDuckScene()
+        : await buildDemo(
+            params.get('bg') !== 'color',
+            Math.max(1, Number(params.get('repeat') ?? 1)),
+          );
       if (disposed) return;
       const lab = {
         duration: toSeconds(projectDuration(project)),
@@ -743,6 +841,8 @@ export default function EngineLab() {
           });
           return bitmapPixels(bitmap);
         },
+        previewLevels: (freq: number, windowS: number) =>
+          previewLevels(project, blobs, freq, windowS),
         async cancelAfter(ms: number, options: ExportOptions) {
           const controller = new AbortController();
           setTimeout(() => controller.abort(), ms);

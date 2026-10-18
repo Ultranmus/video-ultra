@@ -223,6 +223,25 @@ describe('properties and locking', () => {
     expect(() => updateItem(project, 'b', { volume: 1 })).toThrow(EditError);
   });
 
+  it('sets ducking on sounding items: clamped to 1, 0 removes it, pictures refuse it', () => {
+    const { project, ids } = setup();
+    updateItem(project, 'a', { duck: 0.6 });
+    expect((findItem(project, 'a')!.item as { duck?: number }).duck).toBe(0.6);
+    updateItem(project, 'a', { duck: 3 });
+    expect((findItem(project, 'a')!.item as { duck?: number }).duck).toBe(1);
+    // A split keeps it on both halves.
+    splitItem(project, 'a', s(1), ids);
+    const halves = mainTrack(project).items.filter(
+      (i) => i.kind === 'video' && i.assetId === 'vidA',
+    );
+    expect(halves.length).toBe(2);
+    expect(halves.every((i) => i.kind === 'video' && i.duck === 1)).toBe(true);
+    updateItem(project, 'a', { duck: 0 });
+    expect('duck' in findItem(project, 'a')!.item).toBe(false);
+    expect(() => updateItem(project, 'b', { duck: 0.5 })).toThrow(EditError);
+    expect(checkInvariants(project)).toEqual([]);
+  });
+
   it('refuses edits on locked tracks', () => {
     const { project, ids } = setup();
     setTrackFlags(project, mainTrack(project).id, { locked: true });

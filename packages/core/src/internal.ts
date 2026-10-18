@@ -77,6 +77,8 @@ export type { Engine, EngineInternal, EngineOptions } from './engine/client';
 export type { EngineStats, ExportRunInfo } from './engine/protocol';
 export { Mixer } from './audio/mixer';
 export type { AudioTrackSource } from './audio/mixer';
+export { applyDuck, DUCK_TUNING, DuckFollower, hasDucking, presenceFor } from './audio/duck';
+export type { DuckTuning } from './audio/duck';
 
 // Media analysis (import probing, thumbnails, waveforms) — runs in its own worker.
 export { createMediaAnalyzer } from './media/analyzer';

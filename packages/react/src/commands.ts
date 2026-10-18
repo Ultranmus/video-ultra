@@ -1,6 +1,7 @@
 import { mainTrack, type ArrangeTo } from '@video-ultra/core';
 import type { EditorController } from './controller';
 import type { IconName } from './icons';
+import { isSounding } from './items';
 import type { AlignEdge } from './stage/arrange';
 
 /**
@@ -36,7 +37,8 @@ export type CommandId =
   | 'alignMiddle'
   | 'alignBottom'
   | 'distributeH'
-  | 'distributeV';
+  | 'distributeV'
+  | 'duck';
 
 /** One action, as it stands right now. */
 export interface Command {
@@ -288,6 +290,20 @@ export function getCommand(ctl: EditorController, id: CommandId): Command {
         disabledReason: ctl.distributeReason(),
         run: () => ctl.distribute(id === 'distributeH' ? 'x' : 'y'),
       };
+    case 'duck': {
+      const sounding = items.filter(isSounding);
+      const on = sounding.length > 0 && sounding.every((i) => !!i.duck);
+      return {
+        id,
+        // Toggles say which way (menus): "Lower under voice" / "Don't lower under voice".
+        label: on ? l.duckStop : l.duck,
+        icon: 'duck',
+        tip: l.tipDuck,
+        pressed: on,
+        disabledReason: ctl.duckReason(),
+        run: () => ctl.toggleDuckSelected(),
+      };
+    }
   }
 }
 
@@ -383,7 +399,7 @@ export function menuSections(ctl: EditorController): {
       ],
     };
   if (items[0]!.kind === 'audio')
-    return { heading: null, sections: [['split'], ['duplicate', 'delete'], ['lock']] };
+    return { heading: null, sections: [['split'], ['duck'], ['duplicate', 'delete'], ['lock']] };
   return {
     heading: null,
     sections: [

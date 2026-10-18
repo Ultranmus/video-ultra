@@ -199,6 +199,12 @@ const audible = {
   muted: z.boolean(),
   fadeIn: time,
   fadeOut: time,
+  /**
+   * Lower under voice (ducking, file version 3+): while the project's other sound — video clips'
+   * own sound, voiceovers, anything not itself ducked — has a voice in it, this item plays at
+   * `1 − duck` of its volume (eased in and out). 0…1; missing = off.
+   */
+  duck: z.optional(unit),
 };
 
 export const VideoItemSchema = z.object({
@@ -311,6 +317,11 @@ export const AssetSchema = z.object({
   vfr: z.optional(z.boolean()),
   /** Which of the file's audio tracks plays (iPhones add an extra spatial-audio track). */
   audioTrack: z.optional(z.int().check(z.nonnegative())),
+  /**
+   * Licence / attribution line for media that came from a library (e.g. "Song — Artist, CC BY
+   * 4.0"), kept so the host can credit it (file version 3+).
+   */
+  credit: z.optional(z.string().check(z.maxLength(500))),
   /** Where the bytes live. The host can resolve `url` sources itself. */
   source: z.discriminatedUnion('type', [
     z.object({ type: z.literal('opfs'), key: z.string() }),

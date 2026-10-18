@@ -39,6 +39,8 @@ export function checkInvariants(project: Project): string[] {
       cursor = itemEnd(item);
       if (track.kind === 'main' && item.groupId)
         problems.push(`${where}: main-track clip in a group`);
+      if ('duck' in item && item.duck !== undefined && !(item.duck > 0 && item.duck <= 1))
+        problems.push(`${where}: duck amount ${item.duck} outside (0, 1] (off = no field)`);
 
       // Asset references
       const assetId = 'assetId' in item ? item.assetId : null;

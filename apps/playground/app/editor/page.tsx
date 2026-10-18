@@ -1,7 +1,8 @@
 'use client';
 
 /**
- * The editor, full screen. `?theme=light|auto`, `?backend=webgl2`, `?autosave=0` for testing.
+ * The editor, full screen. `?theme=light|auto`, `?backend=webgl2`, `?autosave=0` for testing,
+ * `?sounds=0` without the demo music & sounds library.
  * `?device=phone|phone-small|tablet|tablet-portrait` shows it at that device's size (the editor
  * picks its layout from its own width), so phone and tablet layouts can be checked on a desktop
  * without deploying. A strip at the top switches devices; it hides itself on real phones.
@@ -10,6 +11,7 @@ import { VideoEditor } from '@video-ultra/react';
 import '@video-ultra/react/styles.css';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
+import { createDemoSounds } from './demo-sounds';
 
 const DEVICES = {
   full: { label: 'Full window', width: 0, height: 0 },
@@ -28,6 +30,7 @@ function Editor() {
   const requested = params.get('device') as Device | null;
   const device: Device = requested && requested in DEVICES ? requested : 'full';
   // The switcher only makes sense on a big screen (on a phone the editor already is the phone).
+  const [sounds] = useState(createDemoSounds);
   const [wide, setWide] = useState(false);
   const [room, setRoom] = useState(0);
   useEffect(() => {
@@ -74,6 +77,7 @@ function Editor() {
       theme={theme}
       backend={backend}
       autosave={params.get('autosave') !== '0'}
+      {...(params.get('sounds') !== '0' ? { audioLibrary: sounds } : {})}
       onReady={(controller) => {
         (window as unknown as { vuEditor: unknown }).vuEditor = controller;
       }}

@@ -13,15 +13,18 @@ import {
   trimItem,
   updateItem,
   type Adjust,
+  type AudioItem,
   type Item,
   type TextStyle,
   type Transform,
+  type VideoItem,
 } from '@video-ultra/core';
+import { getCommand } from './commands';
 import { useState, type ReactElement } from 'react';
 import { useController, useLabels, useProject, useUi } from './context';
 import { Button, ColorField, EditSlider, IconButton, Section, Segmented } from './controls';
 import { Icon } from './icons';
-import { RATIOS, ratioOf } from './items';
+import { DEFAULT_DUCK, isSounding, RATIOS, ratioOf } from './items';
 import { AnimatePanel, FilterStrip, TransitionGrid } from './looks';
 import type { ToolId } from './state';
 import { ArrangeControls, LockedNote } from './organize';
@@ -266,7 +269,66 @@ function VolumeTool({ item }: { item: Item }) {
           />
         ) : null}
       </div>
+      {isSounding(item) ? <DuckControls item={item} /> : null}
     </>
+  );
+}
+
+/**
+ * "Lower under voice" (ducking, v0.2 B1): a switch, and once on, how much lower. A hint says when
+ * there's nothing to listen to yet.
+ */
+function DuckControls({ item }: { item: VideoItem | AudioItem }) {
+  const ctl = useController();
+  const l = useLabels();
+  // Re-read on every project change: the voice can come from any other clip.
+  const hasVoice = useProject((p) => ctl.hasVoiceFor(item.id, p));
+  const command = getCommand(ctl, 'duck');
+  const on = !!item.duck;
+  const reason = command.disabledReason;
+  return (
+    <div className="vu-duck">
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        aria-disabled={reason ? true : undefined}
+        className="vu-switch-row vu-duck-switch"
+        data-tooltip={reason ?? l.tipDuck}
+        onClick={() => {
+          if (!reason) command.run();
+        }}
+      >
+        <span className="vu-duck-label">
+          <Icon name="duck" size={18} />
+          <span>{l.duck}</span>
+        </span>
+        <span className="vu-switch" aria-hidden="true">
+          <span className="vu-switch-knob" />
+        </span>
+      </button>
+      {on ? (
+        <>
+          <EditSlider
+            label={l.duckAmount}
+            value={item.duck ?? DEFAULT_DUCK}
+            min={0.1}
+            max={1}
+            step={0.05}
+            defaultValue={DEFAULT_DUCK}
+            format={percent}
+            recipe={(d, v) => updateItem(d, item.id, { duck: v })}
+            commitLabel={l.duckAmount}
+            coalesceKey={`duck:${item.id}`}
+          />
+          {hasVoice ? null : (
+            <p className="vu-hint vu-duck-hint" role="status">
+              {l.duckNothingToHear}
+            </p>
+          )}
+        </>
+      ) : null}
+    </div>
   );
 }
 

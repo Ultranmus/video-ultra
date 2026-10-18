@@ -3,7 +3,7 @@
  * Visual review: walks the editor through the states a first-time user sees and saves a
  * screenshot of each — desktop (Chrome) and phone (WebKit, iPhone size, touch). Look at every one
  * before calling UI work done (feedback memory "ui-quality-bar").
- * Usage: playground running, then node scripts/ui-review.ts --shots <dir> [--only desktop|phone]
+ * Usage: playground running, then node scripts/ui-review.ts --shots <dir> [--only desktop|phone|sound]
  *   [--theme light]
  */
 import { chromium, devices, webkit, type Page } from '@playwright/test';
@@ -47,7 +47,87 @@ async function addMedia(page: Page) {
 
 const errors: string[] = [];
 
-if (only !== 'phone') {
+/** Selects the first item of `kind` (and its lane) through the page's controller. */
+async function selectFirst(page: Page, kind: string, nth = 0) {
+  await page.evaluate(
+    ([k, n]) => {
+      const c = (window as any).vuEditor;
+      const items = c.project.tracks.flatMap((t: any) => t.items).filter((i: any) => i.kind === k);
+      c.select(items[n as number].id);
+    },
+    [kind, nth] as const,
+  );
+}
+
+// v0.2 B. Sound: the Audio panel with a host library, preview, add, "Lower under voice".
+if (only === 'sound' || only === undefined) {
+  const browser = await chromium.launch({ channel: 'chrome' });
+  const page = await (
+    await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 })
+  ).newPage();
+  page.on('pageerror', (e) => errors.push(`sound desktop: ${e.message}`));
+  await load(page);
+  await addMedia(page);
+  await page.locator('.vu-rail .vu-btn', { hasText: 'Audio' }).click();
+  await snap(page, 's01-audio-panel-library');
+  await page.locator('.vu-audiolib-play').nth(3).click();
+  await page.waitForTimeout(400);
+  await snap(page, 's02-preview-playing');
+  await page.locator('.vu-audiolib-play').nth(3).click();
+  await page.locator('.vu-audiolib .vu-chip', { hasText: 'Impacts' }).click();
+  await page.waitForTimeout(500);
+  await snap(page, 's03-category');
+  await page.locator('.vu-audiolib-add').first().click();
+  await page.waitForFunction(
+    () =>
+      Object.values((window as any).vuEditor.project.assets).filter((a: any) => a.credit).length,
+    null,
+    { timeout: 20000 },
+  );
+  await snap(page, 's04-sound-added-selected');
+  await page.locator('.vu-audiolib .vu-search input').fill('zzz');
+  await page.waitForTimeout(700);
+  await snap(page, 's05-search-empty');
+  await selectFirst(page, 'audio');
+  await page.locator('.vu-inspector .vu-duck-switch').scrollIntoViewIfNeeded();
+  await page.locator('.vu-inspector .vu-duck-switch').hover();
+  await page.waitForTimeout(800);
+  await snap(page, 's06-duck-off-tooltip');
+  await page.locator('.vu-inspector .vu-duck-switch').click();
+  await page.mouse.move(10, 10);
+  await snap(page, 's07-duck-on');
+  // The video is selected: its own sound can be lowered too; the music is what it hears.
+  await selectFirst(page, 'video');
+  await page.locator('.vu-inspector .vu-duck-switch').scrollIntoViewIfNeeded();
+  await snap(page, 's08-video-sound-section');
+  await selectFirst(page, 'audio');
+  await page.evaluate(() => (window as any).vuEditor.openMenu(700, 500));
+  await snap(page, 's09-context-menu');
+  await browser.close();
+
+  const phone = await webkit.launch();
+  const p = await (await phone.newContext({ ...devices['iPhone 13'] })).newPage();
+  p.on('pageerror', (e) => errors.push(`sound phone: ${e.message}`));
+  await load(p);
+  await addMedia(p);
+  await p.locator('.vu-toolbar .vu-btn', { hasText: 'Audio' }).first().tap();
+  await p.waitForTimeout(800);
+  await snap(p, 's10-phone-audio-panel');
+  await p.locator('.vu-audiolib').scrollIntoViewIfNeeded();
+  await snap(p, 's11-phone-library');
+  await p
+    .locator('.vu-done')
+    .tap()
+    .catch(() => {});
+  await selectFirst(p, 'audio');
+  await p.locator('.vu-toolbar .vu-btn', { hasText: 'Volume' }).first().tap();
+  await snap(p, 's12-phone-volume-dock');
+  await p.locator('.vu-duck-switch').tap();
+  await snap(p, 's13-phone-duck-on');
+  await phone.close();
+}
+
+if (only !== 'phone' && only !== 'sound') {
   const browser = await chromium.launch({ channel: 'chrome' });
   const page = await (
     await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 })
@@ -134,7 +214,7 @@ if (only !== 'phone') {
   await browser.close();
 }
 
-if (only !== 'desktop') {
+if (only !== 'desktop' && only !== 'sound') {
   const browser = await webkit.launch();
   const page = await (await browser.newContext({ ...devices['iPhone 13'] })).newPage();
   page.on('pageerror', (e) => errors.push(`phone: ${e.message}`));

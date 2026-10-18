@@ -59,6 +59,14 @@ export function visualItem(asset: Asset, id: string, start: Time = 0): VideoItem
   };
 }
 
+/** "Lower under voice" amount when switched on: 75 % lower ≈ −12 dB, a classic voice-over duck. */
+export const DEFAULT_DUCK = 0.75;
+
+/** Items that make sound (video clips and music / sound / voiceover clips). */
+export function isSounding(item: Item): item is VideoItem | AudioItem {
+  return item.kind === 'video' || item.kind === 'audio';
+}
+
 /** An audio-lane item playing an audio file (or a video's sound). */
 export function audioItem(asset: Asset, id: string, start: Time): AudioItem {
   return {
