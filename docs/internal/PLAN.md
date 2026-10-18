@@ -109,7 +109,7 @@ Deferred to v0.2+: speed curves, reverse, text animations, templates, keyframes,
 - [x] F3 Export: explicit bitrates per resolution × quality; old export files cleaned on startup (WebKit cancel error didn't reproduce)
 - [x] F4 Firefox WebM: VP8 (3.7× faster than VP9 there)
 - [x] F5 Orphaned media sweep (`sweepMedia`, 10 s after start, owner tab only)
-- [ ] F6 Chrome startup long tasks (> 50 ms)
+- [x] F6 Chrome startup long tasks: probe split; first AudioContext (unavoidable 125 ms) moved to a quiet moment
 - [ ] F7 Audio crossfade under video transitions
 - [ ] F8 UI polish: toolbar overflow hint, compact storage note, ruler labels fade, hide undrawable emoji, voiceover "mute while recording"
 - [ ] F9 Stage pinch-zoom (nothing selected)

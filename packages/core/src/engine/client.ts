@@ -252,8 +252,14 @@ export async function createEngine(
   const idle = (
     globalThis as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }
   ).requestIdleCallback;
-  if (idle) idle(prepareAudio, { timeout: 2000 });
-  else setTimeout(prepareAudio, 0);
+  // Chrome spends ~125 ms of main-thread time starting its audio service on a page's first
+  // AudioContext — unavoidable, and worse inside the user's first Play tap. Do it once startup has
+  // settled, in a quiet moment (PERF.md: the one accepted long task). An early Play still works:
+  // startAudio() prepares it on the spot.
+  setTimeout(() => {
+    if (idle) idle(prepareAudio, { timeout: 10_000 });
+    else prepareAudio();
+  }, 3000);
 
   const startAudio = (): Promise<void> => {
     prepareAudio(); // in case play() comes before idle time

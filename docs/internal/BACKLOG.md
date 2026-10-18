@@ -76,7 +76,7 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [ ] `exact` thumbnails on long-GOP 4K take 0.7–2 s per strip — keep `keyframe` for strips; use
       `exact` only for single frames (cover / freeze preview).
 - [ ] Mediabunny loads in two workers (engine + analyzer); measure the memory on a low-end phone.
-- [ ] **Startup long tasks in Chrome:** two main-thread tasks of 70–140 ms in the first ~0.4 s after
+- [x] (fixed 2026-10-19, PERF.md "Startup main-thread tasks") **Startup long tasks in Chrome:** two main-thread tasks of 70–140 ms in the first ~0.4 s after
       mount (production build; none in WebKit/Firefox, none while editing or playing). Likely the
       AudioContext + worklet setup (#44) and the capability probe. Profile and split.
 - [ ] Stage: pinch with nothing selected should zoom the view (UI_VISION §6) — not built yet.

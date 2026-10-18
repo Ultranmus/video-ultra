@@ -112,6 +112,7 @@ export async function detectCapabilities(): Promise<Capabilities> {
   }
 
   let webgl2 = false;
+  await new Promise<void>((r) => setTimeout(r, 0));
   try {
     const gl = new OffscreenCanvas(1, 1).getContext('webgl2');
     if (gl) {
@@ -134,17 +135,30 @@ export async function detectCapabilities(): Promise<Capabilities> {
       return false;
     }
   };
-  const [avc, hevc, vp9, av1, avc1080, avc4k, vp9Enc, aac, opus] = await Promise.all([
-    safe(() => decodes(CODEC.avc1080, 1920, 1080)),
-    safe(() => decodes(CODEC.hevc, 1920, 1080)),
-    safe(() => decodes(CODEC.vp9, 1920, 1080)),
-    safe(() => decodes(CODEC.av1, 1920, 1080)),
-    safe(() => encodes(CODEC.avc1080, 1920, 1080)),
-    safe(() => encodes(CODEC.avc4k, 3840, 2160)),
-    safe(() => encodes(CODEC.vp9, 1920, 1080)),
-    safe(() => (webcodecs.audio ? encodesAudio('mp4a.40.2') : Promise.resolve(false))),
-    safe(() => (webcodecs.audio ? encodesAudio('opus') : Promise.resolve(false))),
-  ]);
+  // Each check does 8–15 ms of synchronous work in Chrome before it goes async: start them one
+  // task apart (still running at the same time) so they never add up to one long main-thread
+  // task (PERF: none over 50 ms).
+  const yieldTask = () => new Promise<void>((r) => setTimeout(r, 0));
+  const checks: (() => Promise<boolean>)[] = [
+    () => safe(() => decodes(CODEC.avc1080, 1920, 1080)),
+    () => safe(() => decodes(CODEC.hevc, 1920, 1080)),
+    () => safe(() => decodes(CODEC.vp9, 1920, 1080)),
+    () => safe(() => decodes(CODEC.av1, 1920, 1080)),
+    () => safe(() => encodes(CODEC.avc1080, 1920, 1080)),
+    () => safe(() => encodes(CODEC.avc4k, 3840, 2160)),
+    () => safe(() => encodes(CODEC.vp9, 1920, 1080)),
+    () => safe(() => (webcodecs.audio ? encodesAudio('mp4a.40.2') : Promise.resolve(false))),
+    () => safe(() => (webcodecs.audio ? encodesAudio('opus') : Promise.resolve(false))),
+  ];
+  const running: Promise<boolean>[] = [];
+  for (const check of checks) {
+    running.push(check());
+    await yieldTask();
+  }
+  const results = await Promise.all(running);
+  const [avc, hevc, vp9, av1, avc1080, avc4k, vp9Enc, aac, opus] = checks.map(
+    (_, i) => results[i] === true,
+  ) as [boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean];
 
   const opfs = typeof nav.storage?.getDirectory === 'function';
   const fileSystemAccess =

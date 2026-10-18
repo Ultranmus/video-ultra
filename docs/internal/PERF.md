@@ -352,3 +352,17 @@ keep up with exact frames → thumbnails during fast drags (BACKLOG).
 - **WebGPU export is ~2× slower than WebGL2 export** (canvas capture from a WebGPU canvas costs
   more). Phase 2: measure capture paths; until then export renders with WebGL2.
 - Firefox is the slowest seeker; its numbers set the "mid" expectations for desktop.
+
+## Startup main-thread tasks (2026-10-19, production build, Chrome)
+
+Before: two long tasks in the first 0.4 s — 78 ms (capability probe: nine `isConfigSupported`
+calls started in one task, each 8–15 ms synchronous in Chrome, plus the WebGL2 probe) and 109 ms
+(the first `AudioContext`). After:
+
+- Probe: each check starts one task apart (still concurrent) → no long task.
+- `AudioContext`: Chrome spends ~125 ms starting its audio service on a page's first context
+  (measured: first 124.6 ms, second 0.3 ms). Unavoidable and on the main thread; inside the first
+  Play tap it would delay playback. It now runs in a quiet idle moment ~3 s after start — **the
+  one accepted long task** (rule exception, measured). An early Play prepares it on the spot.
+
+Result: long tasks `['3281+116']` (the audio service only), none during startup or editing.
