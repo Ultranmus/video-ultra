@@ -105,6 +105,18 @@ export { captionWords, captionWordTimes, speechAt } from './captions/timing';
 export type { SpeechPosition } from './captions/timing';
 export { CAPTION_PRESETS, DEFAULT_CAPTION_PRESET, lookFromPreset } from './captions/presets';
 export {
+  TEMPLATE_PRESETS,
+  TEMPLATE_CATEGORIES,
+  TEMPLATE_THEMES,
+  templatePreset,
+  fillTemplateText,
+  applyTemplate,
+  type TemplatePreset,
+  type TemplateElement,
+  type TemplateVariable,
+  type TemplateCategory,
+} from './templates/templates';
+export {
   SHAPE_PRESETS,
   SHAPE_CATEGORIES,
   ShapeFamily,

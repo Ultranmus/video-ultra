@@ -745,3 +745,15 @@ reason; when one changes, edit the entry and note the date.
       2048 px on the longest side, keeping their aspect (the engine worker can't decode SVG).
       Lottie files: not supported (needs a Lottie runtime; the animated WebP library covers the
       common case) — BACKLOG.
+139.  **Templates** (v0.3). 192 templates = 32 layouts (titles & intros, name tags, quotes, social,
+      sales & promos, steps & lists, events, vlog & recipes, endings) × 6 themes (Bold, Clean,
+      Elegant, Neon, Retro, Playful: fonts, colours, boxes, shadows, entrance / exit). A template
+      is styled, animated text and emoji elements with timing; texts hold `{variables}` the
+      editor asks for (examples filled in) before adding — that is the "placeholders and text
+      variables" of PLAN v0.3. `applyTemplate` (core) adds them at the playhead as lane items,
+      grouped; empty texts are skipped. The tiles are CSS miniatures on the project's canvas shape
+      (text sized with container units), not engine renders — cheap, and close enough to choose
+      by. After adding, the playhead moves ~1 s in so the template shows (entrances start
+      invisible). Media placeholders ("drop your clip here") are not in this round — BACKLOG.
+      Headings in every library browser are `h3` now (they were `h4` under the panel's `h2`: an
+      axe heading-order issue).

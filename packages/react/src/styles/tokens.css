@@ -218,6 +218,12 @@
     --vu-size-handle-side: 8px;
     --vu-size-region-swatch: 64px;
     --vu-size-key-preset: 28px;
+    /* v0.3 Templates */
+    --vu-size-template: 72px;
+    --vu-size-template-max: 180px;
+    --vu-size-template-preview: 260px;
+    /* Template tiles stand in for footage: a dusky gradient (same in both themes). */
+    --vu-template-bg: linear-gradient(160deg, #3a3550, #1d2433 55%, #12151d);
     /* v0.3 Shape masks */
     --vu-size-shape-tile: 52px;
     --vu-shape-url: none;

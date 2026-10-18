@@ -788,6 +788,26 @@ export const DEFAULT_LABELS = {
   captionsOnDevice: (mb: number) =>
     `Runs on this device, nothing is uploaded · about ${Math.round(mb)} MB to download the first time`,
   captionsOnDeviceCached: 'Runs on this device, nothing is uploaded',
+  // v0.3 Templates
+  templates: 'Templates',
+  tipTemplates: 'Ready-made titles, name tags, quotes and more',
+  templatesHint: 'Tap a template, fill in your words, add it.',
+  addTemplate: 'Add to video',
+  templateAdded: 'Template added — drag it to move it, double-tap a text to edit',
+  templateCategory: (category: string) =>
+    (
+      ({
+        intro: 'Titles & intros',
+        'lower-third': 'Name tags',
+        quote: 'Quotes',
+        social: 'Social',
+        sale: 'Sales & promos',
+        list: 'Steps & lists',
+        event: 'Events',
+        vlog: 'Vlog & recipes',
+        outro: 'Endings',
+      }) as Record<string, string>
+    )[category] ?? category,
   // v0.3 Shape masks
   shape: 'Shape',
   tipShape: 'Show the picture inside a shape',

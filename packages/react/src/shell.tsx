@@ -161,7 +161,15 @@ const RAIL: {
   id: PanelId;
   icon: IconName;
   key:
-    'media' | 'text' | 'audio' | 'stickers' | 'filters' | 'transitions' | 'blurAreas' | 'captions';
+    | 'media'
+    | 'templates'
+    | 'text'
+    | 'audio'
+    | 'stickers'
+    | 'filters'
+    | 'transitions'
+    | 'blurAreas'
+    | 'captions';
   tip:
     | 'tipAddMedia'
     | 'tipText'
@@ -170,9 +178,11 @@ const RAIL: {
     | 'tipFilter'
     | 'tipTransitions'
     | 'tipBlurAreas'
-    | 'tipCaptions';
+    | 'tipCaptions'
+    | 'tipTemplates';
 }[] = [
   { id: 'media', icon: 'media', key: 'media', tip: 'tipAddMedia' },
+  { id: 'templates', icon: 'template', key: 'templates', tip: 'tipTemplates' },
   { id: 'text', icon: 'text', key: 'text', tip: 'tipText' },
   { id: 'captions', icon: 'captions', key: 'captions', tip: 'tipCaptions' },
   { id: 'audio', icon: 'audio', key: 'audio', tip: 'tipAudio' },

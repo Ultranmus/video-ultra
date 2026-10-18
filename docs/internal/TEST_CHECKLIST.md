@@ -43,3 +43,9 @@ Open the branch's Vercel preview (or `pnpm --filter playground dev`), then **`/e
       animated stickers move? (If Safari lacks `ImageDecoder` they stay still — tell me.)
       _Checked here:_ stickers-check (GIF plays and is exact; SVG → 2048 px PNG; animated emoji
       added with its licence and plays).
+- [ ] **Templates (192).** Left menu (phone: toolbar) → **Templates** → scroll the 9 groups →
+      tap one → change the words → **Add to video**. It appears at the playhead as one group
+      (drag moves all of it; double-tap a text to edit); the playhead jumps in so you see it.
+      Play it — entrances and exits animate. Try the same template on 16:9 and 1:1 too.
+      _Checked here:_ every template is valid and grouped (unit test over all 192);
+      templates-check (form, your words, group, undo, countdown, phone, axe).

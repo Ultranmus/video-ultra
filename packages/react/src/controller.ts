@@ -7,6 +7,8 @@ import {
   deleteItem,
   duplicateItem,
   pasteItems,
+  applyTemplate,
+  type TemplatePreset,
   type CopiedItem,
   EditError,
   findItem,
@@ -1201,6 +1203,22 @@ export class EditorController {
   }
 
   /** Adds an overlay/lane item at the playhead and selects it. */
+  /** Adds a template at the playhead (one group) and selects it. */
+  addTemplate(template: TemplatePreset, values: Readonly<Record<string, string>>): void {
+    const at = this.playhead.time;
+    const ids = this.run(this.labels.templates, (d, ctx) =>
+      applyTemplate(d, template, values, at, ctx.ids),
+    );
+    if (!ids?.length) return;
+    this.ui.setState({ selectedId: ids[ids.length - 1]!, selectedIds: ids, tool: null });
+    // Entrances start invisible: show the template once it's in.
+    this.seek(at + Math.min(fromSeconds(1.2), fromSeconds(template.duration / 2)));
+    this.toast(this.labels.templateAdded, 'success', {
+      label: this.labels.undo,
+      run: () => this.undo(),
+    });
+  }
+
   addLaneItem(label: string, make: (id: string, start: Time) => Item): void {
     const id = this.run(label, (d, ctx) => {
       const item = make(ctx.ids(), this.playhead.time);

@@ -19,6 +19,7 @@ import { TEXT_STYLE_CATEGORIES, TEXT_STYLE_PRESETS } from './library/textStyles'
 import { FilterStrip, TransitionGrid } from './looks';
 import { CanvasTool } from './ToolPanel';
 import { BlurPanel } from './picture';
+import { TemplatesPanel } from './templates';
 
 /** The browse panel for an add-content category (desktop panel, phone sheet). */
 export function AddPanel({ panel }: { panel: PanelId }): ReactElement {
@@ -43,6 +44,8 @@ export function AddPanel({ panel }: { panel: PanelId }): ReactElement {
       return <CaptionsPanel />;
     case 'blur':
       return <BlurPanel />;
+    case 'templates':
+      return <TemplatesPanel />;
   }
 }
 

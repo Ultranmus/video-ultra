@@ -151,7 +151,7 @@ export function CategoryBrowser<C extends { id: string; label: string }>({
           data-category={c.id}
           aria-label={c.label}
         >
-          <h4 className="vu-browser-heading">{c.label}</h4>
+          <h3 className="vu-browser-heading">{c.label}</h3>
           {children(c)}
         </section>
       ))}

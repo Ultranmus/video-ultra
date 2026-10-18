@@ -145,7 +145,7 @@ export function MaskTool({ item }: { item: Item }): ReactElement {
       </ul>
       {SHAPE_CATEGORIES.map((category) => (
         <section key={category} className="vu-shape-section">
-          <h4 className="vu-shape-heading">{l.shapeCategory(category)}</h4>
+          <h3 className="vu-shape-heading">{l.shapeCategory(category)}</h3>
           <ul className="vu-shape-grid" aria-label={l.shapeCategory(category)}>
             {SHAPE_PRESETS.filter((p) => p.category === category).map((p) => {
               const url = tiles.get(p.id);

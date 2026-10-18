@@ -1577,6 +1577,110 @@
     pointer-events: none;
   }
 
+  /* v0.3 Templates: CSS miniatures sized by the frame (container units). */
+  .vu-template-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--vu-size-template), 1fr));
+    gap: var(--vu-space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .vu-template {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: var(--vu-space-1);
+    border: 1px solid var(--vu-border);
+    border-radius: var(--vu-radius-md);
+    background: var(--vu-surface-2);
+    transition:
+      border-color var(--vu-duration-fast) var(--vu-ease),
+      transform var(--vu-duration-fast) var(--vu-ease);
+  }
+
+  .vu-template:hover {
+    border-color: var(--vu-accent);
+  }
+
+  .vu-template:active {
+    transform: scale(0.97);
+  }
+
+  .vu-template-frame {
+    position: relative;
+    display: block;
+    width: 100%;
+    max-height: var(--vu-size-template-max);
+    overflow: hidden;
+    container-type: size;
+    border-radius: var(--vu-radius-sm);
+    background: var(--vu-template-bg);
+    pointer-events: none;
+  }
+
+  .vu-template-el {
+    position: absolute;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+  }
+
+  .vu-template-el[data-kind='emoji'] {
+    line-height: 1;
+  }
+
+  .vu-template-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-3);
+  }
+
+  .vu-template-form-head {
+    display: flex;
+    align-items: center;
+    gap: var(--vu-space-2);
+  }
+
+  .vu-template-form-title {
+    margin: 0;
+    font-size: var(--vu-text-lg);
+    font-weight: var(--vu-weight-semibold);
+  }
+
+  .vu-template-preview {
+    display: flex;
+    justify-content: center;
+  }
+
+  .vu-template-preview .vu-template-frame {
+    width: auto;
+    height: var(--vu-size-template-preview);
+    max-height: none;
+  }
+
+  .vu-template-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-1);
+  }
+
+  .vu-template-field input {
+    height: var(--vu-size-touch);
+    padding: 0 var(--vu-space-3);
+    border: 1px solid var(--vu-border-strong);
+    border-radius: var(--vu-radius-md);
+    background: var(--vu-surface-2);
+    color: var(--vu-text);
+  }
+
+  .vu-template-field input:focus-visible {
+    border-color: var(--vu-accent);
+    outline: none;
+    box-shadow: 0 0 0 3px var(--vu-accent-soft);
+  }
+
   /* v0.3 Shape masks: tiles are alpha images coloured by tokens (mask.tsx). */
   .vu-shape-section {
     display: flex;

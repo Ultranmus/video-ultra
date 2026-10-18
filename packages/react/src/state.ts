@@ -15,7 +15,9 @@ export type PanelId =
   | 'layers'
   | 'captions'
   /** Blurred / pixelated areas (v0.2 C3). */
-  | 'blur';
+  | 'blur'
+  /** Templates (v0.3). */
+  | 'templates';
 
 /** Tools whose controls open in the sheet (phone/tablet) or the inspector (desktop). */
 export type ToolId =

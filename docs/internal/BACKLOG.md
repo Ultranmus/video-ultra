@@ -27,6 +27,8 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 
 - [x] (done 2026-10-19, #134) Copy / paste elements (⌘C / ⌘V, with a paste at the playhead) — image-ultra has it; not in
       v0.2's list.
+- [ ] Templates with media placeholders (a framed slot you drop a clip into) and animated
+      template previews (#139).
 - [ ] Lottie stickers (.json / .lottie): need a Lottie runtime in the engine worker (#138).
 - [ ] Animated stickers in Safari without `ImageDecoder` show their first frame: decode GIF /
       WebP frames ourselves (small WASM decoder) if the owner's iPhone lacks it (#138).

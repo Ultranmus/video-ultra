@@ -96,6 +96,13 @@ function singleTools(
   if (!item) {
     return [
       { key: 'media', icon: 'media', label: l.media, tip: l.tipAddMedia, panel: 'media' },
+      {
+        key: 'templates',
+        icon: 'template',
+        label: l.templates,
+        tip: l.tipTemplates,
+        panel: 'templates',
+      },
       { key: 'text', icon: 'text', label: l.text, tip: l.tipText, panel: 'text' },
       {
         key: 'captions',
