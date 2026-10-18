@@ -113,6 +113,7 @@ export type {
   TranscribeResult,
   TranscribeProgress,
   TranscriptWord,
+  TranscriberCheck,
 } from './captions/transcriber';
 
 export const VERSION = '0.0.0';

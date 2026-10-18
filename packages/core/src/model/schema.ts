@@ -313,6 +313,11 @@ export const TextItemSchema = z.object({
    * word highlighting; captions typed or imported without it share their time evenly.
    */
   words: z.optional(z.array(CaptionWordSchema)),
+  /**
+   * Wrap width as a fraction of the canvas width (file version 3+): lines break at spaces to fit,
+   * balanced so they're about the same length. Missing = lines break only where the text does.
+   */
+  maxWidth: z.optional(z.number().check(z.gte(0.05), z.lte(1))),
 });
 
 export const StickerItemSchema = z.object({

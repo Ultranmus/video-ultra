@@ -18,6 +18,20 @@ const measure = (font: string, text: string) => {
 };
 
 describe('text box', () => {
+  it('wraps to the wrap width, balancing the lines', () => {
+    const item = textItem('t', 0);
+    // Font 0.05 × 1000 = 50 px; every character 25 px wide.
+    item.style = { ...item.style, size: 0.05, lineHeight: 1 };
+    item.text = 'aaaa bbbb cccc dddd eeee';
+    item.maxWidth = 0.5; // 500 px on a 1000-wide canvas: 20 characters at most
+    const box = measureTextBox(item, 1000, 1000, measure);
+    // Greedy would give "aaaa bbbb cccc dddd" (19) + "eeee"; balanced gives 14 + 9.
+    expect(box.height).toBeCloseTo(2 * 50);
+    expect(box.width).toBeCloseTo(14 * 25);
+    delete item.maxWidth;
+    expect(measureTextBox(item, 1000, 1000, measure).height).toBeCloseTo(50);
+  });
+
   it('sizes the block from the font size (size × canvas height × scale)', () => {
     const item = textItem('t', 0);
     item.text = 'Hello';

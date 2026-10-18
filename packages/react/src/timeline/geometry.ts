@@ -61,7 +61,8 @@ export const GROUP_ORDER: Record<Track['kind'], number> = {
   main: 0,
   overlay: 1,
   text: 2,
-  audio: 3,
+  caption: 3,
+  audio: 4,
 };
 
 /**

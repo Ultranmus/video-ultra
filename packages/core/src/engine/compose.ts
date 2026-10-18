@@ -756,9 +756,9 @@ export class Composer {
         const marked = highlight
           ? `|${highlight.mode}:${highlight.mode === 'fill' ? highlight.chars : highlight.word}:${highlight.color}`
           : '';
-        const key = `${rasterPx}|${height}|${withLayout ? 'L' : ''}|${item.text}|${styleKey(item.style)}${marked}`;
+        const key = `${rasterPx}|${width}x${height}|${item.maxWidth ?? ''}|${withLayout ? 'L' : ''}|${item.text}|${styleKey(item.style)}${marked}`;
         const canvas = this.rasters.get(item.id, key, () => {
-          const raster = rasterizeText(item, rasterPx, height, k, withLayout, highlight);
+          const raster = rasterizeText(item, rasterPx, height, k, withLayout, highlight, width);
           if (raster.layout) this.textLayouts.set(raster.canvas, raster.layout);
           return raster.canvas;
         });

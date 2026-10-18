@@ -72,6 +72,28 @@ export function groupCaptions(
     current.push({ text, start: word.start, end: Math.max(word.end, word.start) });
   }
   flush();
+  // A lone word (a pause at a comma) joins the caption after it when that's close and still fits.
+  for (let i = 0; i < out.length - 1; i++) {
+    const a = out[i]!;
+    const b = out[i + 1]!;
+    const close = b.start - a.end <= fromSeconds(1);
+    const fits =
+      a.text.length + 1 + b.text.length <= maxChars &&
+      b.end - a.start <= fromSeconds(maxSeconds + 1);
+    if (a.words.length === 1 && close && fits && !SENTENCE_END.test(a.text)) {
+      const shift = b.start - a.start;
+      out.splice(i, 2, {
+        start: a.start,
+        end: b.end,
+        text: `${a.text} ${b.text}`,
+        words: [
+          ...a.words,
+          ...b.words.map((w) => ({ ...w, start: w.start + shift, end: w.end + shift })),
+        ],
+      });
+      i--;
+    }
+  }
   // Captions never overlap: each ends by the time the next starts.
   for (let i = 0; i < out.length - 1; i++) {
     const a = out[i]!;

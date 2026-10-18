@@ -788,6 +788,13 @@ export function Stage(): ReactElement {
           : d.type === 'rotate'
             ? l.rotate
             : l.edit;
+    // Captions share one place and size: moving one moves them all (rotation stays upright).
+    const caption = ctl.project.tracks.find((t) => t.kind === 'caption');
+    const only = next.size === 1 ? [...next][0]! : null;
+    if (only && caption?.items.some((i) => i.id === only[0])) {
+      ctl.setCaptionLook({ x: only[1].x, y: only[1].y, scale: only[1].scale });
+      return;
+    }
     ctl.run(label, (draft) => {
       for (const [id, tf] of next) updateItem(draft, id, { transform: tf });
     });

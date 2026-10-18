@@ -185,6 +185,9 @@
     --vu-size-modal: 440px;
     /* Layers & organising (v0.2) */
     --vu-size-popover: 288px;
+    /* Captions (v0.2 A) */
+    --vu-size-caption-preset: 64px;
+    --vu-size-caption-time: 52px;
     --vu-size-menu: 232px;
     --vu-size-layer-row: 48px;
     --vu-size-layer-thumb: 32px;

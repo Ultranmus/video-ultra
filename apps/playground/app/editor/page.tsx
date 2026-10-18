@@ -11,7 +11,9 @@ import { VideoEditor } from '@video-ultra/react';
 import '@video-ultra/react/styles.css';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
+import { createOnDeviceTranscriber } from '@video-ultra/captions';
 import { createDemoSounds } from './demo-sounds';
+import { createFakeTranscriber } from './fake-transcriber';
 
 const DEVICES = {
   full: { label: 'Full window', width: 0, height: 0 },
@@ -31,6 +33,10 @@ function Editor() {
   const device: Device = requested && requested in DEVICES ? requested : 'full';
   // The switcher only makes sense on a big screen (on a phone the editor already is the phone).
   const [sounds] = useState(createDemoSounds);
+  // Auto captions on this device (`?transcriber=fake`: a stand-in for checks; `=0`: none).
+  const [transcriber] = useState(() =>
+    params.get('transcriber') === 'fake' ? createFakeTranscriber() : createOnDeviceTranscriber(),
+  );
   const [wide, setWide] = useState(false);
   const [room, setRoom] = useState(0);
   useEffect(() => {
@@ -78,6 +84,7 @@ function Editor() {
       backend={backend}
       autosave={params.get('autosave') !== '0'}
       {...(params.get('sounds') !== '0' ? { audioLibrary: sounds } : {})}
+      {...(params.get('transcriber') !== '0' ? { transcriber } : {})}
       onReady={(controller) => {
         (window as unknown as { vuEditor: unknown }).vuEditor = controller;
       }}

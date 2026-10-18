@@ -16,6 +16,9 @@ import {
   parseProject,
   projectDuration,
   projectFrame,
+  FLICKS_PER_SECOND,
+  fromSeconds,
+  itemEnd,
   randomId,
   setItemFlags,
   setExportRange,
@@ -26,6 +29,21 @@ import {
   ungroupItems,
   updateItem,
   type ArrangeTo,
+  addCaptions,
+  captionTrack,
+  CAPTION_PRESETS,
+  formatSrt,
+  formatVtt,
+  groupCaptions,
+  mergeCaptionWithNext,
+  parseSubtitles,
+  setCaptionLook,
+  setCaptionText,
+  TRANSCRIBE_SAMPLE_RATE,
+  type CaptionLookPatch,
+  type SubtitleCue,
+  type Transcriber,
+  type TranscriberCheck,
   type Asset,
   type RegionItem,
   type Capabilities,
@@ -96,6 +114,8 @@ export interface ControllerOptions {
   stickerLibrary?: string | false;
   /** The host's music & sound-effects source for the Audio panel. */
   audioLibrary?: AudioLibrary;
+  /** Turns speech into timed words for auto captions (on-device or the host's service). */
+  transcriber?: Transcriber;
 }
 
 /**
@@ -1540,5 +1560,180 @@ export class EditorController {
     return result.ok
       ? { project: result.project, error: null }
       : { project: null, error: result.error };
+  }
+
+  // ── captions (v0.2 A) ──────────────────────────────────────────────────
+
+  #captionAbort: AbortController | null = null;
+
+  /** Whether auto captions can run, and what they'd take, for `language`. */
+  async checkCaptions(language: string): Promise<TranscriberCheck | null> {
+    const t = this.options.transcriber;
+    if (!t) return null;
+    return (await t.check?.(language).catch(() => null)) ?? { available: true, onDevice: false };
+  }
+
+  /**
+   * Auto captions: the video's speech (music lowered under voice is left out, so the words come
+   * through) goes to the transcriber piece by piece; the words become captions that replace any
+   * there were. One undo step. Progress is in `ui.captionJob`; `cancelCaptions()` stops it.
+   */
+  async autoCaptions(language: string): Promise<void> {
+    const transcriber = this.options.transcriber;
+    const engine = this.engine;
+    const l = this.labels;
+    if (!transcriber || !engine) return;
+    const duration = projectDuration(this.project);
+    if (duration === 0) {
+      this.toast(l.needClips, 'info');
+      return;
+    }
+    this.#captionAbort?.abort();
+    const abort = new AbortController();
+    this.#captionAbort = abort;
+    this.ui.setState({ captionJob: { stage: 'listen', fraction: 0 } });
+    const speech = produce(this.project, (d) => {
+      for (const track of d.tracks)
+        track.items = track.items.filter((i) => !('duck' in i && i.duck));
+    });
+    const seconds = duration / FLICKS_PER_SECOND;
+    try {
+      const result = await transcriber.transcribe({
+        audio: engine.listen(speech, 0, duration, TRANSCRIBE_SAMPLE_RATE, abort.signal),
+        duration: seconds,
+        language,
+        signal: abort.signal,
+        onProgress: (p) =>
+          this.ui.setState({
+            captionJob: {
+              stage: p.stage,
+              fraction: p.fraction,
+              ...(p.loaded !== undefined ? { loaded: p.loaded } : {}),
+              ...(p.total !== undefined ? { total: p.total } : {}),
+            },
+          }),
+      });
+      if (abort.signal.aborted) return;
+      const captions = groupCaptions(result.words, 0);
+      if (captions.length === 0) {
+        this.toast(l.captionsNoSpeech, 'info');
+        return;
+      }
+      this.run(l.autoCaptions, (d, ctx) =>
+        addCaptions(d, captions, ctx.ids, { replace: true, preset: this.#captionPreset() }),
+      );
+      this.toast(l.captionsDone(captions.length), 'success', {
+        label: l.undo,
+        run: () => this.undo(),
+      });
+    } catch (error) {
+      if (abort.signal.aborted || (error instanceof DOMException && error.name === 'AbortError'))
+        return;
+      this.toast(l.captionsFailed(error instanceof Error ? error.message : String(error)), 'error');
+    } finally {
+      if (this.#captionAbort === abort) {
+        this.#captionAbort = null;
+        this.ui.setState({ captionJob: null });
+      }
+    }
+  }
+
+  cancelCaptions(): void {
+    this.#captionAbort?.abort();
+    this.#captionAbort = null;
+    this.ui.setState({ captionJob: null });
+  }
+
+  /** The preset new captions use: the row's current one, else the default. */
+  #captionPreset() {
+    const id = captionTrack(this.project)?.caption?.preset;
+    return CAPTION_PRESETS.find((p) => p.id === id) ?? CAPTION_PRESETS[0]!;
+  }
+
+  /** Reads an .srt / .vtt file into captions (replacing any). */
+  async importSubtitles(file: File): Promise<void> {
+    const l = this.labels;
+    const text = await file.text().catch(() => '');
+    const cues = parseSubtitles(text);
+    if (cues.length === 0) {
+      this.toast(l.subtitlesUnreadable(file.name), 'error');
+      return;
+    }
+    const added = this.run(l.importCaptions, (d, ctx) =>
+      addCaptions(d, cues, ctx.ids, { replace: true, preset: this.#captionPreset() }),
+    );
+    if (added)
+      this.toast(l.captionsImported(cues.length), 'success', {
+        label: l.undo,
+        run: () => this.undo(),
+      });
+  }
+
+  /** The captions as subtitle cues (for .srt / .vtt). */
+  captionCues(): SubtitleCue[] {
+    const track = captionTrack(this.project);
+    if (!track) return [];
+    return track.items
+      .filter((i) => i.kind === 'text')
+      .map((i) => ({ start: i.start, end: itemEnd(i), text: i.kind === 'text' ? i.text : '' }));
+  }
+
+  /** Downloads the captions as a subtitle file. */
+  downloadSubtitles(format: 'srt' | 'vtt'): void {
+    const cues = this.captionCues();
+    if (cues.length === 0) return;
+    const text = format === 'srt' ? formatSrt(cues) : formatVtt(cues);
+    const blob = new Blob([text], {
+      type: format === 'srt' ? 'application/x-subrip' : 'text/vtt',
+    });
+    const name = (this.project.name || 'captions').replace(/[\\/:*?"<>|]+/g, ' ').trim();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${name}.${format}`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  }
+
+  /** Adds a caption to type at the playhead (2 s, or up to the next one). */
+  addCaptionHere(): void {
+    const l = this.labels;
+    const t = this.playhead.time;
+    const track = captionTrack(this.project);
+    const next = track?.items.find((i) => i.start > t);
+    const end = Math.min(t + fromSeconds(2), next ? next.start : Infinity);
+    if (end - t < projectFrame(this.project) * 3) {
+      this.toast(l.captionNoRoom, 'info');
+      return;
+    }
+    const id = this.run(l.addCaption, (d, ctx) => {
+      addCaptions(d, [{ start: t, end, text: l.captionPlaceholder }], ctx.ids, {
+        preset: this.#captionPreset(),
+      });
+      return captionTrack(d)!.items.find((i) => i.start >= t - projectFrame(d))?.id;
+    });
+    if (id) {
+      this.select(id);
+      this.ui.setState({ captionEditing: id });
+    }
+  }
+
+  setCaptionText(itemId: string, text: string): void {
+    this.run(this.labels.editCaption, (d) => setCaptionText(d, itemId, text), {
+      coalesceKey: `caption-text:${itemId}`,
+    });
+  }
+
+  mergeCaption(itemId: string): void {
+    this.run(this.labels.mergeCaptions, (d) => mergeCaptionWithNext(d, itemId));
+  }
+
+  /** Restyles every caption (one undo step per change; a slider drag is one). */
+  setCaptionLook(patch: CaptionLookPatch, coalesceKey?: string): void {
+    this.run(
+      this.labels.captionStyle,
+      (d) => setCaptionLook(d, patch),
+      coalesceKey ? { coalesceKey } : undefined,
+    );
   }
 }

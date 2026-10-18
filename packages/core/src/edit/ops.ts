@@ -1041,6 +1041,9 @@ export interface CaptionInput {
   words?: CaptionWord[];
 }
 
+/** How wide captions may get before they wrap (fraction of the canvas width). */
+const CAPTION_WRAP = 0.86;
+
 /** The project's caption row, if it has one. */
 export function captionTrack(project: Project): Track | null {
   return project.tracks.find((t) => t.kind === 'caption') ?? null;
@@ -1097,6 +1100,7 @@ export function addCaptions(
       ),
       filter: null,
       adjust: {},
+      maxWidth: template?.kind === 'text' && template.maxWidth ? template.maxWidth : CAPTION_WRAP,
       ...(c.words?.length ? { words: copy(c.words) } : {}),
     };
     insertSorted(track, item);

@@ -903,7 +903,11 @@ export class TimelineView {
     const m = this.#m;
     const rows = this.#rows(project);
     const main = rows.find((r) => r.track.kind === 'main')!;
-    const kind = laneKindFor(item.kind);
+    // Captions stay on the caption row; everything else goes by its kind.
+    const kind =
+      project.tracks.find((t) => t.items.some((i) => i.id === item.id))?.kind === 'caption'
+        ? 'caption'
+        : laneKindFor(item.kind);
     const end = start + item.duration;
     const fits = (row: Row) =>
       row.track.kind === kind &&
@@ -1211,7 +1215,9 @@ export class TimelineView {
           ? l.rowLayer
           : row.track.kind === 'text'
             ? l.rowText
-            : l.rowAudio;
+            : row.track.kind === 'caption'
+              ? l.rowCaptions
+              : l.rowAudio;
     const same = rows.filter((r) => r.track.kind === row.track.kind);
     return same.length > 1 && row.track.kind !== 'main' ? `${name} ${same.indexOf(row) + 1}` : name;
   }
@@ -1226,6 +1232,8 @@ export class TimelineView {
     const icons: Record<string, string> = {
       main: 'M3 6.5A2.5 2.5 0 015.5 4h13A2.5 2.5 0 0121 6.5v11a2.5 2.5 0 01-2.5 2.5h-13A2.5 2.5 0 013 17.5zM10 9v6l5-3z',
       text: 'M5 6V4.5h14V6M12 4.5v15M9 19.5h6',
+      caption:
+        'M3.5 6.5A2 2 0 015.5 4.5h13a2 2 0 012 2v11a2 2 0 01-2 2h-13a2 2 0 01-2-2zM7 14h4M13 14h4M7 11h10',
       overlay: 'M4 8.5h11v11H4zM9 4.5h11v11',
       audio: 'M9 18V5.5l11-2V16M9 18a3 3 0 11-6 0 3 3 0 016 0zM20 16a3 3 0 11-6 0 3 3 0 016 0z',
       off: 'M3 3l18 18',

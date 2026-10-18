@@ -37,6 +37,12 @@ export interface OnDeviceTranscriberOptions {
   modelHost?: string;
   /** Where the speech runtime's `.wasm` files are served (default: next to its JS module). */
   runtimePath?: string;
+  /**
+   * Keep the model loaded between jobs (faster next time, holds ~0.3–1 GB). Default false: the
+   * worker closes after each job and its memory goes back to the page; the downloaded files stay
+   * cached, so the next job only waits a few seconds.
+   */
+  keepLoaded?: boolean;
   /** @internal Measurements only. */
   debug?: { session?: Record<string, unknown>; files?: { encoder: string; decoder: string } };
 }
@@ -49,6 +55,8 @@ export interface DeviceSupport {
   model: CaptionModel;
   /** Approximate one-time download, in MB. */
   downloadMB: number;
+  /** Roughly how fast it hears (× real time) on a typical laptop; phones are 2–4× slower. */
+  speed: number;
   /** Why not, when `ok` is false. */
   reason?: string;
 }
@@ -112,42 +120,56 @@ export async function chooseModel(
   language = 'auto',
 ): Promise<DeviceSupport> {
   const nav = typeof navigator !== 'undefined' ? navigator : undefined;
-  let device: 'webgpu' | 'wasm' = 'wasm';
-  if (options.device === 'webgpu' || options.device === 'wasm') device = options.device;
-  else if (nav && 'gpu' in nav) {
+  let gpu = false;
+  if (nav && 'gpu' in nav) {
     try {
-      const adapter = await (nav as Navigator & { gpu: GPU }).gpu.requestAdapter();
-      if (adapter) device = 'webgpu';
+      gpu = (await (nav as Navigator & { gpu: GPU }).gpu.requestAdapter()) !== null;
     } catch {
       /* no adapter */
     }
   }
-  const small = NEEDS_SMALL.has(language);
+  const needsSmall = NEEDS_SMALL.has(language);
+  const memory = (nav as (Navigator & { deviceMemory?: number }) | undefined)?.deviceMemory;
   const model: CaptionModel =
     options.model && options.model !== 'auto'
       ? options.model
-      : small
+      : needsSmall
         ? 'small'
-        : device === 'webgpu'
+        : memory !== undefined && memory >= 8
           ? 'base'
           : 'tiny';
-  const memory = (nav as (Navigator & { deviceMemory?: number }) | undefined)?.deviceMemory;
+  // Measured (PERF.md "Captions"): tiny and base are as fast on WebAssembly as on WebGPU and
+  // lighter; small is 2.5× faster on WebGPU.
+  const device: 'webgpu' | 'wasm' =
+    options.device === 'webgpu' || options.device === 'wasm'
+      ? options.device
+      : model === 'small' && gpu
+        ? 'webgpu'
+        : 'wasm';
   const cores = nav?.hardwareConcurrency ?? 4;
   const tooSmall = (memory !== undefined && memory < 4) || cores < 4;
   const tooSlow = model === 'small' && device !== 'webgpu' && options.model !== 'small';
   const reason = tooSmall
     ? 'This device is too small to make captions on its own.'
     : tooSlow
-      ? 'Captions in this language need a device with WebGPU.'
+      ? 'Captions in this language need a device with WebGPU (a recent computer).'
       : undefined;
   return {
     ok: !reason,
     device,
     model,
     downloadMB: FILES[model][device].mb,
+    speed: SPEED[model][device],
     ...(reason ? { reason } : {}),
   };
 }
+
+/** × real time on a 2023 laptop (captions-bench). */
+const SPEED: Record<CaptionModel, Record<'webgpu' | 'wasm', number>> = {
+  tiny: { webgpu: 9, wasm: 10 },
+  base: { webgpu: 6, wasm: 4.5 },
+  small: { webgpu: 0.8, wasm: 0.9 },
+};
 
 /**
  * An on-device {@link Transcriber}. The worker and model load on the first `transcribe()` call
@@ -220,7 +242,23 @@ export function createOnDeviceTranscriber(options: OnDeviceTranscriberOptions = 
       worker!.postMessage(msg, [audio.buffer]);
     });
 
+  const close = () => {
+    worker?.terminate();
+    worker = null;
+    loading = null;
+  };
+
   return {
+    async check(language: string) {
+      const support = await chooseModel(options, language);
+      return {
+        available: support.ok,
+        onDevice: true,
+        downloadMB: support.downloadMB,
+        speed: support.speed,
+        ...(support.reason ? { reason: support.reason } : {}),
+      };
+    },
     async transcribe(request: TranscribeRequest): Promise<TranscribeResult> {
       const { signal } = request;
       const abort = () => {
@@ -261,12 +299,10 @@ export function createOnDeviceTranscriber(options: OnDeviceTranscriberOptions = 
       } finally {
         signal.removeEventListener('abort', abort);
         onDownload = null;
+        // WebAssembly memory never shrinks: close the worker so the page gets it back.
+        if (!options.keepLoaded) close();
       }
     },
-    dispose() {
-      worker?.terminate();
-      worker = null;
-      loading = null;
-    },
+    dispose: close,
   };
 }

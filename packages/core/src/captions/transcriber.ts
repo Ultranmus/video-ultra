@@ -45,9 +45,24 @@ export interface TranscribeResult {
   language: string;
 }
 
+/** What transcribing a language would take on this device (shown before starting). */
+export interface TranscriberCheck {
+  /** False when it can't run here; `reason` says why. */
+  available: boolean;
+  /** True when it runs on the device (nothing is uploaded). */
+  onDevice: boolean;
+  /** One-time download in MB (first use only), if any. */
+  downloadMB?: number;
+  /** Roughly how many seconds of speech it hears per second (for "about N min"). */
+  speed?: number;
+  reason?: string;
+}
+
 /** Turns speech into timed words. Implement this to use your own speech service. */
 export interface Transcriber {
   transcribe(request: TranscribeRequest): Promise<TranscribeResult>;
+  /** Optional: whether and how `language` can be transcribed here, before starting. */
+  check?(language: string): Promise<TranscriberCheck>;
   /** Frees its model / worker (optional). */
   dispose?(): void;
 }

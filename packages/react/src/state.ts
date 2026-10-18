@@ -13,6 +13,7 @@ export type PanelId =
   | 'filters'
   | 'transitions'
   | 'layers'
+  | 'captions'
   /** Blurred / pixelated areas (v0.2 C3). */
   | 'blur';
 
@@ -76,6 +77,15 @@ export interface UiState {
   layersSelecting: boolean;
   /** The context menu, at a point in the editor root (px). */
   menu: { x: number; y: number } | null;
+  /** Auto captions running: what it's doing and how far (null = not running). */
+  captionJob: {
+    stage: 'listen' | 'download' | 'transcribe';
+    fraction: number;
+    loaded?: number;
+    total?: number;
+  } | null;
+  /** A caption whose text box should take focus in the Captions panel. */
+  captionEditing: string | null;
   /** Last screen-reader announcement (a polite live region reads it). */
   announcement: string;
   panel: PanelId | null;
@@ -113,6 +123,8 @@ export function createUiStore() {
     layersSelecting: false,
     menu: null,
     announcement: '',
+    captionJob: null,
+    captionEditing: null,
     panel: 'media',
     tool: null,
     sheetPanel: false,

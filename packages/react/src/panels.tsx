@@ -1,4 +1,5 @@
 import { LayersPanel } from './organize';
+import { CaptionsPanel } from './captions';
 import {
   findItem,
   FLICKS_PER_SECOND,
@@ -38,6 +39,8 @@ export function AddPanel({ panel }: { panel: PanelId }): ReactElement {
       return <TransitionGrid />;
     case 'layers':
       return <LayersPanel />;
+    case 'captions':
+      return <CaptionsPanel />;
     case 'blur':
       return <BlurPanel />;
   }

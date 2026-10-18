@@ -74,6 +74,17 @@ describe('grouping words into captions', () => {
     for (let i = 1; i < caps.length; i++)
       expect(caps[i]!.start).toBeGreaterThanOrEqual(caps[i - 1]!.end);
   });
+
+  it('a lone word after a short pause joins the next caption', () => {
+    const caps = groupCaptions([
+      w('First,', 0, 0.4),
+      w('rinse', 1.1, 1.4),
+      w('the', 1.45, 1.6),
+      w('rice.', 1.65, 2),
+    ]);
+    expect(caps.map((c) => c.text)).toEqual(['First, rinse the rice.']);
+    expect(caps[0]!.words.map((x) => x.start)).toEqual([0, s(1.1), s(1.45), s(1.65)]);
+  });
 });
 
 describe('speech timing', () => {

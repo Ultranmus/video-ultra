@@ -3,6 +3,7 @@ import {
   type Asset,
   type Capabilities,
   type Project,
+  type Transcriber,
   type ExportResult,
   type AudioExportResult,
   type FrameImage,
@@ -71,6 +72,12 @@ export interface VideoEditorProps {
    * CC0 sound effects. Read once, like `initialProject`.
    */
   audioLibrary?: AudioLibrary;
+  /**
+   * Turns speech into timed words for Auto captions: `createOnDeviceTranscriber()` from the
+   * optional `@video-ultra/captions` package (runs on the device, nothing uploaded), or your own
+   * service. Without it, captions can still be imported (.srt / .vtt) or typed.
+   */
+  transcriber?: Transcriber;
   /** `dark` (default), `light` or `auto` (follow the OS). */
   theme?: ThemeMode;
   /** Typed overrides for the common theme tokens. */
@@ -116,6 +123,7 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
         ...(props.autosave !== undefined ? { autosave: props.autosave } : {}),
         ...(props.stickerLibrary !== undefined ? { stickerLibrary: props.stickerLibrary } : {}),
         ...(props.audioLibrary ? { audioLibrary: props.audioLibrary } : {}),
+        ...(props.transcriber ? { transcriber: props.transcriber } : {}),
       },
       parsed?.project ?? undefined,
     );

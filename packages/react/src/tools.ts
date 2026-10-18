@@ -97,6 +97,13 @@ function singleTools(
     return [
       { key: 'media', icon: 'media', label: l.media, tip: l.tipAddMedia, panel: 'media' },
       { key: 'text', icon: 'text', label: l.text, tip: l.tipText, panel: 'text' },
+      {
+        key: 'captions',
+        icon: 'captions',
+        label: l.captions,
+        tip: l.tipCaptions,
+        panel: 'captions',
+      },
       { key: 'audio', icon: 'audio', label: l.audio, tip: l.tipAudio, panel: 'audio' },
       {
         key: 'stickers',
@@ -236,6 +243,27 @@ function singleTools(
         remove,
       ];
     case 'text':
+      // A caption: its words, the shared captions look, and cutting / joining.
+      if (project.tracks.some((t) => t.kind === 'caption' && t.items.includes(item)))
+        return [
+          { key: 'text-edit', icon: 'edit', label: l.edit, tool: 'text-edit' },
+          {
+            key: 'captions',
+            icon: 'captions',
+            label: l.captionStyles,
+            tip: l.tipCaptions,
+            panel: 'captions',
+          },
+          split,
+          {
+            key: 'merge',
+            icon: 'merge',
+            label: l.mergeCaptions,
+            tip: l.mergeCaptionsTip,
+            run: () => ctl.mergeCaption(item.id),
+          },
+          remove,
+        ];
       return [
         { key: 'text-edit', icon: 'edit', label: l.edit, tool: 'text-edit' },
         { key: 'text-style', icon: 'style', label: l.style, tool: 'text-style' },

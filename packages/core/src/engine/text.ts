@@ -42,16 +42,56 @@ interface BlockLayout {
   lineHeightPx: number;
 }
 
+/**
+ * Breaks a paragraph at spaces so no line is wider than `max` px, with lines about the same
+ * length (the narrowest width that still needs no more lines than filling greedily would).
+ */
+function wrapLine(line: string, max: number, width: (s: string) => number): string[] {
+  const words = line.split(/ +/).filter(Boolean);
+  if (words.length < 2 || width(line) <= max) return [line];
+  const greedy = (limit: number) => {
+    const out: string[] = [];
+    let current = '';
+    for (const w of words) {
+      const next = current ? `${current} ${w}` : w;
+      if (current && width(next) > limit) {
+        out.push(current);
+        current = w;
+      } else current = next;
+    }
+    if (current) out.push(current);
+    return out;
+  };
+  const target = greedy(max).length;
+  let lo = Math.max(...words.map(width));
+  let hi = max;
+  for (let i = 0; i < 12 && hi - lo > 1; i++) {
+    const mid = (lo + hi) / 2;
+    if (greedy(mid).length <= target) hi = mid;
+    else lo = mid;
+  }
+  return greedy(hi);
+}
+
 function layoutBlock(
   text: string,
   style: TextStyle,
   fontPx: number,
   measure: MeasureText,
+  /** Wrap width in the same px as `fontPx` (null: no wrapping). */
+  maxWidth: number | null = null,
 ): BlockLayout {
   const font = textFont(style, fontPx);
-  const lines = text.split('\n');
   const spacing = style.letterSpacing * fontPx;
-  const widths = lines.map((line) => Math.max(0, measure(font, line) + spacing * charCount(line)));
+  const lineWidth = (line: string) => Math.max(0, measure(font, line) + spacing * charCount(line));
+  const padding0 = style.background ? style.background.padding * fontPx : 0;
+  const lines =
+    maxWidth !== null
+      ? text
+          .split('\n')
+          .flatMap((p) => wrapLine(p, Math.max(fontPx, maxWidth - 2 * padding0), lineWidth))
+      : text.split('\n');
+  const widths = lines.map(lineWidth);
   const padding = style.background ? style.background.padding * fontPx : 0;
   const lineHeightPx = style.lineHeight * fontPx;
   return {
@@ -74,8 +114,13 @@ export function measureTextBox(
   canvasH: number,
   measure: MeasureText,
 ): { width: number; height: number } {
-  void canvasW; // positions are relative; the size only depends on the height
-  const block = layoutBlock(item.text, item.style, textFontPx(item, canvasH), measure);
+  const block = layoutBlock(
+    item.text,
+    item.style,
+    textFontPx(item, canvasH),
+    measure,
+    item.maxWidth ? item.maxWidth * canvasW : null,
+  );
   return { width: block.width, height: block.height };
 }
 
@@ -262,6 +307,8 @@ export function rasterizeText(
   displayScale: number,
   withLayout = false,
   highlight: TextHighlight | null = null,
+  /** Output canvas width (px), for the wrap width. */
+  canvasW = 0,
 ): TextRaster {
   const style = item.style;
   const probe = new OffscreenCanvas(1, 1).getContext('2d')!;
@@ -269,7 +316,13 @@ export function rasterizeText(
     probe.font = font;
     return probe.measureText(text).width;
   };
-  const block = layoutBlock(item.text, style, fontPx, measure);
+  const block = layoutBlock(
+    item.text,
+    style,
+    fontPx,
+    measure,
+    item.maxWidth && canvasW ? (item.maxWidth * canvasW) / displayScale : null,
+  );
   const outline = style.outline ? style.outline.width * fontPx : 0;
   const shadowUnit = canvasH / 1080 / displayScale;
   const shadow = style.shadow;
@@ -417,12 +470,20 @@ export function rasterizeText(
     setShadow(false);
     // Word / fill highlight: the same glyphs again in the highlight colour, clipped to its range.
     const r = ranges[i];
-    if (r && highlight && highlight.mode !== 'box') {
+    if (r && highlight) {
+      // Word / fill: the glyphs again in the highlight colour. Box: the word in a colour that
+      // reads on the box (dark on a light box, white on a dark one).
+      const color =
+        highlight.mode === 'box'
+          ? luminance(highlight.color) > 0.55
+            ? '#111111'
+            : '#ffffff'
+          : highlight.color;
       ctx.save();
       ctx.beginPath();
       ctx.rect(r[0], y - block.lineHeightPx, r[1] - r[0], block.lineHeightPx * 2);
       ctx.clip();
-      ctx.fillStyle = highlight.color;
+      ctx.fillStyle = color;
       drawLine(line, x, y, false);
       ctx.restore();
     }
@@ -451,4 +512,16 @@ export function rasterizeEmoji(emoji: string, sizePx: number): OffscreenCanvas {
 export function rasterSize(px: number, exact: boolean): number {
   if (exact || px <= 0) return Math.max(1, px);
   return Math.max(1, 2 ** (Math.round(Math.log2(px) * 4) / 4));
+}
+
+/** Relative luminance (0…1) of a #rgb / #rrggbb colour; other colour forms count as dark. */
+function luminance(color: string): number {
+  const hex = color.trim().replace('#', '');
+  if (!/^[0-9a-f]{3}([0-9a-f]{3})?$/i.test(hex)) return 0;
+  const full = hex.length === 3 ? [...hex].map((c) => c + c).join('') : hex;
+  const [r, g, b] = [0, 2, 4].map((i) => {
+    const v = parseInt(full.slice(i, i + 2), 16) / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
 }

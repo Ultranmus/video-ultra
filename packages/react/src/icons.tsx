@@ -108,6 +108,10 @@ const paths = {
   lut: 'M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 12l8-4.5M12 12v9M12 12L4 7.5',
   rectangle: 'M4 6h16v12H4z',
   oval: 'M12 18c4.4 0 8-2.7 8-6s-3.6-6-8-6-8 2.7-8 6 3.6 6 8 6z',
+  // v0.2 A. Captions
+  captions:
+    'M3.5 6.5A2 2 0 015.5 4.5h13a2 2 0 012 2v11a2 2 0 01-2 2h-13a2 2 0 01-2-2zM7 14h4M13 14h4M7 11h10',
+  merge: 'M5 5v4a3 3 0 003 3h8a3 3 0 003-3V5M12 12v7M9 16l3 3 3-3',
 } as const;
 
 /** Name of an editor icon. */

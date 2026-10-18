@@ -160,7 +160,8 @@ export function TopBar({ onClose }: { onClose?: (() => void) | undefined }): Rea
 const RAIL: {
   id: PanelId;
   icon: IconName;
-  key: 'media' | 'text' | 'audio' | 'stickers' | 'filters' | 'transitions' | 'blurAreas';
+  key:
+    'media' | 'text' | 'audio' | 'stickers' | 'filters' | 'transitions' | 'blurAreas' | 'captions';
   tip:
     | 'tipAddMedia'
     | 'tipText'
@@ -168,10 +169,12 @@ const RAIL: {
     | 'tipStickers'
     | 'tipFilter'
     | 'tipTransitions'
-    | 'tipBlurAreas';
+    | 'tipBlurAreas'
+    | 'tipCaptions';
 }[] = [
   { id: 'media', icon: 'media', key: 'media', tip: 'tipAddMedia' },
   { id: 'text', icon: 'text', key: 'text', tip: 'tipText' },
+  { id: 'captions', icon: 'captions', key: 'captions', tip: 'tipCaptions' },
   { id: 'audio', icon: 'audio', key: 'audio', tip: 'tipAudio' },
   { id: 'stickers', icon: 'sticker', key: 'stickers', tip: 'tipStickers' },
   { id: 'filters', icon: 'filter', key: 'filters', tip: 'tipFilter' },
