@@ -6,7 +6,14 @@ import {
   type TranscriptWord,
 } from '@video-ultra/core';
 import type { FromWorker, ToWorker } from './protocol';
-import { keepWords, windowsOf, WINDOW_SECONDS } from './windows';
+import {
+  activeFrames,
+  activeShare,
+  keepWords,
+  windowsOf,
+  wordsWithSound,
+  WINDOW_SECONDS,
+} from './windows';
 
 /**
  * @video-ultra/captions — optional on-device auto-captions (v0.2 A5, DECISIONS #115). Speech is
@@ -138,9 +145,11 @@ export async function chooseModel(
       ? options.model
       : needsSmall
         ? 'small'
-        : memory !== undefined && memory >= 8
-          ? 'base'
-          : 'tiny';
+        : // `base` hears real recordings clearly better than `tiny` (DECISIONS #130); `tiny` only
+          // where the device says it's short of memory (Safari doesn't say: `base`).
+          memory !== undefined && memory < 6
+          ? 'tiny'
+          : 'base';
   // Measured (PERF.md "Captions"): tiny and base are as fast on WebAssembly as on WebGPU and
   // lighter; small is 2.5× faster on WebGPU.
   const device: 'webgpu' | 'wasm' =
@@ -299,6 +308,16 @@ export function createOnDeviceTranscriber(options: OnDeviceTranscriberOptions = 
         for await (const w of windowsOf(request.audio, TRANSCRIBE_SAMPLE_RATE)) {
           if (signal.aborted) throw new DOMException('Cancelled', 'AbortError');
           const length = w.audio.length / TRANSCRIBE_SAMPLE_RATE;
+          // Nearly silent (a quiet room, wind, hum): nothing to hear — the model would only make
+          // words up. Skip it (DECISIONS #130).
+          const active = activeFrames(w.audio);
+          if (activeShare(active) < 0.04) {
+            request.onProgress?.({
+              stage: 'transcribe',
+              fraction: Math.min(1, (w.index + 1) / windows),
+            });
+            continue;
+          }
           // Detecting: keep this window, in case the language heard needs another model.
           const again = language === 'auto' ? w.audio.slice() : null;
           let heard = await hear(w.audio, language);
@@ -320,7 +339,8 @@ export function createOnDeviceTranscriber(options: OnDeviceTranscriberOptions = 
               heard = await hear(again, language);
             }
           }
-          for (const word of keepWords(heard.words, w.index, w.isLast, length)) words.push(word);
+          const spoken = wordsWithSound(heard.words, active);
+          for (const word of keepWords(spoken, w.index, w.isLast, length)) words.push(word);
           request.onProgress?.({
             stage: 'transcribe',
             fraction: Math.min(1, (w.index + 1) / windows),

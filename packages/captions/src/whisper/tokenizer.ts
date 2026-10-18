@@ -25,6 +25,8 @@ export interface SpecialTokens {
   eot: number;
   transcribe: number;
   noTimestamps: number;
+  /** "Nobody is speaking here" — its probability tells silence and noise from speech. */
+  noSpeech: number;
   /** First timestamp token; every id from here up is a timestamp. */
   timestampBegin: number;
   /** `<|en|>` → id … */
@@ -72,6 +74,7 @@ export class WhisperTokenizer {
       eot: id('<|endoftext|>'),
       transcribe: id('<|transcribe|>'),
       noTimestamps,
+      noSpeech: byName.get('<|nospeech|>') ?? id('<|nocaptions|>'),
       timestampBegin: noTimestamps + 1,
       languages,
     };

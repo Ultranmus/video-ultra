@@ -38,6 +38,8 @@ export function keepWords(
   for (const w of words) {
     const text = w.text.trim();
     if (!text || w.start >= length) continue;
+    // Sound descriptions the model sometimes writes ("[music]", "(applause)", "♪").
+    if (/^[[(♪].*[\])♪]$|^[♪\s]+$/u.test(text)) continue;
     const start = Math.max(0, w.start + offset);
     const end = Math.max(
       start + 0.01,
@@ -86,4 +88,47 @@ export async function* windowsOf(
   const tail = filled > size - step || !pending ? buffer.slice(0, filled) : null;
   if (pending) yield { ...pending, isLast: !tail || tail.length === 0 };
   if (tail && tail.length > 0) yield { index, audio: tail, isLast: true };
+}
+
+/** 20 ms frames at 16 kHz. */
+const FRAME = 320;
+
+/**
+ * Which 20 ms frames of a window have sound loud enough to be speech (a quiet room, wind and
+ * hum don't): louder than −44 dBFS and well above the window's own noise floor. Pure; tested.
+ */
+export function activeFrames(audio: Float32Array): Uint8Array {
+  const n = Math.floor(audio.length / FRAME);
+  const rms = new Float32Array(n);
+  for (let f = 0; f < n; f++) {
+    let sum = 0;
+    for (let i = f * FRAME; i < (f + 1) * FRAME; i++) sum += audio[i]! * audio[i]!;
+    rms[f] = Math.sqrt(sum / FRAME);
+  }
+  const sorted = Float32Array.from(rms).sort();
+  const floor = sorted[Math.floor(n * 0.1)] ?? 0;
+  const threshold = Math.max(0.006, floor * 3);
+  const out = new Uint8Array(n);
+  for (let f = 0; f < n; f++) out[f] = rms[f]! > threshold ? 1 : 0;
+  return out;
+}
+
+/** Share of frames with sound (0…1). */
+export function activeShare(active: Uint8Array): number {
+  let k = 0;
+  for (const a of active) k += a;
+  return active.length ? k / active.length : 0;
+}
+
+/** Drops words said where there was no sound at all (times relative to the window, s). */
+export function wordsWithSound<W extends { start: number; end: number }>(
+  words: readonly W[],
+  active: Uint8Array,
+): W[] {
+  return words.filter((w) => {
+    const a = Math.max(0, Math.floor((w.start * 16_000) / FRAME) - 2);
+    const b = Math.min(active.length, Math.ceil((w.end * 16_000) / FRAME) + 2);
+    for (let f = a; f < b; f++) if (active[f]) return true;
+    return false;
+  });
 }

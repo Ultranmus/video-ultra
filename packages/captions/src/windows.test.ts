@@ -56,3 +56,25 @@ describe('windows', () => {
     expect(keepWords([{ text: 'x', start: 3, end: 2 }], 0, true)[0]!.end).toBeCloseTo(3.01);
   });
 });
+
+describe('sound check', () => {
+  it('finds speech-loud frames and drops words said in silence', async () => {
+    const { activeFrames, activeShare, wordsWithSound } = await import('./windows');
+    const a = new Float32Array(16_000 * 2);
+    // 0.5–1.0 s: a loud tone; the rest a faint hiss.
+    for (let i = 0; i < a.length; i++)
+      a[i] = i >= 8000 && i < 16000 ? 0.2 * Math.sin(i / 5) : 0.001 * Math.sin(i * 1.7);
+    const active = activeFrames(a);
+    expect(activeShare(active)).toBeCloseTo(0.25, 1);
+    expect(
+      wordsWithSound(
+        [
+          { text: 'real', start: 0.6, end: 0.8 },
+          { text: 'ghost', start: 1.5, end: 1.8 },
+        ],
+        active,
+      ).map((w) => (w as { text: string }).text),
+    ).toEqual(['real']);
+    expect(activeShare(activeFrames(new Float32Array(32_000)))).toBe(0);
+  });
+});

@@ -312,11 +312,17 @@ if (hindi) {
     await page.locator('.vu-dock .vu-captions').isVisible(),
   );
   // Hindi works on a phone without WebGPU too (the larger model, slower — the estimate says so).
-  await page.locator('.vu-dock button', { hasText: /^Hindi$/ }).first().tap();
+  await page
+    .locator('.vu-dock button', { hasText: /^Hindi$/ })
+    .first()
+    .tap();
   await page.waitForTimeout(300);
   const make = page.locator('.vu-dock .vu-btn', { hasText: 'Make captions' });
   check('phone: Hindi can be captioned', (await make.getAttribute('aria-disabled')) !== 'true');
-  await page.locator('.vu-dock button', { hasText: /^English$/ }).first().tap();
+  await page
+    .locator('.vu-dock button', { hasText: /^English$/ })
+    .first()
+    .tap();
   // The sheet scrolls to its end while half open.
   const scrolls = await page.evaluate(() => {
     const body = document.querySelector('.vu-dock-body') as HTMLElement;

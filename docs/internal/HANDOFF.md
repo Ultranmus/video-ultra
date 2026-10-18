@@ -2,6 +2,12 @@
 
 Where the last session stopped and what comes next. Update before ending every session.
 
+## 2026-10-19 (made-up captions fixed — DECISIONS #130)
+
+Auto captions no longer invent sentences when nobody is speaking; default model is `base` (more
+accurate on real recordings). Owner to retry on the iPhone with a clip where someone speaks
+clearly, and say the language spoken — the remaining unknown is real-speech accuracy on device.
+
 ## 2026-10-19 (owner's iPhone report fixed — DECISIONS #129)
 
 Captions crash on iPhone, Hindi/Bangla/Urdu disabled, sheet not scrolling (Captions, Blur),

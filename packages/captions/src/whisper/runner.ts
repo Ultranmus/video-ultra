@@ -24,6 +24,27 @@ export interface WhisperConfig {
 
 type Session = Ort.InferenceSession;
 
+/** Languages "Detect" chooses from (the ones the Captions panel offers). */
+const DETECT_AMONG = new Set([
+  'en',
+  'hi',
+  'es',
+  'fr',
+  'de',
+  'pt',
+  'it',
+  'nl',
+  'id',
+  'tr',
+  'ru',
+  'ar',
+  'bn',
+  'ur',
+  'ta',
+  'te',
+  'mr',
+]);
+
 export class WhisperRunner {
   readonly #ort: typeof Ort;
   readonly #encoder: Session;
@@ -81,6 +102,8 @@ export class WhisperRunner {
       const logits = out.logits.data as Float32Array;
       let best = -Infinity;
       for (const [code, id] of special.languages) {
+        // Only the languages captions offer: on noise, detection drifts to rare ones.
+        if (!DETECT_AMONG.has(code)) continue;
         const v = logits[id]!;
         if (v > best) {
           best = v;
@@ -91,6 +114,9 @@ export class WhisperRunner {
       disposeAll(out.raw);
     }
     const prompt = [special.sot, langId!, special.transcribe, special.noTimestamps];
+    let noSpeech = 0;
+    let logprobSum = 0;
+    let picked = 0;
 
     const heads = cfg.alignmentHeads;
     const frames = Math.min(1500, Math.ceil(audio.length / SAMPLE_RATE / 0.02));
@@ -103,7 +129,11 @@ export class WhisperRunner {
       if (past) disposeAll(past, out.keep);
       past = out.present;
       this.#collect(out.raw, input.length, rows, frames);
+      // How likely "nobody speaks here" was, right after <|startoftranscript|> (first pass only).
+      if (step === 0) noSpeech = this.#probability(out.logits, 0, special.noSpeech);
       const next = this.#pick(out.logits, step === 0);
+      logprobSum += this.#lastLogprob;
+      picked++;
       disposeAll(out.raw, out.keep);
       if (next === special.eot) {
         tokens.push(next);
@@ -119,6 +149,22 @@ export class WhisperRunner {
     // Text tokens (without the end token and any trailing repetition cut).
     const text = tokens.filter((t) => t < special.eot);
     if (!text.length) return { words: [], language: lang };
+    // Made-up text (DECISIONS #130): with no clear speech the model still writes confident
+    // sentences. Drop the window when it thought nobody was speaking and wasn't sure of what it
+    // wrote (Whisper's own rule), when it was very unsure, or when it only repeated itself.
+    const avg = logprobSum / Math.max(1, picked);
+    // Repetition in words (tokens repeat a lot in scripts spelled byte by byte, like Devanagari).
+    const said = this.#tok.decode(text).split(/\s+/).filter(Boolean);
+    const unique = said.length ? new Set(said).size / said.length : 1;
+    // Measured on real speech vs. made-up text (PERF.md "Captions"): speech scores no-speech
+    // ≤ 0.04 and confidence ≥ −0.3; made-up text no-speech ≥ 0.08 and confidence ≤ −0.75.
+    if (
+      avg < -1 ||
+      (noSpeech > 0.06 && avg < -0.6) ||
+      noSpeech > 0.5 ||
+      (said.length > 8 && unique < 0.3)
+    )
+      return { words: [], language: lang };
     const totalRows = prompt.length + tokens.length;
     const attention = rows.map((r) => {
       const m = new Float32Array(totalRows * frames);
@@ -196,6 +242,21 @@ export class WhisperRunner {
     });
   }
 
+  /** Log-probability of the last token `#pick` chose. */
+  #lastLogprob = 0;
+
+  /** Probability of token `id` at position `row` (softmax over the vocabulary). */
+  #probability(logits: Ort.Tensor, row: number, id: number): number {
+    const data = logits.data as Float32Array;
+    const vocab = logits.dims[2]!;
+    const base = row * vocab;
+    let max = -Infinity;
+    for (let v = 0; v < vocab; v++) if (data[base + v]! > max) max = data[base + v]!;
+    let sum = 0;
+    for (let v = 0; v < vocab; v++) sum += Math.exp(data[base + v]! - max);
+    return Math.exp(data[base + id]! - max) / sum;
+  }
+
   /** Greedy pick at the last position, with the suppression rules. */
   #pick(logits: Ort.Tensor, first: boolean): number {
     const data = logits.data as Float32Array;
@@ -212,6 +273,13 @@ export class WhisperRunner {
         id = v;
       }
     }
+    // Its log-probability among the tokens it could have chosen.
+    let sum = 0;
+    for (let v = 0; v < vocab; v++) {
+      if (this.#suppress[v] || (first && this.#cfg.beginSuppressTokens.includes(v))) continue;
+      sum += Math.exp(data[base + v]! - best);
+    }
+    this.#lastLogprob = -Math.log(sum);
     return id;
   }
 }

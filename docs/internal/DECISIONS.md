@@ -666,3 +666,18 @@ reason; when one changes, edit the entry and note the date.
       stuck finger made every later tap look like a second finger — no select, move, menu or
       deselect) and ends a gesture on lost pointer capture. (f) The selection outline is one
       accent line (the dark outer ring read as a black line).
+130.  **Auto captions reject made-up text** (owner's iPhone test, 2026-10-19: "I don't know if you
+      can speak English"). With no clear speech (quiet room, wind, ambient sound) every model
+      wrote confident sentences. The sound path was ruled out first (what the model gets matches
+      a reference decode: correlation 0.993–0.9999 on speech clips and iPhone footage). Guards,
+      tuned on real iPhone recordings without speech vs. speech clips: (a) a window that's almost
+      silent (< 4 % of 20 ms frames louder than −44 dBFS and 3× its noise floor) never reaches
+      the model; words said where there was no sound are dropped; (b) a window is dropped when
+      its average token log-probability < −1, or no-speech probability > 0.06 with log-probability
+      < −0.6, or no-speech > 0.5 (speech measured ≤ 0.04 / ≥ −0.3, made-up text ≥ 0.08 /
+      ≤ −0.75), or its words only repeat; (c) sound tags ("[music]") are dropped; (d) Detect only
+      chooses among the languages the panel offers (on noise it drifted to Norwegian, Javanese,
+      Korean). Result: every iPhone clip without speech now gives no captions in all three models;
+      English (2–5 % WER) and Hindi (72 words) unchanged. Default model is now `base` (amends
+      #128): it hears real recordings clearly better than `tiny`; `tiny` only where the device
+      reports < 6 GB.

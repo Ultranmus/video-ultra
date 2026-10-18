@@ -405,3 +405,15 @@ speech; real recordings are checked on devices). Word error rate (WER) against t
 - **Audio for the transcriber:** pulled 10 s at a time from the export mixer at 16 kHz mono —
   flat memory for any length.
 - Phones still need measuring (owner's devices): expect 2–4× slower than the laptop.
+
+### Made-up text guards (DECISIONS #130)
+
+Per 30 s window (no-speech probability · average token log-probability):
+
+| Clip                        | tiny                        | base                        | small                       |
+| --------------------------- | --------------------------- | --------------------------- | --------------------------- |
+| speech (English, 2 windows) | 0.03 / 0.03 · −0.10 / −0.25 | 0.01 / 0.02 · −0.10 / −0.11 | 0.03 / 0.02 · −0.08 / −0.16 |
+| speech (Hindi)              | —                           | —                           | 0.012 · −0.26               |
+| iPhone, no speech (3 clips) | 0.18–0.72 · −0.75 to −1.77  | 0.10–0.56 · −1.03 to −2.27  | 0.08–0.75 · −0.82 to −2.98  |
+
+After the guards: no captions from any no-speech clip; speech clips unchanged.
