@@ -2177,6 +2177,8 @@
     min-width: 0;
     min-height: 0;
     padding: var(--vu-space-5);
+    /* A zoomed-in view stays inside the stage. */
+    overflow: clip;
     touch-action: none;
   }
 
@@ -2189,9 +2191,26 @@
   .vu-stage-frame {
     position: relative;
     flex: none;
+    transform-origin: 0 0;
     border-radius: 2px;
     background: var(--vu-stage-canvas);
     box-shadow: var(--vu-shadow-stage);
+  }
+
+  /* Zoomed in: a pill to go back to the whole frame (and how far in we are). */
+  .vu-stage-fit {
+    position: absolute;
+    top: var(--vu-space-3);
+    right: var(--vu-space-3);
+    z-index: 2;
+    height: var(--vu-size-choice);
+    padding: 0 var(--vu-space-3);
+    border-radius: var(--vu-radius-full);
+    background: var(--vu-overlay);
+    color: var(--vu-on-media);
+    font-size: var(--vu-text-xs);
+    font-weight: var(--vu-weight-semibold);
+    font-variant-numeric: tabular-nums;
   }
 
   .vu-stage-canvas {
@@ -2266,9 +2285,11 @@
     top: 0;
     left: 0;
     transform-origin: center;
+    /* While the view is zoomed (--vu-stage-zoom on the frame) the outline and handles keep their
+       on-screen size. */
     box-shadow:
-      0 0 0 1px var(--vu-selection),
-      0 0 0 2px var(--vu-overlay);
+      0 0 0 calc(1px / var(--vu-stage-zoom, 1)) var(--vu-selection),
+      0 0 0 calc(2px / var(--vu-stage-zoom, 1)) var(--vu-overlay);
     pointer-events: none;
   }
 
@@ -2279,6 +2300,7 @@
     margin: calc(var(--vu-size-handle) / -2);
     border-radius: 3px;
     background: var(--vu-handle-fill);
+    scale: calc(1 / var(--vu-stage-zoom, 1));
     box-shadow:
       0 0 0 1px var(--vu-selection),
       var(--vu-shadow-thumb);
@@ -2316,15 +2338,15 @@
 
   .vu-rotate-stem {
     position: absolute;
-    top: calc(var(--vu-space-6) * -1);
+    top: calc(var(--vu-space-6) * -1 / var(--vu-stage-zoom, 1));
     left: 50%;
-    width: 1px;
-    height: var(--vu-space-6);
+    width: calc(1px / var(--vu-stage-zoom, 1));
+    height: calc(var(--vu-space-6) / var(--vu-stage-zoom, 1));
     background: var(--vu-selection);
   }
 
   .vu-handle-rotate {
-    top: calc(var(--vu-space-6) * -1);
+    top: calc(var(--vu-space-6) * -1 / var(--vu-stage-zoom, 1));
     left: 50%;
     border-radius: var(--vu-radius-full);
     cursor: grab;

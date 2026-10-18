@@ -31,7 +31,27 @@ type StageDrag =
       ids: [number, number];
       dist: number;
       angle: number;
-    };
+    }
+  /** Two fingers with nothing selected: zoom the view (screen coordinates). */
+  | {
+      type: 'view';
+      ids: [number, number];
+      dist: number;
+      mid: { x: number; y: number };
+      start: View;
+      /** Frame's top-left on screen with no zoom / pan. */
+      base: { x: number; y: number };
+    }
+  /** One finger on empty stage while zoomed in: pan the view. */
+  | { type: 'pan'; id: number; x: number; y: number; start: View; moved: boolean };
+
+/** How the stage view is zoomed and panned (CSS on the frame; the project doesn't change). */
+interface View {
+  z: number;
+  x: number;
+  y: number;
+}
+const MAX_ZOOM = 5;
 
 export function Stage(): ReactElement {
   const ctl = useController();
@@ -43,6 +63,23 @@ export function Stage(): ReactElement {
   const guideY = useRef<HTMLDivElement>(null);
   const { pw, ph } = useProject((p) => ({ pw: p.settings.width, ph: p.settings.height }));
   const [frame, setFrame] = useState({ w: 0, h: 0 });
+  // View zoom: kept in a ref and applied to the frame's style while gesturing (no render per
+  // move); `zoom` state follows at the end (Fit button, sharper engine rendering).
+  const view = useRef<View>({ z: 1, x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const applyView = (v: View) => {
+    view.current = v;
+    const el = frameRef.current;
+    if (!el) return;
+    el.style.transform =
+      v.z === 1 && !v.x && !v.y ? '' : `translate(${v.x}px, ${v.y}px) scale(${v.z})`;
+    // Handles and the outline divide by this to keep their on-screen size.
+    el.style.setProperty('--vu-stage-zoom', String(v.z));
+  };
+  const resetView = () => {
+    applyView({ z: 1, x: 0, y: 0 });
+    setZoom(1);
+  };
   const status = useUi((s) => s.status);
   const empty = useProject((p) => p.tracks.every((t) => t.items.length === 0));
 
@@ -67,10 +104,12 @@ export function Stage(): ReactElement {
   useEffect(() => {
     if (frame.w === 0) return;
     const dpr = Math.min(devicePixelRatio || 1, 2);
+    // Zoomed in, render more pixels so it stays sharp — never beyond the project's own size.
+    const k = Math.max(1, Math.min(zoom, pw / Math.max(1, frame.w * dpr)));
     void ctl.engine
-      ?.setViewSize(Math.round(frame.w * dpr), Math.round(frame.h * dpr))
+      ?.setViewSize(Math.round(frame.w * dpr * k), Math.round(frame.h * dpr * k))
       .catch(() => {});
-  }, [ctl, frame.w, frame.h]);
+  }, [ctl, frame.w, frame.h, zoom, pw]);
 
   // The engine and its canvas. Strict mode runs this twice: the first run's async setup must not
   // leave an engine behind once cleaned up (BACKLOG).
@@ -153,10 +192,14 @@ export function Stage(): ReactElement {
   const drag = useRef<StageDrag | null>(null);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
 
+  // Project pixels under a screen point. Uses the frame's on-screen size, so it holds while the
+  // view is zoomed or panned.
   const toCanvas = (e: { clientX: number; clientY: number }) => {
     const r = frameRef.current!.getBoundingClientRect();
-    return { x: (e.clientX - r.left) / scale, y: (e.clientY - r.top) / scale };
+    const k = r.width / pw || 1;
+    return { x: (e.clientX - r.left) / k, y: (e.clientY - r.top) / k };
   };
+  const screen = useRef(new Map<number, { x: number; y: number }>());
 
   const showGuides = (x: boolean, y: boolean) => {
     if (guideX.current) guideX.current.hidden = !x;
@@ -181,8 +224,29 @@ export function Stage(): ReactElement {
     }
     const p = toCanvas(e);
     pointers.current.set(e.pointerId, p);
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    screen.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {
+      /* the pointer already ended */
+    }
     const current = ctl.selectedItem();
+
+    // Two fingers and nothing to transform: zoom the view around the fingers.
+    if (pointers.current.size === 2 && !(current && 'transform' in current)) {
+      ctl.preview(null);
+      const [a, b] = [...screen.current.values()];
+      const r = frameRef.current!.getBoundingClientRect();
+      drag.current = {
+        type: 'view',
+        ids: [...screen.current.keys()] as [number, number],
+        dist: Math.max(1, Math.hypot(a!.x - b!.x, a!.y - b!.y)),
+        mid: { x: (a!.x + b!.x) / 2, y: (a!.y + b!.y) / 2 },
+        start: { ...view.current },
+        base: { x: r.left - view.current.x, y: r.top - view.current.y },
+      };
+      return;
+    }
 
     if (pointers.current.size === 2 && current && 'transform' in current) {
       latestTf.current = null;
@@ -235,7 +299,7 @@ export function Stage(): ReactElement {
       p.x,
       p.y,
       measure,
-      (touch ? 12 : 4) / scale,
+      (touch ? 12 : 4) / (scale * view.current.z),
     );
     // Keep the current selection when tapping inside it (it may be under another layer).
     const keep =
@@ -248,6 +312,18 @@ export function Stage(): ReactElement {
       hitInside(keep, p)
         ? current
         : hit;
+    // Zoomed in, a drag on empty stage pans the view (a tap still clears the selection).
+    if (!target && view.current.z > 1) {
+      drag.current = {
+        type: 'pan',
+        id: e.pointerId,
+        x: e.clientX,
+        y: e.clientY,
+        start: { ...view.current },
+        moved: false,
+      };
+      return;
+    }
     ctl.select(target?.id ?? null);
     if (target && 'transform' in target && !isLocked(target)) {
       drag.current = {
@@ -277,8 +353,37 @@ export function Stage(): ReactElement {
     if (!pointers.current.has(e.pointerId)) return;
     const p = toCanvas(e);
     pointers.current.set(e.pointerId, p);
+    screen.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const d = drag.current;
     if (!d) return;
+    if (d.type === 'view') {
+      const a = screen.current.get(d.ids[0]);
+      const b = screen.current.get(d.ids[1]);
+      if (!a || !b) return;
+      const z = Math.min(
+        MAX_ZOOM,
+        Math.max(1, (d.start.z * Math.hypot(a.x - b.x, a.y - b.y)) / d.dist),
+      );
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      // Keep the point that was under the fingers under them.
+      const px = (d.mid.x - d.base.x - d.start.x) / d.start.z;
+      const py = (d.mid.y - d.base.y - d.start.y) / d.start.z;
+      applyView(
+        z === 1
+          ? { z, x: 0, y: 0 }
+          : { z, x: mid.x - d.base.x - px * z, y: mid.y - d.base.y - py * z },
+      );
+      return;
+    }
+    if (d.type === 'pan') {
+      if (d.id !== e.pointerId) return;
+      const dx = e.clientX - d.x;
+      const dy = e.clientY - d.y;
+      if (!d.moved && Math.hypot(dx, dy) < 4) return;
+      d.moved = true;
+      applyView({ ...d.start, x: d.start.x + dx, y: d.start.y + dy });
+      return;
+    }
     if (d.type === 'pinch') {
       const a = pointers.current.get(d.ids[0]);
       const b = pointers.current.get(d.ids[1]);
@@ -295,8 +400,9 @@ export function Stage(): ReactElement {
     }
     if (d.id !== e.pointerId) return;
     if (d.type === 'move') {
-      const sx = snapCentre(d.tf.x + (p.x - d.x) / pw, 6 / scale / pw);
-      const sy = snapCentre(d.tf.y + (p.y - d.y) / ph, 6 / scale / ph);
+      const k = scale * view.current.z;
+      const sx = snapCentre(d.tf.x + (p.x - d.x) / pw, 6 / k / pw);
+      const sy = snapCentre(d.tf.y + (p.y - d.y) / ph, 6 / k / ph);
       showGuides(sx.snapped, sy.snapped);
       previewTransform(d.item, { ...d.tf, x: sx.value, y: sy.value });
     } else if (d.type === 'scale') {
@@ -315,8 +421,21 @@ export function Stage(): ReactElement {
 
   const finish = (e: React.PointerEvent, cancelled: boolean) => {
     pointers.current.delete(e.pointerId);
+    screen.current.delete(e.pointerId);
     const d = drag.current;
     if (!d) return;
+    if (d.type === 'view') {
+      if (pointers.current.size >= 2) return;
+      drag.current = null;
+      setZoom(view.current.z);
+      return;
+    }
+    if (d.type === 'pan') {
+      if (d.id !== e.pointerId) return;
+      drag.current = null;
+      if (!d.moved) ctl.select(null);
+      return;
+    }
     if (d.type === 'pinch') {
       if (pointers.current.size >= 2) return;
     } else if (d.id !== e.pointerId) return;
@@ -330,6 +449,30 @@ export function Stage(): ReactElement {
     }
     ctl.run(l.edit, (draft) => updateItem(draft, d.item.id, { transform: latest }));
   };
+
+  // Desktop: Ctrl/⌘ + wheel (or a trackpad pinch) zooms the view around the pointer.
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || !frameRef.current) return;
+      e.preventDefault();
+      const v = view.current;
+      const z = Math.min(MAX_ZOOM, Math.max(1, v.z * Math.exp(-e.deltaY * 0.01)));
+      const r = frameRef.current.getBoundingClientRect();
+      const base = { x: r.left - v.x, y: r.top - v.y };
+      const px = (e.clientX - base.x - v.x) / v.z;
+      const py = (e.clientY - base.y - v.y) / v.z;
+      applyView(
+        z === 1
+          ? { z, x: 0, y: 0 }
+          : { z, x: e.clientX - base.x - px * z, y: e.clientY - base.y - py * z },
+      );
+      setZoom(z);
+    };
+    stage.addEventListener('wheel', onWheel, { passive: false });
+    return () => stage.removeEventListener('wheel', onWheel);
+  }, []);
 
   return (
     <div
@@ -376,6 +519,16 @@ export function Stage(): ReactElement {
           <span className="vu-handle vu-handle-rotate" data-handle="rotate" />
         </div>
       </div>
+      {zoom > 1 ? (
+        <button
+          type="button"
+          className="vu-stage-fit"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={resetView}
+        >
+          {l.fitView} · {Math.round(zoom * 100)}%
+        </button>
+      ) : null}
     </div>
   );
 }

@@ -79,7 +79,7 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [x] (fixed 2026-10-19, PERF.md "Startup main-thread tasks") **Startup long tasks in Chrome:** two main-thread tasks of 70–140 ms in the first ~0.4 s after
       mount (production build; none in WebKit/Firefox, none while editing or playing). Likely the
       AudioContext + worklet setup (#44) and the capability probe. Profile and split.
-- [ ] Stage: pinch with nothing selected should zoom the view (UI_VISION §6) — not built yet.
+- [x] (done 2026-10-19, #114) Stage: pinch with nothing selected should zoom the view (UI_VISION §6) — not built yet.
 - [x] (fixed 2026-10-19) Voiceover plays the project while recording (so the speaker can follow); without headphones
       the project's sound is recorded too. Offer "mute while recording".
 - [ ] File handles (Chromium desktop): import still copies into OPFS; use `showOpenFilePicker` +
@@ -125,7 +125,7 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       cancel close the encoder without an unhandled error.
 - [ ] Real-iPhone check of the second UI pass: keyboard lift (visualViewport) while editing text,
       long-press reorder without Safari's callout, dock heights, Preview mode.
-- [ ] Stage view pinch-zoom (nothing selected) — still not built.
+- [x] (done 2026-10-19, #114) Stage view pinch-zoom (nothing selected) — still not built.
 - [ ] Inspector: "Appearance" buttons stack one per row in a narrow inspector; consider an icon
       row (rotate / flip H / flip V) like image-ultra's adjust bar.
 - [x] (fixed 2026-10-19) Ruler labels under the playhead capsule are hidden; a nicer approach would fade them.

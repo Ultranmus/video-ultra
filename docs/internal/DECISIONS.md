@@ -534,3 +534,9 @@ reason; when one changes, edit the entry and note the date.
       fading in — equal power (sin / cos). With no spare media a side fades inside its own clip: a
       dip, never a hard cut. Pure maths in `audio/spans.ts` (tested); preview and export share it.
       The export check measures the fade's end to the millisecond (A/V offset ≤ 1 ms in MP4).
+114.  **The stage view zooms** (UI_VISION §6, 2026-10-19). Two fingers with nothing selected (or
+      Ctrl/⌘ + wheel / trackpad pinch on desktop) zoom the preview up to 500% around the fingers or
+      pointer; one finger on empty stage pans while zoomed; a "Fit · N%" pill resets. It is CSS on
+      the frame (the project never changes); the engine renders more pixels to stay sharp (never
+      beyond the project's size); stage pointer maths uses the frame's on-screen size, so editing
+      while zoomed is exact; handles and the outline keep their on-screen size.

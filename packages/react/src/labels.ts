@@ -407,6 +407,7 @@ export const DEFAULT_LABELS = {
   tipTransitionMarker: (name: string | null) =>
     name ? `Transition: ${name} — click to change` : 'Add a transition here',
   tipRuler: 'Click or drag to move the playhead',
+  fitView: 'Fit',
   rowVideo: 'Video',
   filtersNotForSound: 'Sound has no picture to filter — showing the clip under the playhead.',
   transitionsForPictures: 'Sound has no transitions — showing the nearest cut between clips.',
