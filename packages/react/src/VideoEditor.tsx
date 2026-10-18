@@ -12,6 +12,7 @@ import {
 import { useEffect, useRef, useState, type CSSProperties, type ReactElement } from 'react';
 import { ControllerContext, useController, useLabels, useUi } from './context';
 import { EditorController } from './controller';
+import type { EditorCustomization, EditorEvent } from './embed';
 import { CameraRecorder } from './Camera';
 import { ExportDialog } from './ExportDialog';
 import { Icon } from './icons';
@@ -91,6 +92,13 @@ export interface VideoEditorProps {
    * isn't shown.
    */
   backgroundRemover?: BackgroundRemover;
+  /**
+   * Embedding API: hide or reorder built-in tools, add your own panels, top-bar buttons and
+   * media sources (see {@link EditorCustomization}).
+   */
+  customize?: EditorCustomization;
+  /** Everything that happens in the editor (edits, selection, playback, commands, export…). */
+  onEvent?: (event: EditorEvent) => void;
   /** `dark` (default), `light` or `auto` (follow the OS). */
   theme?: ThemeMode;
   /** Typed overrides for the common theme tokens. */
@@ -151,6 +159,7 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
         ...(props.audioLibrary ? { audioLibrary: props.audioLibrary } : {}),
         ...(props.transcriber ? { transcriber: props.transcriber } : {}),
         ...(props.backgroundRemover ? { backgroundRemover: props.backgroundRemover } : {}),
+        ...(props.customize ? { customize: props.customize } : {}),
       },
       parsed?.project ?? undefined,
     );
@@ -159,6 +168,13 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
   });
   const controller = ctl.controller;
   const rootRef = useRef<HTMLDivElement>(null);
+
+  // The host's event listener (latest one; it may change between renders).
+  const onEvent = useRef(props.onEvent);
+  useEffect(() => {
+    onEvent.current = props.onEvent;
+  });
+  useEffect(() => controller.on((event) => onEvent.current?.(event)), [controller]);
 
   // Start: capabilities, storage, media. Strict mode mounts twice — `cancelled` guards async work.
   useEffect(() => {

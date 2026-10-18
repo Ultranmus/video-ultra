@@ -123,8 +123,11 @@ const paths = {
 /** Name of an editor icon. */
 export type IconName = keyof typeof paths;
 
+/** An editor icon by name, or a host's own (`{ path }`: one SVG path on a 24 × 24 grid). */
+export type IconSpec = IconName | { path: string };
+
 /** An editor icon. Decorative: pair it with a visible label. */
-export function Icon({ name, size = 20 }: { name: IconName; size?: number }): ReactElement {
+export function Icon({ name, size = 20 }: { name: IconSpec; size?: number }): ReactElement {
   return (
     <svg
       className="vu-icon"
@@ -139,7 +142,7 @@ export function Icon({ name, size = 20 }: { name: IconName; size?: number }): Re
       aria-hidden="true"
       focusable="false"
     >
-      <path d={paths[name]} />
+      <path d={typeof name === 'string' ? paths[name] : name.path} />
     </svg>
   );
 }

@@ -788,6 +788,14 @@ export const DEFAULT_LABELS = {
   captionsOnDevice: (mb: number) =>
     `Runs on this device, nothing is uploaded · about ${Math.round(mb)} MB to download the first time`,
   captionsOnDeviceCached: 'Runs on this device, nothing is uploaded',
+  // v0.3 Embedding API: the host's media sources
+  mediaSources: 'More media',
+  searchMedia: 'Search videos and photos',
+  noMediaFound: 'Nothing found',
+  mediaSourceError: 'Couldn’t load these — check the connection and try again.',
+  mediaSourceFailed: (name: string) => `Couldn't add "${name}"`,
+  addNamed: (name: string) => `Add ${name}`,
+  loadingResults: 'Loading…',
   // v0.3 Background removal
   removeBackground: 'Remove background',
   restoreBackground: 'Restore background',

@@ -1,7 +1,8 @@
 import { findItem, type Item, type Project } from '@video-ultra/core';
 import { getCommand, type CommandId } from './commands';
 import type { EditorController } from './controller';
-import type { IconName } from './icons';
+import type { IconSpec } from './icons';
+import { inHostOrder, isHidden } from './embed';
 import type { Labels } from './labels';
 import type { PanelId, ToolId } from './state';
 import { hasCutInto, type Targets } from './targets';
@@ -9,7 +10,7 @@ import { hasCutInto, type Targets } from './targets';
 /** One entry of the phone/tablet contextual toolbar. */
 export interface ToolEntry {
   key: string;
-  icon: IconName;
+  icon: IconSpec;
   label: string;
   /** What it does (tooltip). */
   tip?: string;
@@ -36,6 +37,33 @@ export function toolsFor(
   targets: Targets,
   /** How many items are selected (several: the selection's tools). */
   count = item ? 1 : 0,
+): ToolEntry[] {
+  const customize = ctl.options.customize;
+  const entries = builtInTools(item, project, ctl, l, targets, count).filter(
+    (t) => !isHidden(customize, t.key),
+  );
+  if (item || count > 0 || !customize?.panels?.length) return entries;
+  // Nothing selected: the host's panels join the add tools, in its order.
+  const custom: ToolEntry[] = customize.panels.map((p) => ({
+    key: p.id,
+    icon: { path: p.icon },
+    label: p.label,
+    ...(p.tip ? { tip: p.tip } : {}),
+    panel: `custom:${p.id}`,
+  }));
+  return inHostOrder(
+    [...entries.map((e) => ({ ...e, id: e.key })), ...custom.map((e) => ({ ...e, id: e.key }))],
+    customize.railOrder,
+  );
+}
+
+function builtInTools(
+  item: Item | null,
+  project: Project,
+  ctl: EditorController,
+  l: Labels,
+  targets: Targets,
+  count: number,
 ): ToolEntry[] {
   const command = (id: CommandId, key = id): ToolEntry => {
     const c = getCommand(ctl, id);

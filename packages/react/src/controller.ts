@@ -1,3 +1,4 @@
+import type { EditorCustomization, EditorEvent } from './embed';
 import {
   addAsset,
   addToLane,
@@ -128,6 +129,8 @@ export interface ControllerOptions {
   audioLibrary?: AudioLibrary;
   /** Turns speech into timed words for auto captions (on-device or the host's service). */
   transcriber?: Transcriber;
+  /** Host customisation: hidden tools, own panels, buttons and media sources (embed.ts). */
+  customize?: EditorCustomization;
   /** Removes photo backgrounds (`createBackgroundRemover()` from `@video-ultra/ai`, or yours). */
   backgroundRemover?: BackgroundRemover;
 }
@@ -200,10 +203,49 @@ export class EditorController {
   /** Bumped by stop(); async work from an older start() checks it and backs out. */
   #generation = 0;
 
+  #listeners = new Set<(event: EditorEvent) => void>();
+
+  /** Listens to what happens in the editor (edits, selection, playback, …); returns an unsubscribe. */
+  on(listener: (event: EditorEvent) => void): () => void {
+    this.#listeners.add(listener);
+    return () => {
+      this.#listeners.delete(listener);
+    };
+  }
+
+  /** Tells the listeners (a host's listener throwing never breaks the editor). */
+  notify(event: EditorEvent): void {
+    for (const listener of this.#listeners) {
+      try {
+        listener(event);
+      } catch (error) {
+        console.error(error);
+      }
+    }
+  }
+
   constructor(options: ControllerOptions, project?: Project) {
     this.options = options;
     this.labels = options.labels;
     this.editor = createEditor(project ?? createProject());
+    this.#disposers.push(
+      this.ui.subscribe((state, prev) => {
+        if (!this.#listeners.size) return;
+        if (state.selectedIds !== prev.selectedIds)
+          this.notify({ type: 'selection', ids: state.selectedIds });
+        if (state.playing !== prev.playing)
+          this.notify({ type: 'playback', playing: state.playing });
+        if (state.panel !== prev.panel) this.notify({ type: 'panel', id: state.panel });
+      }),
+      this.editor.store.subscribe((state, prev) => {
+        if (state.project === prev.project || !this.#listeners.size) return;
+        const { labels, position } = this.editor.history();
+        this.notify({
+          type: 'change',
+          label: position > 0 ? (labels[position - 1] ?? null) : null,
+        });
+      }),
+    );
     this.#disposers.push(
       this.editor.store.subscribe((state, prev) => {
         if (state.project === prev.project) return;
@@ -1328,6 +1370,7 @@ export class EditorController {
           }
         });
         this.#registerMedia(asset, file);
+        this.notify({ type: 'import', assetId: asset.id, name: asset.name });
         if (selectId) this.select(selectId);
         this.ui.setState((s) => ({ imports: s.imports.filter((r) => r.id !== rowId) }));
       } catch (error) {
@@ -1555,7 +1598,15 @@ export class EditorController {
     const engine = this.engine;
     if (!engine) throw new Error(this.labels.exportUnavailable);
     this.pause();
-    const result = await engine.export(options, onProgress, signal);
+    this.notify({ type: 'export', phase: 'start' });
+    let result: ExportResult;
+    try {
+      result = await engine.export(options, onProgress, signal);
+    } catch (error) {
+      this.notify({ type: 'export', phase: signal.aborted ? 'cancelled' : 'error' });
+      throw error;
+    }
+    this.notify({ type: 'export', phase: 'done' });
     for (const warning of result.warnings) this.toast(warning, 'info');
     this.options.onExport?.(result);
     return result;

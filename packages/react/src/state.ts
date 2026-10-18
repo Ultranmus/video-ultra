@@ -17,7 +17,9 @@ export type PanelId =
   /** Blurred / pixelated areas (v0.2 C3). */
   | 'blur'
   /** Templates (v0.3). */
-  | 'templates';
+  | 'templates'
+  /** A host's own panel (embedding API, v0.3). */
+  | `custom:${string}`;
 
 /** Tools whose controls open in the sheet (phone/tablet) or the inspector (desktop). */
 export type ToolId =

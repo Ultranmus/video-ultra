@@ -191,14 +191,14 @@ _D. Capture & export_
 
 **v0.3 — Canva tier**
 
-- [ ] Templates with placeholders and text variables (M)
-- [ ] Auto-captions with on-device speech-to-text — lazy model in a worker, inside memory budgets (L)
-- [ ] Background removal — lazy segmentation model in a worker (L)
-- [ ] Lottie / GIF / SVG stickers (M)
-- [ ] Shape masks (M)
-- [ ] Embedding API: show / hide / reorder tools, custom panels and buttons, asset-source plugins,
+- [x] Templates with placeholders and text variables (M) — 192 templates (#139)
+- [x] Auto-captions with on-device speech-to-text — lazy model in a worker, inside memory budgets (L) — done in v0.2
+- [x] Background removal — lazy segmentation model in a worker (L) — photos and image stickers (#140)
+- [x] Lottie / GIF / SVG stickers (M) — GIF / WebP / APNG / SVG + 611 animated emoji (#138); Lottie → BACKLOG
+- [x] Shape masks (M) — 126 shapes (#133)
+- [x] Embedding API: show / hide / reorder tools, custom panels and buttons, asset-source plugins,
       events, custom labels — builds on the command registry (6.0) (M)
-- [ ] High-contrast themes and a touch-aware density setting (S)
+- [x] High-contrast themes and a touch-aware density setting (S) (#136)
 
 **v0.4+ — pro layer (behind progressive disclosure)**
 

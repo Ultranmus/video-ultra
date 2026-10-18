@@ -19,6 +19,15 @@ export type {
   AudioLibraryQuery,
   AudioLibraryTrack,
 } from './library/audio-library';
+export type {
+  EditorCustomization,
+  EditorEvent,
+  CustomPanel,
+  CustomButton,
+  CustomIconPath,
+  MediaSource,
+  MediaSourceItem,
+} from './embed';
 export { themeOverridesToStyle } from './theme';
 export type { ThemeMode, ThemeOverrides } from './theme';
 export { VERSION, detectCapabilities } from '@video-ultra/core';

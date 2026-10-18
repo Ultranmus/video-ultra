@@ -15,7 +15,10 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactElement } from 
 import { useController, useHistory, useLabels, useProject, useUi } from './context';
 import { Button, IconButton, Ruler, Section, ToolButton } from './controls';
 import { formatClock } from './format';
-import { Icon, type IconName } from './icons';
+import { Icon, type IconName, type IconSpec } from './icons';
+import { inHostOrder, isHidden } from './embed';
+import type { EditorController } from './controller';
+import type { Labels } from './labels';
 import { itemTitle, kindLabel, ratioOf } from './items';
 import { AddPanel } from './panels';
 import type { PanelId, ToolId } from './state';
@@ -143,6 +146,15 @@ export function TopBar({ onClose }: { onClose?: (() => void) | undefined }): Rea
             onClick={() => ctl.ui.setState({ helpOpen: true })}
           />
         ) : null}
+        {ctl.options.customize?.buttons?.map((b) => (
+          <Button
+            key={b.id}
+            {...(b.icon ? { icon: { path: b.icon } } : {})}
+            label={b.label}
+            variant={b.variant ?? 'secondary'}
+            onClick={() => b.onClick(ctl)}
+          />
+        ))}
         <Button
           icon="download"
           label={l.export}
@@ -192,18 +204,45 @@ const RAIL: {
   { id: 'blur', icon: 'blurArea', key: 'blurAreas', tip: 'tipBlurAreas' },
 ];
 
+/** The left menu: built-in panels the host didn't hide, the host's own panels, in its order. */
+export function railEntries(
+  ctl: EditorController,
+  l: Labels,
+): { id: PanelId; icon: IconSpec; label: string; tip: string }[] {
+  const customize = ctl.options.customize;
+  const entries = [
+    ...RAIL.filter((r) => !isHidden(customize, r.id)).map((r) => ({
+      id: r.id as PanelId,
+      icon: r.icon as IconSpec,
+      label: l[r.key],
+      tip: l[r.tip],
+    })),
+    ...(customize?.panels ?? []).map((p) => ({
+      id: `custom:${p.id}` as PanelId,
+      icon: { path: p.icon } as IconSpec,
+      label: p.label,
+      tip: p.tip ?? p.label,
+    })),
+  ];
+  // The host names its panels by their own id in `railOrder`.
+  const order = customize?.railOrder?.map((id) =>
+    customize.panels?.some((p) => p.id === id) ? `custom:${id}` : id,
+  );
+  return inHostOrder(entries, order);
+}
+
 export function Rail(): ReactElement {
   const ctl = useController();
   const l = useLabels();
   const panel = useUi((s) => s.panel);
   return (
     <nav className="vu-rail" aria-label={l.addContent}>
-      {RAIL.map((entry) => (
+      {railEntries(ctl, l).map((entry) => (
         <ToolButton
           key={entry.id}
           icon={entry.icon}
-          label={l[entry.key]}
-          tip={l[entry.tip]}
+          label={entry.label}
+          tip={entry.tip}
           active={panel === entry.id}
           pressed={panel === entry.id}
           onClick={() => ctl.openPanel(panel === entry.id ? null : entry.id)}
@@ -219,7 +258,14 @@ export function Panel(): ReactElement | null {
   const panel = useUi((s) => s.panel);
   if (!panel) return null;
   const entry = RAIL.find((r) => r.id === panel);
-  const title = entry ? l[entry.key] : panel === 'layers' ? l.layers : l.canvas;
+  const custom = ctl.options.customize?.panels?.find((p) => `custom:${p.id}` === panel);
+  const title = custom
+    ? custom.label
+    : entry
+      ? l[entry.key]
+      : panel === 'layers'
+        ? l.layers
+        : l.canvas;
   return (
     <aside className="vu-panel" aria-label={title}>
       <div className="vu-panel-head">
@@ -757,13 +803,16 @@ function Sheet({ tool, panel }: { tool: ToolId | null; panel: PanelId | null }):
     return () => ro.disconnect();
   }, []);
   const entry = RAIL.find((r) => r.id === panel);
+  const custom = ctl.options.customize?.panels?.find((p) => `custom:${p.id}` === panel);
   const title = tool
     ? l[TOOL_TITLE[tool]]
-    : entry
-      ? l[entry.key]
-      : panel === 'layers'
-        ? l.layers
-        : l.canvas;
+    : custom
+      ? custom.label
+      : entry
+        ? l[entry.key]
+        : panel === 'layers'
+          ? l.layers
+          : l.canvas;
 
   /**
    * The sheet is always full height and only ever moves with `transform` (no height animation,

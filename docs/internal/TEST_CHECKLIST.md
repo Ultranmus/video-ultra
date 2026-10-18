@@ -55,3 +55,8 @@ Open the branch's Vercel preview (or `pnpm --filter playground dev`), then **`/e
       product photo on the computer too. **On the iPhone:** time it, and does the tab survive?
       Also works on an image sticker. _Checked here:_ cutout-check with both models (pixels:
       background gone, person kept; restore; undo; memory back to normal after).
+- [ ] **Embedding API (for host apps).** Open `/editor?embed=1`: the left menu has **Brand**
+      second (the host's own panel: "Add brand title" works), Blur is gone, the top bar has a
+      **Share** button, the Media panel has a **Backgrounds** source (search "ocean", tap to
+      add), and Duplicate is gone from the menu (⌘D does nothing). On the phone, Brand is in the
+      add tools. _Checked here:_ embed-check (all of it, plus every event type arriving).

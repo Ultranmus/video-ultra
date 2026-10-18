@@ -1,5 +1,6 @@
 import { mainTrack, projectDuration, type ArrangeTo } from '@video-ultra/core';
 import type { EditorController } from './controller';
+import { isHidden } from './embed';
 import type { IconName } from './icons';
 import { isSounding } from './items';
 import type { AlignEdge } from './stage/arrange';
@@ -368,8 +369,12 @@ export function getCommand(ctl: EditorController, id: CommandId): Command {
 /** Runs a command if it can run; otherwise says why (never silently nothing). */
 export function runCommand(ctl: EditorController, id: CommandId): void {
   const command = getCommand(ctl, id);
+  if (isHidden(ctl.options.customize, id)) return; // the host took it out
   if (command.disabledReason) ctl.toast(command.disabledReason, 'info');
-  else command.run();
+  else {
+    command.run();
+    ctl.notify({ type: 'command', id });
+  }
 }
 
 /** A keyboard shortcut. `mod` = ⌘ on Apple devices, Ctrl elsewhere. */
@@ -433,6 +438,21 @@ export function commandForKey(e: {
  * `align` opens a submenu).
  */
 export function menuSections(ctl: EditorController): {
+  heading: string | null;
+  sections: (CommandId | 'align')[][];
+} {
+  const all = builtInMenu(ctl);
+  const hide = ctl.options.customize?.hide;
+  if (!hide?.length) return all;
+  return {
+    heading: all.heading,
+    sections: all.sections
+      .map((group) => group.filter((id) => !hide.includes(id)))
+      .filter((group) => group.length > 0),
+  };
+}
+
+function builtInMenu(ctl: EditorController): {
   heading: string | null;
   sections: (CommandId | 'align')[][];
 } {

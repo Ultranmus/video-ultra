@@ -770,3 +770,13 @@ reason; when one changes, edit the entry and note the date.
       Non-destructive: the transparent PNG is a new image asset and the item gets
       `cutout: { assetId }` (file version 4); the engine draws it instead; Restore removes the
       field. Copy / paste carries the cutout asset.
+141.  **Embedding API** (v0.3). `<VideoEditor customize={…} onEvent={…}>`: `hide` (built-in panel,
+      tool and command ids — hidden commands leave menus and their shortcuts do nothing),
+      `railOrder`, `panels` (the host's own left-menu panels, also phone add tools; rendered
+      with the controller), `buttons` (top bar, before Export), `mediaSources` (search + load,
+      shown in the Media panel, credit kept on the asset; like `audioLibrary`). Icons are one SVG
+      path on a 24 × 24 grid (our stroke style). Events: `change` (with the undo label),
+      `selection`, `playback`, `command`, `import`, `export` (start / done / cancelled / error),
+      `panel` — also `controller.on(listener)`; a listener that throws never breaks the editor.
+      Custom labels were already `labels`. Demo: playground `?embed=1`; embed-check covers it.
+      The command registry (#91, #116) is what makes hiding consistent everywhere.
