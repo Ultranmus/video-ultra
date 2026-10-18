@@ -540,3 +540,14 @@ reason; when one changes, edit the entry and note the date.
       the frame (the project never changes); the engine renders more pixels to stay sharp (never
       beyond the project's size); stage pointer maths uses the frame's on-screen size, so editing
       while zoomed is exact; handles and the outline keep their on-screen size.
+115.  **Auto-captions: pluggable transcriber + optional on-device model, chosen for speed and
+      efficiency** (owner, 2026-10-19). Core gets a caption track, SRT / VTT, caption rendering and
+      a transcriber interface (audio in → timed words out). The default speech engine ships as a
+      separate optional package (`@video-ultra/captions`): nothing downloads until the user taps
+      "Auto captions" (a one-time, clearly sized download, then cached in OPFS); it runs in its
+      own worker, WebGPU first, single-threaded WASM otherwise (no SharedArrayBuffer — CLAUDE.md);
+      audio streams in 30 s chunks at 16 kHz mono so memory stays flat. Hosts may plug in any
+      transcriber (a server is allowed — then privacy is the host's to state). Speed first: the
+      smallest model that captions well; the A0 spike picks it from measurements (tiny multilingual
+      vs an English-only fast model for English, Hindi accuracy checked). Low-tier phones get auto
+      captions only through a host transcriber; import and typed captions work everywhere.

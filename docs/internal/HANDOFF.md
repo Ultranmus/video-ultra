@@ -9,7 +9,7 @@ one tab owns a project (Web Lock, read-only second tab), crashed-engine screen, 
 bitrates + VP8 on Firefox + stale export tidy, orphaned-media sweep, no startup long tasks
 (AudioContext moved to a quiet moment — PERF.md), sound crossfades under transitions, UI polish
 (toolbar fades, ruler fade, device-drawable emoji, voiceover mute), stage view zoom.
-Next: plan v0.2 with the owner (draft roadmap in PLAN.md), one question at a time. Still needs the
+v0.2 scope confirmed by the owner (PLAN.md "v0.2 — everyday creator", DECISIONS #115): all four groups + auto-captions. Next: A0 speech-model spike, then captions A1–A6. Still needs the
 owner: real iPhone / Android checkpoint (https: `pnpm --filter playground dev:https`).
 
 ## 2026-10-19 (mobile pass)
