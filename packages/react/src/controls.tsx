@@ -403,19 +403,29 @@ export function Chips<T extends string>({
   );
 }
 
+/** The quick palette: neutrals and warm tones first, then the cool side; 15 + custom = 2 rows of 8. */
 const SWATCHES = [
   ['#ffffff', 'White'],
+  ['#d4d4d8', 'Silver'],
+  ['#71717a', 'Grey'],
   ['#000000', 'Black'],
+  ['#fff3d6', 'Cream'],
   ['#f5d547', 'Yellow'],
+  ['#ffb020', 'Amber'],
   ['#ff7a45', 'Orange'],
   ['#ff4d6d', 'Red'],
+  ['#ff5fa2', 'Pink'],
   ['#c86bfa', 'Purple'],
   ['#5b8cff', 'Blue'],
+  ['#38c6f4', 'Sky'],
   ['#33c3a0', 'Teal'],
   ['#8fd16a', 'Green'],
 ] as const;
 
-/** Colour swatches plus a full colour picker. Previews while dragging; one edit per change. */
+/**
+ * A colour: the current colour (with its hex) beside the label, a quick palette, and the full
+ * picker under it on demand. Previews while dragging; one edit per change.
+ */
 export function ColorField({
   label,
   value,
@@ -433,18 +443,61 @@ export function ColorField({
   const ctl = useController();
   const l = ctl.labels;
   const [open, setOpen] = useState(false);
-  const custom = !SWATCHES.some(([c]) => c === value.toLowerCase());
+  const pickerId = useId();
+  const lower = value.toLowerCase();
+  const custom = !SWATCHES.some(([c]) => c === lower);
   const commit = (color: string) => ctl.run(commitLabel, (d) => recipe(d, color), { coalesceKey });
+  const shown = /^#[0-9a-f]{6}$/i.test(value) ? value.toUpperCase() : l.customColor;
+  // Opened at the bottom of a scrolling panel: bring the whole picker into view (that panel only —
+  // never the editor itself).
+  const revealPicker = (el: HTMLDivElement | null) => {
+    if (!el) return;
+    requestAnimationFrame(() => {
+      let scroller = el.parentElement;
+      while (scroller && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY))
+        scroller = scroller.parentElement;
+      if (!scroller) return;
+      // What is actually visible: a phone sheet's lower part sits under the tab bar / off-screen.
+      const tabBar = el.closest('.vu-root')?.querySelector('.vu-toolbar');
+      const visibleBottom = Math.min(
+        scroller.getBoundingClientRect().bottom,
+        tabBar ? tabBar.getBoundingClientRect().top : Infinity,
+        window.innerHeight,
+      );
+      const r = el.getBoundingClientRect();
+      // All of it if it fits, else its top near the top of the visible area.
+      const room = visibleBottom - scroller.getBoundingClientRect().top;
+      const by =
+        r.height + 12 <= room
+          ? r.bottom + 12 - visibleBottom
+          : r.top - scroller.getBoundingClientRect().top - 48;
+      if (by > 0) scroller.scrollBy({ top: by, behavior: 'smooth' });
+    });
+  };
   return (
-    <div className="vu-field">
-      <span className="vu-field-row">{label}</span>
+    <div className="vu-field vu-colorfield">
+      <div className="vu-field-row">
+        <span>{label}</span>
+        <button
+          type="button"
+          className="vu-color-current"
+          aria-expanded={open}
+          aria-controls={pickerId}
+          data-tooltip={l.customColor}
+          onClick={() => setOpen(!open)}
+        >
+          <span className="vu-color-dot" style={{ ['--vu-swatch' as string]: value }} />
+          <span className="vu-color-hex">{shown}</span>
+          <Icon name="chevronDown" size={14} />
+        </button>
+      </div>
       <div className="vu-swatches" role="radiogroup" aria-label={label}>
         {SWATCHES.map(([color, name]) => (
           <button
             key={color}
             type="button"
             role="radio"
-            aria-checked={value.toLowerCase() === color}
+            aria-checked={lower === color}
             aria-label={name}
             data-tooltip={name}
             className="vu-swatch"
@@ -457,18 +510,28 @@ export function ColorField({
           className="vu-swatch vu-swatch-custom"
           aria-label={l.customColor}
           aria-expanded={open}
+          aria-controls={pickerId}
           data-tooltip={l.customColor}
           data-checked={custom || undefined}
           onClick={() => setOpen(!open)}
         />
       </div>
       {open ? (
-        <ColorPicker
-          value={/^#[0-9a-f]{6}$/i.test(value) ? value : '#ffffff'}
-          onPreview={(c) => ctl.preview((d) => recipe(d, c))}
-          onChange={commit}
-          labels={{ saturation: l.cpSaturation, hue: l.cpHue, hex: l.cpHex, recent: l.cpRecent }}
-        />
+        <div id={pickerId} ref={revealPicker} className="vu-colorpicker-wrap">
+          <ColorPicker
+            value={/^#[0-9a-f]{6}$/i.test(value) ? value : '#ffffff'}
+            onPreview={(c) => ctl.preview((d) => recipe(d, c))}
+            onChange={commit}
+            labels={{
+              saturation: l.cpSaturation,
+              hue: l.cpHue,
+              hex: l.cpHex,
+              recent: l.cpRecent,
+              before: l.cpBefore,
+              eyedropper: l.cpEyedropper,
+            }}
+          />
+        </div>
       ) : null}
     </div>
   );

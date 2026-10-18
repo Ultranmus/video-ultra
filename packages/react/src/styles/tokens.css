@@ -133,8 +133,13 @@
     --vu-size-sticker: 64px;
     --vu-size-textstyle: 64px;
     --vu-size-cp-square: 140px;
-    --vu-size-cp-hue: 12px;
-    --vu-size-cp-knob: 16px;
+    --vu-size-cp-hue: 14px;
+    --vu-size-cp-knob: 22px;
+    --vu-size-cp-compare: 64px;
+    --vu-size-cp-area-max: 168px;
+    --vu-size-cp-area-phone: 116px;
+    --vu-size-color-dot: 18px;
+    --vu-size-swatch-max: 36px;
     --vu-size-swatch-sm: 22px;
     --vu-scrollbar: rgba(255, 255, 255, 0.18);
     --vu-scrollbar-hover: rgba(255, 255, 255, 0.3);
@@ -142,6 +147,8 @@
     --vu-textstyle-bg: #3a3a44;
     --vu-cp-black: #000000;
     --vu-cp-white: #ffffff;
+    --vu-cp-ring: rgba(0, 0, 0, 0.12);
+    --vu-shadow-cp-knob: 0 0 0 1px rgba(0, 0, 0, 0.18), 0 2px 6px rgba(0, 0, 0, 0.35);
     --vu-cp-h0: #ff0000;
     --vu-cp-h60: #ffff00;
     --vu-cp-h120: #00ff00;

@@ -53,11 +53,26 @@ export interface ColorPickerLabels {
   hue: string;
   hex: string;
   recent: string;
+  /** The "before" half of the comparison (tapping it goes back). */
+  before: string;
+  eyedropper: string;
+}
+
+/** A knob position 0…1 along a track, kept fully inside it. */
+const inset = (f: number) =>
+  `calc(${f} * (100% - var(--vu-size-cp-knob)) + var(--vu-size-cp-knob) / 2)`;
+
+/** The browser's screen colour picker (Chromium desktop), when there is one. */
+type EyeDropperCtor = new () => { open(): Promise<{ sRGBHex: string }> };
+function eyeDropper(): EyeDropperCtor | null {
+  return (globalThis as { EyeDropper?: EyeDropperCtor }).EyeDropper ?? null;
 }
 
 /**
- * A colour picker: saturation/brightness square, hue strip, hex field and recent colours.
- * `onPreview` fires while dragging (no store writes), `onChange` once on release / Enter.
+ * The full colour picker: a saturation / brightness area, a hue slider, a before | after preview
+ * (tap "before" to go back), a compact hex field, the screen eyedropper where the browser has one,
+ * and recent colours. `onPreview` fires while dragging (no store writes); `onChange` once on
+ * release, Enter or a tap.
  */
 export function ColorPicker({
   value,
@@ -71,16 +86,18 @@ export function ColorPicker({
   labels: ColorPickerLabels;
 }): ReactElement {
   const [hsv, setHsv] = useState(() => hexToHsv(value));
-  const [hex, setHex] = useState(value);
+  const [hex, setHex] = useState(value.replace('#', ''));
   const [recent] = useState(readRecent);
-  const square = useRef<HTMLDivElement>(null);
+  const [before] = useState(value);
+  const area = useRef<HTMLDivElement>(null);
   const strip = useRef<HTMLDivElement>(null);
   const latest = useRef(value);
+  const Dropper = eyeDropper();
 
   useEffect(() => {
     if (value.toLowerCase() !== latest.current.toLowerCase()) {
       setHsv(hexToHsv(value));
-      setHex(value);
+      setHex(value.replace('#', ''));
       latest.current = value;
     }
   }, [value]);
@@ -89,12 +106,18 @@ export function ColorPicker({
     setHsv(next);
     const c = hsvToHex(next.h, next.s, next.v);
     latest.current = c;
-    setHex(c);
+    setHex(c.slice(1));
     onPreview(c);
   };
   const commit = () => {
     remember(latest.current);
     onChange(latest.current);
+  };
+  const pick = (c: string) => {
+    latest.current = c.toLowerCase();
+    setHsv(hexToHsv(c));
+    setHex(c.slice(1).toLowerCase());
+    commit();
   };
 
   const drag = (
@@ -103,15 +126,23 @@ export function ColorPicker({
     apply: (x: number, y: number) => void,
   ) => {
     if (!el) return;
-    el.setPointerCapture(e.pointerId);
+    try {
+      el.setPointerCapture(e.pointerId);
+    } catch {
+      /* already released */
+    }
+    el.dataset.dragging = '';
+    // Knobs stay fully inside their track: the usable range is inset by half a knob.
+    const k = el.querySelector<HTMLElement>('.vu-cp-knob')?.offsetWidth ?? 0;
     const move = (ev: PointerEvent) => {
       const r = el.getBoundingClientRect();
       apply(
-        Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width)),
-        Math.min(1, Math.max(0, (ev.clientY - r.top) / r.height)),
+        Math.min(1, Math.max(0, (ev.clientX - r.left - k / 2) / Math.max(1, r.width - k))),
+        Math.min(1, Math.max(0, (ev.clientY - r.top - k / 2) / Math.max(1, r.height - k))),
       );
     };
     const up = () => {
+      delete el.dataset.dragging;
       el.removeEventListener('pointermove', move);
       el.removeEventListener('pointerup', up);
       el.removeEventListener('pointercancel', up);
@@ -122,18 +153,19 @@ export function ColorPicker({
     el.addEventListener('pointercancel', up);
     move(e.nativeEvent);
   };
+  const current = hsvToHex(hsv.h, hsv.s, hsv.v);
 
   return (
-    <div className="vu-colorpicker">
+    <div className="vu-colorpicker" style={{ ['--vu-cp-hue' as string]: `hsl(${hsv.h} 100% 50%)` }}>
       <div
-        ref={square}
-        className="vu-cp-square"
+        ref={area}
+        className="vu-cp-area"
         role="slider"
         tabIndex={0}
         aria-label={labels.saturation}
+        aria-valuetext={current}
         aria-valuenow={Math.round(hsv.s * 100)}
-        style={{ ['--vu-cp-hue' as string]: `hsl(${hsv.h} 100% 50%)` }}
-        onPointerDown={(e) => drag(square.current, e, (x, y) => show({ h: hsv.h, s: x, v: 1 - y }))}
+        onPointerDown={(e) => drag(area.current, e, (x, y) => show({ h: hsv.h, s: x, v: 1 - y }))}
         onKeyDown={(e) => {
           const d = e.shiftKey ? 0.1 : 0.02;
           const next = { ...hsv };
@@ -149,7 +181,7 @@ export function ColorPicker({
       >
         <span
           className="vu-cp-knob"
-          style={{ left: `${hsv.s * 100}%`, top: `${(1 - hsv.v) * 100}%`, background: hex }}
+          style={{ left: inset(hsv.s), top: inset(1 - hsv.v), background: current }}
         />
       </div>
       <div
@@ -161,7 +193,9 @@ export function ColorPicker({
         aria-valuemin={0}
         aria-valuemax={360}
         aria-valuenow={Math.round(hsv.h)}
-        onPointerDown={(e) => drag(strip.current, e, (x) => show({ ...hsv, h: x * 360 }))}
+        onPointerDown={(e) =>
+          drag(strip.current, e, (x) => show({ ...hsv, h: Math.min(359.9, x * 360) }))
+        }
         onKeyDown={(e) => {
           const d = e.shiftKey ? 30 : 5;
           if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
@@ -170,38 +204,63 @@ export function ColorPicker({
           commit();
         }}
       >
-        <span
-          className="vu-cp-knob"
-          style={{
-            left: `${(hsv.h / 360) * 100}%`,
-            top: '50%',
-            background: `hsl(${hsv.h} 100% 50%)`,
-          }}
-        />
+        <span className="vu-cp-knob vu-cp-knob-hue" style={{ left: inset(hsv.h / 360) }} />
       </div>
       <div className="vu-cp-row">
-        <span className="vu-cp-preview" style={{ background: hex }} />
-        <input
-          className="vu-cp-hex"
-          aria-label={labels.hex}
-          value={hex}
-          spellCheck={false}
-          onChange={(e) => setHex(e.currentTarget.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') e.currentTarget.blur();
-          }}
-          onBlur={() => {
-            const v = hex.startsWith('#') ? hex : `#${hex}`;
-            if (/^#[0-9a-f]{6}$/i.test(v)) {
-              latest.current = v.toLowerCase();
-              setHsv(hexToHsv(v));
-              commit();
-            } else setHex(latest.current);
-          }}
-        />
+        <span className="vu-cp-compare">
+          <button
+            type="button"
+            className="vu-cp-before"
+            style={{ ['--vu-swatch' as string]: before }}
+            aria-label={labels.before}
+            data-tooltip={labels.before}
+            onClick={() => /^#[0-9a-f]{6}$/i.test(before) && pick(before)}
+          />
+          <span className="vu-cp-after" style={{ ['--vu-swatch' as string]: current }} />
+        </span>
+        <label className="vu-cp-hexbox">
+          <span aria-hidden="true">#</span>
+          <input
+            className="vu-cp-hex"
+            aria-label={labels.hex}
+            value={hex}
+            maxLength={7}
+            spellCheck={false}
+            autoCapitalize="off"
+            autoComplete="off"
+            onChange={(e) => setHex(e.currentTarget.value.replace('#', ''))}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur();
+            }}
+            onBlur={() => {
+              const v = `#${hex.trim()}`;
+              if (/^#[0-9a-f]{6}$/i.test(v)) pick(v);
+              else setHex(latest.current.slice(1));
+            }}
+          />
+        </label>
+        {Dropper ? (
+          <button
+            type="button"
+            className="vu-cp-dropper"
+            aria-label={labels.eyedropper}
+            data-tooltip={labels.eyedropper}
+            onClick={() => {
+              void new Dropper()
+                .open()
+                .then((r) => pick(r.sRGBHex.length === 7 ? r.sRGBHex : before))
+                .catch(() => {});
+            }}
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+              <path d="M14.5 5.5l4 4M12.5 7.5l4 4-8 8H4.5v-4z M15 3.5a2.1 2.1 0 013 3l-1.5 1.5-3-3z" />
+            </svg>
+          </button>
+        ) : null}
       </div>
       {recent.length ? (
         <div className="vu-cp-recent" role="group" aria-label={labels.recent}>
+          <span className="vu-cp-recent-label">{labels.recent}</span>
           {recent.map((c) => (
             <button
               key={c}
@@ -210,12 +269,7 @@ export function ColorPicker({
               aria-label={c}
               data-tooltip={c}
               style={{ ['--vu-swatch' as string]: c }}
-              onClick={() => {
-                latest.current = c;
-                setHsv(hexToHsv(c));
-                setHex(c);
-                commit();
-              }}
+              onClick={() => pick(c)}
             />
           ))}
         </div>

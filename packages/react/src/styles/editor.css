@@ -888,22 +888,75 @@
     color: var(--vu-accent-text);
   }
 
+  /* The current colour beside the label: dot + hex + chevron; opens the full picker. */
+  .vu-colorfield .vu-field-row {
+    align-items: center;
+  }
+
+  .vu-color-current {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vu-space-2);
+    height: var(--vu-size-choice);
+    padding: 0 var(--vu-space-2) 0 var(--vu-space-1);
+    border: 1px solid var(--vu-border);
+    border-radius: var(--vu-radius-full);
+    background: var(--vu-surface-2);
+    color: var(--vu-text-muted);
+    font-size: var(--vu-text-xs);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.04em;
+    transition:
+      background-color var(--vu-duration-fast) var(--vu-ease),
+      color var(--vu-duration-fast) var(--vu-ease);
+  }
+
+  .vu-color-current:hover,
+  .vu-color-current[aria-expanded='true'] {
+    background: var(--vu-surface-3);
+    color: var(--vu-text);
+  }
+
+  .vu-color-current .vu-icon {
+    transition: transform var(--vu-duration-base) var(--vu-ease);
+  }
+
+  .vu-color-current[aria-expanded='true'] .vu-icon {
+    transform: rotate(180deg);
+  }
+
+  .vu-color-dot {
+    width: var(--vu-size-color-dot);
+    height: var(--vu-size-color-dot);
+    border-radius: var(--vu-radius-full);
+    background: var(--vu-swatch);
+    box-shadow: inset 0 0 0 1px var(--vu-border-strong);
+  }
+
+  /* Quick palette: two even rows of eight, at any width. */
   .vu-swatches {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(8, minmax(0, 1fr));
     gap: var(--vu-space-2);
     /* Room for the selected ring (it sits outside the swatch). */
     padding: var(--vu-space-1);
   }
 
   .vu-swatch {
-    width: var(--vu-size-swatch);
-    height: var(--vu-size-swatch);
+    justify-self: center;
+    width: 100%;
+    max-width: var(--vu-size-swatch-max);
+    aspect-ratio: 1;
     padding: 0;
     border-radius: var(--vu-radius-full);
     background: var(--vu-swatch);
     box-shadow: inset 0 0 0 1px var(--vu-border-strong);
     cursor: pointer;
+    transition: transform var(--vu-duration-fast) var(--vu-ease);
+  }
+
+  .vu-swatch:hover {
+    transform: scale(1.08);
   }
 
   .vu-root .vu-swatch[aria-checked='true'],
@@ -1531,30 +1584,54 @@
   }
 
   /* Colour picker */
+  .vu-colorpicker-wrap {
+    animation: vu-cp-in var(--vu-duration-base) var(--vu-ease-out);
+  }
+
+  @keyframes vu-cp-in {
+    from {
+      opacity: 0;
+      transform: translateY(calc(var(--vu-space-2) * -1));
+    }
+  }
+
   .vu-colorpicker {
     display: flex;
     flex-direction: column;
-    gap: var(--vu-space-3);
+    gap: var(--vu-space-4);
     padding: var(--vu-space-3);
     border: 1px solid var(--vu-border);
-    border-radius: var(--vu-radius-md);
+    border-radius: var(--vu-radius-lg);
     background: var(--vu-surface-2);
   }
 
-  .vu-cp-square {
+  /* Saturation (→) and brightness (↑) for the current hue. */
+  .vu-cp-area {
     position: relative;
-    height: var(--vu-size-cp-square);
-    border-radius: var(--vu-radius-sm);
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    /* Short enough that the hue slider and hex field stay in view in a phone sheet. */
+    max-height: var(--vu-size-cp-area-max);
+    border-radius: var(--vu-radius-md);
     background:
       linear-gradient(to top, var(--vu-cp-black), transparent),
       linear-gradient(to right, var(--vu-cp-white), var(--vu-cp-hue));
+    box-shadow: inset 0 0 0 1px var(--vu-cp-ring);
     cursor: crosshair;
     touch-action: none;
   }
 
+  /* Phones: a shorter colour area, so the whole picker fits the sheet at once. */
+  @container vu (max-width: 767px) {
+    .vu-cp-area {
+      max-height: var(--vu-size-cp-area-phone);
+    }
+  }
+
   .vu-cp-hue {
     position: relative;
-    height: var(--vu-size-cp-hue);
+    height: var(--vu-size-cp-knob);
+    padding-block: calc((var(--vu-size-cp-knob) - var(--vu-size-cp-hue)) / 2);
     border-radius: var(--vu-radius-full);
     background: linear-gradient(
       to right,
@@ -1566,19 +1643,32 @@
       var(--vu-cp-h300),
       var(--vu-cp-h0)
     );
+    /* The track is thinner than the knob: paint only the content box (padding = knob room). */
+    background-clip: content-box;
     cursor: pointer;
     touch-action: none;
   }
 
+  /* Knobs: a white ring around the colour they stand on; a little bigger while dragged. */
   .vu-cp-knob {
     position: absolute;
     width: var(--vu-size-cp-knob);
     height: var(--vu-size-cp-knob);
-    margin: calc(var(--vu-size-cp-knob) / -2);
-    border: 2px solid var(--vu-on-media);
+    border: 3px solid var(--vu-cp-white);
     border-radius: var(--vu-radius-full);
-    box-shadow: var(--vu-shadow-thumb);
+    box-shadow: var(--vu-shadow-cp-knob);
+    transform: translate(-50%, -50%);
+    transition: transform var(--vu-duration-fast) var(--vu-ease);
     pointer-events: none;
+  }
+
+  [data-dragging] > .vu-cp-knob {
+    transform: translate(-50%, -50%) scale(1.18);
+  }
+
+  .vu-cp-knob-hue {
+    top: 50%;
+    background: var(--vu-cp-hue);
   }
 
   .vu-cp-row {
@@ -1587,33 +1677,99 @@
     gap: var(--vu-space-2);
   }
 
-  .vu-cp-preview {
-    width: var(--vu-size-swatch);
-    height: var(--vu-size-swatch);
-    border-radius: var(--vu-radius-sm);
+  /* Before | after: the colour you started with (tap to go back) next to the new one. */
+  .vu-cp-compare {
+    display: flex;
+    flex: none;
+    width: var(--vu-size-cp-compare);
+    height: var(--vu-size-choice-lg);
+    overflow: hidden;
+    border-radius: var(--vu-radius-md);
     box-shadow: inset 0 0 0 1px var(--vu-border-strong);
+  }
+
+  .vu-cp-before,
+  .vu-cp-after {
+    flex: 1;
+    background: var(--vu-swatch);
+  }
+
+  .vu-cp-before {
+    padding: 0;
+    cursor: pointer;
+  }
+
+  .vu-cp-hexbox {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: var(--vu-space-1);
+    min-width: 0;
+    height: var(--vu-size-choice-lg);
+    padding: 0 var(--vu-space-3);
+    border: 1px solid var(--vu-border-strong);
+    border-radius: var(--vu-radius-md);
+    background: var(--vu-surface-1);
+    color: var(--vu-text-subtle);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .vu-cp-hexbox:focus-within {
+    border-color: var(--vu-accent);
   }
 
   .vu-cp-hex {
     flex: 1;
     min-width: 0;
+    border: 0;
+    background: transparent;
+    color: var(--vu-text);
+    font: inherit;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    outline: none;
+  }
+
+  .vu-cp-dropper {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: var(--vu-size-choice-lg);
     height: var(--vu-size-choice-lg);
-    padding: 0 var(--vu-space-2);
     border: 1px solid var(--vu-border-strong);
-    border-radius: var(--vu-radius-sm);
+    border-radius: var(--vu-radius-md);
     background: var(--vu-surface-1);
-    font-variant-numeric: tabular-nums;
-    text-transform: lowercase;
+    color: var(--vu-text-muted);
+  }
+
+  .vu-cp-dropper:hover {
+    color: var(--vu-text);
+  }
+
+  .vu-cp-dropper svg {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
 
   .vu-cp-recent {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: var(--vu-space-2);
+  }
+
+  .vu-cp-recent-label {
+    margin-right: var(--vu-space-1);
+    color: var(--vu-text-subtle);
+    font-size: var(--vu-text-xs);
   }
 
   .vu-swatch-sm {
     width: var(--vu-size-swatch-sm);
+    max-width: none;
     height: var(--vu-size-swatch-sm);
   }
 
