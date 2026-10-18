@@ -28,6 +28,8 @@ import type { Renderer } from '../render/types';
 import { Composer, type MediaLibrary } from './compose';
 import {
   audioFramesFor,
+  exportAudioBitrate,
+  exportBitrate,
   EXPORT_SAMPLE_RATE,
   exportFrameCount,
   exportFrameTime,
@@ -82,6 +84,32 @@ async function removeOldExports(root: FileSystemDirectoryHandle): Promise<void> 
     if (name.startsWith(OPFS_PREFIX)) names.push(name);
   }
   for (const name of names) await root.removeEntry(name).catch(() => undefined);
+}
+
+/**
+ * Startup tidy: deletes export files older than `maxAgeMs` (a page that exported and was closed
+ * never deletes its file otherwise). Recent ones stay — another open tab may still be offering
+ * its file for download; the next export removes those anyway.
+ */
+export async function cleanStaleExports(maxAgeMs = 60 * 60 * 1000): Promise<number> {
+  let removed = 0;
+  try {
+    const root = await navigator.storage.getDirectory();
+    const now = Date.now();
+    for await (const [name, handle] of (
+      root as unknown as { entries(): AsyncIterable<[string, FileSystemHandle]> }
+    ).entries()) {
+      if (!name.startsWith(OPFS_PREFIX) || handle.kind !== 'file') continue;
+      const file = await (handle as FileSystemFileHandle).getFile().catch(() => null);
+      if (file && now - file.lastModified > maxAgeMs) {
+        await root.removeEntry(name).catch(() => undefined);
+        removed++;
+      }
+    }
+  } catch {
+    /* no OPFS here: nothing to tidy */
+  }
+  return removed;
 }
 
 async function opfsTarget(name: string): Promise<OpfsTarget | null> {
@@ -304,6 +332,8 @@ export async function runExport(
   );
   const framesTotal = exportFrameCount(duration, fps);
   const warnings: string[] = [];
+  // The encoder's own presets differ a lot between browsers; probing with them is fine, the
+  // real encode uses an explicit bitrate (exportBitrate).
   const quality =
     options.quality === 'low'
       ? QUALITY_LOW
@@ -312,7 +342,12 @@ export async function runExport(
         : QUALITY_HIGH;
 
   // Codecs.
-  const candidates: VideoCodec[] = format === 'mp4' ? ['avc'] : ['vp9', 'vp8'];
+  // WebM: VP9 everywhere except Firefox, whose VP9 encoder is software-only and slower than real
+  // time (0.70× at 720p) — VP8 there is 3.7× faster (2.6×) for a somewhat larger file
+  // (DECISIONS #111). Measured with scripts/export-check.ts.
+  const firefox = /firefox/i.test(globalThis.navigator?.userAgent ?? '');
+  const candidates: VideoCodec[] =
+    format === 'mp4' ? ['avc'] : firefox ? ['vp8', 'vp9'] : ['vp9', 'vp8'];
   let videoCodec: VideoCodec | null = null;
   for (const codec of candidates) {
     if (await canEncodeVideo(codec, { width, height, frameRate: fps, quality })) {
@@ -371,14 +406,23 @@ export async function runExport(
   };
   const videoSource = new CanvasSource(canvas, {
     codec: videoCodec,
-    quality,
+    bitrate: exportBitrate(
+      width,
+      height,
+      fps,
+      options.quality,
+      videoCodec === 'vp9' ? 'vp9' : videoCodec === 'vp8' ? 'vp8' : 'avc',
+    ),
     keyFrameInterval: 2,
     latencyMode: 'quality',
   });
   output.addVideoTrack(videoSource, { frameRate: fps });
   let audioSource: AudioSampleSource | null = null;
   if (audioCodec) {
-    audioSource = new AudioSampleSource({ codec: audioCodec, quality });
+    audioSource = new AudioSampleSource({
+      codec: audioCodec,
+      bitrate: exportAudioBitrate(options.quality),
+    });
     output.addAudioTrack(audioSource);
   }
   const mixer = audioSource ? new Mixer(EXPORT_SAMPLE_RATE, deps.audioOf) : null;

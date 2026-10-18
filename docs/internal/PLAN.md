@@ -106,8 +106,8 @@ Deferred to v0.2+: speed curves, reverse, text animations, templates, keyframes,
 
 - [x] F1 Two tabs on one project: Web Lock per project; the second tab is read-only with "Use it here"
 - [x] F2 Fatal engine error → "stopped" screen with Reload (DECISIONS #93)
-- [ ] F3 Export: explicit bitrates per resolution × quality; WebKit encoder cancel error; old export files cleaned on startup
-- [ ] F4 Firefox WebM: measure VP8, use it if faster than VP9
+- [x] F3 Export: explicit bitrates per resolution × quality; old export files cleaned on startup (WebKit cancel error didn't reproduce)
+- [x] F4 Firefox WebM: VP8 (3.7× faster than VP9 there)
 - [ ] F5 Orphaned media sweep
 - [ ] F6 Chrome startup long tasks (> 50 ms)
 - [ ] F7 Audio crossfade under video transitions

@@ -71,6 +71,32 @@ export function exportSize(
   return { width: even(shortSide), height: even((shortSide * projectH) / projectW) };
 }
 
+/** Bits per pixel per frame for each quality (H.264 at typical settings). */
+const BITS_PER_PIXEL = { low: 0.05, medium: 0.09, high: 0.16 } as const;
+/** VP9 needs fewer bits for the same look than H.264; VP8 a few more. */
+const CODEC_FACTOR = { avc: 1, vp9: 0.8, vp8: 1.2 } as const;
+
+/**
+ * The video bitrate (bits/s) an export uses: set from the picture size, frame rate and quality,
+ * so the same choice gives about the same file size in every browser (encoders' own "quality"
+ * presets differed up to 4×). The export dialog's size estimate uses the same numbers.
+ */
+export function exportBitrate(
+  width: number,
+  height: number,
+  fps: number,
+  quality: ExportOptions['quality'],
+  codec: keyof typeof CODEC_FACTOR = 'avc',
+): number {
+  const bits = width * height * fps * BITS_PER_PIXEL[quality] * CODEC_FACTOR[codec];
+  return Math.round(Math.min(60_000_000, Math.max(400_000, bits)));
+}
+
+/** The audio bitrate (bits/s) for each quality: AAC / Opus stereo. */
+export function exportAudioBitrate(quality: ExportOptions['quality']): number {
+  return quality === 'low' ? 96_000 : quality === 'medium' ? 128_000 : 192_000;
+}
+
 /** Number of frames for a project of `duration` flicks at `fps` (at least one). */
 export function exportFrameCount(duration: Time, fps: number): number {
   return Math.max(1, Math.round((duration / FLICKS_PER_SECOND) * fps));

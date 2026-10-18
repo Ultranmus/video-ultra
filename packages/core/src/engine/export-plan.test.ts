@@ -2,11 +2,27 @@ import { describe, expect, it } from 'vitest';
 import { fromSeconds } from '../model/time';
 import {
   audioFramesFor,
+  exportAudioBitrate,
+  exportBitrate,
   exportFrameCount,
   exportFrameTime,
   exportSize,
   maxExportHeight,
 } from './export-plan';
+
+describe('export bitrates', () => {
+  it('scale with picture size, frame rate and quality, the same in every browser', () => {
+    const b = (h: number, fps: number, q: 'low' | 'medium' | 'high') =>
+      exportBitrate((h * 16) / 9, h, fps, q);
+    expect(b(1080, 30, 'medium')).toBeCloseTo(5_598_720, -3); // ≈ 5.6 Mb/s
+    expect(b(1080, 60, 'medium')).toBe(2 * b(1080, 30, 'medium'));
+    expect(b(720, 30, 'low')).toBeLessThan(b(720, 30, 'medium'));
+    expect(b(720, 30, 'medium')).toBeLessThan(b(720, 30, 'high'));
+    expect(exportBitrate(1920, 1080, 30, 'medium', 'vp9')).toBeLessThan(b(1080, 30, 'medium'));
+    expect(exportBitrate(16, 16, 24, 'low')).toBe(400_000); // floor
+    expect(exportAudioBitrate('medium')).toBe(128_000);
+  });
+});
 
 describe('export plan', () => {
   it('uses the shorter side as the height setting', () => {

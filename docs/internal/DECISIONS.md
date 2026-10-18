@@ -521,3 +521,10 @@ reason; when one changes, edit the entry and note the date.
       AudioWorklet on https / localhost; on `http://<LAN IP>` the engine reports
       `onAudioUnavailable('insecure')` and the editor shows a calm one-time note instead of a raw
       error. Phone testing with sound: `pnpm --filter playground dev:https` or a preview deploy.
+111.  **WebM on Firefox uses VP8** (2026-10-19; owner asked for a recommendation earlier). Firefox's
+      VP9 encoder is software-only: 0.70× real time at 720p. VP8 there runs at 2.6× (3.7× faster)
+      for a larger file (7.5 vs 4.1 MB for 17 s). Every other browser keeps VP9 (smaller, fast).
+112.  **Exports use explicit bitrates** (2026-10-19): bits per pixel per frame by quality (low 0.05,
+      balanced 0.09, best 0.16; VP9 ×0.8, VP8 ×1.2), audio 96 / 128 / 192 kb/s. The browsers'
+      own quality presets gave 2.9 / 3.2 / 13.4 MB for the same 17 s 720p MP4; now 5.4–5.5 MB
+      everywhere. The export dialog's size estimate uses the same `exportBitrate()`.

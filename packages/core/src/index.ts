@@ -66,7 +66,14 @@ export type {
 } from './effects/presets';
 
 // Export settings
-export { maxExportHeight, exportLimits, exportSize, EXPORT_HEIGHTS } from './engine/export-plan';
+export {
+  maxExportHeight,
+  exportLimits,
+  exportSize,
+  exportBitrate,
+  exportAudioBitrate,
+  EXPORT_HEIGHTS,
+} from './engine/export-plan';
 export type {
   ExportOptions,
   ExportProgress,

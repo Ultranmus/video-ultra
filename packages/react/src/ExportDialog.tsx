@@ -2,6 +2,8 @@ import {
   fps as toFps,
   exportLimits,
   exportSize,
+  exportBitrate,
+  exportAudioBitrate,
   maxExportHeight,
   type ExportLimits,
   projectDuration,
@@ -17,19 +19,20 @@ import { Icon } from './icons';
 
 const HEIGHTS = [480, 720, 1080, 1440, 2160] as const;
 
-/** Rough bits per pixel per frame for each quality (H.264/VP9 at typical settings). */
-const BITS_PER_PIXEL = { low: 0.05, medium: 0.09, high: 0.16 } as const;
-
-/** An honest estimate of the file size (MB): video at the quality's typical rate + 128 kb/s sound. */
+/**
+ * The file size (MB) the export will have: the same video and audio bitrates the encoder uses
+ * (`exportBitrate`), so the estimate holds in every browser.
+ */
 function estimateMb(
   width: number,
   height: number,
   fps: number,
-  quality: keyof typeof BITS_PER_PIXEL,
+  quality: ExportOptions['quality'],
   seconds: number,
+  format: ExportOptions['format'],
 ) {
-  const video = width * height * fps * BITS_PER_PIXEL[quality];
-  return ((video + 128_000) * seconds) / 8 / 1e6;
+  const video = exportBitrate(width, height, fps, quality, format === 'webm' ? 'vp9' : 'avc');
+  return ((video + exportAudioBitrate(quality)) * seconds) / 8 / 1e6;
 }
 
 function formatMb(mb: number): string {
@@ -234,7 +237,14 @@ export function ExportDialog(): ReactElement | null {
   const fileName = `${ctl.project.name || 'video'}.${result?.result.extension ?? options.format}`;
   const seconds = duration / 705_600_000;
   const out = exportSize(width, height, outHeight);
-  const estimate = estimateMb(out.width, out.height, options.fps, options.quality, seconds);
+  const estimate = estimateMb(
+    out.width,
+    out.height,
+    options.fps,
+    options.quality,
+    seconds,
+    options.format,
+  );
   const aspect = width / height;
   const shareFile =
     result && typeof navigator.canShare === 'function'
@@ -440,7 +450,14 @@ export function ExportDialog(): ReactElement | null {
                               : l.qualityHigh
                         }
                         detail={formatMb(
-                          estimateMb(out.width, out.height, options.fps, q, seconds),
+                          estimateMb(
+                            out.width,
+                            out.height,
+                            options.fps,
+                            q,
+                            seconds,
+                            options.format,
+                          ),
                         )}
                         onPick={(quality) => setOptions({ ...options, quality })}
                       />

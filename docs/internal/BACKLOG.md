@@ -21,7 +21,7 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       capture paths (copyExternalImageToTexture / readback / VideoFrame from GPUTexture); export
       with WebGL2 until WebGPU wins.
 - [x] Exported audio is ~0.05–0.1 s longer than video (AAC padding) — trimmed + priming compensated (#66).
-- [ ] WebKit's encoder makes ~3× smaller files at the same quality setting — compare visual
+- [x] (fixed with explicit bitrates) WebKit's encoder makes ~3× smaller files at the same quality setting — compare visual
       quality; set explicit bitrates per resolution if needed.
 - [x] Truncated files: probe finds the playable length and warns "incomplete" (2026-10-17).
 - [x] Firefox + HEVC: probe returns `unsupported-video-codec` with a plain message (2026-10-17);
@@ -87,7 +87,7 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [x] Timeline: lane header icons toggle mute (main/audio) / hide (visual lanes), with buttons in the accessible layer. Lock: not exposed yet.
 - [x] ~~Exported audio is ~0.05–0.1 s longer than video (AAC padding)~~ — audio trimmed to the
       video length and encoder priming compensated (DECISIONS #66).
-- [ ] **Firefox WebM export is slower than real time** (VP9 software encoder, 0.71× at 720p;
+- [x] (fixed 2026-10-19: VP8 on Firefox, 2.6× real time) **Firefox WebM export is slower than real time** (VP9 software encoder, 0.71× at 720p;
       encoder wait 39 ms/frame). Try VP8 on Firefox, or steer Firefox users to MP4 (2.7×).
 - [ ] WebM/Opus lip sync in Playwright WebKit is 30 ms late in ffmpeg: WebKit's Opus chunk
       timestamps jitter (0, 33, 53, 67 ms … instead of 20 ms steps) and the muxer keeps them. Check
@@ -105,13 +105,13 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       them); the export sheet now takes a screen Wake Lock and says "keep this tab open".
 - [ ] Export when the WebM memory fallback is used keeps the whole file in memory (BufferTarget)
       — only Safari Private Browsing / Playwright WebKit. MP4's fallback is append-only Blob parts.
-- [ ] OPFS export files are deleted only when the next export starts (or on cancel). If the host
+- [x] (fixed 2026-10-19: files older than an hour are removed at startup) OPFS export files are deleted only when the next export starts (or on cancel). If the host
       never exports again the last file stays; add `engine.clearExports()` or delete on startup
       (needs care: the host may still hold the Blob).
 - [ ] MP4 is written with moov at the end when streaming to OPFS (fast start needs the whole file
       in memory or `fastStart: 'reserve'` with packet counts). Fine for downloads/sharing; check
       upload targets that need fast start.
-- [ ] Same `quality: 'medium'`, very different file sizes: the 17 s 720p MP4 is 2.9 MB (Chrome),
+- [x] (fixed 2026-10-19: explicit bitrates, #112) Same `quality: 'medium'`, very different file sizes: the 17 s 720p MP4 is 2.9 MB (Chrome),
       3.2 MB (WebKit), 13.4 MB (Firefox). Set explicit bitrates per resolution × quality instead
       of Mediabunny's relative quality (joins the existing WebKit file-size item).
 - [ ] Text wraps only at explicit line breaks (no automatic width/wrap box yet).

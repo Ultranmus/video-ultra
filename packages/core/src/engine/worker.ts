@@ -10,7 +10,7 @@ import { createWebGPURenderer } from '../render/webgpu';
 import { Mixer, type AudioTrackSource } from '../audio/mixer';
 import { AudioOutput } from './audio-output';
 import { Composer, type MediaLibrary, type VideoMedia } from './compose';
-import { ExportCancelled, runExport } from './export-run';
+import { cleanStaleExports, ExportCancelled, runExport } from './export-run';
 import { DecoderPool } from './frames';
 import { QualityGovernor } from './quality';
 import type { EngineMessage, EngineRequest, EngineResponseData, EngineStats } from './protocol';
@@ -791,6 +791,8 @@ async function handle(
       }
       renderer ??= createWebGL2Renderer(canvas);
       composer = new Composer(renderer, pool, media, false, RASTER_BUDGET[tier]);
+      // Old export files left by closed pages: tidy once, after startup work is done.
+      setTimeout(() => void cleanStaleExports(), 5000);
       composer.cheapEffects = tier === 'low';
       return { type: 'init', backend: renderer.backend };
     }
