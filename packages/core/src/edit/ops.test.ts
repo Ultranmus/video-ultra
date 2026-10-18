@@ -36,6 +36,7 @@ import {
   shiftItems,
   arrangeItem,
   setExportRange,
+  pasteItems,
 } from './ops';
 import { groupOf } from '../model/project';
 
@@ -578,5 +579,46 @@ describe('setExportRange', () => {
     const { project } = setup();
     expect(() => setExportRange(project, { start: s(3), end: s(3) })).toThrow(EditError);
     expect(() => setExportRange(project, { start: s(3), end: s(1) })).toThrow(EditError);
+  });
+});
+
+describe('paste', () => {
+  it('pastes lane items at the playhead, keeping their spacing and grouping', () => {
+    const { project, ids } = setup();
+    addToLane(project, textItem('t1', 1, 2), ids);
+    addToLane(project, textItem('t2', 2, 2), ids);
+    groupItems(project, ['t1', 't2'], ids);
+    const copied = ['t1', 't2'].map((id) => ({
+      item: findItem(project, id)!.item,
+      fromMain: false,
+    }));
+    const made = pasteItems(project, copied, project.assets, s(6), ids);
+    const [a, b] = made.map((id) => findItem(project, id)!.item);
+    expect(a!.start).toBe(s(6));
+    expect(b!.start).toBe(s(7));
+    expect(a!.groupId).toBeDefined();
+    expect(a!.groupId).toBe(b!.groupId);
+    expect(a!.groupId).not.toBe(findItem(project, 't1')!.item.groupId);
+    checkInvariants(project);
+  });
+
+  it('pastes main clips into the main video after the clip under the playhead', () => {
+    const { project, ids } = setup();
+    const copied = [{ item: findItem(project, 'c')!.item, fromMain: true }];
+    const [id] = pasteItems(project, copied, project.assets, s(1), ids);
+    expect(mainTrack(project).items.map((i) => i.id)).toEqual(['a', id, 'b', 'c']);
+    checkInvariants(project);
+  });
+
+  it('adds media from another project and refuses media that is gone', () => {
+    const { project, ids } = setup();
+    const other = fixtureProject();
+    const asset = { ...project.assets.vidA!, id: 'elsewhere' };
+    const clip = { ...videoItem('x', 'elsewhere', 2) };
+    pasteItems(other, [{ item: clip, fromMain: true }], { elsewhere: asset }, 0, ids);
+    expect(other.assets.elsewhere).toBeDefined();
+    expect(() =>
+      pasteItems(other, [{ item: { ...clip, assetId: 'gone' }, fromMain: true }], {}, 0, ids),
+    ).toThrow(EditError);
   });
 });

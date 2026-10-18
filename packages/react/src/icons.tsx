@@ -23,6 +23,8 @@ const paths = {
   split: 'M12 3v18M6 7h3v10H6M18 7h-3v10h3',
   delete: 'M4.5 7h15M10 11v6M14 11v6M6 7l1 12.5h10L18 7M9 7V4.5h6V7',
   duplicate: 'M8 8h11v11H8zM5 16V5h11',
+  cut: 'M6 18a2.5 2.5 0 100-.1M6 6a2.5 2.5 0 100 .1M8 7.5L20 18M8 16.5L20 6',
+  paste: 'M9 4h6v3H9zM7 5.5H5V21h14V5.5h-2M9 12h6M9 16h4',
   speed: 'M12 20a8 8 0 118-8M12 12l4.5-4.5M20 12h-2',
   volume: 'M4 9.5h3.5L12 5v14l-4.5-4.5H4zM16 9a4 4 0 010 6M18.5 6.5a7.5 7.5 0 010 11',
   muted: 'M4 9.5h3.5L12 5v14l-4.5-4.5H4zM16 9.5l5 5M21 9.5l-5 5',

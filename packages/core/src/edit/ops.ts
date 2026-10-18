@@ -705,6 +705,67 @@ export function duplicateItem(project: Project, itemId: string, ids: IdFactory):
   return dup.id;
 }
 
+/** A copied item and whether it was a clip of the main video (see {@link pasteItems}). */
+export interface CopiedItem {
+  item: Item;
+  fromMain: boolean;
+}
+
+/**
+ * Pastes copied items at `at` (usually the playhead), keeping their timing relative to each
+ * other. Copies get new ids; groups stay groups (as new groups). Clips copied from the main
+ * video go back into it, after the clip under `at`; everything else goes to a lane. Media the
+ * project doesn't have yet (copied from another project) is added from `assets`. Returns the new
+ * ids, in the order given.
+ */
+export function pasteItems(
+  project: Project,
+  copied: readonly CopiedItem[],
+  assets: Readonly<Record<string, Asset>>,
+  at: Time,
+  ids: IdFactory,
+): string[] {
+  if (copied.length === 0) return [];
+  let first = Infinity;
+  for (const c of copied) if (!c.fromMain) first = Math.min(first, c.item.start);
+  const groups = new Map<string, string>();
+  const main = mainTrack(project);
+  // After the clip under the playhead (its end is the next cut).
+  let mainIndex = main.items.findIndex((i) => i.start <= at && at < itemEnd(i)) + 1;
+  if (mainIndex === 0) mainIndex = at <= 0 ? 0 : main.items.length;
+  const made: string[] = [];
+  for (const { item: original, fromMain } of copied) {
+    const item = copy(original) as Item;
+    if ('assetId' in item && item.assetId && !project.assets[item.assetId]) {
+      const asset = assets[item.assetId];
+      if (!asset) throw new EditError('invalid', 'The copied media is no longer available');
+      project.assets[asset.id] = copy(asset);
+    }
+    if ('lut' in item && item.lut && !project.assets[item.lut.assetId]) {
+      const lut = assets[item.lut.assetId];
+      if (lut) project.assets[lut.id] = copy(lut);
+      else delete item.lut;
+    }
+    item.id = ids();
+    delete item.locked;
+    delete item.groupId;
+    if (fromMain) {
+      insertMain(project, item, mainIndex++);
+    } else {
+      if (original.groupId) {
+        const group = groups.get(original.groupId) ?? ids();
+        groups.set(original.groupId, group);
+        item.groupId = group;
+      }
+      item.start = at + (original.start - first);
+      addToLane(project, item, ids);
+    }
+    made.push(item.id);
+  }
+  tidyGroups(project);
+  return made;
+}
+
 /** Changes playback speed; the item gets shorter or longer on the timeline. */
 export function setSpeed(project: Project, itemId: string, speed: number, ids: IdFactory): void {
   const { track, item } = editable(project, itemId);

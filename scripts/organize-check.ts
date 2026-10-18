@@ -351,6 +351,46 @@ if (only !== 'phone') {
     [a, b],
   );
   check('boxed texts group with ⌘G', grouped);
+  // Copy the group, move the playhead, paste: two new texts there, still a group of their own.
+  await page.keyboard.press(`${mod}+c`);
+  await page.evaluate(() => (window as any).vuEditor.seek(4 * 705_600_000));
+  await page.keyboard.press(`${mod}+v`);
+  const pasted = await page.evaluate(() => {
+    const c = (window as any).vuEditor;
+    const ids: string[] = c.ui.getState().selectedIds;
+    const items = c.project.tracks.flatMap((t: any) => t.items);
+    const got = ids.map((id) => items.find((i: any) => i.id === id));
+    return {
+      n: got.length,
+      starts: got.map((i: any) => i.start / 705_600_000),
+      grouped: !!got[0]?.groupId && got.every((i: any) => i.groupId === got[0].groupId),
+      texts: items.filter((i: any) => i.kind === 'text').length,
+    };
+  });
+  check(
+    '⌘C then ⌘V pastes a copy at the playhead, as its own group',
+    pasted.n === 2 && pasted.texts === 4 && pasted.grouped && pasted.starts.every((t) => t >= 4),
+    JSON.stringify(pasted),
+  );
+  await page.keyboard.press(`${mod}+x`);
+  const afterCut = await page.evaluate(
+    () =>
+      (window as any).vuEditor.project.tracks
+        .flatMap((t: any) => t.items)
+        .filter((i: any) => i.kind === 'text').length,
+  );
+  await page.keyboard.press(`${mod}+v`);
+  const afterPaste = await page.evaluate(
+    () =>
+      (window as any).vuEditor.project.tracks
+        .flatMap((t: any) => t.items)
+        .filter((i: any) => i.kind === 'text').length,
+  );
+  check(
+    '⌘X removes, ⌘V brings it back',
+    afterCut === 2 && afterPaste === 4,
+    `${afterCut} → ${afterPaste}`,
+  );
   await page.mouse.click(at(0.03, 0.5).x, at(0.03, 0.5).y);
   const video = await page.evaluate(() => (window as any).vuEditor.project.tracks[0].items[0].id);
   check('a click on the video still selects it', (await selection(page)).join() === video);

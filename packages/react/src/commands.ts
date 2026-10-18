@@ -18,6 +18,9 @@ export type CommandId =
   | 'layers'
   | 'split'
   | 'duplicate'
+  | 'copy'
+  | 'cut'
+  | 'paste'
   | 'freeze'
   | 'delete'
   | 'selectAll'
@@ -165,6 +168,36 @@ export function getCommand(ctl: EditorController, id: CommandId): Command {
         shortcut: '⌘D',
         disabledReason: selectReason,
         run: () => ctl.duplicateSelected(),
+      };
+    case 'copy':
+      return {
+        id,
+        label: l.copy,
+        icon: 'duplicate',
+        tip: l.tipCopy,
+        shortcut: '⌘C',
+        disabledReason: selectReason,
+        run: () => ctl.copySelected(),
+      };
+    case 'cut':
+      return {
+        id,
+        label: l.cutItems,
+        icon: 'cut',
+        tip: l.tipCut,
+        shortcut: '⌘X',
+        disabledReason: selectReason ?? (locked ? l.lockedReason : null),
+        run: () => ctl.cutSelected(),
+      };
+    case 'paste':
+      return {
+        id,
+        label: l.paste,
+        icon: 'paste',
+        tip: l.tipPaste,
+        shortcut: '⌘V',
+        disabledReason: ctl.hasClipboard() ? null : l.nothingToPaste,
+        run: () => ctl.paste(),
       };
     case 'delete':
       return {
@@ -353,6 +386,9 @@ export const KEYMAP: readonly KeyBinding[] = [
   { key: 'z', mod: true, shift: true, id: 'redo' },
   { key: 'y', mod: true, id: 'redo' },
   { key: 'd', mod: true, id: 'duplicate' },
+  { key: 'c', mod: true, id: 'copy' },
+  { key: 'x', mod: true, id: 'cut' },
+  { key: 'v', mod: true, id: 'paste' },
   { key: 'a', mod: true, id: 'selectAll' },
   { key: 'g', mod: true, id: 'group' },
   { key: 'g', mod: true, shift: true, id: 'ungroup' },
@@ -402,7 +438,14 @@ export function menuSections(ctl: EditorController): {
 } {
   const l = ctl.labels;
   const items = ctl.selectedItems();
-  if (items.length === 0) return { heading: null, sections: [['selectAll'], ['undo', 'redo']] };
+  if (items.length === 0)
+    return {
+      heading: null,
+      sections: [
+        ['paste', 'selectAll'],
+        ['undo', 'redo'],
+      ],
+    };
   const main = mainTrack(ctl.project);
   const onMain = items.length === 1 && main.items.includes(items[0]!);
   if (items.length > 1) {
@@ -410,6 +453,7 @@ export function menuSections(ctl: EditorController): {
       heading: l.selectedCount(items.length),
       sections: [
         [ctl.selectedGroup() ? 'ungroup' : 'group'],
+        ['copy', 'cut', 'paste'],
         ['duplicate', 'delete'],
         ['align', 'front', 'back'],
         ['lock', 'hide'],
@@ -421,16 +465,21 @@ export function menuSections(ctl: EditorController): {
       heading: null,
       sections: [
         ['split', 'freeze'],
+        ['copy', 'cut', 'paste'],
         ['duplicate', 'delete'],
         ['lock', 'hide'],
       ],
     };
   if (items[0]!.kind === 'audio')
-    return { heading: null, sections: [['split'], ['duck'], ['duplicate', 'delete'], ['lock']] };
+    return {
+      heading: null,
+      sections: [['split'], ['duck'], ['copy', 'cut', 'paste'], ['duplicate', 'delete'], ['lock']],
+    };
   return {
     heading: null,
     sections: [
       ['split'],
+      ['copy', 'cut', 'paste'],
       ['duplicate', 'delete'],
       ['forward', 'backward', 'front', 'back'],
       ['align'],

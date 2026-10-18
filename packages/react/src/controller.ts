@@ -6,6 +6,8 @@ import {
   createProject,
   deleteItem,
   duplicateItem,
+  pasteItems,
+  type CopiedItem,
   EditError,
   findItem,
   freezeFrame,
@@ -123,6 +125,12 @@ export interface ControllerOptions {
  * media analyzer, storage, UI state and the playhead. React components read from it with
  * selectors and call its methods; nothing here renders.
  */
+/**
+ * What ⌘C copied: shared by every editor on the page, so a copy in one project pastes into
+ * another (with the media it uses). Plain objects from the project — never mutated.
+ */
+let clipboard: { items: CopiedItem[]; assets: Record<string, Asset> } | null = null;
+
 export class EditorController {
   readonly editor: Editor;
   readonly ui = createUiStore();
@@ -976,6 +984,57 @@ export class EditorController {
     if (!id) return;
     this.select(id);
     this.toast(this.labels.duplicatedDone, 'success', {
+      label: this.labels.undo,
+      run: () => this.undo(),
+    });
+  }
+
+  /** Copies the selection (and the media it uses) for {@link paste}. */
+  copySelected(): number {
+    const items = this.selectedItems();
+    if (items.length === 0) return 0;
+    const main = mainTrack(this.project);
+    const assets: Record<string, Asset> = {};
+    for (const item of items) {
+      const ids = [
+        'assetId' in item ? item.assetId : null,
+        'lut' in item && item.lut ? item.lut.assetId : null,
+      ];
+      for (const id of ids) if (id && this.project.assets[id]) assets[id] = this.project.assets[id];
+    }
+    clipboard = {
+      items: items.map((item) => ({ item, fromMain: main.items.includes(item) })),
+      assets,
+    };
+    this.toast(this.labels.copiedDone(items.length), 'success');
+    return items.length;
+  }
+
+  /** Copies the selection, then deletes it. */
+  cutSelected(): void {
+    if (this.copySelected() === 0) return;
+    this.deleteSelected();
+  }
+
+  /** Whether {@link paste} has something to paste. */
+  hasClipboard(): boolean {
+    return clipboard !== null;
+  }
+
+  /** Pastes what was copied at the playhead, and selects it. */
+  paste(): void {
+    const copied = clipboard;
+    if (!copied) {
+      this.toast(this.labels.nothingToPaste, 'info');
+      return;
+    }
+    const at = this.playhead.time;
+    const ids = this.run(this.labels.paste, (d, ctx) =>
+      pasteItems(d, copied.items, copied.assets, at, ctx.ids),
+    );
+    if (!ids?.length) return;
+    this.ui.setState({ selectedId: ids[ids.length - 1]!, selectedIds: ids, tool: null });
+    this.toast(this.labels.pastedDone, 'success', {
       label: this.labels.undo,
       run: () => this.undo(),
     });
