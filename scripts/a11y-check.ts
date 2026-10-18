@@ -1,7 +1,7 @@
 /**
  * Accessibility audit of the editor with axe (WCAG 2.2 A/AA rules), at phone and desktop sizes,
  * empty and with media + a selected clip + an open tool. Usage: playground running, then
- * node scripts/a11y-check.ts [--port 3200] [--theme dark|light]
+ * node scripts/a11y-check.ts [--port 3200] [--theme dark|light] [--contrast high]
  */
 import AxeBuilder from '@axe-core/playwright';
 import { chromium } from '@playwright/test';
@@ -13,6 +13,7 @@ const arg = (name: string) =>
     : undefined;
 const port = arg('port') ?? '3200';
 const theme = arg('theme') ?? 'dark';
+const contrast = arg('contrast') ?? 'normal';
 /** The bits of the playground's `window.vuEditor` (EditorController) this script uses. */
 interface Ctl {
   project: { tracks: { items: { id: string; kind: string }[] }[] };
@@ -30,7 +31,7 @@ for (const [size, viewport] of [
   ['desktop', { width: 1440, height: 900 }],
 ] as const) {
   const page = await (await browser.newContext({ viewport })).newPage();
-  await page.goto(`http://localhost:${port}/editor?autosave=0&theme=${theme}`);
+  await page.goto(`http://localhost:${port}/editor?autosave=0&theme=${theme}&contrast=${contrast}`);
   await page.waitForSelector('.vu-stage-canvas');
   const audit = async (label: string) => {
     const result = await new AxeBuilder({ page })

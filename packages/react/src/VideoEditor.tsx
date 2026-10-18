@@ -82,6 +82,16 @@ export interface VideoEditorProps {
   theme?: ThemeMode;
   /** Typed overrides for the common theme tokens. */
   themeOverrides?: ThemeOverrides;
+  /**
+   * `normal` (default), `high` (stronger text, borders and focus rings — for low vision or bright
+   * sunlight), or `auto` (high when the OS asks for more contrast).
+   */
+  contrast?: 'normal' | 'high' | 'auto';
+  /**
+   * Control sizes: `auto` (default — thumb-sized on touch screens), `touch` (thumb-sized
+   * everywhere) or `compact` (mouse sizes, also on touch screens).
+   */
+  density?: 'auto' | 'touch' | 'compact';
   /** Replace any of the editor's text (translation). */
   labels?: Partial<Labels>;
   /** Text direction of the editor chrome. The timeline always runs left to right. */
@@ -211,6 +221,10 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
         ref={rootRef}
         className={`vu-root${props.className ? ` ${props.className}` : ''}`}
         data-vu-theme={theme === 'auto' ? undefined : theme}
+        data-vu-contrast={
+          props.contrast && props.contrast !== 'normal' ? props.contrast : undefined
+        }
+        data-vu-density={props.density && props.density !== 'auto' ? props.density : undefined}
         dir={props.dir ?? 'ltr'}
         tabIndex={-1}
         onPointerDown={(e) => {

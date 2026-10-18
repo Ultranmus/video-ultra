@@ -2,7 +2,8 @@
 
 /**
  * The editor, full screen. `?theme=light|auto`, `?backend=webgl2`, `?autosave=0` for testing,
- * `?sounds=0` without the demo music & sounds library.
+ * `?sounds=0` without the demo music & sounds library. `?contrast=high|auto` for high contrast,
+ * `?density=touch|compact` for control sizes.
  * `?device=phone|phone-small|tablet|tablet-portrait` shows it at that device's size (the editor
  * picks its layout from its own width), so phone and tablet layouts can be checked on a desktop
  * without deploying. A strip at the top switches devices; it hides itself on real phones.
@@ -29,6 +30,8 @@ function Editor() {
   const router = useRouter();
   const theme = (params.get('theme') ?? 'dark') as 'dark' | 'light' | 'auto';
   const backend = (params.get('backend') ?? 'auto') as 'auto' | 'webgpu' | 'webgl2';
+  const contrast = (params.get('contrast') ?? 'normal') as 'normal' | 'high' | 'auto';
+  const density = (params.get('density') ?? 'auto') as 'auto' | 'touch' | 'compact';
   const requested = params.get('device') as Device | null;
   const device: Device = requested && requested in DEVICES ? requested : 'full';
   // The switcher only makes sense on a big screen (on a phone the editor already is the phone).
@@ -81,6 +84,8 @@ function Editor() {
       // A new device size starts a fresh editor (the project comes back from autosave).
       key={device}
       theme={theme}
+      contrast={contrast}
+      density={density}
       backend={backend}
       autosave={params.get('autosave') !== '0'}
       {...(params.get('sounds') !== '0' ? { audioLibrary: sounds } : {})}
