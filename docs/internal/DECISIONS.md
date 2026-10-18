@@ -687,3 +687,47 @@ reason; when one changes, edit the entry and note the date.
       test ran on. The old `^1.30.0` range had resolved to that pre-release, which the range does
       not allow, so `pnpm install --frozen-lockfile` refused the lockfile. Move to the next
       stable release only after re-running the caption checks on it.
+
+132.  **Large speech model: lean download and crash memory** (owner's iPhone: the tab died after
+      the ~300 MB Hindi model downloaded, "A problem repeatedly occurred", 2026-10-19). (a) Model
+      files stream straight into Cache Storage (`cache.put` with the response stream, progress
+      counted in a TransformStream) and are read back once, just before their session is built —
+      the old path held each file three times (chunks, joined copy, cache copy). Without Cache
+      Storage, one buffer sized from Content-Length. (b) While a model is built and hears its
+      first window, `video-ultra-captions-building` names it in localStorage; a page that dies
+      there leaves it set, and the next visit records that setup as crashed (kept a week): the
+      other runtime once (WebAssembly), else a smaller model when the language allows, else not
+      offered, with "ran out of memory… try on a computer" — never a second crash. (c) On phones
+      the panel says before starting that `small` may not fit (`TranscriberCheck.memoryRisk`).
+      Measured on desktop Chrome (PERF.md "Captions"): `small` peaks at ~1.2 GB while it hears
+      (the encoder's attention), so the download fix alone may not be enough on an iPhone. Tried
+      and rejected: `graphOptimizationLevel: 'basic'` (wrong output), no arenas (no saving),
+      4-bit encoder (no words) and 4-bit decoder (+500 MB).
+133.  **Shape masks** (v0.3, file version 4). A picture (video, photo, freeze) can show only
+      inside a shape, or only outside it (`mask: { shape, feather, invert? }`). Shapes are signed
+      distance fields drawn in the compositor (one more `vec4` pair of uniforms; no textures, no
+      memory), mirrored in TypeScript (`effects/shapes.ts`) for the picker tiles and tests; 126
+      presets in 6 groups from 15 families (polygons, stars, rounded boxes, ellipse, squircle,
+      heart, cross, ring, flower, cog, blob, crescent, arrow, bubble, cloud). Proportional shapes
+      fit the picture's smaller side; `stretch` ones fill its box. Feather 0…1 = up to a quarter
+      of the radius; one pixel of anti-aliasing from the layer's on-screen size. Masks apply on
+      the main track too (the background shows outside). Golden frames: WebGL2 matches the
+      TypeScript reference with 0.00 / 255 mean error (circle, inverted star, feathered heart on
+      the main video); WebGPU runs the same WGSL (owner's Mac: composite-check). Uniform slot
+      528 bytes → WebGPU slots 768. GLSL generated with naga 30.0.1.
+134.  **Copy / paste** (⌘C / ⌘X / ⌘V; backlog). `pasteItems` places copies at the playhead with
+      their spacing; groups stay groups (new group ids); clips copied from the main video go back
+      into it after the clip under the playhead; media from another project comes with the copy.
+      The clipboard is in memory, shared by every editor on the page (not the system clipboard —
+      a project item isn't useful to other apps).
+135.  **A mouse drag on the main video draws a selection box** (owner: "check grouping on canvas
+      by cursor"). The main video fills the frame, so a drag almost always started on it and
+      moved it off the canvas. While the main video isn't selected, a drag on it now draws the
+      selection box (lane items only, as before) and a click selects it; once selected it drags.
+      Touch is unchanged (a drag on the video still moves it: no box on phones).
+136.  **High contrast and density** (v0.3). `contrast` ('normal' | 'high' | 'auto' — follows
+      `prefers-contrast: more`) and `density` ('auto' | 'touch' | 'compact') on `<VideoEditor>`,
+      as data attributes that redefine tokens only (THEMING.md). axe: 0 violations on every
+      a11y-check page with high contrast, dark and light.
+137.  **Release after v0.4** (owner, 2026-10-19): v0.1 isn't published on its own; v0.3 and v0.4
+      are built first, then the Day 7 packaging and the owner's publish.

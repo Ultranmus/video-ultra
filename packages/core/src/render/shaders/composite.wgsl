@@ -47,6 +47,9 @@ struct Uniforms {
   region: vec4f, // x: blurred area (0 none · 1 blur · 2 pixelate) · y: 1 = ellipse · zw: edge width
   back: vec4f, // pixels underneath: texel = (px − xy) · zw (renderer; blurred area: uv)
   blend: vec4f, // x: blend mode (0 normal · 1 multiply · … · 8 difference) · yz: max uv (0 = whole texture)
+  // Shape mask (effects/shapes.ts): x: family (0 none) · yzw: the family's a, b, c
+  shape: vec4f,
+  shapeP: vec4f, // x: turn (radians) · y: 1 stretch + 2 invert · z: feather · w: unused
 };
 
 @group(0) @binding(0) var<uniform> u: Uniforms;
@@ -449,6 +452,174 @@ fn regionAlpha(q: vec2f) -> f32 {
   return (1.0 - smoothstep(1.0 - e.x, 1.0, m.x)) * (1.0 - smoothstep(1.0 - e.y, 1.0, m.y));
 }
 
+// ── shape masks (effects/shapes.ts `shapeDistance` is the same maths) ─────────────
+
+fn fmod(x: f32, y: f32) -> f32 {
+  return x - y * floor(x / y);
+}
+
+// Exact regular polygon with circumradius r, a vertex pointing up.
+fn sdPolygon(p0: vec2f, r: f32, n: f32) -> f32 {
+  let an = 3.14159265 / n;
+  let bn = fmod(atan2(p0.x, -p0.y), 2.0 * an) - an;
+  let l = length(p0);
+  var p = vec2f(l * cos(bn) - r * cos(an), l * abs(sin(bn)) - r * sin(an));
+  p.y += clamp(-p.y, 0.0, r * sin(an));
+  return length(p) * sign(p.x);
+}
+
+// Star: n points, circumradius r, sharpness m (2 = a polygon … n = sharpest).
+fn sdStar(p0: vec2f, r: f32, n: f32, m: f32) -> f32 {
+  let an = 3.14159265 / n;
+  let en = 3.14159265 / m;
+  let bn = fmod(atan2(p0.x, -p0.y), 2.0 * an) - an;
+  let l = length(p0);
+  var p = vec2f(l * cos(bn) - r * cos(an), l * abs(sin(bn)) - r * sin(an));
+  let e = vec2f(cos(en), sin(en));
+  p += e * clamp(-dot(p, e), 0.0, r * sin(an) / e.y);
+  return length(p) * sign(p.x);
+}
+
+fn sdRoundedBox(p: vec2f, b: vec2f, r: f32) -> f32 {
+  let q = abs(p) - b + vec2f(r);
+  return length(max(q, vec2f(0.0))) + min(max(q.x, q.y), 0.0) - r;
+}
+
+fn sdHeart(p0: vec2f) -> f32 {
+  let x = abs(p0.x) * 0.82;
+  let y = -p0.y * 0.82 + 0.6;
+  var d = 0.0;
+  if (y + x > 1.0) {
+    d = length(vec2f(x - 0.25, y - 0.75)) - 0.35355339;
+  } else {
+    let m = 0.5 * max(x + y, 0.0);
+    let a = vec2f(x, y - 1.0);
+    let b = vec2f(x - m, y - m);
+    d = sqrt(min(dot(a, a), dot(b, b))) * sign(x - y);
+  }
+  return d / 0.82;
+}
+
+fn sdCross(p0: vec2f, t: f32, r: f32) -> f32 {
+  var p = abs(p0);
+  if (p.y > p.x) {
+    p = p.yx;
+  }
+  let b = vec2f(1.0 - r, t - r);
+  let q = p - b;
+  let k = max(q.y, q.x);
+  let w = select(vec2f(b.y - p.x, -k), q, k > 0.0);
+  return sign(k) * length(max(w, vec2f(0.0))) - r;
+}
+
+fn hash1(n: f32) -> f32 {
+  return fract(sin(n) * 43758.5453);
+}
+
+fn blobRadius(t: f32, seed: f32) -> f32 {
+  var r = 0.84;
+  let freqs = vec3f(2.0, 3.0, 5.0);
+  for (var i = 0; i < 3; i++) {
+    let fi = f32(i);
+    let amp = 0.04 + 0.07 * hash1(seed * 12.9898 + fi * 78.233);
+    let ph = 6.2831 * hash1(seed * 39.3468 + fi * 11.135);
+    r += amp * sin(freqs[i] * t + ph);
+  }
+  return r;
+}
+
+// Signed distance from the shape's edge (negative inside); `ax` = box aspect in shape space.
+fn shapeDistance(p: vec2f, ax: f32) -> f32 {
+  let f = u.shape.x;
+  let a = u.shape.y;
+  let b = u.shape.z;
+  let c = u.shape.w;
+  let k = min(ax, 1.0);
+  if (f < 1.5) {
+    return sdPolygon(p, 1.0 - c, a) - c;
+  }
+  if (f < 2.5) {
+    return sdStar(p, 1.0 - c, a, b) - c;
+  }
+  if (f < 3.5) {
+    return sdRoundedBox(p, vec2f(ax, 1.0), k * min(a, 1.0));
+  }
+  if (f < 4.5) {
+    return (length(vec2f(p.x / ax, p.y)) - 1.0) * k;
+  }
+  if (f < 5.5) {
+    return sdHeart(p) - c;
+  }
+  if (f < 6.5) {
+    return sdCross(p, a, c);
+  }
+  if (f < 7.5) {
+    return abs(length(p) - (1.0 + b) * 0.5) - (1.0 - b) * 0.5;
+  }
+  if (f < 8.5) {
+    let t = atan2(p.x, -p.y);
+    return (length(p) - (1.0 - b * (0.5 - 0.5 * cos(a * t)))) * 0.7;
+  }
+  if (f < 9.5) {
+    let s = vec2f(abs(p.x) / ax, abs(p.y));
+    return (pow(pow(s.x, a) + pow(s.y, a), 1.0 / a) - 1.0) * k;
+  }
+  if (f < 10.5) {
+    let inner = length(p - vec2f(a * 1.2, -a * 0.25)) - 0.95;
+    return max(length(p) - 1.0, -inner);
+  }
+  if (f < 11.5) {
+    let sx = p.x / ax;
+    let shaft = sdRoundedBox(vec2f(sx + 0.3, p.y), vec2f(0.62, a), 0.0) * k;
+    let head = sdPolygon(vec2f(-p.y, -(sx - 0.18)), 0.82, 3.0) * k;
+    return min(shaft, head);
+  }
+  if (f < 12.5) {
+    let t = atan2(p.x, -p.y);
+    let teeth = smoothstep(-0.8, 0.8, sin(a * t));
+    return (length(p) - (1.0 - b + b * teeth)) * 0.6;
+  }
+  if (f < 13.5) {
+    let t = atan2(p.x, -p.y);
+    return (length(p) - blobRadius(t, a)) * 0.8;
+  }
+  if (f < 14.5) {
+    let body = sdRoundedBox(vec2f(p.x, p.y + 0.18), vec2f(ax, 0.72), 0.3 * k);
+    let tail = sdPolygon(vec2f(p.x - a * k * 0.45, -(p.y - 0.6)), 0.36, 3.0);
+    return min(body, tail);
+  }
+  let q = vec2f(p.x / ax, p.y);
+  var d = length(q - vec2f(-0.5, 0.18)) - 0.42;
+  d = min(d, length(q - vec2f(0.0, -0.12)) - 0.55);
+  d = min(d, length(q - vec2f(0.5, 0.15)) - 0.44);
+  d = min(d, length(q - vec2f(-0.2, 0.3)) - 0.4);
+  d = min(d, length(q - vec2f(0.22, 0.32)) - 0.4);
+  return d * k;
+}
+
+// How much of the layer shows at quad point q (−1…1) through its shape mask.
+fn shapeAlpha(q: vec2f) -> f32 {
+  // The box's half size in pixels (layer geometry × canvas size).
+  let hw = length(vec2f(u.pos.x * u.canvas.z, u.pos.z * u.canvas.w)) * 0.5;
+  let hh = length(vec2f(u.pos.y * u.canvas.z, u.pos.w * u.canvas.w)) * 0.5;
+  let boxAspect = hw / max(hh, 1e-4);
+  let stretch = fract(u.shapeP.y * 0.5) > 0.25;
+  let invert = u.shapeP.y > 1.5;
+  let k = select(min(boxAspect, 1.0), 1.0, stretch);
+  var p = vec2f(q.x * boxAspect, q.y) / k;
+  if (u.shapeP.x != 0.0) {
+    let cs = cos(-u.shapeP.x);
+    let sn = sin(-u.shapeP.x);
+    p = vec2f(p.x * cs - p.y * sn, p.x * sn + p.y * cs);
+  }
+  let d = shapeDistance(p, boxAspect / k);
+  // One pixel of anti-aliasing, or the feather when wider.
+  let edge = 1.0 / max(k * hh, 1.0);
+  let w = max(edge, u.shapeP.z * 0.5);
+  let inside = 1.0 - smoothstep(-w, w * 0.25 + edge, d);
+  return select(inside, 1.0 - inside, invert);
+}
+
 // Separable blend modes (W3C compositing): b = what's underneath, s = the layer's colour. The
 // result goes out with the layer's alpha and is mixed by the usual src·α + dst·(1 − α), which is
 // exactly α·B(b, s) + (1 − α)·b over the opaque canvas.
@@ -516,6 +687,9 @@ fn fs(in: VsOut) -> @location(0) vec4f {
   }
   if (u.region.x > 0.5) {
     a *= regionAlpha(in.q);
+  }
+  if (u.shape.x > 0.5) {
+    a *= shapeAlpha(in.q);
   }
   if (u.mask.x > 0.5) {
     if (u.mask.x > 19.5) {

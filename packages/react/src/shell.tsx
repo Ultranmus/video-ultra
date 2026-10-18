@@ -676,7 +676,8 @@ type TitleKey =
   | 'arrange'
   | 'greenScreen'
   | 'blend'
-  | 'blurArea';
+  | 'blurArea'
+  | 'shape';
 
 const TOOL_TITLE: Record<ToolId, TitleKey> = {
   speed: 'speed',
@@ -701,6 +702,7 @@ const TOOL_TITLE: Record<ToolId, TitleKey> = {
   key: 'greenScreen',
   blend: 'blend',
   region: 'blurArea',
+  mask: 'shape',
 };
 
 /**

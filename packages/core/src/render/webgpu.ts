@@ -18,10 +18,10 @@ import { SHADERS } from './shaders/generated';
 import type { FramePlacement, LayerDraw, LayerSource, Renderer, RendererOptions } from './types';
 
 /**
- * One layer's uniforms (LAYER_FLOATS × 4 = 496 bytes), rounded up to a multiple of 256 (WebGPU's
+ * One layer's uniforms (LAYER_FLOATS × 4 = 528 bytes), rounded up to a multiple of 256 (WebGPU's
  * minUniformBufferOffsetAlignment).
  */
-const SLOT_BYTES = 512;
+const SLOT_BYTES = 768;
 
 /**
  * WebGPU compositor. Video frames are imported with `importExternalTexture` — handed to the GPU

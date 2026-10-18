@@ -101,7 +101,7 @@ describe('HDR calibration', () => {
     expect(Array.from(u.slice(o + 28, o + 32))).toEqual([1, 1, 1, 1]);
     expect(u[o + 28 + 7]).toBe(1); // saturation
     expect([u[o + 28 + 26], u[o + 28 + 27]]).toEqual([0.25, 0.5]);
-    expect(LAYER_FLOATS * 4).toBeLessThanOrEqual(512); // fits a WebGPU uniform slot (webgpu.ts)
+    expect(LAYER_FLOATS * 4).toBeLessThanOrEqual(768); // fits a WebGPU uniform slot (webgpu.ts)
     expect(u[0]).toBe(0); // the first slot is untouched
   });
 

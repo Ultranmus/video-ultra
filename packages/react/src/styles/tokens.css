@@ -218,6 +218,9 @@
     --vu-size-handle-side: 8px;
     --vu-size-region-swatch: 64px;
     --vu-size-key-preset: 28px;
+    /* v0.3 Shape masks */
+    --vu-size-shape-tile: 52px;
+    --vu-shape-url: none;
 
     /* Layers */
     --vu-z-overlay: 10;

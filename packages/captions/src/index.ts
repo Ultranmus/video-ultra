@@ -66,6 +66,8 @@ export interface DeviceSupport {
   speed: number;
   /** Why not, when `ok` is false. */
   reason?: string;
+  /** The model may need more memory than this phone has (measured ~1.2 GB for `small`). */
+  memoryRisk: boolean;
 }
 
 /** Model files per size and runtime (measured, PERF.md "Captions"). */
@@ -235,15 +237,11 @@ export async function chooseModel(
     model: pickedModel,
     downloadMB: FILES[pickedModel][pickedDevice].mb,
     speed: SPEED[pickedModel][pickedDevice] / (phone ? 3 : 1),
+    // `small` peaks at ~1.2 GB while it hears (PERF.md "Captions"): too close to what a phone's
+    // browser gives one tab.
+    memoryRisk: phone && pickedModel === 'small',
     ...(reason ? { reason } : {}),
   };
-}
-
-/** Runtime settings that hold less memory (measured −70 MB on the laptop). */
-const LEAN_SESSION = { enableCpuMemArena: false, enableMemPattern: false };
-
-function phoneLike(): boolean {
-  return typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
 }
 
 /** × real time on a 2023 laptop (captions-bench). */
@@ -310,8 +308,7 @@ export function createOnDeviceTranscriber(options: OnDeviceTranscriberOptions = 
             device: support.device,
           },
           runtimePath: options.runtimePath ?? null,
-          // No preallocated arenas on phones: a little slower, less memory held (PERF.md).
-          session: options.debug?.session ?? (phoneLike() ? LEAN_SESSION : null),
+          session: options.debug?.session ?? null,
         };
         worker!.postMessage(load);
       });
@@ -349,6 +346,7 @@ export function createOnDeviceTranscriber(options: OnDeviceTranscriberOptions = 
         onDevice: true,
         downloadMB: support.downloadMB,
         speed: support.speed,
+        memoryRisk: support.memoryRisk,
         ...(support.reason ? { reason: support.reason } : {}),
       };
     },

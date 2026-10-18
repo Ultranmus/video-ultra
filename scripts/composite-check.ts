@@ -8,6 +8,7 @@ import { chromium, firefox, webkit } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { shapeCoverage, shapePreset } from '../packages/core/src/effects/shapes.ts';
 
 /** Playground URL (PLAYGROUND=http://localhost:3301 when another dev server uses 3200). */
 const BASE = process.env.PLAYGROUND ?? 'http://localhost:3200';
@@ -520,6 +521,61 @@ function checkPictureTools(g: Record<string, Img>, backends: string[]): void {
       off.length === 0,
       `${b}: 9 blend modes match the reference maths (worst ${worst.toFixed(2)} / 255)${off.length ? ` — off: ${off.join(', ')}` : ''}`,
     );
+  }
+  // Shape masks: each pixel against the CPU reference (effects/shapes.ts `shapeCoverage`).
+  for (const b of backends) {
+    const at = (v: string) => g[`pic-${v}-${b}`];
+    const plain = at('plain');
+    if (!plain) continue;
+    const orange = [200, 120, 40];
+    const masked = (
+      variant: string,
+      shape: string,
+      box: [number, number, number, number],
+      feather: number,
+      invert: boolean,
+      inside: (x: number, y: number) => number[],
+      outside: (x: number, y: number) => number[],
+    ) => {
+      const img = at(variant);
+      if (!img) return check(false, `${b}: ${variant} rendered`);
+      const p = shapePreset(shape)!;
+      const [x0, y0, x1, y1] = box;
+      const hw = (x1 - x0) / 2;
+      const hh = (y1 - y0) / 2;
+      let e = 0;
+      let k = 0;
+      let edgeMiss = 0;
+      for (let y = 0; y < SIZE; y += 2)
+        for (let x = 0; x < SIZE; x += 2) {
+          const qx = (x + 0.5 - (x0 + hw)) / hw;
+          const qy = (y + 0.5 - (y0 + hh)) / hh;
+          const cov =
+            Math.abs(qx) <= 1 && Math.abs(qy) <= 1
+              ? shapeCoverage(p, qx, qy, hw / hh, 1 / Math.min(hw, hh), feather * 0.5, invert)
+              : 0;
+          const a = inside(x, y);
+          const o = outside(x, y);
+          const got = px(img, x, y);
+          let d = 0;
+          for (let c = 0; c < 3; c++) d += Math.abs(got[c]! - (cov * a[c]! + (1 - cov) * o[c]!));
+          // Edge pixels may differ by the anti-aliasing; count only clear misses there.
+          if (cov > 0.02 && cov < 0.98) edgeMiss += d / 3 > 40 ? 1 : 0;
+          else {
+            e += d / 3;
+            k++;
+          }
+        }
+      check(
+        e / k < 3 && edgeMiss < 20,
+        `${b}: ${variant} matches the reference shape (mean error ${(e / k).toFixed(2)} / 255, ${edgeMiss} edge misses)`,
+      );
+    };
+    const footage = (x: number, y: number) => px(plain, x, y);
+    masked('mask-circle', 'circle', [160, 160, 480, 480], 0, false, () => orange, footage);
+    masked('mask-star-invert', 'star-5', [160, 160, 480, 480], 0, true, () => orange, footage);
+    // The footage band: 640 × 360 at y 140–500; outside the heart the black background shows.
+    masked('mask-heart-main', 'heart', [0, 140, 640, 500], 0.3, false, footage, () => [0, 0, 0]);
   }
   if (backends.length === 2) {
     const base = mae(g['pic-plain-webgpu']!, g['pic-plain-webgl2']!);

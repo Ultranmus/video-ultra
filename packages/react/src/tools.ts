@@ -173,6 +173,13 @@ function singleTools(
     tip: l.tipGreenScreen,
     tool: 'key',
   };
+  const mask: ToolEntry = {
+    key: 'mask',
+    icon: 'shape',
+    label: l.shape,
+    tip: l.tipShape,
+    tool: 'mask',
+  };
   const blend: ToolEntry[] = onMain
     ? []
     : [{ key: 'blend', icon: 'blend', label: l.blend, tip: l.tipBlend, tool: 'blend' }];
@@ -189,6 +196,7 @@ function singleTools(
           tool: 'volume',
         },
         ...look,
+        mask,
         greenScreen,
         ...transition,
         { key: 'fade', icon: 'fade', label: l.fade, tip: l.tipFade, tool: 'fade' },
@@ -217,6 +225,7 @@ function singleTools(
         split,
         { key: 'duration', icon: 'speed', label: l.duration, tip: l.duration, tool: 'duration' },
         ...look,
+        mask,
         greenScreen,
         ...transition,
         ...animate,

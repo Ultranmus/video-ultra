@@ -41,7 +41,9 @@ export type ToolId =
   // v0.2 C. Picture tools
   | 'key'
   | 'blend'
-  | 'region';
+  | 'region'
+  // v0.3 Shape masks
+  | 'mask';
 
 export interface ImportRow {
   id: string;

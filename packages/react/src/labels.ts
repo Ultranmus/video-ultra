@@ -785,6 +785,31 @@ export const DEFAULT_LABELS = {
   captionsOnDevice: (mb: number) =>
     `Runs on this device, nothing is uploaded · about ${Math.round(mb)} MB to download the first time`,
   captionsOnDeviceCached: 'Runs on this device, nothing is uploaded',
+  // v0.3 Shape masks
+  shape: 'Shape',
+  tipShape: 'Show the picture inside a shape',
+  shapeHint: 'Pick a shape — the picture shows only inside it.',
+  shapeNone: 'No shape',
+  shapeFeather: 'Soft edge',
+  shapeInvert: 'Show outside the shape',
+  shapeCategory: (category: string) =>
+    (
+      ({
+        basic: 'Basic',
+        polygons: 'Polygons',
+        stars: 'Stars & bursts',
+        flowers: 'Flowers & cogs',
+        organic: 'Organic',
+        symbols: 'Symbols',
+      }) as Record<string, string>
+    )[category] ?? category,
+  /** A shape's name from its id ('star-5-soft' → 'Star 5 soft'). */
+  shapeName: (id: string) => {
+    const words = id.split('-').join(' ');
+    return words.charAt(0).toUpperCase() + words.slice(1);
+  },
+  captionsMemoryRisk:
+    'This language needs the large speech model. It may not fit in a phone’s memory — if the page reloads, use a computer for this language.',
   captionsByHost: 'Made by this app’s captions service',
   captionsUnavailable: 'Auto captions aren’t available here — import a file or type them.',
   captionsAbout: (minutes: number) =>

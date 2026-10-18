@@ -405,6 +405,16 @@ speech; real recordings are checked on devices). Word error rate (WER) against t
 - **Audio for the transcriber:** pulled 10 s at a time from the export mixer at 16 kHz mono —
   flat memory for any length.
 - Phones still need measuring (owner's devices): expect 2–4× slower than the laptop.
+- **`small` memory, measured 2026-10-19** (Linux, 4 cores, Chrome 155, `captions-memory.ts wasm
+small speech-hi.m4a`, renderer = page + worker): 155 MB before → ~880 MB once both model files
+  are built (8 s) → **peak ~1.2–1.28 GB while hearing** (30 s windows) → back to ~190 MB after
+  the job. 28 s of Hindi took 57 s (0.5× real time on this CPU). Session settings: arenas off
+  1.28 GB (no saving); `graphOptimizationLevel: 'basic'` 1.18 GB but wrong text (20 words instead
+  of 84). Files: 4-bit encoder + 8-bit decoder 1.17 GB but no words; 4-bit both 1.82 GB. So the
+  8-bit pair stays. (espeak's Hindi voice is too robotic for a word-error rate — every setup
+  scored ~100 %; the Mac voice gave 43 % earlier — so these runs compare memory and speed only.)
+- **Download path** (DECISIONS #132): a model file is now held once (read back from Cache
+  Storage) instead of three times while downloading — by design, not measured on a phone.
 
 ### Made-up text guards (DECISIONS #130)
 
@@ -417,3 +427,11 @@ Per 30 s window (no-speech probability · average token log-probability):
 | iPhone, no speech (3 clips) | 0.18–0.72 · −0.75 to −1.77  | 0.10–0.56 · −1.03 to −2.27  | 0.08–0.75 · −0.82 to −2.98  |
 
 After the guards: no captions from any no-speech clip; speech clips unchanged.
+
+## Shape masks (v0.3, 2026-10-19)
+
+- No textures or buffers: a shape is ~20–60 ALU ops per covered pixel in the layer's own draw
+  (one uniform-driven branch; layers without a mask pay one compare). Uniform slot 496 → 528
+  bytes (WebGPU slot 512 → 768 bytes, ×16 layers = 12 KB).
+- Picker tiles: 126 × 40×40 alpha images, drawn in ≤ 6 ms slices per frame and cached for the page.
+  shapes-check: opening the picker adds no main-thread task over 50 ms (Chrome, 4-core Linux).

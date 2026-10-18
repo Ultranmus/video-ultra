@@ -45,6 +45,8 @@ const MIGRATIONS: Record<number, (old: Record<string, unknown>) => Record<string
   }),
   /** 2 → 3: items may be locked, hidden and grouped (all optional, none yet). */
   2: (old) => ({ ...old, version: 3 }),
+  /** 3 → 4: pictures may have a shape mask (optional, none yet). */
+  3: (old) => ({ ...old, version: 4 }),
 };
 
 /**

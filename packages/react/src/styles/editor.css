@@ -1577,6 +1577,75 @@
     pointer-events: none;
   }
 
+  /* v0.3 Shape masks: tiles are alpha images coloured by tokens (mask.tsx). */
+  .vu-shape-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-2);
+  }
+
+  .vu-shape-heading {
+    margin: 0;
+    color: var(--vu-text-muted);
+    font-size: var(--vu-text-sm);
+    font-weight: var(--vu-weight-semibold);
+  }
+
+  .vu-shape-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--vu-size-shape-tile), 1fr));
+    gap: var(--vu-space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .vu-shape-tile {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    aspect-ratio: 1;
+    padding: var(--vu-space-2);
+    border: 1px solid transparent;
+    border-radius: var(--vu-radius-md);
+    background: var(--vu-surface-2);
+    transition:
+      background-color var(--vu-duration-fast) var(--vu-ease),
+      transform var(--vu-duration-fast) var(--vu-ease);
+  }
+
+  .vu-shape-tile:hover {
+    background: var(--vu-surface-3);
+  }
+
+  .vu-shape-tile:active {
+    transform: scale(0.95);
+  }
+
+  .vu-shape-tile[aria-pressed='true'] {
+    border-color: var(--vu-selection);
+    background: var(--vu-accent-soft);
+  }
+
+  .vu-shape-glyph {
+    width: 100%;
+    height: 100%;
+    background: var(--vu-text);
+    mask: var(--vu-shape-url) center / contain no-repeat;
+  }
+
+  .vu-shape-tile[aria-pressed='true'] .vu-shape-glyph {
+    background: var(--vu-accent-text);
+  }
+
+  .vu-shape-none {
+    width: 70%;
+    height: 70%;
+    border: 2px dashed var(--vu-text-muted);
+    border-radius: var(--vu-radius-sm);
+  }
+
   .vu-textstyle-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

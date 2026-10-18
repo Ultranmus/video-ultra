@@ -104,6 +104,15 @@ export type { GroupOptions, GroupedCaption } from './captions/group';
 export { captionWords, captionWordTimes, speechAt } from './captions/timing';
 export type { SpeechPosition } from './captions/timing';
 export { CAPTION_PRESETS, DEFAULT_CAPTION_PRESET, lookFromPreset } from './captions/presets';
+export {
+  SHAPE_PRESETS,
+  SHAPE_CATEGORIES,
+  ShapeFamily,
+  shapePreset,
+  shapeDistance,
+  shapeCoverage,
+  type ShapePreset,
+} from './effects/shapes';
 export type { CaptionPreset } from './captions/presets';
 // Captions: the transcriber interface (audio in, timed words out)
 export { TRANSCRIBE_SAMPLE_RATE } from './captions/transcriber';

@@ -10,7 +10,7 @@ import * as z from 'zod/mini';
  *   that fits the item inside the canvas, so changing the aspect ratio keeps layouts sensible.
  */
 
-export const PROJECT_VERSION = 3;
+export const PROJECT_VERSION = 4;
 
 const time = z.int().check(z.nonnegative());
 const positiveTime = z.int().check(z.positive());
@@ -218,6 +218,19 @@ export const BlendModeSchema = z.enum([
   'difference',
 ]);
 
+/**
+ * A shape mask (file version 4+, optional): the picture shows only inside the shape (or only
+ * outside it, `invert`). The shape fits the picture's box (effects/shapes.ts).
+ */
+export const ShapeMaskSchema = z.object({
+  /** Shape preset id (`SHAPE_PRESETS`), e.g. `'circle'`, `'star-5'`, `'heart'`. */
+  shape: id,
+  /** Soft edge, 0 (sharp) … 1 (very soft). */
+  feather: unit,
+  /** Show the outside of the shape instead. */
+  invert: z.optional(z.boolean()),
+});
+
 const visual = {
   transform: TransformSchema,
   crop: CropSchema,
@@ -235,6 +248,8 @@ const visual = {
   lut: z.optional(LutRefSchema),
   /** Lanes only: how the picture mixes with what's under it (file version 3+). */
   blend: z.optional(BlendModeSchema),
+  /** Shape mask (file version 4+). Missing = the whole picture. */
+  mask: z.optional(ShapeMaskSchema),
 };
 
 const audible = {
@@ -493,6 +508,8 @@ export type ChromaKey = z.infer<typeof ChromaKeySchema>;
 export type LutRef = z.infer<typeof LutRefSchema>;
 /** How a layer mixes with what's under it. */
 export type BlendMode = z.infer<typeof BlendModeSchema>;
+/** A picture's shape mask. */
+export type ShapeMask = z.infer<typeof ShapeMaskSchema>;
 /** Anything that sits on a track. */
 export type Item = z.infer<typeof ItemSchema>;
 export type ItemKind = Item['kind'];

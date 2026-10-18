@@ -1,4 +1,5 @@
 import { current, isDraft, type Draft } from 'immer';
+import { shapePreset } from '../effects/shapes';
 import {
   ALLOWED_KINDS,
   DEFAULT_TRANSFORM,
@@ -26,6 +27,7 @@ import type {
   LutRef,
   Project,
   RegionItem,
+  ShapeMask,
   TextStyle,
   Track,
   Transform,
@@ -866,6 +868,8 @@ export interface ItemPatch {
   lut?: LutRef | null;
   /** Lane items; `'normal'` (or `null`) removes the field. */
   blend?: BlendMode | null;
+  /** Pictures: shape mask (the shape must be one of `SHAPE_PRESETS`); `null` removes it. */
+  mask?: ShapeMask | null;
   /** Blurred areas. */
   effect?: RegionItem['effect'];
   shape?: RegionItem['shape'];
@@ -875,7 +879,7 @@ export interface ItemPatch {
 }
 
 /** Fields that `null` (or `blend: 'normal'`) removes instead of setting. */
-const REMOVABLE = new Set(['key', 'lut', 'blend']);
+const REMOVABLE = new Set(['key', 'lut', 'blend', 'mask']);
 /** Size limits of a blurred area's box (fractions of the canvas). */
 const REGION_MIN = 0.01;
 const REGION_MAX = 4;
@@ -897,9 +901,10 @@ const FIELDS_BY_KIND: Record<Item['kind'], readonly string[]> = {
     'key',
     'lut',
     'blend',
+    'mask',
   ],
-  image: ['name', 'transform', 'crop', 'fit', 'filter', 'adjust', 'key', 'lut', 'blend'],
-  freeze: ['name', 'transform', 'crop', 'fit', 'filter', 'adjust', 'key', 'lut', 'blend'],
+  image: ['name', 'transform', 'crop', 'fit', 'filter', 'adjust', 'key', 'lut', 'blend', 'mask'],
+  freeze: ['name', 'transform', 'crop', 'fit', 'filter', 'adjust', 'key', 'lut', 'blend', 'mask'],
   audio: ['name', 'volume', 'muted', 'fadeIn', 'fadeOut', 'duck'],
   text: ['name', 'text', 'style', 'transform', 'filter', 'adjust', 'blend'],
   sticker: ['name', 'transform', 'emoji', 'filter', 'adjust', 'blend'],
@@ -911,6 +916,8 @@ export function updateItem(project: Project, itemId: string, patch: ItemPatch): 
   const { item } = editable(project, itemId);
   const allowed = FIELDS_BY_KIND[item.kind];
   const target = item as Record<string, unknown>;
+  if (patch.mask && !shapePreset(patch.mask.shape))
+    throw new EditError('invalid', `No mask shape ${patch.mask.shape}`);
   if (patch.lut) {
     const asset = project.assets[patch.lut.assetId];
     if (!asset || asset.kind !== 'lut')
@@ -931,6 +938,7 @@ export function updateItem(project: Project, itemId: string, patch: ItemPatch): 
     item.key.spill = clamp01(item.key.spill);
   }
   if ('lut' in item && item.lut) item.lut.intensity = clamp01(item.lut.intensity);
+  if ('mask' in item && item.mask) item.mask.feather = clamp01(item.mask.feather);
   if (item.kind === 'region') {
     item.amount = clamp01(item.amount);
     const size = (v: number) =>

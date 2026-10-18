@@ -1,4 +1,5 @@
 import type { Input, InputVideoTrack, VideoSample } from 'mediabunny';
+import { shapePreset } from '../effects/shapes';
 import {
   animationState,
   resetState,
@@ -446,6 +447,20 @@ export class Composer {
     // Lanes only: the main video is the bottom of the stack.
     if (layer.track.kind !== 'main' && 'blend' in item && item.blend)
       pic.blend = BLEND_IDS[item.blend] ?? 0;
+    if ('mask' in item && item.mask) {
+      const shape = shapePreset(item.mask.shape);
+      if (shape) {
+        pic.shape = shape.family;
+        pic.shapeA = shape.a;
+        pic.shapeB = shape.b;
+        pic.shapeC = shape.c;
+        pic.shapeRotation = shape.rotation;
+        pic.shapeStretch = shape.stretch;
+        pic.shapeInvert = !!item.mask.invert;
+        // Feather 0…1 → up to a quarter of the shape's radius.
+        pic.shapeFeather = item.mask.feather * 0.5;
+      }
+    }
   }
 
   /** Parsed `#rrggbb` colours (key colours), cached so frames don't parse strings. */

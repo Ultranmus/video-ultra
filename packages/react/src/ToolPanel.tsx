@@ -28,6 +28,7 @@ import { DEFAULT_DUCK, isSounding, RATIOS, ratioOf } from './items';
 import { AnimatePanel, FilterStrip, TransitionGrid } from './looks';
 import type { ToolId } from './state';
 import { ArrangeControls, LockedNote } from './organize';
+import { MaskTool } from './mask';
 import { BlendTool, GreenScreenTool, RegionTool } from './picture';
 
 const seconds = (t: number) => t / FLICKS_PER_SECOND;
@@ -104,6 +105,8 @@ function ItemTool({ tool, item }: { tool: ToolId; item: Item }): ReactElement | 
       return <BlendTool item={item} />;
     case 'region':
       return <RegionTool item={item} />;
+    case 'mask':
+      return <MaskTool item={item} />;
     default:
       return null;
   }
@@ -126,6 +129,9 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
       <Section title={l.cropRotate} collapsible defaultOpen={false}>
         <TransformTool item={item} />
         <CropTool item={item} />
+      </Section>
+      <Section title={l.shape} collapsible defaultOpen={'mask' in item && !!item.mask}>
+        <MaskTool item={item} />
       </Section>
       <Section title={l.greenScreen} collapsible defaultOpen={'key' in item && !!item.key}>
         <GreenScreenTool item={item} />

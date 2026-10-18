@@ -73,7 +73,7 @@ export function curvePixels(calibration: HdrCalibration): Uint8Array<ArrayBuffer
 
 /**
  * Floats per layer in the uniform block: 7 × vec4 (pos, posT, uv, uvT, c0, c1, c2) + the effect
- * block (24 × vec4, effects/colour.ts) = 124 floats, 496 bytes.
+ * block (26 × vec4, effects/colour.ts) = 132 floats, 528 bytes.
  */
 export const LAYER_FLOATS = 28 + EFFECT_FLOATS;
 
