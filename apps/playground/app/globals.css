@@ -200,7 +200,8 @@ video {
   position: relative;
   flex: none;
   margin: auto;
-  overflow: hidden;
+  /* clip: the frame itself can never be scrolled (like a real phone screen). */
+  overflow: clip;
   border: 1px solid var(--border);
   border-radius: 16px;
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);

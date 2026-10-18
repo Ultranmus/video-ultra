@@ -239,6 +239,10 @@ export const DEFAULT_LABELS = {
   unsupportedBody:
     'The editor needs WebCodecs and WebGL2. Use a current version of Chrome, Edge, Safari or Firefox.',
   engineError: (message: string) => `Preview problem: ${message}`,
+  audioNeedsSecure:
+    'No sound on this connection: browsers only play editor audio on secure (https) pages. Everything else works.',
+  audioUnavailable: (detail: string) =>
+    `Sound is off in this browser (${detail}). Everything else works.`,
   importFailed: (name: string, reason: string) => `${name}: ${reason}`,
   storageFull:
     "There's no space left to store this file. Free up space on this device or remove media you don't use.",

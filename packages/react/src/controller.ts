@@ -216,6 +216,13 @@ export class EditorController {
       // Audio problems are reported once, not as a blocking error.
       this.toast(this.labels.engineError(message), 'error');
     };
+    engine.onAudioUnavailable = (reason, detail) => {
+      // Not an error the user caused or can fix in the editor: a calm note, once.
+      this.toast(
+        reason === 'insecure' ? this.labels.audioNeedsSecure : this.labels.audioUnavailable(detail),
+        'info',
+      );
+    };
     await engine.setProject(this.project);
     for (const [assetId, blob] of this.media) await engine.addMedia(assetId, blob);
     await engine.seek(this.playhead.time);

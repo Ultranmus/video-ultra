@@ -11,7 +11,7 @@ import {
   trimItem,
   type Item,
 } from '@video-ultra/core';
-import { useEffect, useRef, useState, type ReactElement } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactElement } from 'react';
 import { useController, useHistory, useLabels, useProject, useUi } from './context';
 import { Button, IconButton, Ruler, Section, ToolButton } from './controls';
 import { formatClock } from './format';
@@ -643,6 +643,23 @@ function Sheet({ tool, panel }: { tool: ToolId | null; panel: PanelId | null }):
   const ref = useRef<HTMLElement>(null);
   const drag = useRef<{ id: number; y: number; t: number; base: number; dy: number } | null>(null);
   const leaving = useRef(false);
+  // The sheet's full height is the editor's room above the tab bar, measured — the editor is a
+  // width-only container, so CSS can't know its height (cqh would be the browser window's).
+  useLayoutEffect(() => {
+    const sheet = ref.current;
+    const area = sheet?.parentElement;
+    const root = sheet?.closest<HTMLElement>('.vu-root');
+    if (!sheet || !area || !root) return;
+    const measure = () => {
+      const full = area.getBoundingClientRect().bottom - root.getBoundingClientRect().top;
+      sheet.style.setProperty('--vu-sheet-full', `${Math.max(0, Math.round(full))}px`);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(root);
+    ro.observe(area);
+    return () => ro.disconnect();
+  }, []);
   const entry = RAIL.find((r) => r.id === panel);
   const title = tool ? l[TOOL_TITLE[tool]] : entry ? l[entry.key] : l.canvas;
 

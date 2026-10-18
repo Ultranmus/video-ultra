@@ -1,5 +1,35 @@
 import { useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
 
+/**
+ * Scrolls `scroller` so `section` sits just under the sticky chip bar. Done by hand on purpose:
+ * `scrollIntoView` also scrolls every ancestor — including the editor itself when part of a
+ * sheet is off-screen, which shoved the whole layout (the tab bar ended up mid-screen).
+ */
+function scrollToSection(
+  scroller: HTMLElement,
+  section: HTMLElement,
+  bar: HTMLElement | null,
+  smooth: boolean,
+): void {
+  const top =
+    scroller.scrollTop +
+    section.getBoundingClientRect().top -
+    scroller.getBoundingClientRect().top -
+    (bar?.offsetHeight ?? 0);
+  scroller.scrollTo({ top: Math.max(0, top), behavior: smooth ? 'smooth' : 'auto' });
+}
+
+/** Scrolls the chip row (only it) sideways so `chip` is in view. */
+function revealChip(row: HTMLElement, chip: HTMLElement): void {
+  const r = row.getBoundingClientRect();
+  const c = chip.getBoundingClientRect();
+  const pad = 24;
+  if (c.left < r.left)
+    row.scrollTo({ left: row.scrollLeft + c.left - r.left - pad, behavior: 'smooth' });
+  else if (c.right > r.right)
+    row.scrollTo({ left: row.scrollLeft + c.right - r.right + pad, behavior: 'smooth' });
+}
+
 /** The nearest scrolling ancestor (panel, dock or inspector body). */
 function scrollerOf(el: HTMLElement): HTMLElement | null {
   let node = el.parentElement;
@@ -68,17 +98,18 @@ export function CategoryBrowser<C extends { id: string; label: string }>({
 
   // Keep the active chip visible in the chip row.
   useEffect(() => {
-    barRef.current
-      ?.querySelector<HTMLElement>(`[data-chip="${CSS.escape(active)}"]`)
-      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    const row = barRef.current?.querySelector<HTMLElement>('.vu-chips-scroll');
+    const chip = row?.querySelector<HTMLElement>(`[data-chip="${CSS.escape(active)}"]`);
+    if (row && chip) revealChip(row, chip);
   }, [active]);
 
   // Start at the category of the current choice.
   useEffect(() => {
     if (!initial || initial === categories[0]?.id) return;
-    rootRef.current
-      ?.querySelector<HTMLElement>(`[data-category="${CSS.escape(initial)}"]`)
-      ?.scrollIntoView({ block: 'start' });
+    const root = rootRef.current;
+    const section = root?.querySelector<HTMLElement>(`[data-category="${CSS.escape(initial)}"]`);
+    const scroller = root ? scrollerOf(root) : null;
+    if (section && scroller) scrollToSection(scroller, section, barRef.current, false);
     // Only on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -86,9 +117,10 @@ export function CategoryBrowser<C extends { id: string; label: string }>({
   const jump = (id: string) => {
     setActive(id);
     jumping.current = true;
-    rootRef.current
-      ?.querySelector<HTMLElement>(`[data-category="${CSS.escape(id)}"]`)
-      ?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    const root = rootRef.current;
+    const section = root?.querySelector<HTMLElement>(`[data-category="${CSS.escape(id)}"]`);
+    const scroller = root ? scrollerOf(root) : null;
+    if (section && scroller) scrollToSection(scroller, section, barRef.current, true);
     // Let the smooth scroll land before following the scroll again.
     setTimeout(() => (jumping.current = false), 600);
   };

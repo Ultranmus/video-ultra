@@ -85,6 +85,12 @@ export interface Engine {
   onTime: ((time: Time, playing: boolean) => void) | null;
   onEnded: (() => void) | null;
   onError: ((message: string) => void) | null;
+  /**
+   * Sound can't play: `insecure` — the page isn't a secure context (http on a LAN address), so the
+   * browser offers no AudioWorklet; `failed` — anything else (`detail` says what). Playback goes on
+   * silently on the wall clock. Reported once.
+   */
+  onAudioUnavailable: ((reason: 'insecure' | 'failed', detail: string) => void) | null;
   destroy(): void;
 }
 
@@ -127,6 +133,7 @@ export async function createEngine(
     onTime: null as Engine['onTime'],
     onEnded: null as Engine['onEnded'],
     onError: null as Engine['onError'],
+    onAudioUnavailable: null as Engine['onAudioUnavailable'],
   };
 
   worker.onmessage = (event: MessageEvent<EngineMessage>) => {
@@ -180,7 +187,8 @@ export async function createEngine(
   // Sound: an AudioWorklet on the main thread's AudioContext, fed directly by the worker over a
   // MessagePort. Created on the first play() — browsers (iOS Safari especially) only allow audio to
   // start inside a user gesture, so the context is created and resumed synchronously there.
-  let audio: { context: AudioContext; ready: Promise<void> } | null = null;
+  // `context` is null when this browser can't play sound here (see onAudioUnavailable).
+  let audio: { context: AudioContext | null; ready: Promise<void> } | null = null;
   // Set by destroy(): late idle callbacks then do nothing (no context created after the end).
   let destroyed = false;
   // Building the AudioContext and loading the worklet costs ~100 ms of main-thread time in Chrome, so
@@ -190,6 +198,16 @@ export async function createEngine(
   const prepareAudio = () => {
     if (destroyed || audio || options.audio === false || typeof AudioContext === 'undefined')
       return;
+    // Browsers only offer AudioWorklet on secure pages (https, localhost). On http over a LAN
+    // address (a phone testing a dev server) there is no sound — say so plainly, once.
+    if (!('audioWorklet' in AudioContext.prototype)) {
+      audio = { context: null, ready: Promise.resolve() };
+      handlers.onAudioUnavailable?.(
+        globalThis.isSecureContext === false ? 'insecure' : 'failed',
+        'AudioWorklet is not available',
+      );
+      return;
+    }
     const context = new AudioContext({ latencyHint: 'interactive' });
     const ready = (async () => {
       await context.audioWorklet.addModule(new URL('./audio.worklet.js', import.meta.url));
@@ -207,6 +225,8 @@ export async function createEngine(
     })().catch((error: unknown) => {
       if (destroyed) return; // torn down while loading: not a problem worth reporting
       // No sound is better than no playback: keep going on the wall clock.
+      const detail = error instanceof Error ? error.message : String(error);
+      if (handlers.onAudioUnavailable) return handlers.onAudioUnavailable('failed', detail);
       handlers.onError?.(
         `Audio unavailable: ${error instanceof Error ? error.message : String(error)}`,
       );
@@ -222,7 +242,7 @@ export async function createEngine(
   const startAudio = (): Promise<void> => {
     prepareAudio(); // in case play() comes before idle time
     if (!audio) return Promise.resolve();
-    void audio.context.resume(); // synchronously inside the user's gesture
+    void audio.context?.resume(); // synchronously inside the user's gesture
     return audio.ready;
   };
 
@@ -347,7 +367,7 @@ export async function createEngine(
       // Safe to call twice (React strict mode, a host re-mounting the editor).
       if (destroyed) return;
       destroyed = true;
-      if (audio && audio.context.state !== 'closed') audio.context.close().catch(() => {});
+      if (audio?.context && audio.context.state !== 'closed') audio.context.close().catch(() => {});
       worker.terminate();
       for (const entry of pending.values()) entry.reject(new Error('Engine destroyed'));
       pending.clear();

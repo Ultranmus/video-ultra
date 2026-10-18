@@ -512,3 +512,12 @@ reason; when one changes, edit the entry and note the date.
 108.  **No duplicate controls on desktop** (owner, 2026-10-19): Filters, Transitions and
       animations live only in the left menu; the inspector is the detail view (text, style,
       speed, sound, adjust, crop, opacity…). Phones keep them in the toolbar (no left menu there).
+109.  **Nothing may scroll the editor itself** (2026-10-19). `.vu-root` uses `overflow: clip`, and
+      the libraries scroll their own list and chip row by hand — `scrollIntoView` also scrolled the
+      editor when part of the sheet was off-screen (the tab bar ended up mid-screen). The sheet's
+      full height is measured (the editor is a width-only container, so `100cqh` meant the browser
+      window, wrong whenever the editor is embedded in a smaller box).
+110.  **No sound without a secure page, said plainly** (2026-10-19). Browsers only offer
+      AudioWorklet on https / localhost; on `http://<LAN IP>` the engine reports
+      `onAudioUnavailable('insecure')` and the editor shows a calm one-time note instead of a raw
+      error. Phone testing with sound: `pnpm --filter playground dev:https` or a preview deploy.
