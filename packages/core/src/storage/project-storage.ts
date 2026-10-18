@@ -77,6 +77,18 @@ export interface ProjectWriter {
   readonly needsSnapshot: boolean;
 }
 
+/** Streams a recording into storage piece by piece. From {@link ProjectStorage.recordMedia}. */
+export interface MediaRecordingWriter {
+  /** Bytes stored so far. */
+  readonly bytes: number;
+  /** Adds a piece at the end (pieces are written in call order). */
+  append(chunk: Blob): Promise<void>;
+  /** Waits for every piece, then returns the stored file and its source. */
+  finish(): Promise<{ file: File; source: Asset['source'] }>;
+  /** Removes everything stored for this recording. */
+  discard(): Promise<void>;
+}
+
 /** Local storage for media and projects. Created with {@link createProjectStorage}. */
 export interface ProjectStorage extends WaveformCache {
   readonly kind: 'opfs' | 'memory';
@@ -90,6 +102,13 @@ export interface ProjectStorage extends WaveformCache {
    * when `signal` aborts (no partial file is left).
    */
   putMedia(assetId: string, file: Blob, signal?: AbortSignal): Promise<Asset['source']>;
+  /**
+   * Stores a recording that arrives in pieces (the camera): each `append` streams a piece onto the
+   * end of the asset's file, so a long recording never sits in memory. `finish()` returns the
+   * stored file (disk-backed) and the Asset.source to record; `discard()` removes it. A piece that
+   * fails (e.g. {@link StorageFullError}) leaves what was stored before it intact.
+   */
+  recordMedia(assetId: string): MediaRecordingWriter;
   /**
    * Keeps a handle to the user's original file instead of copying it (File System Access API,
    * Chromium desktop) and returns the Asset.source to record.
@@ -246,6 +265,46 @@ export function createProjectStorageOn(
         throw error;
       }
       return { type: 'opfs', key: assetId };
+    },
+
+    recordMedia(assetId) {
+      const path = mediaPath(assetId);
+      let chain: Promise<void> = Promise.resolve();
+      let failure: unknown = null;
+      let bytes = 0;
+      return {
+        get bytes() {
+          return bytes;
+        },
+        append(chunk) {
+          // In order, one after another; after a failure nothing more is written.
+          chain = chain.then(async () => {
+            if (failure) throw failure;
+            try {
+              await files.appendBlob(path, chunk);
+              bytes += chunk.size;
+            } catch (error) {
+              failure = isQuotaError(error) ? new StorageFullError() : error;
+              throw failure;
+            }
+          });
+          return chain;
+        },
+        async finish() {
+          await chain.catch(() => undefined);
+          const file = await files.read(path);
+          if (!file || file.size === 0) {
+            if (failure) throw failure;
+            throw new Error('Nothing was recorded.');
+          }
+          return { file, source: { type: 'opfs' as const, key: assetId } };
+        },
+        async discard() {
+          failure ??= new Error('Recording discarded');
+          await chain.catch(() => undefined);
+          await files.remove(path);
+        },
+      };
     },
 
     async putMediaHandle(assetId, handle) {

@@ -96,6 +96,7 @@ export type {
   ProjectStorage,
   ProjectStorageOptions,
   ProjectWriter,
+  MediaRecordingWriter,
   StoredProjectInfo,
   StoredLogEntry,
   StorageStatus,

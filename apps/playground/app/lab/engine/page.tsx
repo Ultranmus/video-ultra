@@ -29,6 +29,10 @@ import {
   toSeconds,
   type Direction,
   type ExportOptions,
+  type AudioExportOptions,
+  type AudioExportResult,
+  type FrameImage,
+  type FrameImageOptions,
   type ExportResult,
   type ImageItem,
   type Project,
@@ -617,6 +621,15 @@ declare global {
         backend?: 'webgpu' | 'webgl2',
       ): Promise<{ result: Omit<ExportResult, 'blob'>; info: ExportRunInfo; base64: string }>;
       cancelAfter(ms: number, options: ExportOptions): Promise<string>;
+      /** Sound only (M4A / Ogg / WAV), as base64. */
+      exportAudio(
+        options: AudioExportOptions,
+      ): Promise<{ result: Omit<AudioExportResult, 'blob'>; base64: string }>;
+      /** One frame saved as a picture (PNG / JPEG), as base64. */
+      captureImage(
+        s: number,
+        options: FrameImageOptions,
+      ): Promise<{ image: Omit<FrameImage, 'blob'>; base64: string }>;
       /** One exact frame (the export's compositor path) as base64 RGBA. */
       captureFrame(
         s: number,
@@ -742,6 +755,16 @@ export default function EngineLab() {
             backend: backend ?? 'webgl2',
           });
           return bitmapPixels(bitmap);
+        },
+        async exportAudio(options: AudioExportOptions) {
+          const { blob, ...rest } = await e.exportAudio(options, (p) =>
+            setProgress(`${Math.round(p.fraction * 100)} %`),
+          );
+          return { result: rest, base64: await blobBase64(blob) };
+        },
+        async captureImage(sec: number, options: FrameImageOptions) {
+          const { blob, ...rest } = await e.captureImage(fromSeconds(sec), options);
+          return { image: rest, base64: await blobBase64(blob) };
         },
         async cancelAfter(ms: number, options: ExportOptions) {
           const controller = new AbortController();

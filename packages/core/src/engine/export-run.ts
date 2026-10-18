@@ -10,11 +10,13 @@ import {
   canEncodeAudio,
   canEncodeVideo,
   Mp4OutputFormat,
+  OggOutputFormat,
   Output,
   QUALITY_HIGH,
   QUALITY_LOW,
   QUALITY_MEDIUM,
   StreamTarget,
+  WavOutputFormat,
   WebMOutputFormat,
   type StreamTargetChunk,
   type VideoCodec,
@@ -34,8 +36,12 @@ import {
   exportFrameCount,
   exportFrameTime,
   exportSize,
+  resolveExportRange,
+  type AudioExportOptions,
+  type AudioExportResult,
   type ExportOptions,
   type ExportProgress,
+  type ExportRange,
   type ExportResult,
 } from './export-plan';
 import { DecoderPool } from './frames';
@@ -181,6 +187,55 @@ function blobWritable(): { writable: WritableStream<StreamTargetChunk>; result: 
   };
 }
 
+/** Where an export's bytes go: an OPFS file (streamed to disk) or, as a fallback, memory. */
+interface ExportSink {
+  target: StreamTarget | BufferTarget;
+  storage: 'opfs' | 'memory';
+  /** Memory MP4 is written append-only, so it must be fragmented. */
+  fragmented: boolean;
+  /** The finished file, typed `mimeType`. */
+  blob(mimeType: string): Promise<Blob>;
+  /** Deletes a partial file (cancel / failure). */
+  remove(): Promise<void>;
+}
+
+/**
+ * Opens the target for one export file (`extension` names it). MP4 / M4A without OPFS go to Blob
+ * parts as fragmented MP4 (bounded memory); WebM / Ogg / WAV without OPFS go to one buffer.
+ */
+async function exportSink(extension: string): Promise<ExportSink> {
+  const opfs = await opfsTarget(`${OPFS_PREFIX}${Date.now().toString(36)}.${extension}`);
+  const typed = (blob: Blob, mimeType: string) =>
+    blob.type === mimeType ? blob : new Blob([blob], { type: mimeType });
+  if (opfs) {
+    return {
+      target: new StreamTarget(opfs.writable, { chunked: true, chunkSize: 4 * 1024 * 1024 }),
+      storage: 'opfs',
+      fragmented: false,
+      blob: async (mimeType) => typed(await opfs.file(), mimeType),
+      remove: () => opfs.remove(),
+    };
+  }
+  if (extension === 'mp4' || extension === 'm4a') {
+    const memory = blobWritable();
+    return {
+      target: new StreamTarget(memory.writable, { chunked: true, chunkSize: 4 * 1024 * 1024 }),
+      storage: 'memory',
+      fragmented: true,
+      blob: async (mimeType) => typed(memory.result(), mimeType),
+      remove: async () => undefined,
+    };
+  }
+  const buffer = new BufferTarget();
+  return {
+    target: buffer,
+    storage: 'memory',
+    fragmented: false,
+    blob: async (mimeType) => new Blob([buffer.buffer!], { type: mimeType }),
+    remove: async () => undefined,
+  };
+}
+
 let aacFallbackRegistered = false;
 /** No native AAC encoder (Firefox): load the WASM one, only now (DECISIONS #28). */
 async function ensureAacEncoder(): Promise<void> {
@@ -190,6 +245,8 @@ async function ensureAacEncoder(): Promise<void> {
   aacFallbackRegistered = true;
 }
 
+/** Container the delay is measured in (players treat priming per container). */
+type DelayContainer = 'mp4' | 'webm' | 'ogg';
 const delays = new Map<string, Promise<number>>();
 /** Details of the last delay measurement (for the export check). */
 export let lastDelayProbe: { codec: string; found: number; firstTimestamp: number } | null = null;
@@ -200,24 +257,33 @@ export let lastDelayProbe: { codec: string; found: number; firstTimestamp: numbe
  * so players would play the sound that much late. Measured once per session by encoding a tone
  * that starts at a known sample and decoding it back (~50 ms); falls back to typical values.
  */
-export function encoderDelay(codec: 'aac' | 'opus'): Promise<number> {
-  let pending = delays.get(codec);
+export function encoderDelay(
+  codec: 'aac' | 'opus',
+  container: DelayContainer = codec === 'aac' ? 'mp4' : 'webm',
+): Promise<number> {
+  const key = `${codec}-${container}`;
+  let pending = delays.get(key);
   if (!pending) {
-    pending = measureDelay(codec).catch(() =>
+    pending = measureDelay(codec, container).catch(() =>
       codec === 'opus' ? 312 : aacFallbackRegistered ? 1024 : 2112,
     );
-    delays.set(codec, pending);
+    delays.set(key, pending);
   }
   return pending;
 }
 
-async function measureDelay(codec: 'aac' | 'opus'): Promise<number> {
+async function measureDelay(codec: 'aac' | 'opus', container: DelayContainer): Promise<number> {
   const rate = EXPORT_SAMPLE_RATE;
   const onset = 4800;
   const frames = 14400;
   const target = new BufferTarget();
   const output = new Output({
-    format: codec === 'aac' ? new Mp4OutputFormat() : new WebMOutputFormat(),
+    format:
+      container === 'mp4'
+        ? new Mp4OutputFormat()
+        : container === 'ogg'
+          ? new OggOutputFormat()
+          : new WebMOutputFormat(),
     target,
   });
   const source = new AudioSampleSource({ codec, quality: QUALITY_MEDIUM });
@@ -303,12 +369,28 @@ export interface ExportRunStats {
   audioDelaySamples: number;
 }
 
-function hasSound(project: Project, audioOf: ExportDeps['audioOf']): boolean {
+/** The exported span of the timeline, or a plain-language error when it's empty. */
+function exportSpan(range: ExportRange | undefined, duration: number): ExportRange {
+  const span = resolveExportRange(range, duration);
+  if (!span)
+    throw new Error('The chosen part of the video is empty — set its start before its end.');
+  return span;
+}
+
+/** Some clip in `span` (default: anywhere) plays sound the mixer can read. */
+function hasSound(project: Project, audioOf: ExportDeps['audioOf'], span?: ExportRange): boolean {
   for (const track of project.tracks) {
     if (track.muted) continue;
     for (const item of track.items) {
       if (item.kind !== 'video' && item.kind !== 'audio') continue;
       if (item.muted || item.volume === 0) continue;
+      // A second of slack: sound crossfades under transitions run past a clip's edges (#113).
+      if (
+        span &&
+        (item.start >= span.end + FLICKS_PER_SECOND ||
+          item.start + item.duration <= span.start - FLICKS_PER_SECOND)
+      )
+        continue;
       if (audioOf(item.assetId)) return true;
     }
   }
@@ -324,13 +406,14 @@ export async function runExport(
   const started = performance.now();
   const duration = projectDuration(project);
   if (duration <= 0) throw new Error('The project is empty — add a clip before exporting.');
+  const span = exportSpan(options.range, duration);
   const { fps, format } = options;
   const { width, height } = exportSize(
     project.settings.width,
     project.settings.height,
     options.height,
   );
-  const framesTotal = exportFrameCount(duration, fps);
+  const framesTotal = exportFrameCount(span.end - span.start, fps);
   const warnings: string[] = [];
   // The encoder's own presets differ a lot between browsers; probing with them is fine, the
   // real encode uses an explicit bitrate (exportBitrate).
@@ -361,7 +444,7 @@ export async function runExport(
     );
   }
   let audioCodec: 'aac' | 'opus' | null = null;
-  if (hasSound(project, deps.audioOf)) {
+  if (hasSound(project, deps.audioOf, span)) {
     if (format === 'mp4') {
       await ensureAacEncoder();
       audioCodec = 'aac';
@@ -375,21 +458,13 @@ export async function runExport(
   }
 
   // Target: OPFS (streamed to disk) or memory.
-  const fileName = `${OPFS_PREFIX}${Date.now().toString(36)}.${format}`;
-  const opfs = await opfsTarget(fileName);
-  const memoryMp4 = !opfs && format === 'mp4' ? blobWritable() : null;
-  const memoryWebm = !opfs && format === 'webm' ? new BufferTarget() : null;
-  const target = opfs
-    ? new StreamTarget(opfs.writable, { chunked: true, chunkSize: 4 * 1024 * 1024 })
-    : memoryMp4
-      ? new StreamTarget(memoryMp4.writable, { chunked: true, chunkSize: 4 * 1024 * 1024 })
-      : memoryWebm!;
+  const sink = await exportSink(format);
   const output = new Output({
     format:
       format === 'mp4'
-        ? new Mp4OutputFormat(opfs ? {} : { fastStart: 'fragmented' })
+        ? new Mp4OutputFormat(sink.fragmented ? { fastStart: 'fragmented' } : {})
         : new WebMOutputFormat(),
-    target,
+    target: sink.target,
   });
 
   const canvas = new OffscreenCanvas(width, height);
@@ -441,7 +516,13 @@ export async function runExport(
       const data = new Float32Array(frames * 2);
       const left = data.subarray(0, frames);
       const right = data.subarray(frames);
-      await mixer.render(project, (audioWritten + delay) * flicksPerSample, frames, left, right);
+      await mixer.render(
+        project,
+        span.start + (audioWritten + delay) * flicksPerSample,
+        frames,
+        left,
+        right,
+      );
       const sample = new AudioSample({
         data,
         format: 'f32-planar',
@@ -483,7 +564,7 @@ export async function runExport(
     report(0, true);
     for (let i = 0; i < framesTotal; i++) {
       if (deps.isCancelled()) throw new ExportCancelled();
-      const t = exportFrameTime(i, fps);
+      const t = span.start + exportFrameTime(i, fps);
       // Clips that are done give back their decoder and last frame (memory stays flat).
       if (i % 15 === 0) {
         keep.clear();
@@ -514,7 +595,7 @@ export async function runExport(
   } catch (error) {
     if (output.state !== 'finalized' && output.state !== 'canceled')
       await output.cancel().catch(() => undefined);
-    await opfs?.remove();
+    await sink.remove();
     throw error;
   } finally {
     composer.destroy();
@@ -524,11 +605,7 @@ export async function runExport(
   report(framesTotal, true);
 
   const mimeType = format === 'mp4' ? 'video/mp4' : 'video/webm';
-  let blob: Blob;
-  if (opfs) blob = await opfs.file();
-  else if (memoryMp4) blob = memoryMp4.result();
-  else blob = new Blob([memoryWebm!.buffer!], { type: mimeType });
-  if (blob.type !== mimeType) blob = new Blob([blob], { type: mimeType });
+  const blob = await sink.blob(mimeType);
   return {
     result: {
       blob,
@@ -537,7 +614,7 @@ export async function runExport(
       width,
       height,
       durationSeconds: framesTotal / fps,
-      storage: opfs ? 'opfs' : 'memory',
+      storage: sink.storage,
       frames: framesTotal,
       videoCodec,
       audioCodec,
@@ -546,4 +623,163 @@ export async function runExport(
     },
     stats,
   };
+}
+
+/** What a sound-only export needs from the engine worker. */
+export type AudioExportDeps = Pick<
+  ExportDeps,
+  'project' | 'audioOf' | 'isCancelled' | 'onProgress'
+>;
+
+/** Container codec and file type of each sound-only format. */
+const AUDIO_FORMATS = {
+  m4a: { codec: 'aac', mimeType: 'audio/mp4' },
+  ogg: { codec: 'opus', mimeType: 'audio/ogg' },
+  wav: { codec: 'pcm-s16', mimeType: 'audio/wav' },
+} as const;
+
+/**
+ * Exports only the sound: the same mixer at 48 kHz stereo, with the encoder's priming compensated
+ * exactly as in a video export, so the file lines up with (and sounds like) the video export's
+ * track. AAC in M4A, Opus in Ogg, or 16-bit PCM WAV (lossless, no encoder needed). Streamed to
+ * OPFS like video. Throws {@link ExportCancelled} when cancelled (the partial file is deleted).
+ */
+export async function runAudioExport(
+  deps: AudioExportDeps,
+  options: AudioExportOptions,
+): Promise<{ result: AudioExportResult; stats: { audioMs: number; audioDelaySamples: number } }> {
+  const { project } = deps;
+  const started = performance.now();
+  const duration = projectDuration(project);
+  if (duration <= 0) throw new Error('The project is empty — add a clip before exporting.');
+  const span = exportSpan(options.range, duration);
+  if (!hasSound(project, deps.audioOf, span))
+    throw new Error('There is no sound in this part of the video to export.');
+  const { codec, mimeType } = AUDIO_FORMATS[options.format];
+  if (codec === 'aac') await ensureAacEncoder();
+  else if (codec === 'opus' && !(await canEncodeAudio('opus')))
+    throw new Error("This browser can't encode Opus sound. Choose M4A or WAV instead.");
+
+  const sink = await exportSink(options.format);
+  const output = new Output({
+    format:
+      options.format === 'm4a'
+        ? new Mp4OutputFormat(sink.fragmented ? { fastStart: 'fragmented' } : {})
+        : options.format === 'ogg'
+          ? new OggOutputFormat()
+          : new WavOutputFormat(),
+    target: sink.target,
+  });
+  const source = new AudioSampleSource(
+    codec === 'pcm-s16' ? { codec } : { codec, bitrate: exportAudioBitrate(options.quality) },
+  );
+  output.addAudioTrack(source);
+  const mixer = new Mixer(EXPORT_SAMPLE_RATE, deps.audioOf);
+  const delay =
+    codec === 'aac'
+      ? await encoderDelay('aac', 'mp4')
+      : codec === 'opus'
+        ? await encoderDelay('opus', 'ogg')
+        : 0;
+  const flicksPerSample = FLICKS_PER_SECOND / EXPORT_SAMPLE_RATE; // 14 700, exact
+  const total = Math.max(1, Math.round((span.end - span.start) / flicksPerSample));
+  // Decoded = priming + what is written, so writing `total − delay` decodes to exactly `total`.
+  const toWrite = Math.max(0, total - delay);
+  const blocks = Math.max(1, Math.ceil(toWrite / AUDIO_BLOCK));
+  let written = 0;
+  let lastProgress = 0;
+  let audioMs = 0;
+  try {
+    await output.start();
+    while (written < toWrite) {
+      if (deps.isCancelled()) throw new ExportCancelled();
+      const frames = Math.min(AUDIO_BLOCK, toWrite - written);
+      // A fresh block each time: the encoder may still read the previous one (32 KB, not per frame).
+      const data = new Float32Array(frames * 2);
+      const a0 = performance.now();
+      await mixer.render(
+        project,
+        span.start + (written + delay) * flicksPerSample,
+        frames,
+        data.subarray(0, frames),
+        data.subarray(frames),
+      );
+      const sample = new AudioSample({
+        data,
+        format: 'f32-planar',
+        numberOfChannels: 2,
+        sampleRate: EXPORT_SAMPLE_RATE,
+        timestamp: written / EXPORT_SAMPLE_RATE,
+      });
+      try {
+        await source.add(sample);
+      } finally {
+        sample.close();
+      }
+      audioMs += performance.now() - a0;
+      written += frames;
+      const now = performance.now();
+      if (now - lastProgress >= PROGRESS_MS) {
+        lastProgress = now;
+        const fraction = written / Math.max(1, toWrite);
+        const elapsed = (now - started) / 1000;
+        deps.onProgress({
+          fraction,
+          framesDone: Math.ceil(written / AUDIO_BLOCK),
+          framesTotal: blocks,
+          etaSeconds: fraction > 0.02 ? Math.max(0, (elapsed / fraction) * (1 - fraction)) : null,
+        });
+      }
+    }
+    source.close();
+    if (deps.isCancelled()) throw new ExportCancelled();
+    await output.finalize();
+  } catch (error) {
+    if (output.state !== 'finalized' && output.state !== 'canceled')
+      await output.cancel().catch(() => undefined);
+    await sink.remove();
+    throw error;
+  } finally {
+    mixer.dispose();
+  }
+  deps.onProgress({ fraction: 1, framesDone: blocks, framesTotal: blocks, etaSeconds: 0 });
+  return {
+    result: {
+      blob: await sink.blob(mimeType),
+      mimeType,
+      extension: options.format,
+      codec,
+      sampleRate: EXPORT_SAMPLE_RATE,
+      channels: 2,
+      durationSeconds: total / EXPORT_SAMPLE_RATE,
+      storage: sink.storage,
+      elapsedSeconds: (performance.now() - started) / 1000,
+      warnings: [],
+    },
+    stats: { audioMs, audioDelaySamples: delay },
+  };
+}
+
+/**
+ * Encodes a rendered frame as a PNG or JPEG file (in the worker: OffscreenCanvas 2D +
+ * `convertToBlob`). Closes `bitmap`.
+ */
+export async function encodeFrameImage(
+  bitmap: ImageBitmap,
+  format: 'png' | 'jpeg',
+  quality = 0.92,
+): Promise<Blob> {
+  try {
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error("This browser can't make pictures in the background.");
+    ctx.drawImage(bitmap, 0, 0);
+    return await canvas.convertToBlob(
+      format === 'png'
+        ? { type: 'image/png' }
+        : { type: 'image/jpeg', quality: Math.max(0, Math.min(1, quality)) },
+    );
+  } finally {
+    bitmap.close();
+  }
 }

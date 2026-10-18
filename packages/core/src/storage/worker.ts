@@ -79,14 +79,22 @@ async function write(
   }
 }
 
-async function copy(id: number, root: string, path: string, blob: Blob): Promise<number> {
+async function copy(
+  id: number,
+  root: string,
+  path: string,
+  blob: Blob,
+  append = false,
+): Promise<number> {
   const handle = await fileHandle(root, path);
   const sync = await open(handle);
-  let at = 0;
+  // Appending (a recording arriving in pieces): a failed piece is cut off again, the rest stays.
+  const startSize = append ? sync.getSize() : 0;
+  let at = startSize;
   let failed = true;
   const reader = blob.stream().getReader();
   try {
-    sync.truncate(0);
+    sync.truncate(startSize);
     let sinceFlush = 0;
     for (;;) {
       if (cancelled.has(id)) {
@@ -110,8 +118,16 @@ async function copy(id: number, root: string, path: string, blob: Blob): Promise
   } finally {
     cancelled.delete(id);
     void reader.cancel().catch(() => undefined);
+    if (failed && append) {
+      try {
+        sync.truncate(startSize);
+        sync.flush();
+      } catch {
+        /* the file stays as it was written so far */
+      }
+    }
     sync.close();
-    if (failed) {
+    if (failed && !append) {
       // Leave no partial media behind.
       const parts = path.split('/').filter(Boolean);
       const name = parts.pop()!;
@@ -152,7 +168,7 @@ self.onmessage = (event: MessageEvent<StorageRequest>) => {
       ? () => probe(request.root, request.id)
       : request.op === 'write'
         ? () => write(request.root, request.path, request.data, request.append)
-        : () => copy(request.id, request.root, request.path, request.blob);
+        : () => copy(request.id, request.root, request.path, request.blob, request.append);
   const key = request.op === 'probe' ? `probe-${request.id}` : `${request.root}/${request.path}`;
   serial(key, task).then(
     (size) => self.postMessage({ id: request.id, ok: true, size }),

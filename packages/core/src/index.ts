@@ -73,6 +73,9 @@ export {
   exportBitrate,
   exportAudioBitrate,
   EXPORT_HEIGHTS,
+  EXPORT_PRESETS,
+  presetFits,
+  resolveExportRange,
 } from './engine/export-plan';
 export type {
   ExportOptions,
@@ -80,6 +83,14 @@ export type {
   ExportResult,
   ExportHeight,
   ExportLimits,
+  ExportRange,
+  ExportPreset,
+  AudioExportFormat,
+  AudioExportOptions,
+  AudioExportResult,
+  FrameImageFormat,
+  FrameImageOptions,
+  FrameImage,
 } from './engine/export-plan';
 
 /** The package version. */

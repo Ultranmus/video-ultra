@@ -10,7 +10,14 @@ import { createWebGPURenderer } from '../render/webgpu';
 import { Mixer, type AudioTrackSource } from '../audio/mixer';
 import { AudioOutput } from './audio-output';
 import { Composer, type MediaLibrary, type VideoMedia } from './compose';
-import { cleanStaleExports, ExportCancelled, runExport } from './export-run';
+import {
+  cleanStaleExports,
+  encodeFrameImage,
+  ExportCancelled,
+  runAudioExport,
+  runExport,
+} from './export-run';
+import { exportSize } from './export-plan';
 import { DecoderPool } from './frames';
 import { QualityGovernor } from './quality';
 import type { EngineMessage, EngineRequest, EngineResponseData, EngineStats } from './protocol';
@@ -452,32 +459,121 @@ async function startExport(
   }
 }
 
+/** Sound-only export: shares the export slot (one at a time, preview paused) and its cancel. */
+async function startAudioExport(
+  request: Extract<EngineRequest, { type: 'export-audio' }>,
+): Promise<EngineResponseData> {
+  if (!project) throw new Error('No project to export');
+  if (exportJob) throw new Error('An export is already running');
+  const job = { id: request.jobId, cancelled: false };
+  exportJob = job;
+  stats.exporting = true;
+  try {
+    pausePlayback();
+    wakeRefine?.();
+    if (pausedLoop) await pausedLoop;
+    const p = project;
+    await mediaReady(p);
+    const { result, stats: run } = await runAudioExport(
+      {
+        project: p,
+        audioOf: (assetId) => audioTracks.get(assetId) ?? null,
+        isCancelled: () => job.cancelled,
+        onProgress: (progress) =>
+          post({ id: -1, event: { type: 'export-progress', jobId: job.id, progress } }),
+      },
+      request.options,
+    );
+    return { type: 'export-audio', result, stats: run };
+  } catch (error) {
+    if (error instanceof ExportCancelled) throw error;
+    throw error instanceof Error ? error : new Error(String(error));
+  } finally {
+    exportJob = null;
+    stats.exporting = false;
+    void showAt(playheadAt);
+  }
+}
+
+/**
+ * One exact frame of `p` at `time` on a fresh `width × height` canvas, handed to `withBitmap` while the
+ * renderer is still alive (a bitmap from a GL canvas can be emptied when its context goes). An
+ * explicit backend is strict (golden checks must know which path drew the picture).
+ */
+async function renderStill<T>(
+  p: Project,
+  time: number,
+  width: number,
+  height: number,
+  backend: RenderBackend | undefined,
+  withBitmap: (bitmap: ImageBitmap, backend: RenderBackend) => Promise<T> | T,
+): Promise<T> {
+  await mediaReady(p);
+  const canvas = new OffscreenCanvas(width, height);
+  const r =
+    backend === 'webgpu'
+      ? await createWebGPURenderer(canvas)
+      : await makeRenderer(canvas, backend ?? renderer?.backend ?? 'webgl2');
+  const c = new Composer(r, new DecoderPool(2), media, true, RASTER_BUDGET[tier], false);
+  try {
+    await c.render(p, Math.max(0, Math.round(time)), width, height, null);
+    return await withBitmap(canvas.transferToImageBitmap(), r.backend);
+  } finally {
+    c.destroy();
+    r.destroy();
+  }
+}
+
 /** Renders one exact frame at any size and backend into an ImageBitmap (tests, cover images). */
 async function capture(
   request: Extract<EngineRequest, { type: 'capture' }>,
 ): Promise<{ data: EngineResponseData; transfer: Transferable[] }> {
   if (!project) throw new Error('No project');
   const p = project;
-  await mediaReady(p);
   const size =
     request.width && request.height
       ? { width: request.width, height: request.height }
       : previewSize(p);
-  const canvas = new OffscreenCanvas(size.width, size.height);
-  // An explicit backend is strict (golden checks must know which path drew the picture).
-  const r =
-    request.backend === 'webgpu'
-      ? await createWebGPURenderer(canvas)
-      : await makeRenderer(canvas, request.backend ?? renderer?.backend ?? 'webgl2');
-  const c = new Composer(r, new DecoderPool(2), media, true, RASTER_BUDGET[tier], false);
-  try {
-    await c.render(p, Math.max(0, Math.round(request.time)), size.width, size.height, null);
-    const bitmap = canvas.transferToImageBitmap();
-    return { data: { type: 'capture', bitmap, backend: r.backend }, transfer: [bitmap] };
-  } finally {
-    c.destroy();
-    r.destroy();
-  }
+  return renderStill(
+    p,
+    request.time,
+    size.width,
+    size.height,
+    request.backend,
+    (bitmap, backend) => ({
+      data: { type: 'capture', bitmap, backend },
+      transfer: [bitmap],
+    }),
+  );
+}
+
+/**
+ * One frame saved as a picture: the project's own size (or a given shorter side), drawn by the
+ * export's renderer path, encoded to PNG / JPEG in this worker.
+ */
+async function captureImage(
+  request: Extract<EngineRequest, { type: 'capture-image' }>,
+): Promise<EngineResponseData> {
+  if (!project) throw new Error('No project');
+  const p = project;
+  const { width, height } = request.options.height
+    ? exportSize(p.settings.width, p.settings.height, request.options.height)
+    : { width: p.settings.width, height: p.settings.height };
+  const time = Math.min(Math.max(0, request.time), Math.max(0, projectDuration(p) - 1));
+  const png = request.options.format === 'png';
+  const blob = await renderStill(p, time, width, height, EXPORT_BACKEND, (bitmap) =>
+    encodeFrameImage(bitmap, request.options.format, request.options.quality),
+  );
+  return {
+    type: 'capture-image',
+    image: {
+      blob,
+      mimeType: png ? 'image/png' : 'image/jpeg',
+      extension: png ? 'png' : 'jpg',
+      width,
+      height,
+    },
+  };
 }
 
 /**
@@ -896,6 +992,10 @@ async function handle(
       return { type: 'ok' };
     case 'capture':
       return capture(request);
+    case 'export-audio':
+      return startAudioExport(request);
+    case 'capture-image':
+      return captureImage(request);
     case 'filter-previews':
       return inLooksQueue(() => filterPreviews(request));
     case 'transition-preview':

@@ -59,6 +59,10 @@ class CrashingStore implements FileStore {
     if (this.crashed) throw new Error('crashed');
     return this.inner.copyIn(path, blob);
   }
+  async appendBlob(path: string, blob: Blob) {
+    if (this.crashed) throw new Error('crashed');
+    return this.inner.appendBlob(path, blob);
+  }
   async remove(path: string) {
     if (this.crashed) throw new Error('crashed');
     return this.inner.remove(path);
@@ -398,4 +402,22 @@ describe('crash recovery (property test)', () => {
       { numRuns: runs() },
     );
   }, 300_000);
+
+  it('streams a recording into media piece by piece', async () => {
+    const files = new MemoryFileStore();
+    const storage = createProjectStorageOn(files);
+    const rec = storage.recordMedia('cam1');
+    await rec.append(new Blob(['abc']));
+    void rec.append(new Blob(['def']));
+    await rec.append(new Blob(['gh']));
+    expect(rec.bytes).toBe(8);
+    const { file, source } = await rec.finish();
+    expect(source).toEqual({ type: 'opfs', key: 'cam1' });
+    expect(await file.text()).toBe('abcdefgh');
+    const again = storage.recordMedia('cam2');
+    await again.append(new Blob(['x']));
+    await again.discard();
+    expect(await files.read('media/cam2')).toBeNull();
+    await expect(storage.recordMedia('cam3').finish()).rejects.toThrow('Nothing was recorded');
+  });
 });

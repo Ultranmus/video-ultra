@@ -18,6 +18,18 @@ export interface ExportOptions {
   height: ExportHeight;
   fps: 24 | 30 | 60;
   quality: 'low' | 'medium' | 'high';
+  /**
+   * Export only this part of the timeline (flicks, `start` inclusive, `end` exclusive). Omitted:
+   * the whole video. Clamped to the video's length; transitions, animations and sound at the
+   * edges are exactly what plays at those times.
+   */
+  range?: ExportRange;
+}
+
+/** A part of the timeline, in flicks: from `start` up to (not including) `end`. */
+export interface ExportRange {
+  start: Time;
+  end: Time;
 }
 
 /** Export progress, reported about 4 times a second. */
@@ -53,6 +65,127 @@ export interface ExportResult {
   elapsedSeconds: number;
   /** Things the user should know (e.g. no Opus encoder → video without sound). */
   warnings: string[];
+}
+
+/** Sound-only export formats: AAC in `.m4a`, Opus in `.ogg`, or uncompressed 16-bit `.wav`. */
+export type AudioExportFormat = 'm4a' | 'ogg' | 'wav';
+
+/** What to export when exporting only the sound (the same mix as a video export). */
+export interface AudioExportOptions {
+  format: AudioExportFormat;
+  /** Sets the bitrate of AAC / Opus (96 / 128 / 192 kb/s); WAV is always lossless. */
+  quality: ExportOptions['quality'];
+  /** Export only this part of the timeline; omitted = the whole video. */
+  range?: ExportRange;
+}
+
+/** A finished sound-only export (48 kHz stereo). */
+export interface AudioExportResult {
+  /** The sound file (OPFS-backed like video exports, or in memory as a fallback). */
+  blob: Blob;
+  mimeType: string;
+  extension: AudioExportFormat;
+  /** `aac`, `opus` or `pcm-s16`. */
+  codec: string;
+  sampleRate: number;
+  channels: number;
+  durationSeconds: number;
+  storage: 'opfs' | 'memory';
+  /** Wall time of the export, seconds. */
+  elapsedSeconds: number;
+  warnings: string[];
+}
+
+/** Still-image formats for saving a frame. */
+export type FrameImageFormat = 'png' | 'jpeg';
+
+/** Options for saving one frame of the video as a picture. */
+export interface FrameImageOptions {
+  format: FrameImageFormat;
+  /** JPEG quality 0…1 (default 0.92). Ignored for PNG. */
+  quality?: number;
+  /**
+   * The picture's shorter side in pixels; omitted = the project's own size (its canvas, e.g.
+   * 1080 × 1920). The longer side follows the project's aspect ratio.
+   */
+  height?: number;
+}
+
+/** One frame saved as a picture, drawn by the same compositor as the export. */
+export interface FrameImage {
+  blob: Blob;
+  mimeType: string;
+  extension: 'png' | 'jpg';
+  width: number;
+  height: number;
+}
+
+/** A ready-made export setting for a common destination. */
+export interface ExportPreset {
+  /** Stable id: `vertical`, `widescreen` or `square`. */
+  id: 'vertical' | 'widescreen' | 'square';
+  /** The frame shape it is made for (`9:16`, `16:9`, `1:1`) as a canvas size. */
+  aspect: { width: number; height: number };
+  /** Shorter side in pixels. */
+  height: ExportHeight;
+  /** Frame rate; `null` keeps the project's own (24, 30 or 60). */
+  fps: ExportOptions['fps'] | null;
+  format: ExportOptions['format'];
+  quality: ExportOptions['quality'];
+}
+
+/**
+ * Ready-made export settings: vertical 9:16, widescreen 16:9 and square 1:1, all 1080p MP4. A
+ * preset doesn't reshape the picture: when the project's frame shape differs, the editor offers
+ * to change the canvas (an undoable edit) and otherwise exports the project's own shape.
+ */
+export const EXPORT_PRESETS: readonly ExportPreset[] = Object.freeze([
+  {
+    id: 'vertical',
+    aspect: { width: 1080, height: 1920 },
+    height: 1080,
+    fps: 30,
+    format: 'mp4',
+    quality: 'medium',
+  },
+  {
+    id: 'widescreen',
+    aspect: { width: 1920, height: 1080 },
+    height: 1080,
+    fps: null,
+    format: 'mp4',
+    quality: 'medium',
+  },
+  {
+    id: 'square',
+    aspect: { width: 1080, height: 1080 },
+    height: 1080,
+    fps: 30,
+    format: 'mp4',
+    quality: 'medium',
+  },
+]);
+
+/** True when a project of `width × height` already has the preset's frame shape (within 1%). */
+export function presetFits(preset: ExportPreset, width: number, height: number): boolean {
+  return (
+    Math.abs(preset.aspect.width / preset.aspect.height - width / height) < 0.01 * (width / height)
+  );
+}
+
+/**
+ * The part of a `duration`-long timeline an export covers: `range` clamped to the timeline, or
+ * all of it. Returns `null` when the range is empty after clamping.
+ */
+export function resolveExportRange(
+  range: ExportRange | undefined | null,
+  duration: Time,
+): ExportRange | null {
+  if (duration <= 0) return null;
+  if (!range) return { start: 0, end: duration };
+  const start = Math.max(0, Math.min(Math.round(range.start), duration));
+  const end = Math.max(0, Math.min(Math.round(range.end), duration));
+  return end > start ? { start, end } : null;
 }
 
 /** Export audio is always 48 kHz stereo (DECISIONS #29). */

@@ -2,7 +2,15 @@ import type { DeviceTier } from '../capabilities';
 import type { ItemAnimation, Project, Transition } from '../model/schema';
 import type { BackendChoice } from '../lab/protocol';
 import type { RenderBackend } from '../render/types';
-import type { ExportOptions, ExportProgress, ExportResult } from './export-plan';
+import type {
+  AudioExportOptions,
+  AudioExportResult,
+  ExportOptions,
+  ExportProgress,
+  ExportResult,
+  FrameImage,
+  FrameImageOptions,
+} from './export-plan';
 
 /** Messages between the main thread (engine client) and the engine worker. Not public API. */
 
@@ -80,6 +88,10 @@ export type EngineRequest =
   | { type: 'crash-for-test' }
   | { type: 'export'; jobId: number; options: ExportOptions; backend?: RenderBackend }
   | { type: 'export-cancel'; jobId: number }
+  /** Sound only (cancelled with `export-cancel` like a video export). */
+  | { type: 'export-audio'; jobId: number; options: AudioExportOptions }
+  /** One frame as a PNG / JPEG file, drawn like the export. */
+  | { type: 'capture-image'; time: number; options: FrameImageOptions }
   | {
       type: 'capture';
       time: number;
@@ -127,6 +139,12 @@ export type EngineResponseData =
   | { type: 'stats'; stats: EngineStats }
   | { type: 'export'; result: ExportResult; stats: ExportRunInfo }
   | { type: 'capture'; bitmap: ImageBitmap; backend: RenderBackend }
+  | {
+      type: 'export-audio';
+      result: AudioExportResult;
+      stats: { audioMs: number; audioDelaySamples: number };
+    }
+  | { type: 'capture-image'; image: FrameImage }
   | { type: 'filter-previews'; bitmaps: ImageBitmap[] }
   | { type: 'transition-preview'; bitmaps: ImageBitmap[] }
   | { type: 'item-preview'; bitmaps: ImageBitmap[] };

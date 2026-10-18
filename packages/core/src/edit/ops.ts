@@ -729,6 +729,23 @@ export function setCanvasSize(project: Project, width: number, height: number): 
   project.settings.height = h - (h % 2);
 }
 
+/**
+ * Sets (or clears, with `null`) the part of the timeline to export — the in / out points. Times
+ * are rounded to whole flicks; the range must not be empty. It isn't clamped to the video's
+ * length here (edits may shorten the video later); exports clamp it.
+ */
+export function setExportRange(project: Project, range: { start: Time; end: Time } | null): void {
+  if (!range) {
+    delete project.settings.exportRange;
+    return;
+  }
+  const start = Math.max(0, Math.round(range.start));
+  const end = Math.round(range.end);
+  if (!(end > start))
+    throw new EditError('invalid', 'The end of the part to export must come after its start');
+  project.settings.exportRange = { start, end };
+}
+
 /** Sets what shows behind the main track (colour or blurred video). */
 export function setBackground(project: Project, background: Background): void {
   project.settings.background = copy(background);

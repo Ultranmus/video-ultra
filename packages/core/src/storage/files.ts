@@ -16,6 +16,11 @@ export interface FileStore {
    * file is removed and the error is re-thrown (abort → `AbortError`).
    */
   copyIn(path: string, blob: Blob, signal?: AbortSignal): Promise<void>;
+  /**
+   * Appends `blob` to the end of the file (creating it), streamed in chunks. A failed append
+   * leaves the file as it was before it.
+   */
+  appendBlob(path: string, blob: Blob): Promise<void>;
   /** Removes a file or a whole folder. Missing paths are fine. */
   remove(path: string): Promise<void>;
   /** Names directly inside `dir` (files and folders); `[]` if it doesn't exist. */
@@ -93,6 +98,17 @@ export class MemoryFileStore implements FileStore {
     if (signal?.aborted) throw abortError();
     // A File from an input is disk-backed already; keeping the reference costs no memory.
     this.files.set(normalize(path), { parts: [blob], lastModified: this.touch() });
+  }
+
+  async appendBlob(path: string, blob: Blob): Promise<void> {
+    const key = normalize(path);
+    const file = this.files.get(key);
+    if (file) {
+      file.parts.push(blob);
+      file.lastModified = this.touch();
+    } else {
+      this.files.set(key, { parts: [blob], lastModified: this.touch() });
+    }
   }
 
   async remove(path: string): Promise<void> {
