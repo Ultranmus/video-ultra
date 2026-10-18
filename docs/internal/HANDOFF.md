@@ -2,6 +2,16 @@
 
 Where the last session stopped and what comes next. Update before ending every session.
 
+## 2026-10-19 (v0.1 fix pass — release on hold)
+
+Owner put the release on hold: fix v0.1, then plan v0.2. Fix pass F1–F9 done (PLAN.md):
+one tab owns a project (Web Lock, read-only second tab), crashed-engine screen, explicit export
+bitrates + VP8 on Firefox + stale export tidy, orphaned-media sweep, no startup long tasks
+(AudioContext moved to a quiet moment — PERF.md), sound crossfades under transitions, UI polish
+(toolbar fades, ruler fade, device-drawable emoji, voiceover mute), stage view zoom.
+Next: plan v0.2 with the owner (draft roadmap in PLAN.md), one question at a time. Still needs the
+owner: real iPhone / Android checkpoint (https: `pnpm --filter playground dev:https`).
+
 ## 2026-10-19 (mobile pass)
 
 Done from the owner's mobile list: device frames in the playground, one draggable bottom sheet,

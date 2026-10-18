@@ -231,3 +231,16 @@ OPFS recovery, WebCodecs first, ranged reads.
 - Focus tooltips only after keyboard use (no tooltip after a tap).
 - Checks: verify (390 + 11), interaction × 3 browsers, axe 0, composite golden, recovery,
   ui-review; probes for drag-to-close and text filters (WebKit, iPhone size).
+
+## 2026-10-19 · v0.1 fix pass (F1–F9)
+
+- F1 Web Lock per project; second tab read-only with "Use it here" (tested with two tabs).
+- F2 Engine `onFatal` → "The editor stopped" screen with Reload (covered in editor-interact).
+- F3 `exportBitrate()` / `exportAudioBitrate()`: same size in every browser (5.4–5.5 MB vs 2.9–13.4);
+  stale export files removed at startup. F4 VP8 for WebM on Firefox (2.6× vs 0.70× real time).
+- F5 `storage.sweepMedia()` for media no project uses (tested).
+- F6 Capability probe split into tasks; first AudioContext moved to a quiet moment (PERF.md).
+- F7 Equal-power audio crossfade under transitions (`audio/spans.ts`, tested; export ±1 ms).
+- F8 Toolbar edge fades, ruler label fade, emoji filtered to the device's font, voiceover mute.
+- F9 Stage view zoom (pinch, Ctrl/⌘ + wheel, pan, Fit), exact editing while zoomed.
+- Checks: verify (395 + 11), interaction × 3 (+ crash step), export-check × 3, axe 0, recovery.
