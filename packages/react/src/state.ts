@@ -68,6 +68,8 @@ export interface UiState {
   readOnly: boolean;
   persistent: boolean | null;
   recording: boolean;
+  /** The camera recorder covers the editor (v0.2 D. Capture & export). */
+  cameraOpen: boolean;
 }
 
 export function createUiStore() {
@@ -90,6 +92,7 @@ export function createUiStore() {
     readOnly: false,
     persistent: null,
     recording: false,
+    cameraOpen: false,
   }));
 }
 

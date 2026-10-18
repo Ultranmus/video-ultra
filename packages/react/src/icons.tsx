@@ -64,6 +64,14 @@ const paths = {
   alignLeft: 'M4 6h16M4 10h10M4 14h16M4 18h10',
   alignCenter: 'M4 6h16M7 10h10M4 14h16M7 18h10',
   alignRight: 'M4 6h16M10 10h10M4 14h16M10 18h10',
+  // v0.2 D. Capture & export
+  camera:
+    'M3 8.5A2.5 2.5 0 015.5 6h1.8l1.5-2h6.4l1.5 2h1.8A2.5 2.5 0 0121 8.5v9a2.5 2.5 0 01-2.5 2.5h-13A2.5 2.5 0 013 17.5zM12 16.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7z',
+  switchCamera:
+    'M4.5 12a7.5 7.5 0 0113-5.1M19.5 4v4.5H15M19.5 12a7.5 7.5 0 01-13 5.1M4.5 20v-4.5H9',
+  micOff:
+    'M15 10.5V6.5a3 3 0 00-5.6-1.5M9 9v3a3 3 0 004.6 2.5M6 11.5a6 6 0 009.5 4.9M18 11.5a6 6 0 01-.6 2.6M12 17.5V21M4 4l16 16',
+  range: 'M6 5v14M18 5v14M6 12h12M3 5h6M3 19h6M15 5h6M15 19h6',
 } as const;
 
 /** Name of an editor icon. */

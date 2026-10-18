@@ -1813,6 +1813,7 @@ export class TimelineView {
     const m = this.#m;
     ctx.fillStyle = c.bg;
     ctx.fillRect(0, 0, this.#width, m.ruler);
+    this.#drawExportRange(scale);
     // Labels under the playhead's capsule are skipped (no text on text).
     const ph = timeToX(scale, this.#ctl.playhead.time);
     const major = majorTickSeconds(scale.pps);
@@ -1846,6 +1847,33 @@ export class TimelineView {
       }
     }
     ctx.stroke();
+  }
+
+  /**
+   * The part to export (in / out points, keys I / O): a soft band on the ruler with a bracket at
+   * each end, so it's clear what an export will cover (v0.2 D. Capture & export).
+   */
+  #drawExportRange(scale: TimeScale): void {
+    const range = this.#ctl.project.settings.exportRange;
+    if (!range) return;
+    const ctx = this.#ctx;
+    const m = this.#m;
+    const x0 = Math.max(m.header, Math.round(timeToX(scale, range.start)));
+    const x1 = Math.min(this.#width, Math.round(timeToX(scale, range.end)));
+    if (x1 <= x0) return;
+    ctx.fillStyle = this.#c.accentSoft;
+    ctx.fillRect(x0, 0, x1 - x0, m.ruler);
+    ctx.fillStyle = this.#c.selection;
+    for (const [x, dir] of [
+      [Math.round(timeToX(scale, range.start)), 1],
+      [Math.round(timeToX(scale, range.end)), -1],
+    ] as const) {
+      if (x < m.header - 1 || x > this.#width + 1) continue;
+      const edge = dir === 1 ? x : x - 2;
+      ctx.fillRect(edge, 0, 2, m.ruler);
+      ctx.fillRect(dir === 1 ? x : x - 6, 0, 6, 2);
+      ctx.fillRect(dir === 1 ? x : x - 6, m.ruler - 2, 6, 2);
+    }
   }
 
   /** The playhead spine: a 2 px accent line through every lane with a timecode capsule. */

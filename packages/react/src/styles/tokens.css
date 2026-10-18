@@ -192,6 +192,16 @@
     --vu-size-export-go: 48px;
     --vu-size-export-check: 64px;
     --vu-text-emoji: 24px;
+    /* v0.2 D. Capture & export */
+    --vu-size-record: 68px;
+    --vu-size-record-mark: 52px;
+    --vu-size-record-stop: 24px;
+    --vu-size-record-ring: 4px;
+    --vu-size-camera-dot: 8px;
+    --vu-size-range-track: 6px;
+    --vu-size-range-thumb: 20px;
+    --vu-camera-bg: var(--vu-stage-canvas);
+    --vu-record: var(--vu-danger);
 
     /* Layers */
     --vu-z-overlay: 10;
