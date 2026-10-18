@@ -133,7 +133,7 @@ From the public feature lists of three browser editors (one commercial embeddabl
 apps). Features only; no code, assets or names come into this repo. Grouped by our order:
 InShot-simple first, Canva second, pro third. Effort: S / M / L for our worker-based engine.
 
-**v0.2 — everyday creator (CONFIRMED by owner 2026-10-19: all four groups + auto-captions)**
+**v0.2 — everyday creator (CONFIRMED by owner 2026-10-19: all four groups + auto-captions) — BUILT 2026-10-19, waiting on the owner's one test of the whole release**
 
 Order (owner, 2026-10-19, DECISIONS #116): layers & organising first (shared plumbing), then
 captions, sound, picture, capture & export. Built as one stretch with no stops; the owner tests
@@ -155,38 +155,38 @@ _E. Layers & organising_ (as in image-ultra, DECISIONS #116)
 
 _A. Captions & text_ (DECISIONS #115)
 
-- [ ] A0 Spike (≈1 day): speech models on real files — desktop Chrome/Safari, iPhone, mid and
+- [x] A0 Spike (≈1 day): speech models on real files — desktop Chrome/Safari, iPhone, mid and
       budget Android; speed, peak memory, accuracy (incl. Hindi). Record in PERF.md; pick models
       and gating thresholds from the numbers.
-- [ ] A1 Caption track in the project (file version 3 + migration), SRT / VTT import + export
-- [ ] A2 Caption editing: lane blocks, list view, split / merge / retime, type captions by hand
-- [ ] A3 Caption style presets + position; burn-in on export; `.srt` sidecar
-- [ ] A4 Transcriber interface (audio in → timed words out; progress, cancel); host plug-in
-- [ ] A5 `@video-ultra/captions` (optional package): lazy on-device model in a worker, WebGPU
+- [x] A1 Caption track in the project (file version 3 + migration), SRT / VTT import + export
+- [x] A2 Caption editing: lane blocks, list view, split / merge / retime, type captions by hand
+- [x] A3 Caption style presets + position; burn-in on export; `.srt` sidecar
+- [x] A4 Transcriber interface (audio in → timed words out; progress, cancel); host plug-in
+- [x] A5 `@video-ultra/captions` (optional package): lazy on-device model in a worker, WebGPU
       first, single-thread WASM fallback, chunked 16 kHz mono streaming, OPFS model cache,
       device gating (off on low tier unless the host gives a transcriber)
-- [ ] A6 Karaoke: word-by-word / letter-by-letter highlight and reveal (uses the word timings)
+- [x] A6 Karaoke: word-by-word / letter-by-letter highlight and reveal (uses the word timings)
 
 _B. Sound_
 
-- [ ] B1 Ducking: music dips under voice / video speech (sidechain in the mixer, smooth attack /
+- [x] B1 Ducking: music dips under voice / video speech (sidechain in the mixer, smooth attack /
       release, per-lane toggle)
-- [ ] B2 Music & sound-effects library slot: an asset-source interface the host fills (search,
+- [x] B2 Music & sound-effects library slot: an asset-source interface the host fills (search,
       categories, preview, licence line); a small built-in CC0 starter set if one is clearly licensed
-- [ ] B3 Export audio only (AAC / Opus / WAV)
+- [x] B3 Export audio only (AAC / Opus / WAV)
 
 _C. Picture tools_ (one shader each, WGSL → GLSL, golden frames on both backends)
 
-- [ ] C1 Green screen (chroma key: pick colour, tolerance, edge softness, spill)
-- [ ] C2 LUT import (`.cube` 3D LUTs as looks, with intensity)
-- [ ] C3 Blur / pixelate a region (rectangle or ellipse, movable on the stage)
-- [ ] C4 Blend modes for layers (normal, multiply, screen, overlay, soft light, add, …)
+- [x] C1 Green screen (chroma key: pick colour, tolerance, edge softness, spill)
+- [x] C2 LUT import (`.cube` 3D LUTs as looks, with intensity)
+- [x] C3 Blur / pixelate a region (rectangle or ellipse, movable on the stage)
+- [x] C4 Blend modes for layers (normal, multiply, screen, overlay, soft light, add, …)
 
 _D. Capture & export_
 
-- [ ] D1 Record from the camera inside the editor (front / back, into a lane or the main track)
-- [ ] D2 Save the current frame as an image (PNG / JPEG)
-- [ ] D3 Export a range (in / out points) and social presets (Reels / Shorts / TikTok 9:16 1080p,
+- [x] D1 Record from the camera inside the editor (front / back, into a lane or the main track)
+- [x] D2 Save the current frame as an image (PNG / JPEG)
+- [x] D3 Export a range (in / out points) and social presets (Reels / Shorts / TikTok 9:16 1080p,
       YouTube 16:9, square)
 
 **v0.3 — Canva tier**

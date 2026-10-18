@@ -2,6 +2,40 @@
 
 Where the last session stopped and what comes next. Update before ending every session.
 
+## 2026-10-19 (v0.2 built — owner's one test of the whole release is next)
+
+All of v0.2 is built and verified on main: A captions, B sound, C picture tools, D capture &
+export, E layers & organising (PLAN.md, DECISIONS #116–128, PROGRESS.md). Not pushed: pushing
+to origin waits for the owner's word in this conversation.
+
+**Checks on main, all passing:** unit tests (core 449 incl. property tests with every new op,
+captions 3, react 18); organize-check, picture-check, camera-check, audio-check, captions-check
+(incl. the real on-device model, English + Hindi), composite-check (golden frames, both GPU
+backends, 3 browsers), export-check --picture (ffprobe / decode-verified), a11y-check dark +
+light (0 violations), editor-interact (Chrome, WebKit, Firefox), editor-recovery, storage-check,
+ui-review (no page errors); lint, format, shaders, typecheck.
+
+**Owner's test (desktop first, then iPhone, then Android) — `pnpm --filter playground dev`
+(phones: `dev:https`), open `/editor`:**
+
+1. Layers: add 2 texts + a sticker; Shift-click two, ⌘G group, drag them; lock (⇧⌘L) and try to
+   move; History (🕘) jump to Original and back; Layers panel (▤): hide, rename, drag to
+   restack; right-click / long-press for the menu; Arrange → align.
+2. Captions: Captions → English → Make captions on a clip with speech (first time downloads
+   ~41–77 MB); try every style and highlight; edit a line; drag a caption; download .srt;
+   import an .srt. Hindi: needs a computer with WebGPU (~300 MB once). **On the iPhone / Android:
+   how long it takes and whether the tab survives (memory)** — the main unknown.
+3. Sound: add music, turn on "Lower under voice" — it should dip when the video talks; the
+   Audio panel's demo library (search, ▶ preview, + Add).
+4. Picture tools: green screen + Pick from video on a green-screen clip; import a .cube LUT;
+   Blur panel → blur / pixelate a box; blend modes on a layer.
+5. Capture & export: Record with camera (front / back on the phone) → Add to video; Export →
+   Part (I / O), a preset, Sound only (M4A / Ogg / WAV), Picture (PNG / JPEG); play each file.
+6. The four phone fixes from the last report: timeline "+", its hint, the solid tab bar, tools
+   swapping in the open sheet.
+
+Results / screenshots to `~/Desktop/iphone test result/`.
+
 ## 2026-10-19 (v0.1 fix pass — release on hold)
 
 Owner put the release on hold: fix v0.1, then plan v0.2. Fix pass F1–F9 done (PLAN.md):
@@ -93,6 +127,9 @@ node scripts/export-check.ts                    # ffprobe/ffmpeg-verified export
 node scripts/composite-check.ts                 # golden frames, both backends
 node scripts/analyzer-check.ts / storage-check.ts
 node scripts/bench.ts --browsers chrome,webkit,firefox
+node scripts/organize-check.ts / picture-check.ts / camera-check.ts / captions-check.ts [--no-model] [--hindi]
+node scripts/speech-media.ts                    # speech clips with known text (macOS `say`)
+node scripts/captions-bench.ts / captions-memory.ts   # model speed, accuracy, memory
 FC_RUNS=30000 pnpm --filter @video-ultra/core test   # deep property tests
 ```
 

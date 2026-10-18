@@ -380,3 +380,28 @@ Result: long tasks `['3281+116']` (the audio service only), none during startup 
 - **Recording:** JS heap flat (22.3 → 21.1 MB over a 10 s take) — pieces stream to storage.
 - **Exports:** sound only 48–324× real time; a 3 s part exports in 0.5 s (Chrome); video export
   speed unchanged (Chrome MP4 720p 8.15×).
+
+## Captions (v0.2 A0, 2026-10-19, MacBook, Chrome, `scripts/captions-bench.ts` / `captions-memory.ts`)
+
+Speech clips from `scripts/speech-media.ts` (synthetic voices with known text — easier than real
+speech; real recordings are checked on devices). Word error rate (WER) against the known text.
+
+| Model · runtime     | Download | English WER (3 clips + over music) | Speed (× real time) | Hindi                                                         |
+| ------------------- | -------- | ---------------------------------- | ------------------- | ------------------------------------------------------------- |
+| tiny · WebAssembly  | 41 MB    | 3 % / 3 % / 3 %                    | 9.6–10.4            | translated to English (unusable)                              |
+| tiny · WebGPU       | 120 MB   | 2–3 %                              | 7.9–10.1            | unusable                                                      |
+| base · WebAssembly  | 77 MB    | 2–4 %                              | 4.3–4.9             | Urdu script, loops                                            |
+| base · WebGPU       | 206 MB   | 2–4 %                              | 5.8–7.1             | Urdu script                                                   |
+| small · WebGPU      | ~300 MB  | 2 %                                | 2.3                 | Devanagari, good (WER 0.43 counting spelling variants) · 0.8× |
+| small · WebAssembly | 249 MB   | 2 %                                | 0.9                 | same text · 0.9×                                              |
+
+- **Memory (renderer = page + speech worker):** the general ML library peaked at +1.1 GB (tiny)
+  to +2.0 GB (base); our runner settles ~+480 MB with tiny loaded (most of it the encoder's
+  attention over a full 30 s window — fixed cost, not a leak: a 3-minute clip used no more). The
+  worker is closed after each job, so it goes back. Runtime arena / optimisation settings made
+  no real difference (±70 MB).
+- **Through the editor** (captions-check): 30 s of English → 19 captions in 16.6 s including the
+  first-time 77 MB download; 24 s of Hindi → 12 captions in 56.8 s including the ~300 MB download.
+- **Audio for the transcriber:** pulled 10 s at a time from the export mixer at 16 kHz mono —
+  flat memory for any length.
+- Phones still need measuring (owner's devices): expect 2–4× slower than the laptop.

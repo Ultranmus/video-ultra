@@ -553,12 +553,12 @@ reason; when one changes, edit the entry and note the date.
       captions only through a host transcriber; import and typed captions work everywhere.
 116.  **v0.2 adds layers & organising, built first; v0.2 ships as one test** (owner, 2026-10-19).
       Group E — command registry (6.0 pulled forward), History panel, Layers panel, lock (element
-      + lane), multi-select + grouping — as in image-ultra. It comes before captions because it is
-      shared plumbing (one action definition for menus, Layers, shortcuts, a11y; named history
-      steps) and doesn't wait on the speech-model numbers. Video twist: a group moves together in
-      time as well as on the stage. The owner tests all of v0.2 together at the end instead of
-      per-checkpoint; the A0 phone measurements become part of that test, and desktop numbers set
-      conservative device gating until then.
+      - lane), multi-select + grouping — as in image-ultra. It comes before captions because it is
+        shared plumbing (one action definition for menus, Layers, shortcuts, a11y; named history
+        steps) and doesn't wait on the speech-model numbers. Video twist: a group moves together in
+        time as well as on the stage. The owner tests all of v0.2 together at the end instead of
+        per-checkpoint; the A0 phone measurements become part of that test, and desktop numbers set
+        conservative device gating until then.
 117.  **Layers & organising: how it works** (2026-10-19, v0.2 E). File version 3 adds optional
       `locked`, `hidden` and `groupId` on items (no other changes; v1/v2 files migrate as-is).
       **Lock** = selectable, not editable: every edit op refuses a locked item (`editable()`),
@@ -567,7 +567,7 @@ reason; when one changes, edit the entry and note the date.
       tests but listed in Layers. **Groups** are lane items only (main-track clips are a sequence);
       a group of one dissolves (`tidyGroups` after every lane change); a split member keeps both
       halves in the group; picking a member selects the group, double-click picks one member.
-      A group moves together on the stage *and in time* (`shiftItems`: each member keeps its lane
+      A group moves together on the stage _and in time_ (`shiftItems`: each member keeps its lane
       when it fits). **Stacking** is lane order (later lanes draw on top): `arrangeItem` moves the
       element's lane, or the element alone into a new lane when its lane holds others; the main
       video is always at the back; "the stack" is what's on screen at the playhead. **History**
@@ -617,3 +617,37 @@ reason; when one changes, edit the entry and note the date.
       The camera recorder covers the editor (a capture mode): MP4/H.264 preferred, pieces stream
       to storage, limits 10 / 20 / 30 min by tier (5 in memory), camera released during review.
       Editor shortcuts pause while the camera or export dialog is open.
+125.  **Captions are text items on one caption row, with word times and one look** (2026-10-19,
+      v0.2 A1). Track kind `caption` holds text items (so every text style, edit and the engine's
+      text path apply) in time order; each caption may carry `words` (times relative to its
+      start); the row carries `caption` (preset id, highlight mode and colour). Styles, place and
+      size apply to all captions at once (`setCaptionLook`; dragging one moves them all). Text
+      edits keep word times when the words still line up, else time is shared by word length.
+      Split / trim / merge carry words along. SRT / VTT in and out (forgiving reader, strict
+      writer). Captions wrap to a balanced `maxWidth` (86 % of the frame) — a new optional text
+      field the selection box and the engine share. Burned in on export like any text; the
+      subtitle file is a separate download. One caption row in v0.2 (languages: later).
+126.  **Karaoke reuses the engine's two existing text paths** (v0.2 A6). `reveal` / `type`
+      (words / letters appear as said) drive the typewriter reveal mask from the word times — no
+      re-raster. `word` / `box` / `fill` (the word said changes colour, gets a box, or fills
+      letter by letter) re-rasterise the caption once per state (cached per item; fill in
+      half-letter steps). Box text switches to dark on a light box. Right-to-left captions show
+      without the highlight for now (BACKLOG).
+127.  **Our own lean Whisper runner on the ONNX runtime, not a general ML library** (2026-10-19,
+      A0 spike, PERF.md "Captions"). The general library peaked at +1.1–2.0 GB in the tab for a
+      41 MB model (it loads the WebGPU runtime build even for WebAssembly and keeps big
+      transient buffers); a bare runtime session is lean. The runner: our log-mel (mixed-radix
+      FFT, checked against the reference), greedy decoding with the merged decoder's cache and
+      Whisper's suppression rules, a repetition guard, the decoder's full 444-token budget (Hindi
+      needs it), and word times by DTW over the alignment heads' cross-attention. 9.7× real time
+      for tiny vs 7.8× through the library, 3 % vs 5 % word errors. The worker closes after each
+      job (WebAssembly memory never shrinks); model files stay in Cache Storage.
+128.  **Which speech model where** (A0 measurements, supersedes the model guess in #115). English
+      and other well-heard languages: `tiny` on WebAssembly (41 MB, ~10× real time on a laptop,
+      2–3 % word errors incl. over music); `base` (77 MB) when the device reports ≥ 8 GB.
+      WebGPU isn't faster for these (each token round-trips the GPU) and holds more memory.
+      Hindi (and other Indic / Urdu): only `small` writes them properly — tiny translates to
+      English, base writes Urdu script and loops — so they use `small` on WebGPU (~300 MB, about
+      real time on a laptop) and aren't offered on devices without WebGPU unless the host plugs
+      in a transcriber. Under 4 GB / 4 cores: no on-device captions (import / type still work).
+      The speech the model hears leaves out music marked "Lower under voice".

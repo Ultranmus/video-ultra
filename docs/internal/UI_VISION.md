@@ -159,6 +159,19 @@ the stage and everything drawn on it don't mirror. Text items in RTL scripts ren
   Sound only (M4A / Ogg / WAV), Picture (the frame at the playhead, PNG / JPEG). I / O set the
   part from the playhead; the ruler shows it as a band.
 
+## 5d. Captions (v0.2, DECISIONS #125–128)
+
+- A **Captions** rail entry (desktop) / tab-bar tool (phone) opens the Captions panel: Auto
+  captions (spoken language chips — English, Hindi, the browser's language, Detect, "More
+  languages…" — then Make captions; one line says it runs on the device, the one-time download
+  and roughly how long; progress with Stop), Import captions (.srt / .vtt), Add a caption.
+- With captions: Style (preset tiles drawn in their style), Highlight words (Off, Colour, Box,
+  Fill, Word by word, Letter by letter + colour), Position (Top / Middle / Bottom) and Size
+  (S / M / L), the list of all captions (time → seek; edit the text in place; Split, Join with
+  next, Delete on the selected row), Download captions (.srt / .vtt).
+- Timeline: a "Captions" row after text. A selected caption's phone tools: Edit, Style
+  (the panel), Split, Join with next, Delete. Dragging a caption on the stage moves all of them.
+
 ## 6. Gestures
 
 - One finger on the stage: select / move an item. Two fingers: pinch-scale and rotate the

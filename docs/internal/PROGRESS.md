@@ -261,4 +261,26 @@ OPFS recovery, WebCodecs first, ranged reads.
   the sheet (#118).
 - Checks: `scripts/organize-check.ts` 32/32 (Chrome desktop + WebKit phone, axe on Layers and
   the menu); editor-interact 48/48 (Chrome, WebKit, Firefox); a11y-check 0 violations; core
-  402 tests, react 24.
+  402 tests, react 15.
+
+## 2026-10-19 · v0.2 everyday creator — all groups built ✅ (waiting on the owner's one test)
+
+Built in one stretch (owner's request); B, C and D by three helper agents in their own worktrees,
+merged and re-verified on main; A (captions) and E (layers) here.
+
+- **A. Captions:** A0 spike → our own lean Whisper runner on the ONNX runtime (DECISIONS #127),
+  model choice per language and device (#128), `@video-ultra/captions` (optional package,
+  on-device, nothing uploaded). Caption row with word times, SRT / VTT, grouping, 8 style
+  presets, 5 word-highlight modes drawn by the engine, balanced wrapping, Captions panel,
+  timeline row, phone tools, `transcriber` prop (host services welcome). Real speech through the
+  editor: English 19 captions / 16.6 s, Hindi 12 captions / 56.8 s (incl. downloads).
+- **B. Sound:** ducking ("Lower under voice"), music & sounds library slot + synthesised starter
+  sounds, sound-only export (in D).
+- **C. Picture tools:** green screen (pick from video), LUT import, blur / pixelate areas, 9 blend
+  modes — one shader on both backends.
+- **D. Capture & export:** camera recorder, save frame as PNG / JPEG, export a part (I / O),
+  presets, sound-only export (M4A / Ogg / WAV).
+- **E. Layers & organising:** command registry, History, Layers panel, lock, hide, groups,
+  arrange / align, context menu.
+- Owner's phone report fixed on the way (#118, #119).
+- Checks on main: see HANDOFF for the full list and results.
