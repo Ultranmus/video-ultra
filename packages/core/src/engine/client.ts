@@ -181,12 +181,15 @@ export async function createEngine(
   // MessagePort. Created on the first play() — browsers (iOS Safari especially) only allow audio to
   // start inside a user gesture, so the context is created and resumed synchronously there.
   let audio: { context: AudioContext; ready: Promise<void> } | null = null;
+  // Set by destroy(): late idle callbacks then do nothing (no context created after the end).
+  let destroyed = false;
   // Building the AudioContext and loading the worklet costs ~100 ms of main-thread time in Chrome, so
   // it happens now (while loading, in idle time) instead of inside the user's Play tap. A context
   // created without a gesture starts suspended; play() resumes it inside the tap (cheap), which is
   // what iOS Safari requires.
   const prepareAudio = () => {
-    if (audio || options.audio === false || typeof AudioContext === 'undefined') return;
+    if (destroyed || audio || options.audio === false || typeof AudioContext === 'undefined')
+      return;
     const context = new AudioContext({ latencyHint: 'interactive' });
     const ready = (async () => {
       await context.audioWorklet.addModule(new URL('./audio.worklet.js', import.meta.url));
@@ -202,6 +205,7 @@ export async function createEngine(
         channel.port2,
       ]);
     })().catch((error: unknown) => {
+      if (destroyed) return; // torn down while loading: not a problem worth reporting
       // No sound is better than no playback: keep going on the wall clock.
       handlers.onError?.(
         `Audio unavailable: ${error instanceof Error ? error.message : String(error)}`,
@@ -340,7 +344,10 @@ export async function createEngine(
       return data.bitmaps;
     },
     destroy() {
-      void audio?.context.close();
+      // Safe to call twice (React strict mode, a host re-mounting the editor).
+      if (destroyed) return;
+      destroyed = true;
+      if (audio && audio.context.state !== 'closed') audio.context.close().catch(() => {});
       worker.terminate();
       for (const entry of pending.values()) entry.reject(new Error('Engine destroyed'));
       pending.clear();

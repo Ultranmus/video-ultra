@@ -29,8 +29,13 @@ function Editor() {
   const device: Device = requested && requested in DEVICES ? requested : 'full';
   // The switcher only makes sense on a big screen (on a phone the editor already is the phone).
   const [wide, setWide] = useState(false);
+  const [room, setRoom] = useState(0);
   useEffect(() => {
-    const check = () => setWide(window.innerWidth >= 900);
+    const check = () => {
+      setWide(window.innerWidth >= 900);
+      // Height left for a frame: the window minus the strip and the stage padding.
+      setRoom(window.innerHeight - 37 - 32);
+    };
     check();
     window.addEventListener('resize', check);
     return () => window.removeEventListener('resize', check);
@@ -56,8 +61,11 @@ function Editor() {
   };
   const size = DEVICES[device];
   const framed = wide && device !== 'full';
-  // A device taller than the window scrolls here, at true size: scaling it would change how
-  // the editor measures pointers and its canvas timeline.
+  // A device taller than the window keeps its width (that is what picks the editor's layout) and
+  // gets shorter, so the whole editor — bottom tab bar included — is always on screen. (Scaling
+  // the frame instead would change how the editor measures pointers and its canvas timeline.)
+  const height = room > 0 ? Math.min(size.height, room) : size.height;
+  const trimmed = framed && height < size.height;
 
   const editor = (
     <VideoEditor
@@ -84,11 +92,14 @@ function Editor() {
               {DEVICES[d].label}
             </button>
           ))}
+          {trimmed ? (
+            <span className="pg-devices-note">Shortened to {height}px to fit this window</span>
+          ) : null}
         </div>
       ) : null}
       {framed ? (
         <div className="pg-stage">
-          <div className="pg-frame" style={{ width: size.width, height: size.height }}>
+          <div className="pg-frame" style={{ width: size.width, height }}>
             {editor}
           </div>
         </div>

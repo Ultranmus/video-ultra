@@ -205,3 +205,10 @@ video {
   border-radius: 16px;
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
 }
+
+.pg-devices-note {
+  align-self: center;
+  margin-left: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
