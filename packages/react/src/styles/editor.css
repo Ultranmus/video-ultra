@@ -2213,6 +2213,23 @@
     text-align: center;
   }
 
+  .vu-screen h2 {
+    color: var(--vu-text);
+    font-size: var(--vu-text-xl);
+    font-weight: var(--vu-weight-semibold);
+  }
+
+  .vu-screen p {
+    max-width: var(--vu-size-screen-text);
+  }
+
+  /* The technical reason, small and quiet (useful in a bug report). */
+  .vu-screen-detail {
+    color: var(--vu-text-subtle);
+    font-size: var(--vu-text-xs);
+    font-variant-numeric: tabular-nums;
+  }
+
   .vu-screen {
     height: 100%;
   }

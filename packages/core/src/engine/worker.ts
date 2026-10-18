@@ -877,6 +877,11 @@ async function handle(
       );
       return { type: 'ok' };
     }
+    case 'crash-for-test':
+      setTimeout(() => {
+        throw new Error('Test crash');
+      });
+      return { type: 'ok' };
     case 'stats':
       return {
         type: 'stats',

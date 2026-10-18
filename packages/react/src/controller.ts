@@ -279,6 +279,11 @@ export class EditorController {
       // Audio problems are reported once, not as a blocking error.
       this.toast(this.labels.engineError(message), 'error');
     };
+    engine.onFatal = (message) => {
+      // Keep everything saved, then say plainly what happened and offer a way out.
+      this.ui.setState({ playing: false, status: 'stopped', statusMessage: message });
+      void this.#autosave?.flush();
+    };
     engine.onAudioUnavailable = (reason, detail) => {
       // Not an error the user caused or can fix in the editor: a calm note, once.
       this.toast(

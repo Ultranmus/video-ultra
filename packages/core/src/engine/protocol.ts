@@ -76,6 +76,8 @@ export type EngineRequest =
   | { type: 'play' }
   | { type: 'pause' }
   | { type: 'stats' }
+  /** Checks only: make the worker throw an uncaught error (the fatal-error path). */
+  | { type: 'crash-for-test' }
   | { type: 'export'; jobId: number; options: ExportOptions; backend?: RenderBackend }
   | { type: 'export-cancel'; jobId: number }
   | {

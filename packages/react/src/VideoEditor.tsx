@@ -226,6 +226,25 @@ function Shell({
       </div>
     );
   }
+  if (status === 'stopped') {
+    return (
+      <div className="vu-screen" role="alert">
+        <Icon name="warning" size={32} />
+        <h2>{l.stoppedTitle}</h2>
+        <p>{l.stoppedBody}</p>
+        {message ? <p className="vu-screen-detail">{message}</p> : null}
+        <button
+          type="button"
+          className="vu-btn"
+          data-variant="primary"
+          data-layout="row"
+          onClick={() => location.reload()}
+        >
+          <span>{l.reload}</span>
+        </button>
+      </div>
+    );
+  }
   if (status === 'error') {
     return (
       <div className="vu-screen" role="alert">

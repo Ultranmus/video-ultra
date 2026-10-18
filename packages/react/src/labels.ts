@@ -235,6 +235,10 @@ export const DEFAULT_LABELS = {
   deviceLimit: 'Higher resolutions need a more powerful device.',
   // Status / errors
   loading: 'Loading the editor…',
+  stoppedTitle: 'The editor stopped',
+  stoppedBody:
+    'Something went wrong in the preview, probably the device ran out of memory. Your work is saved — reload to keep editing.',
+  reload: 'Reload',
   unsupportedTitle: "This browser can't edit video",
   unsupportedBody:
     'The editor needs WebCodecs and WebGL2. Use a current version of Chrome, Edge, Safari or Firefox.',

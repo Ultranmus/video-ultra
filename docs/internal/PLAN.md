@@ -105,7 +105,7 @@ Deferred to v0.2+: speed curves, reverse, text animations, templates, keyframes,
 ### v0.1 fix pass (owner, 2026-10-19: release on hold until these are done and v0.2 is planned)
 
 - [x] F1 Two tabs on one project: Web Lock per project; the second tab is read-only with "Use it here"
-- [ ] F2 Fatal engine error → "stopped" screen with Reload (DECISIONS #93)
+- [x] F2 Fatal engine error → "stopped" screen with Reload (DECISIONS #93)
 - [ ] F3 Export: explicit bitrates per resolution × quality; WebKit encoder cancel error; old export files cleaned on startup
 - [ ] F4 Firefox WebM: measure VP8, use it if faster than VP9
 - [ ] F5 Orphaned media sweep

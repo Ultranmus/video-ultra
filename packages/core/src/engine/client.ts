@@ -91,6 +91,12 @@ export interface Engine {
    * silently on the wall clock. Reported once.
    */
   onAudioUnavailable: ((reason: 'insecure' | 'failed', detail: string) => void) | null;
+  /**
+   * The engine stopped for good: its worker threw an uncaught error, ran out of memory or sent
+   * unreadable data. Nothing more will play or export; the host should offer a reload (the
+   * project itself is untouched — autosave runs on the main thread).
+   */
+  onFatal: ((message: string) => void) | null;
   destroy(): void;
 }
 
@@ -103,6 +109,8 @@ export interface EngineInternal extends Engine {
     signal?: AbortSignal,
     backend?: RenderBackend,
   ): Promise<{ result: ExportResult; info: ExportRunInfo }>;
+  /** Checks only: crash the worker (tests the fatal-error path). */
+  crashForTest(): void;
 }
 
 export interface EngineOptions {
@@ -134,6 +142,7 @@ export async function createEngine(
     onEnded: null as Engine['onEnded'],
     onError: null as Engine['onError'],
     onAudioUnavailable: null as Engine['onAudioUnavailable'],
+    onFatal: null as Engine['onFatal'],
   };
 
   worker.onmessage = (event: MessageEvent<EngineMessage>) => {
@@ -154,14 +163,21 @@ export async function createEngine(
       entry.reject(new DOMException(message.error, 'AbortError'));
     else entry.reject(new Error(message.error));
   };
-  worker.onerror = (event) => {
-    const error = new Error(
-      `Engine worker failed: ${event.message || 'could not load the worker script'}`,
-    );
+  let fatal = false;
+  const die = (message: string) => {
+    if (fatal) return;
+    fatal = true;
+    const error = new Error(message);
     for (const entry of pending.values()) entry.reject(error);
     pending.clear();
-    handlers.onError?.(error.message);
+    if (handlers.onFatal) handlers.onFatal(message);
+    else handlers.onError?.(message);
   };
+  worker.onerror = (event) => {
+    event.preventDefault?.();
+    die(`Engine worker failed: ${event.message || 'could not load the worker script'}`);
+  };
+  worker.onmessageerror = () => die('Engine worker sent data that could not be read');
 
   const send = (request: EngineRequest, transfer: Transferable[] = []) =>
     new Promise<EngineResponseData>((resolve, reject) => {
@@ -268,6 +284,9 @@ export async function createEngine(
   }
 
   return Object.assign(handlers, {
+    crashForTest() {
+      void send({ type: 'crash-for-test' }).catch(() => {});
+    },
     backend: init.backend,
     async setProject(project: Project) {
       await send({ type: 'project', project });

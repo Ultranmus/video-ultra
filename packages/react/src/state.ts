@@ -45,7 +45,8 @@ export interface Toast {
 
 /** UI-only state (selection, panels, playback flag). The project lives in the core editor store. */
 export interface UiState {
-  status: 'loading' | 'ready' | 'unsupported' | 'error';
+  /** `stopped`: the engine died mid-session (the project is safe; reload to continue). */
+  status: 'loading' | 'ready' | 'unsupported' | 'error' | 'stopped';
   statusMessage: string | null;
   layout: LayoutMode;
   selectedId: string | null;

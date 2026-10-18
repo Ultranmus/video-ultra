@@ -227,7 +227,7 @@ for (const name of browsers) {
   await page.keyboard.press('Escape');
   await page
     .locator('.vu-modal-head .vu-btn')
-    .click()
+    .click({ timeout: 1000 })
     .catch(() => {});
 
   const stats = await page.evaluate(() =>
@@ -236,6 +236,19 @@ for (const name of browsers) {
   const longTasks = await page.evaluate(
     () => (window as unknown as { longTasks: number[] }).longTasks,
   );
+
+  // Last: a crashed engine shows the "stopped" screen with Reload (not a frozen editor).
+  await page.evaluate(() =>
+    (window as unknown as { vuEditor: any }).vuEditor.engine.crashForTest(),
+  );
+  await page.waitForTimeout(800);
+  await check(
+    'engine crash → stopped screen',
+    (await page.locator('.vu-screen', { hasText: 'Reload' }).count()) === 1,
+  );
+  // The test crash itself is expected: don't count it as a page error.
+  for (let i = errors.length - 1; i >= 0; i--)
+    if (errors[i]!.includes('Test crash')) errors.splice(i, 1);
 
   console.log(`\n===== ${name}`);
   console.log(results.join('\n'));

@@ -153,7 +153,7 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [ ] A few emoji draw as boxes where the OS font lacks them (headless Chrome on macOS); the 3D
       tab doesn't have this. Consider hiding emoji the platform can't draw.
 - [ ] Playground `window` test API + URL debug flags (DECISIONS #92). Small; helps phone debugging.
-- [ ] Fatal engine error screen with Reload (DECISIONS #93): catch worker `error` /
+- [x] (done 2026-10-19: engine onFatal → stopped screen; covered by editor-interact) Fatal engine error screen with Reload (DECISIONS #93): catch worker `error` /
       `messageerror` / OOM, show the message, keep the autosave intact.
 - [ ] v0.3 references to build against (specs, not code): loudness to EBU R128 / ITU-R BS.1770
       (integrated + true peak; "normalize audio" and an export loudness target such as −14 LUFS);
