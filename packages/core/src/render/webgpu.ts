@@ -166,7 +166,6 @@ export async function createWebGPURenderer(
     planBounds = new Int32Array(size * 4);
     planSmall = new Int32Array(size * 2);
   };
-  const bounds = new Int32Array(4);
   const small = new Int32Array(2);
   const downGeometry = new Float32Array(12);
   const regionFx = new Float32Array(EFFECT_FLOATS);

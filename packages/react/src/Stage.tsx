@@ -237,7 +237,15 @@ export function Stage(): ReactElement {
     el.toggleAttribute('data-locked', locked);
     el.toggleAttribute('data-group', entries.length > 1);
     // A blurred area also stretches from its sides.
-    el.toggleAttribute('data-sides', entries.length === 1 && entries[0]!.item.kind === 'region');
+    // A blurred area also stretches from its sides — when it's big enough on screen that the
+    // side handles don't crowd the corners.
+    const only = entries.length === 1 ? entries[0]! : null;
+    el.toggleAttribute(
+      'data-sides',
+      !!only &&
+        only.item.kind === 'region' &&
+        Math.min(only.box.width, only.box.height) * scale * view.current.z > 88,
+    );
     // A little air around the item so handles never sit on top of small text or stickers.
     const pad = 6;
     const box: Box =
