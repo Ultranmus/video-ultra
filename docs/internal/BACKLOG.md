@@ -119,7 +119,7 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       larger than the preview; scale the tap distance with the on-screen size if users notice.
 - [ ] Blur transition uses a 13-tap disc on the full-size frame: at full strength rings can show
       on high-contrast edges. Use the backdrop's downscale path if it looks bad on real footage.
-- [ ] Transitions are not crossfaded in audio.
+- [x] (fixed 2026-10-19, #113) Transitions are not crossfaded in audio.
 - [ ] Image stickers that are animated GIFs show the first frame only.
 - [ ] WebKit (Playwright) logs `AudioEncoder encode failed: InternalAudioEncoderCocoa encoding failed` during `scripts/export-check.ts` (around the cancel step) — the check passes; make
       cancel close the encoder without an unhandled error.

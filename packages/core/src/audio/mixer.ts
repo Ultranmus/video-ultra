@@ -1,8 +1,17 @@
 import { AudioSampleSink, type AudioSample, type InputAudioTrack } from 'mediabunny';
-import { itemEnd } from '../model/project';
 import type { Item, Project } from '../model/schema';
 import { FLICKS_PER_SECOND, type Time } from '../model/time';
 import { gainAt, limit, mixInto, Resampler } from './dsp';
+import { audioSpan, spanGain, type AudioSpan } from './spans';
+
+const EMPTY_SPAN: AudioSpan = {
+  start: 0,
+  end: 0,
+  fadeInFrom: 0,
+  fadeInTo: 0,
+  fadeOutFrom: 0,
+  fadeOutTo: 0,
+};
 
 /**
  * The mixer: renders the project's sound for a time range into stereo buffers at the output rate.
@@ -200,21 +209,27 @@ export class Mixer {
     const used = new Set<string>();
     for (const track of project.tracks) {
       if (track.muted) continue;
-      for (const item of track.items) {
-        if (item.start >= blockEnd) break;
-        if (itemEnd(item) <= start) continue;
+      for (let index = 0; index < track.items.length; index++) {
+        const item = track.items[index]!;
         if (item.kind !== 'video' && item.kind !== 'audio') continue;
         if (item.muted || item.volume === 0) continue;
+        // A transition crossfades the sound too: the span may reach past the item's own edges.
+        // Spans come from a per-item pool (no allocation per block once warm).
+        let span = this.spans.get(item.id);
+        if (!span) this.spans.set(item.id, (span = { ...EMPTY_SPAN }));
+        audioSpan(track, index, project.assets[item.assetId]?.duration ?? 0, span);
+        if (span.start >= blockEnd || span.end <= start) continue;
         const source = this.audioOf(item.assetId);
         if (!source) continue;
         used.add(item.id);
-        jobs.push(this.renderItem(item, source, start, frames, outL, outR));
+        jobs.push(this.renderItem(item, span, source, start, frames, outL, outR));
       }
     }
     // Clips render one after another into shared temp buffers (they're short and mostly I/O-bound).
     for (const job of jobs) await job;
     limit(outL, frames);
     limit(outR, frames);
+    for (const id of this.spans.keys()) if (!used.has(id)) this.spans.delete(id);
     for (const [id, reader] of this.readers) {
       if (used.has(id)) continue;
       reader.dispose();
@@ -223,9 +238,11 @@ export class Mixer {
   }
 
   private renderJobChain: Promise<void> = Promise.resolve();
+  private readonly spans = new Map<string, AudioSpan>();
 
   private renderItem(
     item: AudibleItem,
+    span: AudioSpan,
     source: AudioTrackSource,
     start: Time,
     frames: number,
@@ -236,8 +253,8 @@ export class Mixer {
     this.renderJobChain = this.renderJobChain.then(async () => {
       const rate = this.sampleRate;
       const toFrames = (t: Time) => Math.round((t / FLICKS_PER_SECOND) * rate);
-      const first = Math.max(0, toFrames(item.start - start));
-      const last = Math.min(frames, toFrames(itemEnd(item) - start));
+      const first = Math.max(0, toFrames(span.start - start));
+      const last = Math.min(frames, toFrames(span.end - start));
       const count = last - first;
       if (count <= 0) return;
       const timeAtFirst = start + Math.round((first / rate) * FLICKS_PER_SECOND);
@@ -252,8 +269,14 @@ export class Mixer {
       const duration = item.duration / FLICKS_PER_SECOND;
       const fadeIn = item.fadeIn / FLICKS_PER_SECOND;
       const fadeOut = item.fadeOut / FLICKS_PER_SECOND;
-      const g0 = gainAt(local, duration, item.volume, fadeIn, fadeOut);
-      const g1 = gainAt(local + count / rate, duration, item.volume, fadeIn, fadeOut);
+      // The clip's own volume and fades (inside its edges) × the transition crossfade.
+      const clamp = (x: number) => Math.min(duration, Math.max(0, x));
+      const timeAtLast = timeAtFirst + Math.round((count / rate) * FLICKS_PER_SECOND);
+      const g0 =
+        gainAt(clamp(local), duration, item.volume, fadeIn, fadeOut) * spanGain(span, timeAtFirst);
+      const g1 =
+        gainAt(clamp(local + count / rate), duration, item.volume, fadeIn, fadeOut) *
+        spanGain(span, timeAtLast);
       mixInto(outL, first, this.tempL, 0, count, g0, g1);
       mixInto(outR, first, this.tempR, 0, count, g0, g1);
     });

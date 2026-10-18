@@ -306,12 +306,25 @@ for (const name of browsers) {
           Number(m[1]),
         );
         const cut = starts.find((s) => s > 13 && s < 15);
+        // The 14 s cut has a 0.5 s cube transition, and sound crossfades with it (DECISIONS #113):
+        // the outgoing clip's tone runs 0.25 s past the cut, fading out on a cosine from 13.75 s.
+        // silencedetect fires when the faded tone drops below −50 dB, so the exact expected time
+        // follows from the tone's peak level just before the fade — still a millisecond-level
+        // lip-sync check.
+        const stats = spawnSync(
+          'ffmpeg',
+          ['-v', 'info', '-i', file, '-af', 'atrim=13.3:13.7,astats=metadata=0', '-f', 'null', '-'],
+          { encoding: 'utf8' },
+        );
+        const peakDb = Number(/Peak level dB:\s*(-?[\d.]+)/.exec(stats.stderr)?.[1] ?? 'NaN');
+        const g = 10 ** (-50 / 20) / 10 ** (peakDb / 20);
+        const expected = 13.75 + ((Math.acos(Math.min(1, g)) * 2) / Math.PI) * 0.5;
         // MP4 must be exact; WebM/Opus timing comes from the browser's encoder timestamps (Playwright
         // WebKit jitters them by ~13 ms) — fail only past the ~40 ms where lip sync shows.
         const limit = format === 'mp4' ? 0.012 : 0.04;
         check(
-          cut !== undefined && Math.abs(cut - 14) < limit,
-          `${format}: sound stops at the 14 s cut at ${cut?.toFixed(3)} s (A/V offset ${cut !== undefined ? ((cut - 14) * 1000).toFixed(1) : '?'} ms; encoder delay ${info.audioDelaySamples} samples compensated)`,
+          cut !== undefined && Number.isFinite(expected) && Math.abs(cut - expected) < limit,
+          `${format}: sound fades out through the 14 s transition and is silent at ${cut?.toFixed(3)} s, expected ${expected.toFixed(3)} s (A/V offset ${cut !== undefined ? ((cut - expected) * 1000).toFixed(1) : '?'} ms; encoder delay ${info.audioDelaySamples} samples compensated)`,
         );
       }
     }

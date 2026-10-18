@@ -528,3 +528,9 @@ reason; when one changes, edit the entry and note the date.
       balanced 0.09, best 0.16; VP9 ×0.8, VP8 ×1.2), audio 96 / 128 / 192 kb/s. The browsers'
       own quality presets gave 2.9 / 3.2 / 13.4 MB for the same 17 s 720p MP4; now 5.4–5.5 MB
       everywhere. The export dialog's size estimate uses the same `exportBitrate()`.
+113.  **Sound crossfades under picture transitions** (2026-10-19). At a cut with a transition the
+      outgoing clip's sound runs on past the cut (as far as its media goes, at most the window's
+      second half) fading out, and the incoming one starts early (as far as its media allows)
+      fading in — equal power (sin / cos). With no spare media a side fades inside its own clip: a
+      dip, never a hard cut. Pure maths in `audio/spans.ts` (tested); preview and export share it.
+      The export check measures the fade's end to the millisecond (A/V offset ≤ 1 ms in MP4).
