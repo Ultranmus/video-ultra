@@ -20,7 +20,7 @@ import { useController, useLabels, useUi } from './context';
 import { Button, IconButton, Section } from './controls';
 import { formatClock } from './format';
 import { Icon, type IconName } from './icons';
-import { itemTitle } from './items';
+import { itemTitle, kindLabel } from './items';
 
 /**
  * Layers & organising (v0.2, DECISIONS #116): the History popover, the Layers panel, the context
@@ -35,6 +35,7 @@ const KIND_ICON: Record<Item['kind'], IconName> = {
   audio: 'audio',
   text: 'text',
   sticker: 'sticker',
+  region: 'blurArea',
 };
 
 /** Re-renders on every project, history or selection change (commands depend on all three). */
@@ -390,7 +391,7 @@ function LayerRow({
           type="button"
           className="vu-layer-main"
           aria-pressed={selected}
-          aria-label={`${l.kindName(item.kind)}: ${shown}${locked ? `, ${l.lockedState}` : ''}${hidden ? `, ${l.hiddenState}` : ''}`}
+          aria-label={`${kindLabel(l, item.kind, true)}: ${shown}${locked ? `, ${l.lockedState}` : ''}${hidden ? `, ${l.hiddenState}` : ''}`}
           data-tooltip={l.renameTipLayer}
           onClick={(e) => onPick(e.shiftKey || e.metaKey || e.ctrlKey)}
           onDoubleClick={() => setRenaming(true)}

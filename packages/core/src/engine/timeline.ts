@@ -13,7 +13,10 @@ import type { Time } from '../model/time';
  */
 
 /** Item kinds that draw a picture. */
-export type VisualItem = Extract<Item, { kind: 'video' | 'image' | 'freeze' | 'text' | 'sticker' }>;
+export type VisualItem = Extract<
+  Item,
+  { kind: 'video' | 'image' | 'freeze' | 'text' | 'sticker' | 'region' }
+>;
 
 /** A main-track layer taking part in a transition this frame. */
 export interface LayerTransition {

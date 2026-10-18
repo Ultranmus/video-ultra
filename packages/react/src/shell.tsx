@@ -16,7 +16,7 @@ import { useController, useHistory, useLabels, useProject, useUi } from './conte
 import { Button, IconButton, Ruler, Section, ToolButton } from './controls';
 import { formatClock } from './format';
 import { Icon, type IconName } from './icons';
-import { itemTitle, ratioOf } from './items';
+import { itemTitle, kindLabel, ratioOf } from './items';
 import { AddPanel } from './panels';
 import type { PanelId, ToolId } from './state';
 import { useTargets } from './targets';
@@ -160,8 +160,15 @@ export function TopBar({ onClose }: { onClose?: (() => void) | undefined }): Rea
 const RAIL: {
   id: PanelId;
   icon: IconName;
-  key: 'media' | 'text' | 'audio' | 'stickers' | 'filters' | 'transitions';
-  tip: 'tipAddMedia' | 'tipText' | 'tipAudio' | 'tipStickers' | 'tipFilter' | 'tipTransitions';
+  key: 'media' | 'text' | 'audio' | 'stickers' | 'filters' | 'transitions' | 'blurAreas';
+  tip:
+    | 'tipAddMedia'
+    | 'tipText'
+    | 'tipAudio'
+    | 'tipStickers'
+    | 'tipFilter'
+    | 'tipTransitions'
+    | 'tipBlurAreas';
 }[] = [
   { id: 'media', icon: 'media', key: 'media', tip: 'tipAddMedia' },
   { id: 'text', icon: 'text', key: 'text', tip: 'tipText' },
@@ -169,6 +176,7 @@ const RAIL: {
   { id: 'stickers', icon: 'sticker', key: 'stickers', tip: 'tipStickers' },
   { id: 'filters', icon: 'filter', key: 'filters', tip: 'tipFilter' },
   { id: 'transitions', icon: 'transition', key: 'transitions', tip: 'tipTransitions' },
+  { id: 'blur', icon: 'blurArea', key: 'blurAreas', tip: 'tipBlurAreas' },
 ];
 
 export function Rail(): ReactElement {
@@ -221,6 +229,7 @@ const KIND_ICON: Record<Item['kind'], IconName> = {
   audio: 'audio',
   text: 'text',
   sticker: 'sticker',
+  region: 'blurArea',
 };
 
 /** Desktop: the selected item's settings; with nothing selected, the video's own settings. */
@@ -269,7 +278,7 @@ export function Inspector(): ReactElement {
         <div className="vu-inspector-title">
           <h2 className="vu-panel-title">{name}</h2>
           <span className="vu-inspector-meta">
-            {l.kindName(item.kind)} · {(item.duration / FLICKS_PER_SECOND).toFixed(1)} s
+            {kindLabel(l, item.kind, true)} · {(item.duration / FLICKS_PER_SECOND).toFixed(1)} s
           </span>
         </div>
         <IconButton
@@ -506,7 +515,7 @@ function TimelineA11y({ onReveal }: { onReveal: (item: Item) => void }): ReactEl
       {tracks.map((track, ti) => {
         const sound = track.kind === 'main' || track.kind === 'audio';
         const name =
-          ti === 0 ? l.mainTrack : l.lane(l.kind[track.items[0]?.kind ?? 'video'] ?? '', ti);
+          ti === 0 ? l.mainTrack : l.lane(kindLabel(l, track.items[0]?.kind ?? 'video'), ti);
         return (
           <div key={track.id} role="group" aria-label={name}>
             <button
@@ -532,7 +541,7 @@ function TimelineA11y({ onReveal }: { onReveal: (item: Item) => void }): ReactEl
                     role="option"
                     tabIndex={selectedId === item.id || (selectedId === null && n === 1) ? 0 : -1}
                     aria-selected={selectedId === item.id}
-                    aria-label={`${l.clipLabel(index + 1, l.kind[item.kind] ?? item.kind, formatTime(item.start), formatTime(itemEnd(item)))}: ${itemTitle(item, assets)}${item.locked || track.locked ? `, ${l.lockedState}` : ''}${item.hidden ? `, ${l.hiddenState}` : ''}`}
+                    aria-label={`${l.clipLabel(index + 1, kindLabel(l, item.kind), formatTime(item.start), formatTime(itemEnd(item)))}: ${itemTitle(item, assets)}${item.locked || track.locked ? `, ${l.lockedState}` : ''}${item.hidden ? `, ${l.hiddenState}` : ''}`}
                     onFocus={() => {
                       ctl.select(item.id);
                       ctl.seek(item.start);
@@ -661,7 +670,10 @@ type TitleKey =
   | 'audio'
   | 'media'
   | 'animate'
-  | 'arrange';
+  | 'arrange'
+  | 'greenScreen'
+  | 'blend'
+  | 'blurArea';
 
 const TOOL_TITLE: Record<ToolId, TitleKey> = {
   speed: 'speed',
@@ -683,6 +695,9 @@ const TOOL_TITLE: Record<ToolId, TitleKey> = {
   'add-media': 'media',
   animate: 'animate',
   arrange: 'arrange',
+  key: 'greenScreen',
+  blend: 'blend',
+  region: 'blurArea',
 };
 
 /**

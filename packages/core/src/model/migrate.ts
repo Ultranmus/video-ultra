@@ -140,6 +140,10 @@ export function repairProject(project: Project, ids: IdFactory = randomId): stri
     }
     if (item.kind === 'freeze' && asset && item.sourceTime > asset.duration)
       item.sourceTime = asset.duration;
+    if ('lut' in item && item.lut && project.assets[item.lut.assetId]?.kind !== 'lut') {
+      delete item.lut;
+      warnings.push(`Removed the LUT look of "${item.name ?? item.kind}": its file is missing.`);
+    }
     if (item.duration < frame) {
       warnings.push(`Removed "${item.name ?? item.kind}": shorter than one frame.`);
       return false;

@@ -98,6 +98,16 @@ const paths = {
   micOff:
     'M15 10.5V6.5a3 3 0 00-5.6-1.5M9 9v3a3 3 0 004.6 2.5M6 11.5a6 6 0 009.5 4.9M18 11.5a6 6 0 01-.6 2.6M12 17.5V21M4 4l16 16',
   range: 'M6 5v14M18 5v14M6 12h12M3 5h6M3 19h6M15 5h6M15 19h6',
+  // Picture tools (v0.2 C)
+  blurArea:
+    'M4 6h3M10.5 6h3M17 6h3M4 18h3M10.5 18h3M17 18h3M4 6v3M4 15v3M20 6v3M20 15v3M9 12h.01M12 9.5h.01M12 14.5h.01M15 12h.01',
+  pixelate: 'M4 4h16v16H4zM4 9.3h16M4 14.7h16M9.3 4v16M14.7 4v16',
+  greenScreen: 'M3 5h18v14H3zM12 8.5a2 2 0 110 4 2 2 0 010-4zM8 19c.5-2.5 2-4 4-4s3.5 1.5 4 4',
+  eyedropper: 'M13 6l5 5M16.5 3.5a2.1 2.1 0 013 3L17 9l-2-2zM15 8l-8.5 8.5L4 20l3.5-2.5L16 9',
+  blend: 'M9 15a6 6 0 100-12 6 6 0 000 12zM15 21a6 6 0 100-12 6 6 0 000 12z',
+  lut: 'M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 12l8-4.5M12 12v9M12 12L4 7.5',
+  rectangle: 'M4 6h16v12H4z',
+  oval: 'M12 18c4.4 0 8-2.7 8-6s-3.6-6-8-6-8 2.7-8 6 3.6 6 8 6z',
 } as const;
 
 /** Name of an editor icon. */

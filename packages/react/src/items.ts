@@ -1,3 +1,4 @@
+import type { Labels } from './labels';
 import {
   DEFAULT_TEXT_STYLE,
   DEFAULT_TRANSFORM,
@@ -7,6 +8,7 @@ import {
   type AudioItem,
   type ImageItem,
   type Item,
+  type RegionItem,
   type StickerItem,
   type TextItem,
   type Time,
@@ -128,6 +130,39 @@ export function stickerItem(
   };
 }
 
+/**
+ * A blurred / pixelated area (v0.2 C3) at `start`: a box a third of the canvas's shorter side,
+ * square on screen, centred.
+ */
+export function regionItem(
+  id: string,
+  start: Time,
+  effect: RegionItem['effect'],
+  shape: RegionItem['shape'],
+  canvasW: number,
+  canvasH: number,
+): RegionItem {
+  const side = Math.min(canvasW, canvasH) * 0.34;
+  return {
+    id,
+    kind: 'region',
+    start,
+    duration: fromSeconds(OVERLAY_SECONDS),
+    effect,
+    shape,
+    amount: 0.5,
+    width: side / canvasW,
+    height: side / canvasH,
+    transform: { ...DEFAULT_TRANSFORM },
+  };
+}
+
+/** An item kind's name: `title` for headings ("Blurred area"), else lower case for sentences. */
+export function kindLabel(l: Labels, kind: Item['kind'], title = false): string {
+  if (kind === 'region') return title ? l.blurArea : l.regionKind;
+  return title ? l.kindName(kind) : (l.kind[kind] ?? kind);
+}
+
 /** Short human name for an item (timeline labels, screen readers). */
 export function itemTitle(item: Item, assets: Record<string, Asset>): string {
   if (item.name) return item.name;
@@ -136,6 +171,8 @@ export function itemTitle(item: Item, assets: Record<string, Asset>): string {
       return item.text.split('\n')[0] || 'Text';
     case 'sticker':
       return item.emoji ?? assets[item.assetId ?? '']?.name ?? 'Sticker';
+    case 'region':
+      return item.effect === 'pixelate' ? 'Pixelate' : 'Blur';
     default:
       return assets[item.assetId]?.name ?? item.kind;
   }

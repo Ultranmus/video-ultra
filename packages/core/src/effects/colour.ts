@@ -16,8 +16,12 @@ export { FILTER_PARAMS };
  * per-layer extras of transitions and animations ({@link LayerFx}).
  */
 
-/** Floats of per-layer effect uniforms (19 × vec4). */
-export const EFFECT_FLOATS = 76;
+/**
+ * Floats of per-layer effect uniforms (24 × vec4): the colour pipeline and the extras of
+ * transitions / animations (19 × vec4), then the picture tools ({@link PictureFx}: green screen,
+ * LUT, blurred area, where the renderer's copy of the pixels underneath sits, blend mode).
+ */
+export const EFFECT_FLOATS = 96;
 
 /** The colour pipeline's parameters. Identity = {@link identityColour}. */
 export interface ColourParams {
@@ -348,6 +352,106 @@ export function isNoFx(fx: Readonly<LayerFx>): boolean {
   );
 }
 
+/** Blend modes as the shader numbers them (`BlendMode` in the project schema). */
+export const BLEND_IDS = {
+  normal: 0,
+  multiply: 1,
+  screen: 2,
+  overlay: 3,
+  'soft-light': 4,
+  add: 5,
+  lighten: 6,
+  darken: 7,
+  difference: 8,
+} as const;
+
+/**
+ * Per-layer picture tools (v0.2 C1–C4), packed after {@link LayerFx}: green screen, LUT look,
+ * blurred / pixelated area and blend mode. Identity = {@link noPictureFx}.
+ */
+export interface PictureFx {
+  /** Green screen on. */
+  key: boolean;
+  /** Key colour's chroma (BT.709 Cb, Cr). */
+  keyCb: number;
+  keyCr: number;
+  /** Chroma distance fully removed, and the feather beyond it. */
+  keyTolerance: number;
+  keySoftness: number;
+  /** 0…1: how much of the key's tint is taken off what remains. */
+  keySpill: number;
+  /** 0 = no LUT; else how much of it is mixed in. `lutSize` = grid points per side. */
+  lutAmount: number;
+  lutSize: number;
+  /** Blurred area: 0 none · 1 blur · 2 pixelate. */
+  region: number;
+  /** 0 rectangle · 1 ellipse. */
+  regionShape: number;
+  /** Anti-aliased edge width in box units (−1…1), per axis. */
+  regionEdgeX: number;
+  regionEdgeY: number;
+  /** {@link BLEND_IDS}. */
+  blend: number;
+}
+
+/** "No picture tools". */
+export function noPictureFx(): PictureFx {
+  return resetPictureFx({} as PictureFx);
+}
+
+/** Resets `p` in place (reused objects, no allocation). */
+export function resetPictureFx(p: PictureFx): PictureFx {
+  p.key = false;
+  p.keyCb = 0;
+  p.keyCr = 0;
+  p.keyTolerance = 0;
+  p.keySoftness = 0;
+  p.keySpill = 0;
+  p.lutAmount = 0;
+  p.lutSize = 0;
+  p.region = 0;
+  p.regionShape = 0;
+  p.regionEdgeX = 0;
+  p.regionEdgeY = 0;
+  p.blend = 0;
+  return p;
+}
+
+/** True when `p` changes nothing. */
+export function isNoPictureFx(p: Readonly<PictureFx>): boolean {
+  return !p.key && p.lutAmount === 0 && p.region === 0 && p.blend === 0;
+}
+
+/** BT.709 chroma (Cb, Cr) of an RGB colour (0…1) — the same maths as the shader's key. */
+export function chromaOf(r: number, g: number, b: number): [number, number] {
+  return [-0.1146 * r - 0.3854 * g + 0.5 * b, 0.5 * r - 0.4542 * g - 0.0458 * b];
+}
+
+/**
+ * Green-screen settings (0…1 sliders) → shader values: tolerance 0…1 removes colours up to a
+ * chroma distance of 0.02…0.42 from the key; softness feathers over 0.005…0.205 more.
+ */
+export function keyParams(
+  color: readonly [number, number, number],
+  tolerance: number,
+  softness: number,
+  spill: number,
+  out: PictureFx,
+): PictureFx {
+  const [cb, cr] = chromaOf(color[0], color[1], color[2]);
+  out.key = true;
+  out.keyCb = cb;
+  out.keyCr = cr;
+  out.keyTolerance = 0.02 + 0.4 * clamp01(tolerance);
+  out.keySoftness = 0.005 + 0.2 * clamp01(softness);
+  out.keySpill = clamp01(spill);
+  return out;
+}
+
+function clamp01(v: number): number {
+  return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0;
+}
+
 /**
  * Packs colour + extras into `out` at `offset` (floats), in the shader's order (19 × vec4):
  * gain+contrast, lift+saturation, highlights/shadows/vignette/sharpen, shadow tint+mono,
@@ -360,6 +464,7 @@ export function writeEffects(
   offset: number,
   c: Readonly<ColourParams>,
   fx: Readonly<LayerFx>,
+  pic: Readonly<PictureFx> = NO_PICTURE,
 ): void {
   const o = offset;
   out[o] = c.gainR;
@@ -443,8 +548,28 @@ export function writeEffects(
   out[o + 66] = fx.pivotZ;
   out[o + 67] = fx.cheapBlur ? 1 : 0;
   // 68–75: inverse geometry and canvas size, written by the renderer.
-  for (let i = 68; i < EFFECT_FLOATS; i++) out[o + i] = 0;
+  for (let i = 68; i < 76; i++) out[o + i] = 0;
+  out[o + 76] = pic.keyCb;
+  out[o + 77] = pic.keyCr;
+  out[o + 78] = pic.keyTolerance;
+  out[o + 79] = pic.keySoftness;
+  out[o + 80] = pic.keySpill;
+  out[o + 81] = pic.key ? 1 : 0;
+  out[o + 82] = pic.lutAmount;
+  out[o + 83] = pic.lutSize;
+  out[o + 84] = pic.region;
+  out[o + 85] = pic.regionShape;
+  out[o + 86] = pic.regionEdgeX;
+  out[o + 87] = pic.regionEdgeY;
+  // 88–91: where the copy of the pixels underneath sits (renderer).
+  for (let i = 88; i < 92; i++) out[o + i] = 0;
+  out[o + 92] = pic.blend;
+  out[o + 93] = 0;
+  out[o + 94] = 0;
+  out[o + 95] = 0;
 }
+
+const NO_PICTURE: Readonly<PictureFx> = Object.freeze(noPictureFx());
 
 /** The identity effect block (no filter, no extras) — shared, never modified. */
 export const IDENTITY_EFFECTS: Readonly<Float32Array> = (() => {

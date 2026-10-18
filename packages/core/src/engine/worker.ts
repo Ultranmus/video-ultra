@@ -22,6 +22,7 @@ import { DecoderPool } from './frames';
 import { QualityGovernor } from './quality';
 import type { EngineMessage, EngineRequest, EngineResponseData, EngineStats } from './protocol';
 import { upcomingVideo } from './timeline';
+import { parseCubeLut } from '../effects/lut';
 
 /**
  * The engine worker: owns the project, the media, the decoders and the GPU. The main thread only
@@ -62,7 +63,7 @@ let pool = new DecoderPool(DECODER_BUDGET.mid);
 let project: Project | null = null;
 let viewW = 1280;
 let viewH = 720;
-const media: MediaLibrary = { videos: new Map(), images: new Map() };
+const media: MediaLibrary = { videos: new Map(), images: new Map(), luts: new Map() };
 /** Audio tracks by asset (videos with sound and audio files), once loaded. */
 const audioTracks = new Map<string, AudioTrackSource>();
 const audioLoads = new Map<string, Promise<void>>();
@@ -168,6 +169,13 @@ function loadImage(assetId: string, blob: Blob): void {
   const loading = createImageBitmap(blob, { premultiplyAlpha: 'none' });
   loading.catch(reportError);
   media.images.set(assetId, loading);
+}
+
+function loadLut(assetId: string, blob: Blob): void {
+  // Parsed here, off the main thread (a 65-point file has ~275,000 rows).
+  const loading = blob.text().then(parseCubeLut);
+  loading.catch(reportError);
+  media.luts.set(assetId, loading);
 }
 
 /** Frees decoders and frames of items that left the project. */
@@ -412,6 +420,8 @@ async function mediaReady(p: Project): Promise<void> {
     if (i) waits.push(i.catch(() => undefined));
     const a = audioLoads.get(id);
     if (a) waits.push(a.catch(() => undefined));
+    const l = media.luts.get(id);
+    if (l) waits.push(l.catch(() => undefined));
   }
   await Promise.all(waits);
 }
@@ -775,6 +785,73 @@ async function itemPreview(
 }
 
 /**
+ * Green screen "pick from video": the picture item alone (no green screen, blend or
+ * animation, nothing above it) at `time`, at most 480 px, and the average colour of the 5 × 5
+ * pixels around the canvas point `x, y`. Null when the point is outside the canvas.
+ */
+async function pickColour(
+  request: Extract<EngineRequest, { type: 'pick-colour' }>,
+): Promise<EngineResponseData> {
+  if (!project) throw new Error('No project');
+  const found = findItem(project, request.itemId);
+  const none = { type: 'pick-colour' as const, color: null };
+  if (!found || !('crop' in found.item)) return none;
+  if (request.x < 0 || request.x > 1 || request.y < 0 || request.y > 1) return none;
+  const { width: pw, height: ph } = project.settings;
+  const k = Math.min(1, 480 / Math.max(pw, ph));
+  const width = Math.max(16, Math.round(pw * k));
+  const height = Math.max(16, Math.round(ph * k));
+  const l = await looksRenderer(width, height);
+  const shown = { ...found.item, hidden: false, transitionIn: null } as Item;
+  for (const key of ['key', 'blend', 'animation'] as const) Reflect.deleteProperty(shown, key);
+  const track = { ...found.track, muted: true, hidden: false, items: [shown] };
+  const mini: Project = {
+    ...project,
+    settings: { ...project.settings, width, height, background: { type: 'color', color: '#000' } },
+    tracks:
+      found.track.kind === 'main'
+        ? [track]
+        : [
+            { id: 'pick-main', kind: 'main', muted: true, hidden: false, locked: false, items: [] },
+            track,
+          ],
+  };
+  await mediaReady(mini);
+  const item = found.item;
+  const t = Math.max(
+    item.start,
+    Math.min(item.start + item.duration - 1, Math.round(request.time)),
+  );
+  await l.composer.render(mini, t, width, height, null);
+  const bitmap = l.canvas.transferToImageBitmap();
+  const read = new OffscreenCanvas(5, 5);
+  const ctx = read.getContext('2d', { willReadFrequently: true })!;
+  const x = Math.round(request.x * width);
+  const y = Math.round(request.y * height);
+  ctx.drawImage(bitmap, x - 2, y - 2, 5, 5, 0, 0, 5, 5);
+  bitmap.close();
+  looksDone();
+  const data = ctx.getImageData(0, 0, 5, 5).data;
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  let n = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] === 0) continue;
+    r += data[i]!;
+    g += data[i + 1]!;
+    b += data[i + 2]!;
+    n++;
+  }
+  if (n === 0) return none;
+  const hex = (v: number) =>
+    Math.round(v / n)
+      .toString(16)
+      .padStart(2, '0');
+  return { type: 'pick-colour', color: `#${hex(r)}${hex(g)}${hex(b)}` };
+}
+
+/**
  * Transition picker flip-book: the real cut (previous clip → this clip) with one transition,
  * rendered at a few points across its window on the warm looks renderer.
  */
@@ -901,6 +978,7 @@ async function handle(
       const asset = project?.assets[request.assetId];
       if (asset?.kind === 'image') loadImage(request.assetId, request.blob);
       else if (asset?.kind === 'audio') loadAudio(request.assetId, request.blob);
+      else if (asset?.kind === 'lut') loadLut(request.assetId, request.blob);
       else loadVideo(request.assetId, request.blob);
       if (!playing) void showAt(playheadAt);
       return { type: 'ok' };
@@ -1002,6 +1080,12 @@ async function handle(
       return inLooksQueue(() => transitionPreview(request));
     case 'item-preview':
       return inLooksQueue(() => itemPreview(request));
+    case 'lut-check': {
+      const lut = parseCubeLut(await request.blob.text());
+      return { type: 'lut-check', size: lut.size, title: lut.title };
+    }
+    case 'pick-colour':
+      return inLooksQueue(() => pickColour(request));
   }
 }
 

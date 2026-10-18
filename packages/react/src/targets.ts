@@ -114,7 +114,12 @@ export function computeTargets(
   const picture = (i: Item | null | undefined): i is LookItem => !!i && 'filter' in i;
   const fallback = under ?? items[0] ?? null;
   const look: LookItem | null = picture(selected) ? selected : picture(fallback) ? fallback : null;
-  const lookNote = selected && !picture(selected) && look ? l.filtersNotForSound : null;
+  const lookNote =
+    selected && !picture(selected) && look
+      ? selected.kind === 'region'
+        ? l.regionNoLook
+        : l.filtersNotForSound
+      : null;
 
   const nearestMainCut = () => {
     if (items.length < 2) return null;
@@ -148,7 +153,12 @@ export function computeTargets(
       motion = found.item;
       transitionNote = l.transitionsLayerTouch;
     }
-  } else if (found && found.track.kind !== 'main' && found.item.kind !== 'audio') {
+  } else if (
+    found &&
+    found.track.kind !== 'main' &&
+    found.item.kind !== 'audio' &&
+    found.item.kind !== 'region'
+  ) {
     motion = found.item;
   } else {
     transition = nearestMainCut();

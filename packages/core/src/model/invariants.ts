@@ -64,6 +64,13 @@ export function checkInvariants(project: Project): string[] {
         }
       }
 
+      // LUT looks point at a LUT file.
+      if ('lut' in item && item.lut) {
+        const lut = project.assets[item.lut.assetId];
+        if (!lut) problems.push(`${where}: missing LUT ${item.lut.assetId}`);
+        else if (lut.kind !== 'lut') problems.push(`${where}: LUT look uses a ${lut.kind} asset`);
+      }
+
       // Transitions
       if ('transitionIn' in item && item.transitionIn) {
         const previous = track.items[index - 1];

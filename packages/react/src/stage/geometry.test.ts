@@ -10,6 +10,8 @@ import {
 import { describe, expect, it } from 'vitest';
 import { measureTextBox } from '@video-ultra/core/internal';
 import { boxContains, hitStage, itemBox, snapCentre } from './geometry';
+import { kindLabel, regionItem } from '../items';
+import { DEFAULT_LABELS } from '../labels';
 
 const measure = (_font: string, text: string) => text.length * 10;
 
@@ -124,5 +126,17 @@ describe('stage geometry', () => {
   it('snaps to the canvas centre', () => {
     expect(snapCentre(0.503, 0.01)).toEqual({ value: 0.5, snapped: true });
     expect(snapCentre(0.52, 0.01).snapped).toBe(false);
+  });
+
+  it('a blurred area is a square on screen, scaled by its transform (v0.2 C3)', () => {
+    const p = project();
+    const r = regionItem('r', 0, 'blur', 'ellipse', 1080, 1920);
+    const box = itemBox(r, p, 1080, 1920, measure)!;
+    expect(box.width).toBeCloseTo(box.height);
+    expect(box.width).toBeCloseTo(1080 * 0.34);
+    const big = itemBox({ ...r, transform: { ...r.transform, scale: 2 } }, p, 1080, 1920, measure)!;
+    expect(big.width).toBeCloseTo(box.width * 2);
+    expect(kindLabel(DEFAULT_LABELS, 'region', true)).toBe('Blurred area');
+    expect(kindLabel(DEFAULT_LABELS, 'image')).toBe('photo');
   });
 });

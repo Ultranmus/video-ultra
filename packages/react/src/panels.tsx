@@ -17,6 +17,7 @@ import { CategoryBrowser } from './browse';
 import { TEXT_STYLE_CATEGORIES, TEXT_STYLE_PRESETS } from './library/textStyles';
 import { FilterStrip, TransitionGrid } from './looks';
 import { CanvasTool } from './ToolPanel';
+import { BlurPanel } from './picture';
 
 /** The browse panel for an add-content category (desktop panel, phone sheet). */
 export function AddPanel({ panel }: { panel: PanelId }): ReactElement {
@@ -37,6 +38,8 @@ export function AddPanel({ panel }: { panel: PanelId }): ReactElement {
       return <TransitionGrid />;
     case 'layers':
       return <LayersPanel />;
+    case 'blur':
+      return <BlurPanel />;
   }
 }
 
@@ -83,7 +86,9 @@ function ImportRows() {
 function MediaPanel() {
   const ctl = useController();
   const l = useLabels();
-  const assets = useProject((p) => Object.values(p.assets).filter((a) => a.kind !== 'audio'));
+  const assets = useProject((p) =>
+    Object.values(p.assets).filter((a) => a.kind === 'video' || a.kind === 'image'),
+  );
   return (
     <div className="vu-panel-body">
       <button type="button" className="vu-dropcard" onClick={() => ctl.pickFiles()}>

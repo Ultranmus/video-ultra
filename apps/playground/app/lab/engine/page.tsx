@@ -12,6 +12,9 @@
  * overlays on lanes, element animations). `?bench=1` measures the GPU draw cost of the heaviest
  * transitions on both backends. `?bg=color` turns the blurred background off. `?duck=1` builds the
  * ducking scene instead of the demo.
+ * overlays on lanes, element animations, picture tools: green screen, LUT, blurred / pixelated
+ * areas, blend modes). `?bench=1` measures the GPU draw cost of the heaviest
+ * transitions on both backends. `?bg=color` turns the blurred background off.
  */
 import {
   addAsset,
@@ -30,6 +33,8 @@ import {
   setTransition,
   toSeconds,
   type AudioItem,
+  type Asset,
+  type BlendMode,
   type Direction,
   type ExportOptions,
   type AudioExportOptions,
@@ -57,6 +62,11 @@ import {
   moveOnCanvas,
   plainLook,
   noOverlay,
+  BLEND_IDS,
+  keyParams,
+  noPictureFx,
+  parseCubeLut,
+  placedGeometry,
   probeMedia,
   transitionLook,
   transitionOverlay,
@@ -153,6 +163,8 @@ function emoji(id: string, char: string, startS: number, seconds: number): Stick
 async function buildDemo(
   blurBackground: boolean,
   repeat = 1,
+  /** `?picture=1`: also every picture tool (green screen, LUT, blend, pixelated area). */
+  picture = false,
 ): Promise<{ project: Project; blobs: Blobs }> {
   const project = createProject({ name: 'Engine demo', width: 1080, height: 1920 });
   const blobs: Blobs = new Map();
@@ -226,6 +238,31 @@ async function buildDemo(
   setAnimation(project, sticker, 'out', { type: 'spin-out', duration: fromSeconds(0.5) });
   setAnimation(project, logo.id, 'in', { type: 'slide-left-in', duration: fromSeconds(0.6) });
   setAnimation(project, pip.id, 'in', { type: 'flip-in', duration: fromSeconds(0.6) });
+  if (picture) {
+    // The colour bars' green bar keyed out, the photo through a LUT, the logo screened, a
+    // pixelated oval over the middle from 2 s to 6 s.
+    pip.key = { color: '#00ff00', tolerance: 0.4, softness: 0.2, spill: 0.5 };
+    addBlobAsset(project, blobs, 'invert', invertCube(17), 'lut', 0);
+    const photo = main[1]!;
+    if ('crop' in photo) photo.lut = { assetId: 'invert', intensity: 0.6 };
+    logo.blend = 'screen';
+    addToLane(
+      project,
+      {
+        id: id(),
+        kind: 'region',
+        start: fromSeconds(2),
+        duration: fromSeconds(4),
+        effect: 'pixelate',
+        shape: 'ellipse',
+        amount: 0.6,
+        width: 0.5,
+        height: 0.2,
+        transform: { ...DEFAULT_TRANSFORM, y: 0.45 },
+      },
+      id,
+    );
+  }
   return { project, blobs };
 }
 
@@ -470,6 +507,171 @@ async function buildAnimationScene(plain: boolean): Promise<{ project: Project; 
   return { project, blobs };
 }
 
+/** Registers a generated file (a PNG or a .cube LUT) as an asset of `project`. */
+function addBlobAsset(
+  project: Project,
+  blobs: Blobs,
+  id: string,
+  blob: Blob,
+  kind: 'image' | 'lut',
+  size: number,
+): string {
+  const asset: Asset = {
+    id,
+    kind,
+    name: kind === 'lut' ? `${id}.cube` : `${id}.png`,
+    mimeType: kind === 'lut' ? 'text/plain' : 'image/png',
+    size: blob.size,
+    duration: 0,
+    ...(kind === 'image' ? { width: size, height: size } : {}),
+    hasAudio: false,
+    source: { type: 'url', url: `/generated/${id}` },
+  };
+  addAsset(project, asset);
+  blobs.set(id, blob);
+  return id;
+}
+
+/**
+ * A 320 px "green screen" photo: chroma green with a shadow falling towards the bottom (keys need
+ * tolerance), a magenta disc in the middle (must stay).
+ */
+async function greenScreenPng(): Promise<Blob> {
+  const c = new OffscreenCanvas(320, 320);
+  const ctx = c.getContext('2d')!;
+  ctx.fillStyle = '#00b140';
+  ctx.fillRect(0, 0, 320, 320);
+  const shade = ctx.createLinearGradient(0, 160, 0, 320);
+  shade.addColorStop(0, 'rgba(0,0,0,0)');
+  shade.addColorStop(1, 'rgba(0,0,0,0.3)');
+  ctx.fillStyle = shade;
+  ctx.fillRect(0, 160, 320, 160);
+  ctx.fillStyle = '#ff00ff';
+  ctx.beginPath();
+  ctx.arc(160, 160, 80, 0, Math.PI * 2);
+  ctx.fill();
+  return c.convertToBlob({ type: 'image/png' });
+}
+
+/** A 64 px solid colour photo (blend-mode checks). */
+async function solidPng(color: string): Promise<Blob> {
+  const c = new OffscreenCanvas(64, 64);
+  const ctx = c.getContext('2d')!;
+  ctx.fillStyle = color;
+  ctx.fillRect(0, 0, 64, 64);
+  return c.convertToBlob({ type: 'image/png' });
+}
+
+/** A 33-point .cube that inverts the picture. */
+function invertCube(size = 33): Blob {
+  const rows: string[] = [`TITLE "Invert"`, `LUT_3D_SIZE ${size}`];
+  for (let b = 0; b < size; b++)
+    for (let g = 0; g < size; g++)
+      for (let r = 0; r < size; r++)
+        rows.push([r, g, b].map((v) => (1 - v / (size - 1)).toFixed(6)).join(' '));
+  return new Blob([rows.join('\n')], { type: 'text/plain' });
+}
+
+/** Blend modes checked by composite-check (normal included as the reference). */
+const GOLDEN_BLENDS: BlendMode[] = [
+  'normal',
+  'multiply',
+  'screen',
+  'overlay',
+  'soft-light',
+  'add',
+  'lighten',
+  'darken',
+  'difference',
+];
+
+/**
+ * Picture tools golden scene (640×640, footage in the middle band): `plain` (footage only),
+ * `key-off` / `key` (a green-screen photo on a layer, without / with its green screen), `lut`
+ * (an inverting 33-point LUT on the footage), `blur` / `pixelate` (a blurred rectangle / a
+ * pixelated ellipse over the middle), `blend-<mode>` (a solid orange photo at 80% over the
+ * middle with that blend mode).
+ */
+async function buildPictureScene(variant: string): Promise<{ project: Project; blobs: Blobs }> {
+  const project = createProject({ name: 'Picture tools', width: 640, height: 640 });
+  const blobs: Blobs = new Map();
+  const clip = video('a', await loadAsset(project, blobs, 'bbb-1080p60.mp4'), 4, 3);
+  if (variant === 'lut') {
+    addBlobAsset(project, blobs, 'invert', invertCube(), 'lut', 0);
+    clip.lut = { assetId: 'invert', intensity: 1 };
+  }
+  insertMain(project, clip);
+  let n = 0;
+  const ids = () => `p${++n}`;
+  if (variant === 'key' || variant === 'key-off') {
+    const id = addBlobAsset(project, blobs, 'green', await greenScreenPng(), 'image', 320);
+    const layer: ImageItem = {
+      id: 'g',
+      kind: 'image',
+      assetId: id,
+      start: 0,
+      duration: fromSeconds(4),
+      ...look(),
+      transform: { ...DEFAULT_TRANSFORM, x: 0.3, y: 0.5, scale: 0.5 },
+    };
+    if (variant === 'key')
+      layer.key = { color: '#00b140', tolerance: 0.4, softness: 0.2, spill: 0.5 };
+    addToLane(project, layer, ids);
+  }
+  if (variant === 'blur' || variant === 'pixelate') {
+    addToLane(
+      project,
+      {
+        id: 'r',
+        kind: 'region',
+        start: 0,
+        duration: fromSeconds(4),
+        effect: variant,
+        shape: variant === 'blur' ? 'rectangle' : 'ellipse',
+        amount: 0.5,
+        width: 0.4,
+        height: 0.3,
+        transform: { ...DEFAULT_TRANSFORM },
+      },
+      ids,
+    );
+  }
+  if (variant.startsWith('blend-')) {
+    const id = addBlobAsset(
+      project,
+      blobs,
+      'orange',
+      await solidPng('rgb(200,120,40)'),
+      'image',
+      64,
+    );
+    const layer: ImageItem = {
+      id: 'b',
+      kind: 'image',
+      assetId: id,
+      start: 0,
+      duration: fromSeconds(4),
+      ...look(),
+      transform: { ...DEFAULT_TRANSFORM, scale: 0.5, opacity: 0.8 },
+    };
+    const mode = variant.slice('blend-'.length) as BlendMode;
+    if (mode !== 'normal') layer.blend = mode;
+    addToLane(project, layer, ids);
+  }
+  return { project, blobs };
+}
+
+/** Picture tools golden variants (captured at 1 s, both backends). */
+const PICTURE_VARIANTS = [
+  'plain',
+  'key-off',
+  'key',
+  'lut',
+  'blur',
+  'pixelate',
+  ...GOLDEN_BLENDS.map((m) => `blend-${m}`),
+];
+
 /** Animation golden times (s): mid entrance, end of entrance, mid loop (a quarter turn). */
 const ANIMATION_TIMES = [0.3, 0.5, 1.5, 2.25];
 
@@ -528,6 +730,15 @@ async function runGolden(engine: EngineInternal): Promise<Record<string, string>
       () => buildTransitionScene(t),
       [1.8],
       (b) => `tx-${t.type}-${b}`,
+      out,
+    );
+  }
+  for (const variant of PICTURE_VARIANTS) {
+    await captureAll(
+      engine,
+      () => buildPictureScene(variant),
+      [1],
+      (b) => `pic-${variant}-${b}`,
       out,
     );
   }
@@ -591,6 +802,12 @@ const BENCH_CASES: { type: string; direction?: Direction; cheap?: boolean }[] = 
   { type: 'blur', cheap: true },
   { type: 'spin-blur', cheap: true },
   { type: 'motion-blur', cheap: true },
+  // Picture tools (v0.2 C): over one full-screen photo.
+  { type: 'pic-key' },
+  { type: 'pic-lut' },
+  { type: 'pic-blend-overlay' },
+  { type: 'pic-blur-area' },
+  { type: 'pic-pixelate-area' },
 ];
 
 /**
@@ -608,6 +825,7 @@ async function runBench(frames: number): Promise<Record<string, Record<string, n
   sctx.fillRect(0, 0, 2, 2);
   const W = 1080;
   const H = 1920;
+  const benchLut = parseCubeLut(await invertCube(33).text());
   const probe = new OffscreenCanvas(1, 1).getContext('2d')!;
   const out: Record<string, Record<string, number>> = {};
   for (const backend of ['webgl2', 'webgpu'] as const) {
@@ -640,7 +858,56 @@ async function runBench(frames: number): Promise<Record<string, Record<string, n
             fit: 'fill',
           },
         );
-      if (c.type === 'none' || c.type === 'anim-blur') {
+      if (c.type.startsWith('pic-')) {
+        // One full-screen photo plus the tool: key / LUT on it, a full-screen overlay-blended
+        // copy on top, or a 0.8 × 0.5 blurred / pixelated area at full strength.
+        const base = new Float32Array(EFFECT_FLOATS);
+        const pic = noPictureFx();
+        if (c.type === 'pic-key') keyParams([0, 0.69, 0.25], 0.4, 0.3, 0.5, pic);
+        if (c.type === 'pic-lut') {
+          pic.lutAmount = 1;
+          pic.lutSize = 33;
+        }
+        writeEffects(base, 0, identityColour(), plainLook().fx, pic);
+        draws.push({
+          source: a,
+          geometry: place(a),
+          opacity: 1,
+          hdr: false,
+          effects: base,
+          ...(c.type === 'pic-lut' ? { lut: benchLut } : {}),
+        });
+        if (c.type === 'pic-blend-overlay') {
+          const top = noPictureFx();
+          top.blend = BLEND_IDS.overlay;
+          const effects = new Float32Array(EFFECT_FLOATS);
+          writeEffects(effects, 0, identityColour(), plainLook().fx, top);
+          draws.push({
+            source: b,
+            geometry: place(b),
+            opacity: 0.8,
+            hdr: false,
+            effects,
+            blend: BLEND_IDS.overlay,
+          });
+        }
+        if (c.type === 'pic-blur-area' || c.type === 'pic-pixelate-area') {
+          const pixelate = c.type === 'pic-pixelate-area';
+          const area = noPictureFx();
+          area.region = pixelate ? 2 : 1;
+          area.regionEdgeX = area.regionEdgeY = 0.01;
+          const effects = new Float32Array(EFFECT_FLOATS);
+          writeEffects(effects, 0, identityColour(), plainLook().fx, area);
+          draws.push({
+            source: solid,
+            geometry: placedGeometry(W, H, W * 0.8, H * 0.5, { ...DEFAULT_TRANSFORM }),
+            opacity: 1,
+            hdr: false,
+            effects,
+            region: { pixelate, amount: 1 },
+          });
+        }
+      } else if (c.type === 'none' || c.type === 'anim-blur') {
         const effects = new Float32Array(EFFECT_FLOATS);
         const fx = plainLook().fx;
         if (c.type === 'anim-blur') fx.blurX = fx.blurY = 0.03;
@@ -805,6 +1072,7 @@ export default function EngineLab() {
         : await buildDemo(
             params.get('bg') !== 'color',
             Math.max(1, Number(params.get('repeat') ?? 1)),
+            params.get('picture') === '1',
           );
       if (disposed) return;
       const lab = {

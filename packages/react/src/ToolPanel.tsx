@@ -28,6 +28,7 @@ import { DEFAULT_DUCK, isSounding, RATIOS, ratioOf } from './items';
 import { AnimatePanel, FilterStrip, TransitionGrid } from './looks';
 import type { ToolId } from './state';
 import { ArrangeControls, LockedNote } from './organize';
+import { BlendTool, GreenScreenTool, RegionTool } from './picture';
 
 const seconds = (t: number) => t / FLICKS_PER_SECOND;
 const fmtSeconds = (s: number) => `${s.toFixed(1)} s`;
@@ -97,6 +98,12 @@ function ItemTool({ tool, item }: { tool: ToolId; item: Item }): ReactElement | 
       return <OpacityTool item={item} />;
     case 'duration':
       return <DurationTool item={item} />;
+    case 'key':
+      return <GreenScreenTool item={item} />;
+    case 'blend':
+      return <BlendTool item={item} />;
+    case 'region':
+      return <RegionTool item={item} />;
     default:
       return null;
   }
@@ -120,9 +127,13 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
         <TransformTool item={item} />
         <CropTool item={item} />
       </Section>
+      <Section title={l.greenScreen} collapsible defaultOpen={'key' in item && !!item.key}>
+        <GreenScreenTool item={item} />
+      </Section>
       {onMain ? null : (
-        <Section title={l.opacity}>
+        <Section title={l.opacityBlend}>
           <OpacityTool item={item} />
+          <BlendTool item={item} />
         </Section>
       )}
     </>
@@ -179,6 +190,7 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
           <Section title={l.appearance} collapsible defaultOpen={false}>
             <TransformTool item={item} />
             <OpacityTool item={item} />
+            <BlendTool item={item} />
           </Section>
         </>
       );
@@ -189,6 +201,19 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
             <AdjustTool item={item} />
           </Section>
           <Section title={l.appearance}>
+            <TransformTool item={item} />
+            <OpacityTool item={item} />
+            <BlendTool item={item} />
+          </Section>
+        </>
+      );
+    case 'region':
+      return (
+        <>
+          <Section title={l.blurArea}>
+            <RegionTool item={item} />
+          </Section>
+          <Section title={l.regionPosition} collapsible defaultOpen={false}>
             <TransformTool item={item} />
             <OpacityTool item={item} />
           </Section>

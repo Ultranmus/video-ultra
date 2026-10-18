@@ -41,12 +41,20 @@ struct Uniforms {
   pivot: vec4f, // xyz: turn pivot (screen units, z away from the viewer) · w: 1 = half the blur taps
   inv: vec4f, // inverse of mat2(pos): clip offset → q offset (written by the renderer)
   canvas: vec4f, // x: canvas aspect · y: layer box aspect · zw: canvas size in px (renderer)
+  // Picture tools (effects/colour.ts, PictureFx).
+  key: vec4f, // green screen: key chroma (Cb, Cr) · removed distance · feather
+  keyP: vec4f, // x: spill · y: 1 = key on · z: LUT amount (0 = none) · w: LUT size
+  region: vec4f, // x: blurred area (0 none · 1 blur · 2 pixelate) · y: 1 = ellipse · zw: edge width
+  back: vec4f, // pixels underneath: texel = (px − xy) · zw (renderer; blurred area: uv)
+  blend: vec4f, // x: blend mode (0 normal · 1 multiply · … · 8 difference) · yz: max uv (0 = whole texture)
 };
 
 @group(0) @binding(0) var<uniform> u: Uniforms;
 @group(0) @binding(1) var samp: sampler;
 @group(0) @binding(2) var frame: texture_2d<f32>; // @frame — external texture for video on WebGPU
 @group(0) @binding(3) var curve: texture_2d<f32>; // 256×1, per-channel HDR tone curve
+@group(0) @binding(4) var under: texture_2d<f32>; // copy of the pixels under the layer (blend modes)
+@group(0) @binding(5) var lut: texture_3d<f32>; // the layer's 3D LUT (1×1×1 when it has none)
 
 struct VsOut {
   @builtin(position) pos: vec4f,
@@ -85,7 +93,12 @@ fn vs(@builtin(vertex_index) i: u32) -> VsOut {
 }
 
 fn sampleFrame(uv: vec2f) -> vec4f {
-  return textureSample(frame, samp, uv); // @sample-frame
+  var p = uv;
+  if (u.blend.y > 0.0) {
+    // Only part of the texture holds the picture (blurred areas' copies): stay inside it.
+    p = clamp(p, u.fx.zw * 0.5, u.blend.yz);
+  }
+  return textureSample(frame, samp, p); // @sample-frame
 }
 
 // Screen offset → texture uv offset (through the layer's geometry).
@@ -395,6 +408,76 @@ fn textAlpha(q: vec2f) -> f32 {
   return 0.0;
 }
 
+// BT.709 chroma (Cb, Cr) — effects/colour.ts `chromaOf` is the same.
+fn chroma(c: vec3f) -> vec2f {
+  return vec2f(dot(c, vec3f(-0.1146, -0.3854, 0.5)), dot(c, vec3f(0.5, -0.4542, -0.0458)));
+}
+
+// Green screen: how much of the pixel stays (alpha) and its colour with the key's tint (spill)
+// taken off. Removing chroma keeps the brightness (luma) unchanged.
+fn keyAlpha(c: vec3f) -> f32 {
+  return smoothstep(u.key.z, u.key.z + u.key.w, distance(chroma(c), u.key.xy));
+}
+
+fn despill(c: vec3f) -> vec3f {
+  let km = length(u.key.xy);
+  if (u.keyP.x <= 0.0 || km < 1e-4) {
+    return c;
+  }
+  let kd = u.key.xy / km;
+  let d = -kd * (max(dot(chroma(c), kd), 0.0) * u.keyP.x);
+  let rgb = c + vec3f(1.5748 * d.y, -0.1873 * d.x - 0.4681 * d.y, 1.8556 * d.x);
+  return clamp(rgb, vec3f(0.0), vec3f(1.0));
+}
+
+// 3D LUT lookup with trilinear filtering (texel centres: 0.5 / n … 1 − 0.5 / n).
+fn applyLut(c: vec3f) -> vec3f {
+  let n = max(u.keyP.w, 2.0);
+  let p = clamp(c, vec3f(0.0), vec3f(1.0)) * ((n - 1.0) / n) + vec3f(0.5 / n);
+  return textureSampleLevel(lut, samp, p, 0.0).rgb;
+}
+
+// Blurred area's shape: 1 inside, 0 outside, anti-aliased over `region.zw` (box units).
+fn regionAlpha(q: vec2f) -> f32 {
+  let e = max(u.region.zw, vec2f(1e-4));
+  if (u.region.y > 0.5) {
+    let d = length(q);
+    let k = max(e.x, e.y);
+    return 1.0 - smoothstep(1.0 - k, 1.0, d);
+  }
+  let m = abs(q);
+  return (1.0 - smoothstep(1.0 - e.x, 1.0, m.x)) * (1.0 - smoothstep(1.0 - e.y, 1.0, m.y));
+}
+
+// Separable blend modes (W3C compositing): b = what's underneath, s = the layer's colour. The
+// result goes out with the layer's alpha and is mixed by the usual src·α + dst·(1 − α), which is
+// exactly α·B(b, s) + (1 − α)·b over the opaque canvas.
+fn blendColour(b: vec3f, s: vec3f, mode: f32) -> vec3f {
+  if (mode < 1.5) {
+    return b * s;
+  }
+  if (mode < 2.5) {
+    return b + s - b * s;
+  }
+  if (mode < 3.5) {
+    return select(vec3f(1.0) - 2.0 * (vec3f(1.0) - b) * (vec3f(1.0) - s), 2.0 * b * s, b <= vec3f(0.5));
+  }
+  if (mode < 4.5) {
+    let d = select(sqrt(b), ((16.0 * b - vec3f(12.0)) * b + vec3f(4.0)) * b, b <= vec3f(0.25));
+    return select(b + (2.0 * s - vec3f(1.0)) * (d - b), b - (vec3f(1.0) - 2.0 * s) * b * (vec3f(1.0) - b), s <= vec3f(0.5));
+  }
+  if (mode < 5.5) {
+    return min(b + s, vec3f(1.0));
+  }
+  if (mode < 6.5) {
+    return max(b, s);
+  }
+  if (mode < 7.5) {
+    return min(b, s);
+  }
+  return abs(b - s);
+}
+
 @fragment
 fn fs(in: VsOut) -> @location(0) vec4f {
   let screen = in.clip.xy / in.clip.z;
@@ -409,11 +492,31 @@ fn fs(in: VsOut) -> @location(0) vec4f {
     q = vec2f(u.inv.x * d.x + u.inv.y * d.y, u.inv.z * d.x + u.inv.w * d.y);
     inside = step(abs(q.x), 1.0001) * step(abs(q.y), 1.0001);
   }
-  let uv = vec2f(u.uv.x * q.x + u.uv.y * q.y + u.uvT.x, u.uv.z * q.x + u.uv.w * q.y + u.uvT.y);
-  let c = sampleLayer(uv, s);
   let px = (screen * vec2f(0.5, -0.5) + vec2f(0.5)) * u.canvas.zw;
-  var rgb = colour(mix(c.rgb, correctHdr(c.rgb), u.posT.w), in.q, px);
+  var uv = vec2f(u.uv.x * q.x + u.uv.y * q.y + u.uvT.x, u.uv.z * q.x + u.uv.w * q.y + u.uvT.y);
+  if (u.region.x > 0.5) {
+    // A blurred area shows the small copy of what's under it (the layer's texture), by position.
+    uv = (px - u.back.xy) * u.back.zw;
+    if (u.region.x > 1.5) {
+      // Pixelate: one texel of the small copy per cell.
+      let t = u.fx.zw;
+      uv = (floor(uv / t) + vec2f(0.5)) * t;
+    }
+  }
+  let c = sampleLayer(uv, s);
+  var base = mix(c.rgb, correctHdr(c.rgb), u.posT.w);
   var a = c.a * u.posT.z * inside;
+  if (u.keyP.y > 0.5) {
+    a *= keyAlpha(base);
+    base = despill(base);
+  }
+  var rgb = colour(base, in.q, px);
+  if (u.keyP.z > 0.0) {
+    rgb = mix(rgb, applyLut(rgb), u.keyP.z);
+  }
+  if (u.region.x > 0.5) {
+    a *= regionAlpha(in.q);
+  }
   if (u.mask.x > 0.5) {
     if (u.mask.x > 19.5) {
       a *= textAlpha(in.q);
@@ -429,6 +532,11 @@ fn fs(in: VsOut) -> @location(0) vec4f {
     }
   }
   rgb = mix(rgb, u.flash.rgb, u.flash.w);
+  if (u.blend.x > 0.5) {
+    let size = vec2i(textureDimensions(under, 0)) - vec2i(1);
+    let t = clamp(vec2i(floor((px - u.back.xy) * u.back.zw)), vec2i(0), size);
+    rgb = blendColour(textureLoad(under, t, 0).rgb, rgb, u.blend.x);
+  }
   // Straight alpha out; blending is src·α + dst·(1 − α). Images keep their own transparency.
   return vec4f(rgb, a);
 }

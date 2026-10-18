@@ -37,7 +37,8 @@ export interface ProbeWarning {
 
 /** What probing found. Everything an {@link Asset} needs except `id` and `source`. */
 export interface ProbedMedia {
-  kind: Asset['kind'];
+  /** Probed media files are never LUTs (those are read by the engine). */
+  kind: Exclude<Asset['kind'], 'lut'>;
   name: string;
   mimeType: string;
   size: number;

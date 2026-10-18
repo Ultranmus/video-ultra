@@ -69,6 +69,8 @@ interface Colors {
   accentVideo: string;
   accentText: string;
   accentSticker: string;
+  /** Blurred / pixelated areas (v0.2 C3). */
+  accentRegion: string;
   accentAudio: string;
   waveform: string;
   playhead: string;
@@ -292,6 +294,7 @@ export class TimelineView {
       accentVideo: v('--vu-clip-video', '#3b3b46'),
       accentText: v('--vu-clip-text', '#c79a5c'),
       accentSticker: v('--vu-clip-sticker', '#5cc7a6'),
+      accentRegion: v('--vu-clip-region', '#9aa3b8'),
       accentAudio: v('--vu-clip-audio', '#6aa8e0'),
       waveform: v('--vu-waveform', 'rgba(255,255,255,0.55)'),
       playhead: v('--vu-playhead', '#9c479c'),
@@ -1639,7 +1642,9 @@ export class TimelineView {
         ? c.accentText
         : item.kind === 'sticker'
           ? c.accentSticker
-          : c.accentAudio;
+          : item.kind === 'region'
+            ? c.accentRegion
+            : c.accentAudio;
     ctx.save();
     ctx.globalAlpha = alpha;
     // Pictures carry their own colour (thumbnails). Text, stickers and sound get a calm body
@@ -1706,7 +1711,11 @@ export class TimelineView {
             ? 'M5 6V4.5h14V6M12 4.5v15M9 19.5h6'
             : item.kind === 'audio'
               ? 'M9 18V5.5l11-2V16M9 18a3 3 0 11-6 0 3 3 0 016 0zM20 16a3 3 0 11-6 0 3 3 0 016 0z'
-              : '';
+              : item.kind === 'region'
+                ? item.effect === 'pixelate'
+                  ? 'M4 4h16v16H4zM4 9.3h16M4 14.7h16M9.3 4v16M14.7 4v16'
+                  : 'M4 6h3M10.5 6h3M17 6h3M4 18h3M10.5 18h3M17 18h3M4 6v3M4 15v3M20 6v3M20 15v3M9 12h.01M12 9.5h.01M12 14.5h.01M15 12h.01'
+                : '';
         if (glyph) {
           ctx.save();
           const gy = item.kind === 'audio' ? top + 5 : top + height / 2 - 7;
@@ -1716,7 +1725,12 @@ export class TimelineView {
           ctx.lineWidth = 2.25;
           ctx.lineCap = 'round';
           ctx.lineJoin = 'round';
-          ctx.stroke(this.#icon(`glyph-${item.kind}`, glyph));
+          ctx.stroke(
+            this.#icon(
+              `glyph-${item.kind}${item.kind === 'region' ? `-${item.effect}` : ''}`,
+              glyph,
+            ),
+          );
           ctx.restore();
           labelX = bx + 28;
         }

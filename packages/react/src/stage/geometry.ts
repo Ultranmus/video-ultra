@@ -38,6 +38,8 @@ export function itemBox(
     const side = Math.min(canvasW, canvasH) * tf.scale;
     return box(side, side);
   }
+  if (item.kind === 'region')
+    return box(item.width * canvasW * tf.scale, item.height * canvasH * tf.scale);
   const asset = item.assetId ? project.assets[item.assetId] : undefined;
   const aw = asset?.width ?? canvasW;
   const ah = asset?.height ?? canvasH;

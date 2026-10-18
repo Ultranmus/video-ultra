@@ -104,7 +104,7 @@ export function laneKindFor(kind: ItemKind): Exclude<TrackKind, 'main'> {
 /** Item kinds allowed on each track kind. */
 export const ALLOWED_KINDS: Record<TrackKind, readonly ItemKind[]> = {
   main: ['video', 'image', 'freeze'],
-  overlay: ['video', 'image', 'freeze', 'sticker'],
+  overlay: ['video', 'image', 'freeze', 'sticker', 'region'],
   text: ['text'],
   audio: ['audio'],
 };
@@ -181,6 +181,7 @@ export function assetKindsFor(kind: ItemKind): readonly Asset['kind'][] {
       // Audio items can play the sound of a video file ("extract audio").
       return ['audio', 'video'];
     case 'text':
+    case 'region':
       return [];
   }
 }

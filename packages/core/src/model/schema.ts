@@ -180,6 +180,44 @@ const base = {
   groupId: z.optional(id),
 };
 
+/**
+ * Green screen (file version 3+, optional): pixels close to `color` become transparent. Values
+ * 0…1: `tolerance` widens the range of removed colours, `softness` feathers the edge,
+ * `spill` takes the key colour's tint off what remains (green fringes on hair).
+ */
+export const ChromaKeySchema = z.object({
+  /** The colour to remove, `#rrggbb`. */
+  color: z.string(),
+  tolerance: unit,
+  softness: unit,
+  spill: unit,
+});
+
+/**
+ * A 3D LUT look (file version 3+, optional): a `.cube` file stored as a `lut` asset, applied after
+ * the filter and adjustments, mixed in by `intensity`.
+ */
+export const LutRefSchema = z.object({
+  assetId: id,
+  intensity: unit,
+});
+
+/**
+ * How a layer mixes with the pictures under it (file version 3+, optional; missing = `normal`).
+ * Lane items only — the main video is the bottom of the stack.
+ */
+export const BlendModeSchema = z.enum([
+  'normal',
+  'multiply',
+  'screen',
+  'overlay',
+  'soft-light',
+  'add',
+  'lighten',
+  'darken',
+  'difference',
+]);
+
 const visual = {
   transform: TransformSchema,
   crop: CropSchema,
@@ -191,6 +229,12 @@ const visual = {
   transitionIn: z.nullable(TransitionSchema),
   /** Lanes only (picture-in-picture): entrance / exit / loop animations. Ignored on the main track. */
   animation: z.optional(ItemAnimationSchema),
+  /** Green screen (file version 3+). Missing = off. */
+  key: z.optional(ChromaKeySchema),
+  /** A 3D LUT look on top of the filter (file version 3+). Missing = none. */
+  lut: z.optional(LutRefSchema),
+  /** Lanes only: how the picture mixes with what's under it (file version 3+). */
+  blend: z.optional(BlendModeSchema),
 };
 
 const audible = {
@@ -255,6 +299,8 @@ export const TextItemSchema = z.object({
   adjust: AdjustSchema,
   /** Entrance / exit / loop animations. */
   animation: z.optional(ItemAnimationSchema),
+  /** How the text mixes with what's under it (file version 3+). Missing = normal. */
+  blend: z.optional(BlendModeSchema),
 });
 
 export const StickerItemSchema = z.object({
@@ -272,6 +318,27 @@ export const StickerItemSchema = z.object({
   adjust: AdjustSchema,
   /** Entrance / exit / loop animations. */
   animation: z.optional(ItemAnimationSchema),
+  /** How the sticker mixes with what's under it (file version 3+). Missing = normal. */
+  blend: z.optional(BlendModeSchema),
+});
+
+/**
+ * A blurred or pixelated area (file version 3+): hides what is under it (faces, number plates)
+ * for its time on a picture layer. The box is `width × height` (fractions of the canvas width and
+ * height) at `transform.scale` 1, centred at `transform.x / y` and turned by `transform.rotation`;
+ * `transform.opacity` fades the effect.
+ */
+export const RegionItemSchema = z.object({
+  ...base,
+  kind: z.literal('region'),
+  /** Blur, or a mosaic of big pixels. */
+  effect: z.enum(['blur', 'pixelate']),
+  shape: z.enum(['rectangle', 'ellipse']),
+  /** Strength 0…1: how soft the blur is / how big the mosaic's cells are. */
+  amount: unit,
+  width: z.number().check(z.positive()),
+  height: z.number().check(z.positive()),
+  transform: TransformSchema,
 });
 
 export const ItemSchema = z.discriminatedUnion('kind', [
@@ -281,13 +348,14 @@ export const ItemSchema = z.discriminatedUnion('kind', [
   AudioItemSchema,
   TextItemSchema,
   StickerItemSchema,
+  RegionItemSchema,
 ]);
 
 export const TrackSchema = z.object({
   id,
   /**
    * `main`: the story — items back to back from 0, no gaps (exactly one main track).
-   * `overlay`: picture-in-picture video/images/stickers. `text`: titles. `audio`: music, sfx, voice.
+   * `overlay`: picture-in-picture video/images/stickers and blurred areas. `text`: titles. `audio`: music, sfx, voice.
    * Items within one track never overlap.
    */
   kind: z.enum(['main', 'overlay', 'text', 'audio']),
@@ -299,7 +367,8 @@ export const TrackSchema = z.object({
 
 export const AssetSchema = z.object({
   id,
-  kind: z.enum(['video', 'audio', 'image']),
+  /** `lut`: a `.cube` colour look file (file version 3+), used by items' `lut`. */
+  kind: z.enum(['video', 'audio', 'image', 'lut']),
   name: z.string(),
   mimeType: z.string(),
   size: z.int().check(z.nonnegative()),
@@ -375,6 +444,14 @@ export type FreezeItem = z.infer<typeof FreezeItemSchema>;
 export type AudioItem = z.infer<typeof AudioItemSchema>;
 export type TextItem = z.infer<typeof TextItemSchema>;
 export type StickerItem = z.infer<typeof StickerItemSchema>;
+/** A blurred / pixelated area on a picture layer. */
+export type RegionItem = z.infer<typeof RegionItemSchema>;
+/** Green-screen settings of a picture. */
+export type ChromaKey = z.infer<typeof ChromaKeySchema>;
+/** A picture's LUT look. */
+export type LutRef = z.infer<typeof LutRefSchema>;
+/** How a layer mixes with what's under it. */
+export type BlendMode = z.infer<typeof BlendModeSchema>;
 /** Anything that sits on a track. */
 export type Item = z.infer<typeof ItemSchema>;
 export type ItemKind = Item['kind'];

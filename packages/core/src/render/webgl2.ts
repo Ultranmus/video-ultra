@@ -5,10 +5,13 @@ import {
   frameIsHdr,
   hdrCalibrationFor,
   LAYER_FLOATS,
+  writeBackMapping,
   writeLayerUniforms,
 } from './hdr';
 import { EFFECT_FLOATS, IDENTITY_EFFECTS } from '../effects/colour';
 import { backdropSize, footprintRadius, UPSCALE_BLUR_TEXELS } from './backdrop';
+import type { CubeLut } from '../effects/lut';
+import { layerBounds, regionDownRadius, regionPad, regionSmallSize, regionTexel } from './grab';
 import { layerGeometry } from './layout';
 import { SHADERS } from './shaders/generated';
 import type {
@@ -84,9 +87,12 @@ export function createWebGL2Renderer(
     const index = gl.getUniformBlockIndex(program, block);
     if (index !== gl.INVALID_INDEX) gl.uniformBlockBinding(program, index, 0);
   }
-  // Generated sampler names: _group_<g>_binding_<b>_fs. Layer → unit 0, HDR curve → unit 1.
+  // Generated sampler names: _group_<g>_binding_<b>_fs. Layer → unit 0, HDR curve → unit 1,
+  // pixels under the layer (blend modes) → unit 2, 3D LUT → unit 3.
   gl.uniform1i(gl.getUniformLocation(program, '_group_0_binding_2_fs'), 0);
   gl.uniform1i(gl.getUniformLocation(program, '_group_0_binding_3_fs'), 1);
+  gl.uniform1i(gl.getUniformLocation(program, '_group_0_binding_4_fs'), 2);
+  gl.uniform1i(gl.getUniformLocation(program, '_group_0_binding_5_fs'), 3);
 
   // gl_VertexID needs a bound (empty) vertex array on some drivers.
   const vao = gl.createVertexArray();
@@ -108,6 +114,48 @@ export function createWebGL2Renderer(
     gl.UNSIGNED_BYTE,
     curvePixels(calibration),
   );
+
+  // Copy of the pixels under a layer (blend modes, blurred areas): grows to the largest rectangle
+  // needed (one texture, re-specified rarely). Starts as a 1×1 stand-in.
+  gl.activeTexture(gl.TEXTURE2);
+  // copyTexSubImage2D needs a format the canvas can fill: the canvas has no alpha (alpha:
+  // false), so the copy is RGB (sampled alpha reads as 1).
+  const grabRgb = !gl.getParameter(gl.ALPHA_BITS);
+  const grabFormat = grabRgb ? gl.RGB8 : gl.RGBA8;
+  const grabLayout = grabRgb ? gl.RGB : gl.RGBA;
+  const grab = { texture: newTexture(gl), w: 1, h: 1 };
+  gl.texImage2D(gl.TEXTURE_2D, 0, grabFormat, 1, 1, 0, grabLayout, gl.UNSIGNED_BYTE, null);
+  // 3D LUTs: uploaded once per LUT; a 1×1×1 stand-in for layers without one.
+  gl.activeTexture(gl.TEXTURE3);
+  const newLut = (size: number, data: Uint8Array<ArrayBuffer>): WebGLTexture => {
+    const texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_3D, texture);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGBA8, size, size, size, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
+    return texture;
+  };
+  const noLut = newLut(1, new Uint8Array([255, 255, 255, 255]));
+  const luts = new Map<CubeLut, WebGLTexture>();
+  let boundLut: WebGLTexture = noLut;
+  /** Binds `lut`'s 3D texture on unit 3 (uploading it once), leaving unit 0 active. */
+  const bindLut = (lut: CubeLut | null | undefined) => {
+    let texture = lut ? luts.get(lut) : noLut;
+    gl.activeTexture(gl.TEXTURE3);
+    if (!texture) {
+      texture = newLut(lut!.size, lut!.data);
+      luts.set(lut!, texture);
+    } else if (texture !== boundLut) {
+      gl.bindTexture(gl.TEXTURE_3D, texture);
+    }
+    boundLut = texture;
+    gl.activeTexture(gl.TEXTURE0);
+  };
+  gl.activeTexture(gl.TEXTURE0);
 
   // Video layers: one texture per distinct frame in a render, re-specified only on size changes.
   const videoSlots: { texture: WebGLTexture; w: number; h: number }[] = [];
@@ -178,6 +226,7 @@ export function createWebGL2Renderer(
     effects: Readonly<Float32Array> | null,
     texelW: number,
     texelH: number,
+    under: Int32Array | null = null,
   ) => {
     writeLayerUniforms(
       uniforms,
@@ -192,6 +241,8 @@ export function createWebGL2Renderer(
       targetW,
       targetH,
     );
+    // The copy underneath is bottom row first: texel y = y1 − pixel y.
+    if (under) writeBackMapping(uniforms, 0, under[0]!, under[3]!, 1, -1);
     gl.bufferSubData(gl.UNIFORM_BUFFER, 0, uniforms);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   };
@@ -249,6 +300,130 @@ export function createWebGL2Renderer(
     drawQuad(fullscreen, 1, false, fx, 0, 0);
   };
 
+  /** Copies canvas pixels `[x0, y0, x1, y1)` (y down) into the grab texture (bottom row first). */
+  const copyUnder = (b: Int32Array) => {
+    const w = b[2]! - b[0]!;
+    const h = b[3]! - b[1]!;
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, grab.texture);
+    if (w > grab.w || h > grab.h) {
+      // Grow in 256-px steps so a moving layer doesn't re-specify the texture every frame.
+      grab.w = Math.max(grab.w, Math.ceil(w / 256) * 256);
+      grab.h = Math.max(grab.h, Math.ceil(h / 256) * 256);
+      gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        grabFormat,
+        grab.w,
+        grab.h,
+        0,
+        grabLayout,
+        gl.UNSIGNED_BYTE,
+        null,
+      );
+    }
+    gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, b[0]!, canvas.height - b[3]!, w, h);
+    gl.activeTexture(gl.TEXTURE0);
+  };
+
+  // Blurred areas: the copy drawn small through a reused render target (grows, never shrinks).
+  let regionTarget: { texture: WebGLTexture; fbo: WebGLFramebuffer; w: number; h: number } | null =
+    null;
+  const bounds = new Int32Array(4);
+  const small = new Int32Array(2);
+  const downGeometry = new Float32Array(12);
+  const regionFx = new Float32Array(EFFECT_FLOATS);
+
+  /** A blurred / pixelated area: copy what's under it, shrink it, draw it back inside the box. */
+  const drawRegion = (layer: LayerDraw) => {
+    const region = layer.region!;
+    const texel = regionTexel(region.amount, region.pixelate, canvas.height);
+    const pad = regionPad(texel, region.pixelate);
+    if (!layerBounds(layer.geometry, canvas.width, canvas.height, pad, bounds)) return;
+    const w = bounds[2]! - bounds[0]!;
+    const h = bounds[3]! - bounds[1]!;
+    copyUnder(bounds);
+    regionSmallSize(w, h, texel, small);
+    const sw = small[0]!;
+    const sh = small[1]!;
+    if (!regionTarget || regionTarget.w < sw || regionTarget.h < sh) {
+      const rw = Math.max(sw, regionTarget?.w ?? 0, 64);
+      const rh = Math.max(sh, regionTarget?.h ?? 0, 64);
+      if (regionTarget) {
+        gl.deleteFramebuffer(regionTarget.fbo);
+        gl.deleteTexture(regionTarget.texture);
+      }
+      const texture = newTexture(gl);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, rw, rh, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      const fbo = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      regionTarget = { texture, fbo, w: rw, h: rh };
+    }
+    const target = regionTarget;
+    // Pass 1: the copy (bottom row first) into the target's corner, small, averaged.
+    gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo);
+    gl.viewport(0, 0, sw, sh);
+    targetW = sw;
+    targetH = sh;
+    const ku = w / grab.w;
+    const kv = h / grab.h;
+    const g = downGeometry;
+    g[0] = 1;
+    g[1] = 0;
+    g[2] = 0;
+    g[3] = 1;
+    g[4] = 0;
+    g[5] = 0;
+    g[6] = ku / 2;
+    g[7] = 0;
+    g[8] = 0;
+    g[9] = kv / 2;
+    g[10] = ku / 2;
+    g[11] = kv / 2;
+    const down = regionDownRadius(region.pixelate);
+    fx.set(IDENTITY_EFFECTS);
+    fx[24] = (down * ku) / sw;
+    fx[25] = (down * kv) / sh;
+    fx[93] = (w - 0.5) / grab.w;
+    fx[94] = (h - 0.5) / grab.h;
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, grab.texture);
+    gl.disable(gl.BLEND);
+    drawQuad(g, 1, false, fx, 1 / grab.w, 1 / grab.h);
+    gl.enable(gl.BLEND);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    targetW = canvas.width;
+    targetH = canvas.height;
+    // Pass 2: inside the box, the small copy by position (bottom row first, so v runs up).
+    regionFx.set(layer.effects ?? IDENTITY_EFFECTS);
+    if (!region.pixelate) {
+      regionFx[24] = UPSCALE_BLUR_TEXELS / target.w;
+      regionFx[25] = UPSCALE_BLUR_TEXELS / target.h;
+    }
+    regionFx[93] = (sw - 0.5) / target.w;
+    regionFx[94] = (sh - 0.5) / target.h;
+    gl.bindTexture(gl.TEXTURE_2D, target.texture);
+    writeLayerUniforms(
+      uniforms,
+      0,
+      layer.geometry,
+      layer.opacity,
+      false,
+      calibration,
+      regionFx,
+      1 / target.w,
+      1 / target.h,
+      targetW,
+      targetH,
+    );
+    writeBackMapping(uniforms, 0, bounds[0]!, bounds[3]!, sw / w / target.w, -sh / h / target.h);
+    gl.bufferSubData(gl.UNIFORM_BUFFER, 0, uniforms);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  };
+
   const single: LayerDraw = {
     source: null as unknown as VideoFrame,
     geometry: new Float32Array(12),
@@ -273,6 +448,18 @@ export function createWebGL2Renderer(
       gl.activeTexture(gl.TEXTURE0);
       if (backdrop) drawBackdrop(backdrop);
       for (const layer of layers) {
+        if (layer.region) {
+          drawRegion(layer);
+          continue;
+        }
+        // Blend modes read the pixels under the layer: copy them first.
+        let under: Int32Array | null = null;
+        if (layer.blend) {
+          if (!layerBounds(layer.geometry, canvas.width, canvas.height, 1, bounds)) continue;
+          copyUnder(bounds);
+          under = bounds;
+        }
+        bindLut(layer.lut);
         const source = layer.source;
         const hdr = bindSource(source, layer.hdr);
         const w = source instanceof VideoFrame ? source.displayWidth : source.width;
@@ -284,6 +471,7 @@ export function createWebGL2Renderer(
           layer.effects ?? null,
           1 / w,
           1 / h,
+          under,
         );
       }
       // Don't keep (soon closed) frames referenced between renders.
@@ -320,6 +508,14 @@ export function createWebGL2Renderer(
         gl.deleteFramebuffer(backdropTarget.fbo);
         gl.deleteTexture(backdropTarget.texture);
       }
+      if (regionTarget) {
+        gl.deleteFramebuffer(regionTarget.fbo);
+        gl.deleteTexture(regionTarget.texture);
+      }
+      for (const texture of luts.values()) gl.deleteTexture(texture);
+      luts.clear();
+      gl.deleteTexture(noLut);
+      gl.deleteTexture(grab.texture);
       gl.deleteTexture(curve);
       gl.deleteBuffer(ubo);
       gl.deleteVertexArray(vao);

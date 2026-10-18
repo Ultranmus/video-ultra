@@ -13,6 +13,7 @@ export type {
   LayerSource,
   Renderer,
   RendererOptions,
+  RegionDraw,
 } from './render/types';
 export { layerGeometry, displaySize, applyGeometry, GEOMETRY_FLOATS } from './render/layout';
 export type { LayerLook, LayerMedia } from './render/layout';
@@ -38,8 +39,15 @@ export {
   BlurMode,
   MaskShape,
   WarpKind,
+  BLEND_IDS,
+  chromaOf,
+  keyParams,
+  noPictureFx,
 } from './effects/colour';
-export type { ColourParams, LayerFx } from './effects/colour';
+export type { ColourParams, LayerFx, PictureFx } from './effects/colour';
+export { parseCubeLut, sampleLut, LutError, LUT_MIN_SIZE, LUT_MAX_SIZE } from './effects/lut';
+export type { CubeLut } from './effects/lut';
+export { layerBounds, regionTexel } from './render/grab';
 export {
   transitionLook,
   transitionOverlay,

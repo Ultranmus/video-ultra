@@ -12,6 +12,7 @@
  * Usage: playground running, then
  *   node scripts/export-check.ts [--browsers chrome,webkit,firefox] [--formats mp4,webm]
  *     [--backends webgl2,webgpu] [--height 720] [--fps 30] [--save dir] [--no-extras]
+ *     [--backends webgl2,webgpu] [--height 720] [--fps 30] [--save dir] [--picture]
  */
 import { chromium, firefox, webkit, type Browser, type Page } from '@playwright/test';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -32,6 +33,8 @@ const fps = Number(arg('fps') ?? 30) as 30;
 const memory = process.argv.includes('--memory');
 const repeat = Number(arg('repeat') ?? 1);
 const skipExtras = process.argv.includes('--no-extras');
+/** --picture: the demo also uses every picture tool (green screen, LUT, blend, pixelated area). */
+const picture = process.argv.includes('--picture');
 const dir = arg('save') ?? mkdtempSync(join(tmpdir(), 'vu-export-'));
 mkdirSync(dir, { recursive: true });
 
@@ -408,7 +411,10 @@ for (const name of browsers) {
       'console',
       (m) => m.type() === 'error' && !/404/.test(m.text()) && errors.push(m.text()),
     );
-    await page.goto(`${BASE}/lab/engine${repeat > 1 ? `?repeat=${repeat}` : ''}`);
+    const query = [repeat > 1 ? `repeat=${repeat}` : '', picture ? 'picture=1' : '']
+      .filter(Boolean)
+      .join('&');
+    await page.goto(`${BASE}/lab/engine${query ? `?${query}` : ''}`);
     await page.waitForFunction(
       () => /^Ready|FAILED/.test(document.getElementById('status')!.textContent!),
       null,

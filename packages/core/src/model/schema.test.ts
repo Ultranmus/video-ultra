@@ -243,6 +243,69 @@ describe('project file back-compat', () => {
       false,
     );
   });
+
+  it('a version-3 project keeps green screen, LUT, blend modes and blurred areas (v0.2 C)', () => {
+    const data = upgraded(JSON.parse(V01_PROJECT));
+    data.assets.look = {
+      id: 'look',
+      kind: 'lut',
+      name: 'Teal.cube',
+      mimeType: 'text/plain',
+      size: 400000,
+      duration: 0,
+      hasAudio: false,
+      source: { type: 'opfs', key: 'look' },
+    };
+    const main = data.tracks[0].items;
+    main[0].key = { color: '#00b140', tolerance: 0.4, softness: 0.3, spill: 0.5 };
+    main[1].lut = { assetId: 'look', intensity: 0.8 };
+    data.tracks[1].items[0].blend = 'screen';
+    data.tracks[2].items[0].blend = 'soft-light';
+    data.tracks[2].items.push({
+      id: 'r',
+      kind: 'region',
+      start: 2116800000,
+      duration: 2116800000,
+      effect: 'pixelate',
+      shape: 'ellipse',
+      amount: 0.5,
+      width: 0.3,
+      height: 0.2,
+      transform: transform(),
+    });
+    const result = parseProject(data);
+    expect(result.ok, result.ok ? '' : result.error).toBe(true);
+    if (!result.ok) return;
+    expect(result.warnings).toEqual([]);
+    expect(result.project).toEqual(data);
+  });
+
+  it('drops a LUT look whose file is missing; rejects bad picture-tool values', () => {
+    const data = upgraded(JSON.parse(V01_PROJECT));
+    data.tracks[0].items[0].lut = { assetId: 'gone', intensity: 1 };
+    const repaired = parseProject(data);
+    expect(repaired.ok).toBe(true);
+    if (!repaired.ok) return;
+    expect('lut' in repaired.project.tracks[0]!.items[0]!).toBe(false);
+    expect(repaired.warnings.join(' ')).toMatch(/LUT/);
+    const bad = (edit: (d: ReturnType<typeof JSON.parse>) => void) => {
+      const d = upgraded(JSON.parse(V01_PROJECT));
+      edit(d);
+      return parseProject(d).ok;
+    };
+    expect(bad((d) => (d.tracks[2].items[0].blend = 'burn'))).toBe(false);
+    expect(
+      bad(
+        (d) => (d.tracks[0].items[0].key = { color: '#0f0', tolerance: 2, softness: 0, spill: 0 }),
+      ),
+    ).toBe(false);
+    // A lut-kind asset can't be a clip's media.
+    expect(
+      bad((d) => {
+        d.assets.v.kind = 'lut';
+      }),
+    ).toBe(false);
+  });
 });
 
 describe('export range (file version 3, optional)', () => {

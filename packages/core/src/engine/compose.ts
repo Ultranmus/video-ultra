@@ -1,18 +1,25 @@
 import type { Input, InputVideoTrack, VideoSample } from 'mediabunny';
 import { animationState, restingState, type AnimationState } from '../effects/animations';
 import {
+  BLEND_IDS,
   colourParams,
   EFFECT_FLOATS,
   identityColour,
   isIdentityColour,
   isNoFx,
+  isNoPictureFx,
+  keyParams,
   MaskShape,
   noFx,
+  noPictureFx,
   resetFx,
+  resetPictureFx,
   writeEffects,
   type ColourParams,
   type LayerFx,
+  type PictureFx,
 } from '../effects/colour';
+import type { CubeLut } from '../effects/lut';
 import {
   noOverlay,
   plainLook,
@@ -68,6 +75,8 @@ export interface VideoMedia {
 export interface MediaLibrary {
   videos: Map<string, Promise<VideoMedia>>;
   images: Map<string, Promise<ImageBitmap>>;
+  /** Parsed `.cube` LUT files by asset id. */
+  luts: Map<string, Promise<CubeLut>>;
 }
 
 /** Result of one {@link Composer.render}. */
@@ -114,6 +123,7 @@ interface Slot {
   fx: LayerFx;
   look: TransitionLook;
   anim: AnimationState;
+  pic: PictureFx;
 }
 
 type Draft =
@@ -128,6 +138,7 @@ type Draft =
       media: LayerMedia;
       /** False while a transition hides the clip (its decoder keeps running). */
       visible: boolean;
+      lut: CubeLut | null;
     }
   | {
       kind: 'still';
@@ -264,6 +275,7 @@ export class Composer {
       fx: noFx(),
       look: plainLook(),
       anim: restingState(),
+      pic: noPictureFx(),
     });
   }
 
@@ -289,8 +301,10 @@ export class Composer {
     texW: number,
     texH: number,
     textLayout: TextRevealLayout | null,
+    lut: CubeLut | null = null,
   ): Float32Array | null {
     const item = layer.item;
+    this.pictureFx(layer, slot.pic, lut);
     // Pictures, text and stickers all take a colour look.
     if ('filter' in item) colourParams(item.filter, item.adjust, slot.colour);
     else colourParams(null, NO_ADJUST, slot.colour);
@@ -350,13 +364,70 @@ export class Composer {
     }
     fx.grainSeed = this.grainSeed;
     fx.cheapBlur = this.cheapEffects;
-    if (isNoFx(fx) && isIdentityColour(slot.colour)) return null;
-    writeEffects(slot.effects, 0, slot.colour, fx);
+    if (isNoFx(fx) && isIdentityColour(slot.colour) && isNoPictureFx(slot.pic)) return null;
+    writeEffects(slot.effects, 0, slot.colour, fx, slot.pic);
     return slot.effects;
   }
 
-  /** Canvas aspect of the frame being drawn. */
+  /** Green screen, LUT, blend mode and blurred area of a layer, into `pic` (reused). */
+  private pictureFx(layer: ActiveLayer, pic: PictureFx, lut: CubeLut | null): void {
+    resetPictureFx(pic);
+    const item = layer.item;
+    if (item.kind === 'region') {
+      pic.region = item.effect === 'pixelate' ? 2 : 1;
+      pic.regionShape = item.shape === 'ellipse' ? 1 : 0;
+      // About 1.5 canvas px of anti-aliased edge, in box units (half the box = 1).
+      const s = item.transform.scale;
+      pic.regionEdgeX = Math.min(1, 3 / Math.max(1e-3, item.width * this.width * s));
+      pic.regionEdgeY = Math.min(1, 3 / Math.max(1e-3, item.height * this.height * s));
+      return;
+    }
+    if ('key' in item && item.key) {
+      keyParams(
+        this.colourOf(item.key.color),
+        item.key.tolerance,
+        item.key.softness,
+        item.key.spill,
+        pic,
+      );
+    }
+    if (lut && 'lut' in item && item.lut && item.lut.intensity > 0) {
+      pic.lutAmount = Math.min(1, item.lut.intensity);
+      pic.lutSize = lut.size;
+    }
+    // Lanes only: the main video is the bottom of the stack.
+    if (layer.track.kind !== 'main' && 'blend' in item && item.blend)
+      pic.blend = BLEND_IDS[item.blend] ?? 0;
+  }
+
+  /** Parsed `#rrggbb` colours (key colours), cached so frames don't parse strings. */
+  private readonly colours = new Map<string, [number, number, number]>();
+  private colourOf(color: string): [number, number, number] {
+    let rgb = this.colours.get(color);
+    if (!rgb) {
+      rgb = parseColor(color);
+      if (this.colours.size > 64) this.colours.clear();
+      this.colours.set(color, rgb);
+    }
+    return rgb;
+  }
+
+  /** The item's LUT, when it has one and the file is loaded. */
+  private async lutOf(item: Item): Promise<CubeLut | null> {
+    if (!('lut' in item) || !item.lut || item.lut.intensity <= 0) return null;
+    const pending = this.media.luts.get(item.lut.assetId);
+    if (!pending) return null;
+    try {
+      return await pending;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Canvas aspect and size of the frame being drawn. */
   private aspect = 1;
+  private width = 1;
+  private height = 1;
 
   /**
    * Draws the frame at timeline time `t` on a `width × height` target. Preview: waits for decoded
@@ -379,6 +450,8 @@ export class Composer {
     };
     const t0 = performance.now();
     this.aspect = width / height;
+    this.width = width;
+    this.height = height;
     this.grainSeed = frameIndex(t, project.settings.frameRate) % 997;
     const options = this.transitionOptions;
     options.aspect = this.aspect;
@@ -430,6 +503,8 @@ export class Composer {
           opacity: draft.opacity,
           hdr: draft.hdr,
           effects: draft.effects,
+          blend: draft.slot.pic.blend,
+          lut: draft.lut,
         };
       } else {
         draw = draft.draw;
@@ -571,13 +646,25 @@ export class Composer {
         };
         layerGeometry(width, height, media, item, slot.geometry);
         finish();
-        const effects = this.effectsFor(layer, slot, look, anim, bitmap.width, bitmap.height, null);
+        const lut = await this.lutOf(item);
+        const effects = this.effectsFor(
+          layer,
+          slot,
+          look,
+          anim,
+          bitmap.width,
+          bitmap.height,
+          null,
+          lut,
+        );
         const draw: LayerDraw = {
           source: bitmap,
           geometry: slot.geometry,
           opacity: item.transform.opacity * opacity,
           hdr: false,
           effects,
+          blend: slot.pic.blend,
+          lut,
         };
         return { kind: 'still', layer, draw, media, slot, visible: !hidden };
       }
@@ -620,6 +707,7 @@ export class Composer {
             canvas.height,
             this.textLayouts.get(canvas) ?? null,
           ),
+          blend: slot.pic.blend,
         };
         return { kind: 'still', layer, draw, media, slot, visible: !hidden };
       }
@@ -658,8 +746,24 @@ export class Composer {
           opacity: item.transform.opacity * opacity,
           hdr: false,
           effects: this.effectsFor(layer, slot, look, anim, source.width, source.height, null),
+          blend: slot.pic.blend,
         };
         return { kind: 'still', layer, draw, media, slot, visible: !hidden };
+      }
+      case 'region': {
+        // Draws what's under its box, blurred or pixelated (the renderer copies the pixels).
+        const tf = item.transform;
+        placedGeometry(width, height, item.width * width, item.height * height, tf, slot.geometry);
+        const draw: LayerDraw = {
+          source: this.solidSource(),
+          geometry: slot.geometry,
+          opacity: tf.opacity,
+          hdr: false,
+          effects: this.effectsFor(layer, slot, null, null, 2, 2, null),
+          region: { pixelate: item.effect === 'pixelate', amount: item.amount },
+        };
+        const media: LayerMedia = { width: 2, height: 2, rotation: 0, flip: false };
+        return { kind: 'still', layer, draw, media, slot, visible: tf.opacity > 0 };
       }
       case 'video':
       case 'freeze': {
@@ -693,6 +797,7 @@ export class Composer {
         const media = found.video.media;
         layerGeometry(width, height, media, item, slot.geometry);
         finish();
+        const lut = await this.lutOf(item);
         // The picture itself is looked up after all layers are gathered (render), not here: a
         // late frame arriving while other layers are still decoding may replace and close it.
         return {
@@ -702,9 +807,10 @@ export class Composer {
           slot,
           opacity: item.transform.opacity * opacity,
           hdr: found.video.hdr,
-          effects: this.effectsFor(layer, slot, look, anim, media.width, media.height, null),
+          effects: this.effectsFor(layer, slot, look, anim, media.width, media.height, null, lut),
           media,
           visible: !hidden,
+          lut,
         };
       }
     }
