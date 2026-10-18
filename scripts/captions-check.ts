@@ -21,6 +21,7 @@ const port = arg('port') ?? '3200';
 const shots = arg('shots');
 const withModel = !process.argv.includes('--no-model');
 const hindi = process.argv.includes('--hindi');
+const webkitModel = process.argv.includes('--webkit-model');
 let failures = 0;
 const results: string[] = [];
 const check = (label: string, ok: boolean, detail = '') => {
@@ -233,6 +234,40 @@ if (withModel) {
   await browser.close();
 }
 
+// ── the real model in WebKit (Safari's engine: its call-argument limit once broke this) ────
+if (webkitModel) {
+  const browser = await webkit.launch();
+  const page = await (await browser.newContext({ ...devices['iPhone 13'] })).newPage();
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await load(page, '', ['speech-en-gb.m4a']);
+  await page.locator('.vu-toolbar .vu-btn', { hasText: 'Captions' }).first().tap();
+  await page
+    .locator('.vu-dock button', { hasText: /^English$/ })
+    .first()
+    .tap();
+  const t0 = Date.now();
+  await page.locator('.vu-dock .vu-btn', { hasText: 'Make captions' }).tap();
+  const outcome = await page
+    .waitForFunction(
+      () =>
+        (window as any).vuEditor.project.tracks.some((t: any) => t.kind === 'caption') ||
+        document.querySelector('.vu-toast[data-tone="error"]')?.textContent,
+      null,
+      { timeout: 600000 },
+    )
+    .then((h) => h.jsonValue());
+  const caps = await captions(page);
+  const text = caps?.items.map((i) => i.text).join(' ') ?? String(outcome);
+  check(
+    'WebKit: the on-device model captions real speech',
+    /welcome back to the channel/i.test(text),
+    `${((Date.now() - t0) / 1000).toFixed(1)} s: "${text.slice(0, 70)}"`,
+  );
+  check('no page errors (WebKit model)', errors.length === 0, errors.join(' | '));
+  await browser.close();
+}
+
 // ── Hindi (the small model; slow on WebAssembly, so WebGPU) ───────────────
 if (hindi) {
   const browser = await chromium.launch({ channel: 'chrome', args: ['--enable-unsafe-webgpu'] });
@@ -276,6 +311,22 @@ if (hindi) {
     'phone: Captions opens in the sheet',
     await page.locator('.vu-dock .vu-captions').isVisible(),
   );
+  // Hindi works on a phone without WebGPU too (the larger model, slower — the estimate says so).
+  await page.locator('.vu-dock button', { hasText: /^Hindi$/ }).first().tap();
+  await page.waitForTimeout(300);
+  const make = page.locator('.vu-dock .vu-btn', { hasText: 'Make captions' });
+  check('phone: Hindi can be captioned', (await make.getAttribute('aria-disabled')) !== 'true');
+  await page.locator('.vu-dock button', { hasText: /^English$/ }).first().tap();
+  // The sheet scrolls to its end while half open.
+  const scrolls = await page.evaluate(() => {
+    const body = document.querySelector('.vu-dock-body') as HTMLElement;
+    body.scrollTop = body.scrollHeight;
+    const last = body.querySelector('.vu-caption-sources') as HTMLElement;
+    const r = last.getBoundingClientRect();
+    const bar = document.querySelector('.vu-toolbar')!.getBoundingClientRect();
+    return r.bottom <= bar.top + 1;
+  });
+  check('phone: the half-open sheet scrolls to its last control', scrolls);
   await page.locator('.vu-dock .vu-btn', { hasText: 'Make captions' }).tap();
   await page.waitForFunction(
     () => (window as any).vuEditor.project.tracks.some((t: any) => t.kind === 'caption'),

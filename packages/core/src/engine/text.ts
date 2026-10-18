@@ -63,7 +63,8 @@ function wrapLine(line: string, max: number, width: (s: string) => number): stri
     return out;
   };
   const target = greedy(max).length;
-  let lo = Math.max(...words.map(width));
+  let lo = 0;
+  for (const w of words) lo = Math.max(lo, width(w));
   let hi = max;
   for (let i = 0; i < 12 && hi - lo > 1; i++) {
     const mid = (lo + hi) / 2;

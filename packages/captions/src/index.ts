@@ -92,7 +92,10 @@ const FILES: Record<
   },
 };
 
-/** Languages the small models hear badly: these use `small` (DECISIONS #120). */
+/**
+ * Languages the small models hear badly: these use `small` (DECISIONS #128) — on WebGPU when
+ * the device has it, else on WebAssembly (slower; the estimate says how long).
+ */
 const NEEDS_SMALL = new Set([
   'hi',
   'ur',
@@ -148,18 +151,16 @@ export async function chooseModel(
         : 'wasm';
   const cores = nav?.hardwareConcurrency ?? 4;
   const tooSmall = (memory !== undefined && memory < 4) || cores < 4;
-  const tooSlow = model === 'small' && device !== 'webgpu' && options.model !== 'small';
-  const reason = tooSmall
-    ? 'This device is too small to make captions on its own.'
-    : tooSlow
-      ? 'Captions in this language need a device with WebGPU (a recent computer).'
-      : undefined;
+  const reason = tooSmall ? 'This device is too small to make captions on its own.' : undefined;
+  // Phones are ~3× slower than the laptop the speeds were measured on (the estimate says so).
+  const phone =
+    typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches && cores <= 8;
   return {
     ok: !reason,
     device,
     model,
     downloadMB: FILES[model][device].mb,
-    speed: SPEED[model][device],
+    speed: SPEED[model][device] / (phone ? 3 : 1),
     ...(reason ? { reason } : {}),
   };
 }
@@ -181,14 +182,20 @@ export function createOnDeviceTranscriber(options: OnDeviceTranscriberOptions = 
   let nextId = 1;
   const pending = new Map<
     number,
-    { resolve: (w: TranscriptWord[]) => void; reject: (e: Error) => void }
+    {
+      resolve: (w: { words: TranscriptWord[]; language: string }) => void;
+      reject: (e: Error) => void;
+    }
   >();
   let onDownload: ((loaded: number, total: number) => void) | null = null;
 
+  /** The model the worker has loaded (for switching after detecting the language). */
+  let loadedModel: CaptionModel | null = null;
   const start = (language: string): Promise<'webgpu' | 'wasm'> => {
     if (loading) return loading;
     loading = (async () => {
       const support = await chooseModel(options, language);
+      loadedModel = support.model;
       worker = new Worker(new URL('./transcribe.worker.js', import.meta.url), { type: 'module' });
       return new Promise<'webgpu' | 'wasm'>((resolve, reject) => {
         worker!.onmessage = (e: MessageEvent<FromWorker>) => {
@@ -196,7 +203,7 @@ export function createOnDeviceTranscriber(options: OnDeviceTranscriberOptions = 
           if (msg.type === 'download') onDownload?.(msg.loaded, msg.total);
           else if (msg.type === 'ready') resolve(msg.device);
           else if (msg.type === 'words') {
-            pending.get(msg.id)?.resolve(msg.words);
+            pending.get(msg.id)?.resolve({ words: msg.words, language: msg.language });
             pending.delete(msg.id);
           } else if (msg.type === 'error') {
             if (msg.id === null) reject(new Error(msg.message));
@@ -234,7 +241,10 @@ export function createOnDeviceTranscriber(options: OnDeviceTranscriberOptions = 
     return loading;
   };
 
-  const hear = (audio: Float32Array, language: string): Promise<TranscriptWord[]> =>
+  const hear = (
+    audio: Float32Array,
+    language: string,
+  ): Promise<{ words: TranscriptWord[]; language: string }> =>
     new Promise((resolve, reject) => {
       const id = nextId++;
       pending.set(id, { resolve, reject });
@@ -285,17 +295,38 @@ export function createOnDeviceTranscriber(options: OnDeviceTranscriberOptions = 
         const words: TranscriptWord[] = [];
         const windows = Math.max(1, Math.ceil(request.duration / (WINDOW_SECONDS - 2)));
         request.onProgress?.({ stage: 'transcribe', fraction: 0 });
+        let language = request.language;
         for await (const w of windowsOf(request.audio, TRANSCRIBE_SAMPLE_RATE)) {
           if (signal.aborted) throw new DOMException('Cancelled', 'AbortError');
           const length = w.audio.length / TRANSCRIBE_SAMPLE_RATE;
-          const heard = await hear(w.audio, request.language);
-          words.push(...keepWords(heard, w.index, w.isLast, length));
+          // Detecting: keep this window, in case the language heard needs another model.
+          const again = language === 'auto' ? w.audio.slice() : null;
+          let heard = await hear(w.audio, language);
+          if (language === 'auto') {
+            language = heard.language;
+            const need = await chooseModel(options, language);
+            if (again && need.ok && need.model !== loadedModel) {
+              // e.g. Hindi heard with the fast model: load the one that writes it, hear again.
+              close();
+              onDownload = (loaded, total) =>
+                request.onProgress?.({
+                  stage: 'download',
+                  fraction: total ? loaded / total : 0,
+                  loaded,
+                  total,
+                });
+              await start(language);
+              onDownload = null;
+              heard = await hear(again, language);
+            }
+          }
+          for (const word of keepWords(heard.words, w.index, w.isLast, length)) words.push(word);
           request.onProgress?.({
             stage: 'transcribe',
             fraction: Math.min(1, (w.index + 1) / windows),
           });
         }
-        return { words, language: request.language };
+        return { words, language };
       } finally {
         signal.removeEventListener('abort', abort);
         onDownload = null;

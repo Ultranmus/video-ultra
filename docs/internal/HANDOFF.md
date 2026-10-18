@@ -2,6 +2,14 @@
 
 Where the last session stopped and what comes next. Update before ending every session.
 
+## 2026-10-19 (owner's iPhone report fixed — DECISIONS #129)
+
+Captions crash on iPhone, Hindi/Bangla/Urdu disabled, sheet not scrolling (Captions, Blur),
+History off-screen, Align submenu cut off, stage taps/moves/menu dead on iPhone, black line on
+the selection — all fixed. Captions now also run in WebKit with the real model (30 s English in
+10 s). Re-check on the iPhone: stage select / move / long-press menu after using menus and the
+sheet; Hindi captions (expect a few minutes for a minute of speech); every sheet scrolls.
+
 ## 2026-10-19 (v0.2 built — owner's one test of the whole release is next)
 
 All of v0.2 is built and verified on main: A captions, B sound, C picture tools, D capture &

@@ -2287,9 +2287,8 @@
     transform-origin: center;
     /* While the view is zoomed (--vu-stage-zoom on the frame) the outline and handles keep their
        on-screen size. */
-    box-shadow:
-      0 0 0 calc(1px / var(--vu-stage-zoom, 1)) var(--vu-selection),
-      0 0 0 calc(2px / var(--vu-stage-zoom, 1)) var(--vu-overlay);
+    /* One clean line (owner, 2026-10-19: the dark ring around it read as a second, black line). */
+    box-shadow: 0 0 0 calc(1.5px / var(--vu-stage-zoom, 1)) var(--vu-selection);
     pointer-events: none;
   }
 
@@ -2589,10 +2588,10 @@
     animation: vu-dock-swap var(--vu-duration-fast) var(--vu-ease-out);
   }
 
+  /* Opacity only: a transform on a scroll container upsets iOS scrolling. */
   @keyframes vu-dock-swap {
     from {
       opacity: 0;
-      transform: translateY(var(--vu-space-2));
     }
   }
 
@@ -2657,9 +2656,10 @@
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
-    /* The part pushed below the screen (sheet not expanded) is padding, so the end of the list
-       can still be scrolled into view. */
-    padding: var(--vu-space-3) var(--vu-space-4) calc(var(--vu-sheet-y) + var(--vu-space-4));
+    /* The scroll area ends where the sheet's visible part ends (the part pushed below the screen
+       is a margin, not padding): every panel scrolls to its end, on iOS too. */
+    margin-bottom: var(--vu-sheet-y);
+    padding: var(--vu-space-3) var(--vu-space-4) var(--vu-space-4);
     --vu-scroll-pad-top: var(--vu-space-3);
   }
 
@@ -3326,7 +3326,8 @@
     position: absolute;
     top: calc(100% + var(--vu-space-2));
     left: 50%;
-    z-index: var(--vu-z-popover);
+    /* Above toasts: what you're working in is never covered by a notice. */
+    z-index: calc(var(--vu-z-toast) + 1);
     display: flex;
     flex-direction: column;
     gap: var(--vu-space-2);
@@ -3360,9 +3361,32 @@
     flex-direction: column;
     gap: var(--vu-space-1);
     margin: 0;
-    padding: 0;
+    padding: 0 var(--vu-space-1) 0 0;
     overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
     list-style: none;
+  }
+
+  /* Phones: History spans the width under the top bar (centred on its button it ran off the
+     left edge). */
+  @container vu (max-width: 767px) {
+    .vu-topbar {
+      position: relative;
+    }
+
+    .vu-popover-anchor {
+      position: static;
+    }
+
+    .vu-popover {
+      top: 100%;
+      right: var(--vu-space-3);
+      left: var(--vu-space-3);
+      width: auto;
+      max-height: min(70vh, var(--vu-size-sheet));
+      transform: none;
+    }
   }
 
   .vu-history-step {
@@ -3610,10 +3634,13 @@
   /* Context menu */
   .vu-menu {
     position: absolute;
-    z-index: var(--vu-z-popover);
+    z-index: calc(var(--vu-z-toast) + 1);
     display: flex;
     flex-direction: column;
     min-width: var(--vu-size-menu);
+    max-height: 80vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     padding: var(--vu-space-1);
     border: 1px solid var(--vu-border);
     border-radius: var(--vu-radius-md);
@@ -3687,19 +3714,22 @@
     left: calc(100% + var(--vu-space-1));
   }
 
-  /* No room on the right (phones): the submenu opens below its item. */
-  @container (max-width: 767px) {
+  /* Phones: no room on the side — the submenu opens inline, under its item. */
+  @container vu (max-width: 767px) {
     .vu-submenu {
-      top: 100%;
-      left: var(--vu-space-4);
+      position: static;
+      min-width: 0;
+      margin: 0 0 0 var(--vu-space-5);
+      padding: 0;
+      border: 0;
+      background: transparent;
+      box-shadow: none;
     }
   }
 
   /* Several selected: one upright box, a faint outline on each member, and the drag rectangle. */
   .vu-selection-box[data-group] {
-    box-shadow:
-      0 0 0 calc(1.5px / var(--vu-stage-zoom, 1)) var(--vu-selection),
-      0 0 0 calc(2.5px / var(--vu-stage-zoom, 1)) var(--vu-overlay);
+    box-shadow: 0 0 0 calc(2px / var(--vu-stage-zoom, 1)) var(--vu-selection);
   }
 
   .vu-selection-box[data-locked] {
@@ -3723,7 +3753,6 @@
     top: 0;
     left: 0;
     transform-origin: center;
-    box-shadow: 0 0 0 calc(1px / var(--vu-stage-zoom, 1)) var(--vu-accent-soft);
     outline: calc(1px / var(--vu-stage-zoom, 1)) dashed var(--vu-selection);
     outline-offset: 0;
     opacity: 0.7;

@@ -651,3 +651,18 @@ reason; when one changes, edit the entry and note the date.
       real time on a laptop) and aren't offered on devices without WebGPU unless the host plugs
       in a transcriber. Under 4 GB / 4 cores: no on-device captions (import / type still work).
       The speech the model hears leaves out music marked "Lower under voice".
+129.  **Owner's iPhone report fixes** (2026-10-19). (a) Auto captions failed on iPhone with
+      "Maximum call stack size exceeded": the tokenizer spread its 50 000-entry vocabulary into
+      `Math.max(...)`, past Safari's argument limit — loops now (no large spreads in captions).
+      (b) Hindi / Bangla / Urdu are offered on every capable device (amends #128): the larger
+      model runs on WebAssembly where there's no WebGPU, and the panel says how long it takes
+      (phone speeds estimated at a third of a laptop's); a reason shows as text, not only a
+      tooltip. "Detect" switches to the larger model after the first window when it hears such a
+      language. (c) The phone sheet's scroll area now ends where its visible part ends (a bottom
+      margin, not padding) and its content swap is opacity-only — iOS scrolls every panel.
+      (d) History spans the width under the top bar on phones; the Align submenu opens inline;
+      menus re-clamp when they grow; popovers and menus sit above toasts. (e) The stage resets
+      stale touch state when a new gesture starts (iOS can end a touch without telling us; the
+      stuck finger made every later tap look like a second finger — no select, move, menu or
+      deselect) and ends a gesture on lost pointer capture. (f) The selection outline is one
+      accent line (the dark outer ring read as a black line).

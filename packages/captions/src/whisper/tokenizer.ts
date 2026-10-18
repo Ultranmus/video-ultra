@@ -43,10 +43,11 @@ export class WhisperTokenizer {
     model: { vocab: Record<string, number> };
     added_tokens: { id: number; content: string; special?: boolean }[];
   }) {
-    const size = Math.max(
-      ...Object.values(json.model.vocab),
-      ...json.added_tokens.map((t) => t.id),
-    );
+    // A loop, not Math.max(...): the vocabulary has 50 000+ entries, more arguments than
+    // Safari allows in one call ("Maximum call stack size exceeded").
+    let size = 0;
+    for (const id of Object.values(json.model.vocab)) if (id > size) size = id;
+    for (const t of json.added_tokens) if (t.id > size) size = t.id;
     this.#pieces = new Array<string>(size + 1).fill('');
     for (const [piece, id] of Object.entries(json.model.vocab)) this.#pieces[id] = piece;
     const byName = new Map<string, number>();

@@ -521,20 +521,21 @@ function MenuPanel({ x, y }: { x: number; y: number }): ReactElement {
     returnFocus.current?.focus?.({ preventScroll: true });
   };
 
-  // Keep it inside the editor.
+  // Keep it inside the editor — on opening, and when the submenu (inline on phones) makes it
+  // taller. Clamps from the point it was opened at, so a later pass never undoes an earlier one.
+  const focused = useRef(false);
   useLayoutEffect(() => {
     const el = ref.current;
     const root = el?.closest<HTMLElement>('.vu-root');
     if (!el || !root) return;
-    const w = el.offsetWidth;
-    const h = el.offsetHeight;
-    const nx = Math.max(8, Math.min(x, root.clientWidth - w - 8));
-    const ny = Math.max(8, Math.min(y, root.clientHeight - h - 8));
-    if (nx !== pos.x || ny !== pos.y) setPos({ x: nx, y: ny });
-    el.querySelector<HTMLElement>('[role="menuitem"]:not([aria-disabled="true"])')?.focus();
-    // Measure once per opening.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const nx = Math.max(8, Math.min(x, root.clientWidth - el.offsetWidth - 8));
+    const ny = Math.max(8, Math.min(y, root.clientHeight - el.offsetHeight - 8));
+    setPos((p) => (p.x === nx && p.y === ny ? p : { x: nx, y: ny }));
+    if (!focused.current) {
+      focused.current = true;
+      el.querySelector<HTMLElement>('[role="menuitem"]:not([aria-disabled="true"])')?.focus();
+    }
+  }, [x, y, submenu]);
 
   useEffect(() => {
     const onDown = (e: PointerEvent) => {

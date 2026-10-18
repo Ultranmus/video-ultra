@@ -172,6 +172,11 @@ function AutoCaptions({ has }: { has: boolean }): ReactElement | null {
             }
             onClick={() => void ctl.autoCaptions(language)}
           />
+          {check && !check.available ? (
+            <p className="vu-hint" role="note">
+              {check.reason ?? l.captionsUnavailable}
+            </p>
+          ) : null}
           {check?.available ? (
             <p className="vu-hint">
               {check.onDevice

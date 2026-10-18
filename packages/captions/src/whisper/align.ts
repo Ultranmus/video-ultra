@@ -158,7 +158,7 @@ export function wordsFromTokens(
     if (text.includes('�') && k < tokens.length - 1) continue;
     if ((/^\s/.test(text) || PUNCTUATION.test(text.trim())) && ids.length) flush();
     if (!ids.length) start = pendingStart;
-    ids.push(...pending);
+    for (const id of pending) ids.push(id);
     end = ends[k]!;
     pending = [];
   }

@@ -399,6 +399,22 @@ export function Stage(): ReactElement {
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (scale === 0 || e.button > 0) return;
+    // A new gesture (the first finger down, or any mouse press): anything left from an earlier
+    // one is stale. iOS can end a touch without telling us (a menu appears under the finger,
+    // capture fails) — kept, that finger would count as "down" forever and every later tap would
+    // look like a second finger and be ignored.
+    if (e.isPrimary && (pointers.current.size > 0 || drag.current)) {
+      pointers.current.clear();
+      screen.current.clear();
+      cancelLongPress();
+      if (drag.current && drag.current.type !== 'view' && drag.current.type !== 'pan') {
+        latest.current = null;
+        ctl.preview(null);
+        showGuides(false, false);
+      }
+      placeMarquee(null);
+      drag.current = null;
+    }
     // Green screen "pick from video": this tap picks the colour.
     if (ctl.ui.getState().picking) {
       const p = toCanvas(e);
@@ -864,6 +880,10 @@ export function Stage(): ReactElement {
       onPointerMove={onPointerMove}
       onPointerUp={(e) => finish(e, false)}
       onPointerCancel={(e) => finish(e, true)}
+      // The browser took the pointer away without an up / cancel: end what it started.
+      onLostPointerCapture={(e) => {
+        if (pointers.current.has(e.pointerId)) finish(e, true);
+      }}
       onDoubleClick={(e) => {
         // Double-click a group member to pick just that one.
         if (scale === 0 || ctl.ui.getState().selectedIds.length < 2) return;
