@@ -5,7 +5,7 @@ import {
   type Transcriber,
   type TranscriptWord,
 } from '@video-ultra/core';
-import type { FromWorker, ModelChoice, ToWorker } from './protocol';
+import type { FromWorker, ToWorker } from './protocol';
 import { keepWords, windowsOf, WINDOW_SECONDS } from './windows';
 
 /**

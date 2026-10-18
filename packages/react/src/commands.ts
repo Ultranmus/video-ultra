@@ -1,4 +1,4 @@
-import { mainTrack, type ArrangeTo } from '@video-ultra/core';
+import { mainTrack, projectDuration, type ArrangeTo } from '@video-ultra/core';
 import type { EditorController } from './controller';
 import type { IconName } from './icons';
 import { isSounding } from './items';
@@ -38,7 +38,10 @@ export type CommandId =
   | 'alignBottom'
   | 'distributeH'
   | 'distributeV'
-  | 'duck';
+  | 'duck'
+  | 'markIn'
+  | 'markOut'
+  | 'camera';
 
 /** One action, as it stands right now. */
 export interface Command {
@@ -280,6 +283,28 @@ export function getCommand(ctl: EditorController, id: CommandId): Command {
         run: () => ctl.align(edge),
       };
     }
+    case 'markIn':
+    case 'markOut': {
+      const empty = projectDuration(ctl.project) === 0;
+      return {
+        id,
+        label: id === 'markIn' ? l.markIn : l.markOut,
+        icon: 'range',
+        tip: id === 'markIn' ? l.markInTip : l.markOutTip,
+        shortcut: id === 'markIn' ? 'I' : 'O',
+        disabledReason: empty ? l.needClips : null,
+        run: () => (id === 'markIn' ? ctl.setExportIn() : ctl.setExportOut()),
+      };
+    }
+    case 'camera':
+      return {
+        id,
+        label: l.recordCamera,
+        icon: 'camera',
+        tip: l.recordCameraTip,
+        disabledReason: null,
+        run: () => ctl.setCameraOpen(true),
+      };
     case 'distributeH':
     case 'distributeV':
       return {
@@ -338,6 +363,8 @@ export const KEYMAP: readonly KeyBinding[] = [
   { key: ']', mod: true, id: 'front' },
   { key: '[', mod: true, id: 'back' },
   { key: 's', id: 'split' },
+  { key: 'i', id: 'markIn' },
+  { key: 'o', id: 'markOut' },
   { key: 'delete', id: 'delete' },
   { key: 'backspace', id: 'delete' },
 ];

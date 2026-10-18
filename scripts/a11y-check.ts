@@ -16,12 +16,15 @@ const theme = arg('theme') ?? 'dark';
 /** The bits of the playground's `window.vuEditor` (EditorController) this script uses. */
 interface Ctl {
   project: { tracks: { items: { id: string; kind: string }[] }[] };
-  ui: { getState(): { layout: string } };
+  ui: { getState(): { layout: string }; setState(s: Record<string, unknown>): void };
   select(id: string | null): void;
   openTool(tool: string | null): void;
 }
 let total = 0;
-const browser = await chromium.launch({ channel: 'chrome' });
+const browser = await chromium.launch({
+  channel: 'chrome',
+  args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'],
+});
 for (const [size, viewport] of [
   ['phone', { width: 390, height: 844 }],
   ['desktop', { width: 1440, height: 900 }],
@@ -86,6 +89,26 @@ for (const [size, viewport] of [
     .click();
   await page.waitForSelector('.vu-audiolib-row', { timeout: 15000 });
   await audit('audio panel + music & sounds library');
+  // v0.2 D. Capture & export: the export dialog's other kinds, then the camera.
+  await page.evaluate(() =>
+    (window as unknown as { vuEditor: Ctl }).vuEditor.ui.setState({ exportOpen: true }),
+  );
+  await page.waitForTimeout(200);
+  for (const kind of ['Sound only', 'Picture']) {
+    await page.locator('.vu-modal .vu-segment', { hasText: kind }).click();
+    await audit(`export dialog · ${kind}`);
+  }
+  await page.locator('.vu-modal .vu-segment', { hasText: 'Video' }).click();
+  await page.locator('.vu-modal .vu-segment', { hasText: 'Part' }).click();
+  await audit('export dialog · part');
+  await page.keyboard.press('Escape');
+  await page.evaluate(() =>
+    (window as unknown as { vuEditor: { setCameraOpen(o: boolean): void } }).vuEditor.setCameraOpen(
+      true,
+    ),
+  );
+  await page.locator('.vu-camera[data-phase="live"]').waitFor({ timeout: 20000 });
+  await audit('camera');
   await page.close();
 }
 await browser.close();

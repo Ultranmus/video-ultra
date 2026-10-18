@@ -341,6 +341,12 @@ export const ProjectSchema = z.object({
     height: z.int().check(z.positive()),
     frameRate: FrameRateSchema,
     background: BackgroundSchema,
+    /**
+     * The part of the timeline to export (in / out points, flicks; `end` exclusive). Optional
+     * (file version 3+); missing = the whole video. May lie past the end after edits: exports
+     * clamp it to the video's length.
+     */
+    exportRange: z.optional(z.object({ start: time, end: positiveTime })),
   }),
   assets: z.record(z.string(), AssetSchema),
   tracks: z.array(TrackSchema),

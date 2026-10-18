@@ -136,6 +136,17 @@ export class OpfsFileStore implements FileStore {
     }
   }
 
+  async appendBlob(path: string, blob: Blob): Promise<void> {
+    await this.send({
+      id: 0,
+      op: 'copy',
+      root: this.rootName,
+      path: normalize(path),
+      blob,
+      append: true,
+    });
+  }
+
   async remove(path: string): Promise<void> {
     const parts = normalize(path).split('/');
     const name = parts.pop()!;

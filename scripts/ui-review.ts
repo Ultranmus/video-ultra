@@ -128,7 +128,10 @@ if (only === 'sound' || only === undefined) {
 }
 
 if (only !== 'phone' && only !== 'sound') {
-  const browser = await chromium.launch({ channel: 'chrome' });
+  const browser = await chromium.launch({
+    channel: 'chrome',
+    args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'],
+  });
   const page = await (
     await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 })
   ).newPage();
@@ -211,6 +214,44 @@ if (only !== 'phone' && only !== 'sound') {
     .catch(() => {});
   await page.locator('.vu-bar-end .vu-btn[aria-label="Full screen"]').click();
   await snap(page, 'd14-preview');
+  await page.keyboard.press('Escape');
+  // v0.2 D. Capture & export: presets, part, sound only, picture, camera.
+  await page.evaluate(() => (window as any).vuEditor.setPreviewMode(false));
+  await page.evaluate(() => (window as any).vuEditor.seek(705_600_000 * 2));
+  await page.locator('.vu-topbar .vu-btn', { hasText: 'Export' }).click();
+  await page.locator('.vu-modal .vu-export-option', { hasText: 'Widescreen' }).click();
+  await snap(page, 'd15-export-preset-note');
+  await page.locator('.vu-modal .vu-segment', { hasText: 'Part' }).click();
+  await page.locator('.vu-modal .vu-range').scrollIntoViewIfNeeded();
+  await snap(page, 'd16-export-part');
+  await page.locator('.vu-modal .vu-segment', { hasText: 'Sound only' }).click();
+  await snap(page, 'd17-export-sound');
+  await page.locator('.vu-modal .vu-export-go').click();
+  await page.locator('.vu-modal a[download]').waitFor({ timeout: 60000 });
+  await snap(page, 'd17b-export-sound-done');
+  await page.locator('.vu-modal .vu-btn', { hasText: 'Back to editing' }).click();
+  await page.locator('.vu-topbar .vu-btn', { hasText: 'Export' }).click();
+  await page.locator('.vu-modal .vu-segment', { hasText: 'Picture' }).click();
+  await snap(page, 'd18-export-picture');
+  await page.locator('.vu-modal .vu-export-go').click();
+  await page.locator('.vu-modal a[download]').waitFor({ timeout: 60000 });
+  await snap(page, 'd18b-export-picture-done');
+  await page.locator('.vu-modal .vu-btn', { hasText: 'Back to editing' }).click();
+  await page.locator('.vu-rail .vu-btn', { hasText: 'Media' }).click();
+  await snap(page, 'd19-media-panel-camera');
+  await page.locator('.vu-panel .vu-camera-open').click();
+  await page.locator('.vu-camera[data-phase="live"]').waitFor({ timeout: 20000 });
+  await snap(page, 'd20-camera-live');
+  await page.locator('.vu-record').click();
+  await page.waitForTimeout(1600);
+  await snap(page, 'd21-camera-recording');
+  await page.locator('.vu-record').click();
+  await page.locator('.vu-camera[data-phase="review"]').waitFor({ timeout: 20000 });
+  await snap(page, 'd22-camera-review');
+  await page.locator('.vu-camera-bar .vu-btn', { hasText: 'Add to video' }).click();
+  await page.locator('.vu-camera').waitFor({ state: 'detached' });
+  await page.keyboard.press('i');
+  await snap(page, 'd23-range-on-ruler');
   await browser.close();
 }
 
@@ -227,19 +268,43 @@ if (only !== 'desktop' && only !== 'sound') {
   await page.locator('.vu-toolbar .vu-btn', { hasText: 'Speed' }).tap();
   await snap(page, 'p04-speed-dock');
   await page.locator('.vu-done').tap();
+  await page.waitForTimeout(600); // the sheet slides away first
   await page.locator('.vu-toolbar .vu-btn', { hasText: 'Filter' }).first().tap();
   await page.waitForTimeout(1500);
   await snap(page, 'p05-filter-dock');
   await page.locator('.vu-done').tap();
+  await page.waitForTimeout(600); // the sheet slides away first
   await page.locator('.vu-toolbar .vu-btn', { hasText: 'Back' }).first().tap();
   await page.locator('.vu-toolbar .vu-btn', { hasText: 'Text' }).first().tap();
   await snap(page, 'p06-text-panel');
   await page.locator('.vu-dock .vu-btn', { hasText: 'Add text' }).tap();
   await snap(page, 'p07-text-edit');
   await page.locator('.vu-done').tap();
+  await page.waitForTimeout(600); // the sheet slides away first
   await snap(page, 'p08-text-selected');
   await page.locator('.vu-bar-end .vu-btn', { hasText: 'Full screen' }).tap();
   await snap(page, 'p09-preview');
+  await page.locator('.vu-preview-bar .vu-btn').tap();
+  // v0.2 D. Capture & export
+  await page.locator('.vu-topbar .vu-btn', { hasText: 'Export' }).tap();
+  await snap(page, 'p10-export');
+  await page.locator('.vu-modal .vu-export-option', { hasText: 'Square' }).tap();
+  await page.locator('.vu-modal .vu-export-note').scrollIntoViewIfNeeded();
+  await snap(page, 'p11-export-preset-note');
+  await page.locator('.vu-modal .vu-segment', { hasText: 'Part' }).tap();
+  await page.locator('.vu-modal .vu-range').scrollIntoViewIfNeeded();
+  await snap(page, 'p12-export-part');
+  await page.locator('.vu-modal .vu-segment', { hasText: 'Picture' }).tap();
+  await snap(page, 'p13-export-picture');
+  await page.locator('.vu-modal-head .vu-btn').tap();
+  await page.evaluate(() => (window as any).vuEditor.select(null));
+  await page.locator('.vu-toolbar .vu-btn', { hasText: 'Media' }).first().tap();
+  await snap(page, 'p14-media-sheet');
+  await page.locator('.vu-dock .vu-camera-open').tap();
+  await page.locator('.vu-camera[data-phase="live"], .vu-camera[data-phase="error"]').waitFor({
+    timeout: 20000,
+  });
+  await snap(page, 'p15-camera');
   await browser.close();
 }
 

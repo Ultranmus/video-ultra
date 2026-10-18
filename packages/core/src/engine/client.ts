@@ -3,7 +3,15 @@ import type { BackendChoice } from '../lab/protocol';
 import type { ItemAnimation, Project, Transition } from '../model/schema';
 import type { Time } from '../model/time';
 import type { RenderBackend } from '../render/types';
-import type { ExportOptions, ExportProgress, ExportResult } from './export-plan';
+import type {
+  AudioExportOptions,
+  AudioExportResult,
+  ExportOptions,
+  ExportProgress,
+  ExportResult,
+  FrameImage,
+  FrameImageOptions,
+} from './export-plan';
 import type {
   EngineEvent,
   ExportRunInfo,
@@ -37,6 +45,21 @@ export interface Engine {
     onProgress?: (progress: ExportProgress) => void,
     signal?: AbortSignal,
   ): Promise<ExportResult>;
+  /**
+   * Exports only the sound — the same mix as a video export — as M4A (AAC), Ogg (Opus) or WAV.
+   * Same rules as {@link Engine.export}: preview pauses, one export at a time, `signal` cancels
+   * (`AbortError`, partial file deleted), progress ~4 times a second.
+   */
+  exportAudio(
+    options: AudioExportOptions,
+    onProgress?: (progress: ExportProgress) => void,
+    signal?: AbortSignal,
+  ): Promise<AudioExportResult>;
+  /**
+   * One frame at `time` saved as a PNG or JPEG file, at the project's own size by default, drawn
+   * by the same compositor path as the export (so it matches the exported video).
+   */
+  captureImage(time: Time, options: FrameImageOptions): Promise<FrameImage>;
   /**
    * One exact frame of the project at `time` as an ImageBitmap (caller closes it): preview size by
    * default, or `width × height`; `backend` picks the GPU path (golden-image checks).
@@ -278,25 +301,41 @@ export async function createEngine(
     return audio.ready;
   };
 
-  async function exportWithInfo(
-    options: ExportOptions,
-    onProgress?: (progress: ExportProgress) => void,
-    signal?: AbortSignal,
-    backend?: RenderBackend,
-  ): Promise<{ result: ExportResult; info: ExportRunInfo }> {
+  /** Runs one export job (video or sound): progress routing and cancel through `signal`. */
+  async function runJob<T>(
+    request: (jobId: number) => EngineRequest,
+    onProgress: ((progress: ExportProgress) => void) | undefined,
+    signal: AbortSignal | undefined,
+    pick: (data: EngineResponseData) => T,
+  ): Promise<T> {
     if (signal?.aborted) throw new DOMException('Export cancelled', 'AbortError');
     const jobId = nextJob++;
     if (onProgress) progressHandlers.set(jobId, onProgress);
     const abort = () => void send({ type: 'export-cancel', jobId });
     signal?.addEventListener('abort', abort, { once: true });
     try {
-      const data = await send({ type: 'export', jobId, options, ...(backend ? { backend } : {}) });
-      if (data.type !== 'export') throw new Error('Unexpected engine response');
-      return { result: data.result, info: data.stats };
+      return pick(await send(request(jobId)));
     } finally {
       signal?.removeEventListener('abort', abort);
       progressHandlers.delete(jobId);
     }
+  }
+
+  async function exportWithInfo(
+    options: ExportOptions,
+    onProgress?: (progress: ExportProgress) => void,
+    signal?: AbortSignal,
+    backend?: RenderBackend,
+  ): Promise<{ result: ExportResult; info: ExportRunInfo }> {
+    return runJob(
+      (jobId) => ({ type: 'export', jobId, options, ...(backend ? { backend } : {}) }),
+      onProgress,
+      signal,
+      (data) => {
+        if (data.type !== 'export') throw new Error('Unexpected engine response');
+        return { result: data.result, info: data.stats };
+      },
+    );
   }
 
   return Object.assign(handlers, {
@@ -341,6 +380,26 @@ export async function createEngine(
       return (await exportWithInfo(options, onProgress, signal)).result;
     },
     exportWithInfo,
+    exportAudio(
+      options: AudioExportOptions,
+      onProgress?: (progress: ExportProgress) => void,
+      signal?: AbortSignal,
+    ) {
+      return runJob(
+        (jobId) => ({ type: 'export-audio', jobId, options }),
+        onProgress,
+        signal,
+        (data) => {
+          if (data.type !== 'export-audio') throw new Error('Unexpected engine response');
+          return data.result;
+        },
+      );
+    },
+    async captureImage(time: Time, options: FrameImageOptions) {
+      const data = await send({ type: 'capture-image', time, options: { ...options } });
+      if (data.type !== 'capture-image') throw new Error('Unexpected engine response');
+      return data.image;
+    },
     async capture(
       time: Time,
       captureOptions: { width?: number; height?: number; backend?: RenderBackend } = {},

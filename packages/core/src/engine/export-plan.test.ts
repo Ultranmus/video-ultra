@@ -8,6 +8,9 @@ import {
   exportFrameTime,
   exportSize,
   maxExportHeight,
+  EXPORT_PRESETS,
+  presetFits,
+  resolveExportRange,
 } from './export-plan';
 
 describe('export bitrates', () => {
@@ -56,5 +59,35 @@ describe('export plan', () => {
     expect(maxExportHeight('low')).toBe(1080);
     expect(maxExportHeight('mid')).toBe(1440);
     expect(maxExportHeight('high')).toBe(2160);
+  });
+});
+
+describe('export range and presets', () => {
+  it('clamps the range to the video and refuses an empty one', () => {
+    const d = fromSeconds(10);
+    expect(resolveExportRange(undefined, d)).toEqual({ start: 0, end: d });
+    expect(resolveExportRange({ start: fromSeconds(2), end: fromSeconds(4) }, d)).toEqual({
+      start: fromSeconds(2),
+      end: fromSeconds(4),
+    });
+    expect(resolveExportRange({ start: fromSeconds(8), end: fromSeconds(30) }, d)).toEqual({
+      start: fromSeconds(8),
+      end: d,
+    });
+    expect(resolveExportRange({ start: fromSeconds(12), end: fromSeconds(30) }, d)).toBeNull();
+    expect(resolveExportRange(null, 0)).toBeNull();
+  });
+
+  it('has vertical, widescreen and square 1080p presets', () => {
+    expect(EXPORT_PRESETS.map((p) => p.id)).toEqual(['vertical', 'widescreen', 'square']);
+    for (const p of EXPORT_PRESETS) expect(p.height).toBe(1080);
+    const [vertical, wide, square] = EXPORT_PRESETS;
+    expect(presetFits(vertical!, 1080, 1920)).toBe(true);
+    expect(presetFits(vertical!, 720, 1280)).toBe(true);
+    expect(presetFits(vertical!, 1920, 1080)).toBe(false);
+    expect(presetFits(wide!, 1920, 1080)).toBe(true);
+    expect(presetFits(square!, 1080, 1350)).toBe(false);
+    // A 9:16 project exported with the vertical preset is 1080 × 1920.
+    expect(exportSize(1080, 1920, vertical!.height)).toEqual({ width: 1080, height: 1920 });
   });
 });

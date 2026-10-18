@@ -4,10 +4,13 @@ import {
   type Capabilities,
   type Project,
   type ExportResult,
+  type AudioExportResult,
+  type FrameImage,
 } from '@video-ultra/core';
 import { useEffect, useRef, useState, type CSSProperties, type ReactElement } from 'react';
 import { ControllerContext, useController, useLabels, useUi } from './context';
 import { EditorController } from './controller';
+import { CameraRecorder } from './Camera';
 import { ExportDialog } from './ExportDialog';
 import { Icon } from './icons';
 import { DEFAULT_LABELS, type Labels } from './labels';
@@ -41,6 +44,10 @@ export interface VideoEditorProps {
   onSave?: (project: Project) => void | Promise<void>;
   /** Called when an export finishes, with the video file. */
   onExport?: (result: ExportResult) => void;
+  /** Called when a sound-only export finishes, with the sound file. */
+  onExportAudio?: (result: AudioExportResult) => void;
+  /** Called when a frame is saved as a picture, with the image file. */
+  onSaveFrame?: (image: FrameImage) => void;
   /** Shows a close button that calls this. */
   onClose?: () => void;
   /** Called when the device can't run the editor (instead of, or as well as, the built-in message). */
@@ -103,6 +110,8 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
         ...(props.backend ? { backend: props.backend } : {}),
         ...(props.onSave ? { onSave: props.onSave } : {}),
         ...(props.onExport ? { onExport: props.onExport } : {}),
+        ...(props.onExportAudio ? { onExportAudio: props.onExportAudio } : {}),
+        ...(props.onSaveFrame ? { onSaveFrame: props.onSaveFrame } : {}),
         ...(props.resolveMedia ? { resolveMedia: props.resolveMedia } : {}),
         ...(props.autosave !== undefined ? { autosave: props.autosave } : {}),
         ...(props.stickerLibrary !== undefined ? { stickerLibrary: props.stickerLibrary } : {}),
@@ -329,6 +338,7 @@ function Shell({
       <Toasts />
       <ContextMenu />
       <ExportDialog />
+      <CameraRecorder />
       <HelpSheet />
       <Tooltips root={rootRef} />
     </div>
@@ -346,6 +356,9 @@ function useKeyboard(rootRef: React.RefObject<HTMLDivElement | null>) {
       if (target.closest('input, textarea, select, [contenteditable="true"]')) return;
       // Menus and the Layers list handle their own keys.
       if (target.closest('.vu-menu, .vu-layer-list')) return;
+      // The camera and the export dialog cover the editor: its shortcuts wait until they close.
+      const { cameraOpen, exportOpen } = ctl.ui.getState();
+      if (cameraOpen || exportOpen) return;
       if (
         target.closest('[role="option"]') &&
         ['ArrowLeft', 'ArrowRight', 'Delete', 'Backspace'].includes(e.key)

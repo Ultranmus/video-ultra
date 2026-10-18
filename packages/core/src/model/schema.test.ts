@@ -244,3 +244,22 @@ describe('project file back-compat', () => {
     );
   });
 });
+
+describe('export range (file version 3, optional)', () => {
+  it('keeps saved in / out points and opens files without them', () => {
+    const data = JSON.parse(V01_PROJECT);
+    data.settings.exportRange = { start: 352800000, end: 2116800000 };
+    const result = parseProject(JSON.stringify(data));
+    expect(result.ok, result.ok ? '' : result.error).toBe(true);
+    if (!result.ok) return;
+    expect(result.project.settings.exportRange).toEqual({ start: 352800000, end: 2116800000 });
+    const plain = parseProject(V01_PROJECT);
+    expect(plain.ok && plain.project.settings.exportRange).toBeUndefined();
+  });
+
+  it('rejects a range with an empty end', () => {
+    const data = JSON.parse(V01_PROJECT);
+    data.settings.exportRange = { start: 10, end: 0 };
+    expect(parseProject(JSON.stringify(data)).ok).toBe(false);
+  });
+});

@@ -932,7 +932,7 @@ export function HelpSheet(): ReactElement | null {
           <IconButton icon="close" label={l.close} onClick={close} />
         </div>
         <dl className="vu-shortcuts">
-          {l.shortcutList.map(([keys, what]) => (
+          {[...l.shortcutList, ...l.rangeShortcuts].map(([keys, what]) => (
             <div key={keys} className="vu-shortcut">
               <dt>
                 <kbd>{keys}</kbd>

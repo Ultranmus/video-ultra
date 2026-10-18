@@ -35,6 +35,7 @@ import {
   ungroupItems,
   shiftItems,
   arrangeItem,
+  setExportRange,
 } from './ops';
 import { groupOf } from '../model/project';
 
@@ -558,5 +559,24 @@ describe('lock, hide, group (file version 3)', () => {
     const kinds = project.tracks.map((t) => t.items.map((i) => i.id).join('+'));
     expect(kinds.slice(1)).toEqual(['y', 't', 'x']);
     expect(checkInvariants(project)).toEqual([]);
+  });
+});
+
+describe('setExportRange', () => {
+  it('sets, replaces and clears the in / out points', () => {
+    const { project } = setup();
+    setExportRange(project, { start: s(1.5), end: s(4) });
+    expect(project.settings.exportRange).toEqual({ start: s(1.5), end: s(4) });
+    expect(checkInvariants(project)).toEqual([]);
+    setExportRange(project, { start: -5, end: s(2) });
+    expect(project.settings.exportRange).toEqual({ start: 0, end: s(2) });
+    setExportRange(project, null);
+    expect('exportRange' in project.settings).toBe(false);
+  });
+
+  it('refuses an empty range', () => {
+    const { project } = setup();
+    expect(() => setExportRange(project, { start: s(3), end: s(3) })).toThrow(EditError);
+    expect(() => setExportRange(project, { start: s(3), end: s(1) })).toThrow(EditError);
   });
 });

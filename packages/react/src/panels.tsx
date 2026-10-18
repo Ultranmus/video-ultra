@@ -93,6 +93,17 @@ function MediaPanel() {
         <span className="vu-dropcard-title">{l.addMedia}</span>
         <span className="vu-dropcard-hint">{l.addMediaHint}</span>
       </button>
+      <button
+        type="button"
+        className="vu-btn vu-wide vu-camera-open"
+        data-variant="secondary"
+        data-layout="row"
+        data-tooltip={l.recordCameraTip}
+        onClick={() => ctl.setCameraOpen(true)}
+      >
+        <Icon name="camera" />
+        <span>{l.recordCamera}</span>
+      </button>
       <ImportRows />
       {assets.length ? (
         <>

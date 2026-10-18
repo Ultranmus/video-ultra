@@ -1,3 +1,10 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- reads the lab page through window */
+/**
+ * Captions memory over time (v0.2 A0): the test browser's own processes only (renderer = page +
+ * speech worker), sampled every 200 ms through two runs and 3 s after.
+ * Usage: playground running, then node scripts/captions-memory.ts [wasm|webgpu] [tiny|base|small]
+ *   [file] [session-options-json]
+ */
 import { chromium } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 const device = process.argv[2] ?? 'wasm';

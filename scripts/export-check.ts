@@ -6,12 +6,14 @@
  * file left in OPFS). Then the ducking scene (`/lab/engine?duck=1`): the exported music dips by
  * the set amount under the voice and matches the preview mix window by window (`--no-duck` skips
  * it).
+ * file left in OPFS). Then the v0.2 extras: a range export, a preset, sound-only exports (M4A, Ogg,
+ * WAV — in sync with the video export's mix) and a frame saved as PNG / JPEG.
  *
  * Usage: playground running, then
  *   node scripts/export-check.ts [--browsers chrome,webkit,firefox] [--formats mp4,webm]
- *     [--backends webgl2,webgpu] [--height 720] [--fps 30] [--save dir]
+ *     [--backends webgl2,webgpu] [--height 720] [--fps 30] [--save dir] [--no-extras]
  */
-import { chromium, firefox, webkit, type Browser } from '@playwright/test';
+import { chromium, firefox, webkit, type Browser, type Page } from '@playwright/test';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -29,6 +31,7 @@ const height = Number(arg('height') ?? 720) as 720;
 const fps = Number(arg('fps') ?? 30) as 30;
 const memory = process.argv.includes('--memory');
 const repeat = Number(arg('repeat') ?? 1);
+const skipExtras = process.argv.includes('--no-extras');
 const dir = arg('save') ?? mkdtempSync(join(tmpdir(), 'vu-export-'));
 mkdirSync(dir, { recursive: true });
 
@@ -148,6 +151,241 @@ const decodedDuration = (file: string, stream: 'v' | 'a'): number => {
   for (const [pts, dur] of out) if (pts! + (dur || 0) > end) end = pts! + (dur || 0);
   return end;
 };
+
+/** Mono 48 kHz float PCM of a file's sound (ffmpeg mixes the channels down). */
+function pcm(file: string): Float32Array {
+  const raw = execFileSync(
+    'ffmpeg',
+    ['-v', 'error', '-i', file, '-vn', '-ac', '1', '-ar', '48000', '-f', 'f32le', '-'],
+    { maxBuffer: 512 * 1024 * 1024 },
+  );
+  return new Float32Array(raw.buffer, raw.byteOffset, Math.floor(raw.byteLength / 4));
+}
+
+/**
+ * How many samples later `x` plays the sound `ref` has at `refStart` (normalised
+ * cross-correlation over `len` samples, lags within ±`maxLag`). 0 = in sync.
+ */
+function lagOf(
+  ref: Float32Array,
+  refStart: number,
+  x: Float32Array,
+  xStart: number,
+  len: number,
+  maxLag = 960,
+): { lag: number; corr: number } {
+  let best = { lag: 0, corr: -1 };
+  let refEnergy = 0;
+  for (let i = 0; i < len; i++) refEnergy += ref[refStart + i]! ** 2;
+  for (let lag = -maxLag; lag <= maxLag; lag++) {
+    let dot = 0;
+    let energy = 0;
+    for (let i = 0; i < len; i++) {
+      const v = x[xStart + i + lag] ?? 0;
+      dot += ref[refStart + i]! * v;
+      energy += v * v;
+    }
+    const corr = dot / Math.sqrt(refEnergy * energy || 1);
+    if (corr > best.corr) best = { lag, corr };
+  }
+  return best;
+}
+
+/**
+ * v0.2 export extras on the demo: a range export (video + sound in sync, the edges exactly the
+ * timeline's frames), a preset (vertical 1080p), sound-only exports in M4A / Ogg / WAV (format,
+ * length, and lined up with the video export's mix), and a frame saved as PNG / JPEG at the
+ * project's size, matching the compositor.
+ */
+async function checkExtras(page: Page, name: string, duration: number) {
+  const save = (base: string, ext: string, base64: string) => {
+    const file = join(dir, `${name}-${base}.${ext}`);
+    writeFileSync(file, Buffer.from(base64, 'base64'));
+    return file;
+  };
+  const S = 705_600_000;
+  const captureAt = async (sec: number, w: number, h: number) =>
+    Buffer.from(
+      await page.evaluate(([x, ww, hh]) => window.engineLab!.captureFrame(x, ww, hh, 'webgl2'), [
+        sec,
+        w,
+        h,
+      ] as const),
+      'base64',
+    );
+
+  // Sound only: WAV first (lossless — the reference for every other comparison).
+  const audioFiles: Partial<Record<'wav' | 'm4a' | 'ogg', string>> = {};
+  for (const format of ['wav', 'm4a', 'ogg'] as const) {
+    let out: Awaited<ReturnType<NonNullable<Window['engineLab']>['exportAudio']>>;
+    try {
+      out = await page.evaluate(
+        (f) => window.engineLab!.exportAudio({ format: f, quality: 'medium' }),
+        format,
+      );
+    } catch (error) {
+      const message = String(error);
+      if (format === 'ogg' && /can't encode Opus/.test(message)) {
+        console.log(`  - audio ogg: no Opus encoder here (clear message shown): skipped`);
+        continue;
+      }
+      check(false, `audio ${format}: export failed — ${message.slice(0, 300)}`);
+      continue;
+    }
+    const file = save('audio', format, out.base64);
+    audioFiles[format] = file;
+    const p = probe(file);
+    const a = p.streams.find((s) => s.codec_type === 'audio');
+    const want = { wav: 'pcm_s16le', m4a: 'aac', ogg: 'opus' }[format];
+    console.log(
+      `  audio ${format}: ${a?.codec_name} ${a?.sample_rate} Hz ×${a?.channels} · ${(Buffer.byteLength(out.base64, 'base64') / 1e6).toFixed(2)} MB · ${out.result.elapsedSeconds.toFixed(2)} s = ${(duration / out.result.elapsedSeconds).toFixed(1)}× real time · ${out.result.storage}`,
+    );
+    check(
+      a?.codec_name === want &&
+        a.sample_rate === '48000' &&
+        a.channels === 2 &&
+        !p.streams.some((s) => s.codec_type === 'video'),
+      `audio ${format}: ${a?.codec_name}, ${a?.sample_rate} Hz, ${a?.channels} channels, no video`,
+    );
+    const got = decodedDuration(file, 'a') || Number(p.format.duration);
+    // WAV is exact; AAC / Opus packets are 1024 / 960 samples (at most one over).
+    const tolerance = format === 'wav' ? 0.001 : 0.03;
+    check(
+      Math.abs(got - duration) <= tolerance,
+      `audio ${format}: ${got.toFixed(4)} s long (video ${duration.toFixed(4)} s)`,
+    );
+  }
+  const reference = audioFiles.wav ? pcm(audioFiles.wav) : null;
+  // Lined up with the video export's sound: sample lag at 2–3 s, and the same mix (correlation).
+  const video = join(dir, `${name}-webgl2-mp4.mp4`);
+  const compare = (label: string, file: string, at = 2, fileAt = at, limit = 48) => {
+    if (!reference) return;
+    const x = pcm(file);
+    const { lag, corr } = lagOf(reference, at * 48000, x, Math.round(fileAt * 48000), 48000);
+    check(
+      Math.abs(lag) <= limit && corr > 0.9,
+      `${label}: in sync with the WAV mix (lag ${lag} samples = ${(lag / 48).toFixed(2)} ms, correlation ${corr.toFixed(3)})`,
+    );
+  };
+  if (formats.includes('mp4')) compare('video export mp4 sound', video);
+  if (audioFiles.m4a) compare('audio m4a', audioFiles.m4a);
+  if (audioFiles.ogg) compare('audio ogg', audioFiles.ogg);
+
+  // A range: 6.9 → 9.9 s (starts inside the light-leak transition at the 7 s cut).
+  const range = { start: Math.round(6.9 * S), end: Math.round(9.9 * S) };
+  try {
+    const out = await page.evaluate(
+      (r) =>
+        window.engineLab!.exportVideo({
+          format: 'mp4',
+          height: 720,
+          fps: 30,
+          quality: 'medium',
+          range: r,
+        }),
+      range,
+    );
+    const file = save('range', 'mp4', out.base64);
+    const p = probe(file);
+    const v = p.streams.find((s) => s.codec_type === 'video');
+    console.log(
+      `  range 6.9–9.9 s: ${out.result.frames} frames · ${out.result.elapsedSeconds.toFixed(1)} s`,
+    );
+    check(
+      out.result.frames === 90 && Number(v?.nb_read_frames) === 90,
+      `range: 90 frames (reported ${out.result.frames}, decoded ${v?.nb_read_frames})`,
+    );
+    check(
+      Math.abs(Number(p.format.duration) - 3) < 0.06,
+      `range: ${Number(p.format.duration).toFixed(3)} s long`,
+    );
+    const vd = decodedDuration(file, 'v');
+    const ad = decodedDuration(file, 'a');
+    check(Math.abs(ad - vd) <= 0.03, `range: audio ${ad.toFixed(3)} s vs video ${vd.toFixed(3)} s`);
+    for (const [n, what] of [
+      [0, 'first frame, mid-transition'],
+      [3, 'light leak'],
+      [89, 'last frame'],
+    ] as const) {
+      const decoded = frameAt(file, n, out.result.width, out.result.height);
+      const sec = 6.9 + n / 30;
+      const same = rgbMae(decoded, await captureAt(sec, out.result.width, out.result.height));
+      const other = rgbMae(
+        decoded,
+        await captureAt(sec + (n === 89 ? -0.25 : 0.25), out.result.width, out.result.height),
+      );
+      check(
+        same < 6 && same < other * 0.6,
+        `range: frame ${n} (${what}) = timeline ${sec.toFixed(3)} s (${same.toFixed(2)} / 255; 0.25 s off: ${other.toFixed(2)})`,
+      );
+    }
+    // The range's sound is the timeline's sound from 6.9 s.
+    compare('range sound', file, 7.4, 0.5);
+  } catch (error) {
+    check(false, `range export failed — ${String(error).slice(0, 300)}`);
+  }
+  // Range, sound only: exactly the WAV mix from 6.9 s.
+  try {
+    const out = await page.evaluate(
+      (r) => window.engineLab!.exportAudio({ format: 'wav', quality: 'medium', range: r }),
+      range,
+    );
+    const file = save('range-audio', 'wav', out.base64);
+    const got = decodedDuration(file, 'a') || Number(probe(file).format.duration);
+    check(Math.abs(got - 3) <= 0.001, `range audio wav: ${got.toFixed(4)} s long`);
+    compare('range audio wav', file, 7.4, 0.5, 1);
+  } catch (error) {
+    check(false, `range audio export failed — ${String(error).slice(0, 300)}`);
+  }
+
+  // Preset: vertical 9:16, 1080p, 30 fps MP4 (first 2 s to keep the check quick).
+  try {
+    const out = await page.evaluate(() =>
+      window.engineLab!.exportVideo({
+        format: 'mp4',
+        height: 1080,
+        fps: 30,
+        quality: 'medium',
+        range: { start: 0, end: 2 * 705_600_000 },
+      }),
+    );
+    const file = save('preset-vertical', 'mp4', out.base64);
+    const v = probe(file).streams.find((s) => s.codec_type === 'video');
+    check(
+      v?.codec_name === 'h264' &&
+        v.width === 1080 &&
+        v.height === 1920 &&
+        Number(v.nb_read_frames) === 60,
+      `preset vertical: ${v?.codec_name} ${v?.width}×${v?.height}, ${v?.nb_read_frames} frames (expect h264 1080×1920, 60)`,
+    );
+  } catch (error) {
+    check(false, `preset export failed — ${String(error).slice(0, 300)}`);
+  }
+
+  // A frame as a picture: the project's own size (1080 × 1920), = the compositor's frame.
+  for (const format of ['png', 'jpeg'] as const) {
+    try {
+      const out = await page.evaluate(
+        (f) => window.engineLab!.captureImage(7.0, { format: f, quality: 0.9 }),
+        format,
+      );
+      const file = save('frame', out.image.extension, out.base64);
+      const v = probe(file).streams[0];
+      check(
+        v?.width === 1080 && v.height === 1920 && out.image.width === 1080,
+        `frame ${format}: ${v?.codec_name} ${v?.width}×${v?.height} (project size 1080×1920)`,
+      );
+      const decoded = frameAt(file, 0, 1080, 1920);
+      const mae = rgbMae(decoded, await captureAt(7.0, 1080, 1920));
+      check(
+        mae < (format === 'png' ? 1 : 4),
+        `frame ${format}: matches the compositor (${mae.toFixed(2)} / 255) · ${(Buffer.byteLength(out.base64, 'base64') / 1e6).toFixed(2)} MB`,
+      );
+    } catch (error) {
+      check(false, `frame ${format} failed — ${String(error).slice(0, 300)}`);
+    }
+  }
+}
 
 for (const name of browsers) {
   for (const backend of backends) {
@@ -330,6 +568,7 @@ for (const name of browsers) {
         );
       }
     }
+    if (backend === 'webgl2' && !skipExtras) await checkExtras(page, name, duration);
     // Cancel: AbortError, and nothing left behind in OPFS.
     const cancelled = await page.evaluate(() =>
       window.engineLab!.cancelAfter(1200, { format: 'mp4', height: 720, fps: 30, quality: 'low' }),

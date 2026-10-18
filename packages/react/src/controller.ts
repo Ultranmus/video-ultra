@@ -18,8 +18,10 @@ import {
   projectFrame,
   randomId,
   setItemFlags,
+  setExportRange,
   setTrackFlags,
   setTransition,
+  LAYER_SCALE,
   splitItem,
   ungroupItems,
   updateItem,
@@ -34,6 +36,10 @@ import {
   type ExportOptions,
   type ExportProgress,
   type ExportResult,
+  type AudioExportOptions,
+  type AudioExportResult,
+  type FrameImage,
+  type FrameImageOptions,
 } from '@video-ultra/core';
 import {
   assetFromProbe,
@@ -52,6 +58,7 @@ import {
 import { produce } from 'immer';
 import { audioItem, DEFAULT_DUCK, isSounding, itemTitle, stickerItem, visualItem } from './items';
 import { audioExtension, type AudioLibrary, type AudioLibraryTrack } from './library/audio-library';
+import { formatClock } from './format';
 import { computeTargets, type Targets } from './targets';
 import type { Labels } from './labels';
 import { createUiStore, Playhead, type LayoutMode, type PanelId, type ToolId } from './state';
@@ -67,6 +74,10 @@ export interface ControllerOptions {
   onSave?: (project: Project) => void | Promise<void>;
   /** Called when an export finishes. */
   onExport?: (result: ExportResult) => void;
+  /** Called when a sound-only export finishes. */
+  onExportAudio?: (result: AudioExportResult) => void;
+  /** Called when a frame is saved as a picture. */
+  onSaveFrame?: (image: FrameImage) => void;
   /** Gets media bytes for assets the host stores itself (`url` sources or its own keys). */
   resolveMedia?: (asset: Asset) => Promise<Blob | null>;
   /** Keep a local autosave + crash-recovery copy in the browser (default true). */
@@ -1264,6 +1275,119 @@ export class EditorController {
     for (const warning of result.warnings) this.toast(warning, 'info');
     this.options.onExport?.(result);
     return result;
+  }
+
+  // ── v0.2 D. Capture & export ───────────────────────────────────────────
+
+  /**
+   * The part to export starts at the playhead (key I). Its end stays where it was, or is the end
+   * of the video when there was none (or it came before the new start).
+   */
+  setExportIn(): void {
+    const duration = projectDuration(this.project);
+    const t = Math.min(this.playhead.time, duration);
+    if (duration === 0 || t >= duration) return;
+    const r = this.project.settings.exportRange;
+    const end = r && r.end > t && r.end <= duration ? r.end : duration;
+    this.#setRange({ start: t, end }, this.labels.rangeInSet(formatClock(t)));
+  }
+
+  /** The part to export ends at the playhead (key O); its start stays, or is the video's start. */
+  setExportOut(): void {
+    const duration = projectDuration(this.project);
+    const t = Math.min(this.playhead.time, duration);
+    if (t <= 0) return;
+    const r = this.project.settings.exportRange;
+    const start = r && r.start < t ? r.start : 0;
+    this.#setRange({ start, end: t }, this.labels.rangeOutSet(formatClock(t)));
+  }
+
+  /** Sets (or clears, `null`) the part to export as one undoable edit. */
+  setExportRange(range: { start: Time; end: Time } | null): void {
+    this.#setRange(range, null);
+  }
+
+  #setRange(range: { start: Time; end: Time } | null, message: string | null): void {
+    const before = this.project;
+    this.run(this.labels.rangeChange, (d) => setExportRange(d, range));
+    if (this.project === before || !message) return;
+    this.toast(message, 'success', { label: this.labels.undo, run: () => this.undo() });
+  }
+
+  /** Exports only the sound (the same mix as the video export). */
+  async exportAudio(
+    options: AudioExportOptions,
+    onProgress: (p: ExportProgress) => void,
+    signal: AbortSignal,
+  ): Promise<AudioExportResult> {
+    const engine = this.engine;
+    if (!engine) throw new Error(this.labels.exportUnavailable);
+    this.pause();
+    const result = await engine.exportAudio(options, onProgress, signal);
+    for (const warning of result.warnings) this.toast(warning, 'info');
+    this.options.onExportAudio?.(result);
+    return result;
+  }
+
+  /** Saves the frame under the playhead as a picture at the project's size. */
+  async saveFrame(options: FrameImageOptions): Promise<FrameImage> {
+    const engine = this.engine;
+    if (!engine) throw new Error(this.labels.exportUnavailable);
+    this.pause();
+    const image = await engine.captureImage(this.playhead.time, options);
+    this.options.onSaveFrame?.(image);
+    return image;
+  }
+
+  /** Opens / closes the camera recorder (it covers the editor while open). */
+  setCameraOpen(open: boolean): void {
+    if (open) this.pause();
+    this.ui.setState({ cameraOpen: open, tool: null, sheetPanel: false });
+  }
+
+  /**
+   * Adds a finished camera recording (already streamed into storage as `assetId`): probed like an
+   * import, then placed in the main video at the playhead or as a layer over it. Returns false
+   * (after saying why) when the file can't be used.
+   */
+  async addRecording(
+    file: File,
+    assetId: string,
+    source: Asset['source'],
+    place: 'main' | 'layer',
+  ): Promise<boolean> {
+    if (!this.analyzer) return false;
+    const probe = await this.analyzer.probe(file, file.name).catch((error: unknown) => ({
+      ok: false as const,
+      message: error instanceof Error ? error.message : String(error),
+    }));
+    if (!probe.ok) {
+      this.toast(this.labels.recordingFailed(probe.message), 'error');
+      return false;
+    }
+    const asset = assetFromProbe(probe.media, assetId, source);
+    let added: string | null = null;
+    this.run(this.labels.addMedia, (d, ctx) => {
+      addAsset(d, asset);
+      const item = visualItem(asset, ctx.ids(), this.playhead.time);
+      if (place === 'layer') {
+        if ('transform' in item) item.transform = { ...item.transform, scale: LAYER_SCALE };
+        addToLane(d, item, ctx.ids);
+      } else {
+        const main = mainTrack(d).items;
+        const under = itemIndexAt(main, this.playhead.time);
+        insertMain(d, item, under === -1 ? main.length : under + 1);
+      }
+      added = item.id;
+    });
+    if (!added) return false;
+    this.#registerMedia(asset, file);
+    this.select(added);
+    this.toast(this.labels.recordingAdded, 'success', {
+      label: this.labels.undo,
+      run: () => this.undo(),
+    });
+    return true;
   }
 
   // ── feedback ───────────────────────────────────────────────────────────
