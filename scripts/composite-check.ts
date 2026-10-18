@@ -212,6 +212,7 @@ for (const name of names) {
   }
   checkTransitions(g, backends);
   checkAnimations(g, backends);
+  checkPictureTools(g, backends);
   if (backends.length === 2) {
     // The two backends get slightly different pixels from the browser's own YUV → RGB step (the
     // plain video area already differs by ~2 / 255 on Chrome); effects must not add to that.
@@ -242,7 +243,7 @@ if (goldenNames.length > 1) {
   }
 }
 
-for (const prefix of ['tx-', 'anim-']) {
+for (const prefix of ['tx-', 'anim-', 'pic-']) {
   if (goldenNames.length < 2) break;
   const [a, b] = [goldenAll[goldenNames[0]!]!, goldenAll[goldenNames[goldenNames.length - 1]!]!];
   let worst = 0;
@@ -375,6 +376,165 @@ function checkAnimations(g: Record<string, Img>, backends: string[]): void {
     check(
       worst < 1.5,
       `animations: WebGPU and WebGL2 match (worst ${worst.toFixed(2)} / 255 above decode baseline)`,
+    );
+  }
+}
+
+/** W3C separable blend modes (0…1), the CPU reference for the shader's `blendColour`. */
+function blendRef(mode: string, b: number, s: number): number {
+  switch (mode) {
+    case 'multiply':
+      return b * s;
+    case 'screen':
+      return b + s - b * s;
+    case 'overlay':
+      return b <= 0.5 ? 2 * b * s : 1 - 2 * (1 - b) * (1 - s);
+    case 'soft-light': {
+      const d = b <= 0.25 ? ((16 * b - 12) * b + 4) * b : Math.sqrt(b);
+      return s <= 0.5 ? b - (1 - 2 * s) * b * (1 - b) : b + (2 * s - 1) * (d - b);
+    }
+    case 'add':
+      return Math.min(1, b + s);
+    case 'lighten':
+      return Math.max(b, s);
+    case 'darken':
+      return Math.min(b, s);
+    case 'difference':
+      return Math.abs(b - s);
+    default:
+      return s;
+  }
+}
+
+/**
+ * Picture tools golden frames (`pic-<variant>-<backend>`, /lab/engine): green screen, LUT,
+ * blurred / pixelated areas and every blend mode, checked against the plain footage and CPU
+ * references on each backend; the two backends must agree (checked with the other `pic-` frames).
+ */
+function checkPictureTools(g: Record<string, Img>, backends: string[]): void {
+  for (const b of backends) {
+    const at = (v: string) => g[`pic-${v}-${b}`];
+    const plain = at('plain');
+    if (!plain) {
+      check(false, `${b}: picture tool frames rendered`);
+      continue;
+    }
+    // Green screen: a 320 px layer at x 32–352, y 160–480 with a magenta disc at (192, 320).
+    const keyOff = at('key-off')!;
+    const key = at('key')!;
+    const greenOff = mean(region(keyOff, 40, 170, 100, 230), (p) => p[1]! - p[0]!);
+    const screen = mae(key, plain, 40, 170, 100, 230);
+    const shade = mae(key, plain, 40, 420, 100, 470);
+    check(
+      greenOff > 80 && screen < 3 && shade < 4,
+      `${b}: green screen removes the screen, shaded part too (green ${greenOff.toFixed(0)} → differs from footage by ${screen.toFixed(2)}, shade ${shade.toFixed(2)})`,
+    );
+    const disc = region(key, 180, 300, 204, 340);
+    const magenta = mean(disc, (p) => (p[0]! > 200 && p[1]! < 70 && p[2]! > 200 ? 1 : 0));
+    check(
+      magenta > 0.95,
+      `${b}: green screen keeps the subject (${(magenta * 100).toFixed(0)}% magenta)`,
+    );
+    // LUT: an inverting 33-point LUT on the footage band (y 140–500).
+    const lut = at('lut')!;
+    let err = 0;
+    let n = 0;
+    for (let y = 160; y < 480; y += 2)
+      for (let x = 20; x < 620; x += 2) {
+        const p = px(plain, x, y);
+        const q = px(lut, x, y);
+        for (let c = 0; c < 3; c++, n++) err += Math.abs(q[c]! - (255 - p[c]!));
+      }
+    check(err / n < 3, `${b}: LUT inverts the footage (mean error ${(err / n).toFixed(2)} / 255)`);
+    check(mean(region(lut, 0, 0, SIZE, 100), luma) < 3, `${b}: LUT leaves the background alone`);
+    // Blurred rectangle 256 × 192 at the centre (x 192–448, y 224–416); detail = neighbour steps.
+    const detail = (img: Img, x0: number, y0: number, x1: number, y1: number) => {
+      let sum = 0;
+      let count = 0;
+      for (let y = y0; y < y1; y++)
+        for (let x = x0; x < x1 - 1; x++, count++)
+          sum += Math.abs(luma(px(img, x, y)) - luma(px(img, x + 1, y)));
+      return sum / count;
+    };
+    const blur = at('blur')!;
+    const dIn = detail(blur, 200, 232, 440, 408);
+    const dPlain = detail(plain, 200, 232, 440, 408);
+    const outside = mae(blur, plain, 20, 160, 170, 480);
+    check(
+      dIn < dPlain * 0.35 && outside < 0.5,
+      `${b}: blurred area softens only inside (detail ${dPlain.toFixed(2)} → ${dIn.toFixed(2)}, outside differs by ${outside.toFixed(2)})`,
+    );
+    // Pixelated oval: big flat cells inside, corners of its box untouched.
+    const pix = at('pixelate')!;
+    let same = 0;
+    let pairs = 0;
+    for (let y = 280; y < 360; y++)
+      for (let x = 260; x < 380; x++, pairs++) {
+        const p = px(pix, x, y);
+        const q = px(pix, x + 1, y);
+        if (Math.abs(p[0]! - q[0]!) + Math.abs(p[1]! - q[1]!) + Math.abs(p[2]! - q[2]!) <= 3)
+          same++;
+      }
+    const corner = mae(pix, plain, 194, 226, 214, 246);
+    check(
+      same / pairs > 0.85 && corner < 0.5 && mae(pix, plain, 260, 280, 380, 360) > 3,
+      `${b}: pixelated oval is a mosaic inside, untouched in its box's corners (${((same / pairs) * 100).toFixed(0)}% flat, corner differs by ${corner.toFixed(2)})`,
+    );
+    // Blend modes: an orange (200, 120, 40) photo at 80% over x 160–480, y 160–480.
+    const orange = [200, 120, 40].map((v) => v / 255);
+    const off: string[] = [];
+    let worst = 0;
+    for (const mode of [
+      'normal',
+      'multiply',
+      'screen',
+      'overlay',
+      'soft-light',
+      'add',
+      'lighten',
+      'darken',
+      'difference',
+    ]) {
+      const img = at(`blend-${mode}`);
+      if (!img) {
+        off.push(`${mode} missing`);
+        continue;
+      }
+      let e = 0;
+      let k = 0;
+      for (let y = 176; y < 464; y += 3)
+        for (let x = 176; x < 464; x += 3) {
+          const under = px(plain, x, y);
+          const got = px(img, x, y);
+          for (let c = 0; c < 3; c++, k++) {
+            const bb = under[c]! / 255;
+            const want = 0.8 * blendRef(mode, bb, orange[c]!) + 0.2 * bb;
+            e += Math.abs(got[c]! - want * 255);
+          }
+        }
+      const m = e / k;
+      worst = Math.max(worst, m);
+      if (m > 2.5) off.push(`${mode} ${m.toFixed(2)}`);
+    }
+    check(
+      off.length === 0,
+      `${b}: 9 blend modes match the reference maths (worst ${worst.toFixed(2)} / 255)${off.length ? ` — off: ${off.join(', ')}` : ''}`,
+    );
+  }
+  if (backends.length === 2) {
+    const base = mae(g['pic-plain-webgpu']!, g['pic-plain-webgl2']!);
+    let worst = 0;
+    let worstKey = '';
+    for (const key of Object.keys(g)) {
+      if (!key.startsWith('pic-') || !key.endsWith('-webgpu')) continue;
+      const other = g[key.replace(/-webgpu$/, '-webgl2')];
+      if (!other) continue;
+      const d = mae(g[key]!, other);
+      if (d > worst) [worst, worstKey] = [d, key];
+    }
+    check(
+      worst < base + 1,
+      `picture tools: WebGPU and WebGL2 match (worst ${worst.toFixed(2)} at ${worstKey}, decode baseline ${base.toFixed(2)} / 255)`,
     );
   }
 }

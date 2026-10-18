@@ -82,6 +82,16 @@ export interface Engine {
     background: string,
   ): Promise<ImageBitmap[]>;
   /**
+   * Reads a `.cube` LUT file in the worker: its grid size and title. Rejects with a plain message
+   * (error name `LutError`) when the file isn't a usable 3D LUT.
+   */
+  checkLut(blob: Blob): Promise<{ size: number; title: string | null }>;
+  /**
+   * The colour (`#rrggbb`) of a picture item — alone, without its green screen — at canvas point
+   * `x, y` (fractions) at timeline `time`; null outside the picture. For "pick from video".
+   */
+  pickColour(itemId: string, time: Time, x: number, y: number): Promise<string | null>;
+  /**
    * Silences (or restores) the engine's sound output without touching playback timing — e.g.
    * while recording a voiceover without headphones.
    */
@@ -384,6 +394,16 @@ export async function createEngine(
       });
       if (data.type !== 'item-preview') throw new Error('Unexpected engine response');
       return data.bitmaps;
+    },
+    async checkLut(blob: Blob) {
+      const data = await send({ type: 'lut-check', blob });
+      if (data.type !== 'lut-check') throw new Error('Unexpected engine response');
+      return { size: data.size, title: data.title };
+    },
+    async pickColour(itemId: string, time: Time, x: number, y: number) {
+      const data = await send({ type: 'pick-colour', itemId, time, x, y });
+      if (data.type !== 'pick-colour') throw new Error('Unexpected engine response');
+      return data.color;
     },
     async transitionPreview(
       itemId: string,

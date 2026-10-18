@@ -73,7 +73,7 @@ export function curvePixels(calibration: HdrCalibration): Uint8Array<ArrayBuffer
 
 /**
  * Floats per layer in the uniform block: 7 × vec4 (pos, posT, uv, uvT, c0, c1, c2) + the effect
- * block (19 × vec4, effects/colour.ts).
+ * block (24 × vec4, effects/colour.ts) = 124 floats, 496 bytes.
  */
 export const LAYER_FLOATS = 28 + EFFECT_FLOATS;
 
@@ -148,4 +148,24 @@ export function writeLayerUniforms(
   out[e + 5] = boxH > 0 ? boxW / boxH : 1;
   out[e + 6] = canvasW;
   out[e + 7] = canvasH;
+}
+
+/**
+ * Where the copy of the pixels under a layer sits, for the shader: texel (or, for a blurred
+ * area, uv) = (pixel − origin) · step. Writes `back` (effect floats 88–91) of the layer at
+ * `offset`.
+ */
+export function writeBackMapping(
+  out: Float32Array,
+  offset: number,
+  originX: number,
+  originY: number,
+  stepX: number,
+  stepY: number,
+): void {
+  const e = offset + 28 + 88;
+  out[e] = originX;
+  out[e + 1] = originY;
+  out[e + 2] = stepX;
+  out[e + 3] = stepY;
 }

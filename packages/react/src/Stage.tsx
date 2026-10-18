@@ -10,6 +10,7 @@ import {
 import { useEffect, useLayoutEffect, useRef, useState, type ReactElement } from 'react';
 import { useController, useLabels, useProject, useUi } from './context';
 import { Button, EmptyState } from './controls';
+import { Icon } from './icons';
 import { ScrubPreview } from './stage/ScrubPreview';
 import { boundsOf, unionBounds, type Bounds } from './stage/arrange';
 import {
@@ -74,7 +75,23 @@ type StageDrag =
   /** One finger on empty stage while zoomed in: pan the view. */
   | { type: 'pan'; id: number; x: number; y: number; start: View; moved: boolean }
   /** Mouse drag on empty stage: a selection rectangle (canvas px). */
-  | { type: 'marquee'; id: number; x: number; y: number; add: boolean; moved: boolean };
+  | { type: 'marquee'; id: number; x: number; y: number; add: boolean; moved: boolean }
+  /**
+   * A blurred area's side handle: changes its width or height, the opposite side stays put
+   * (v0.2 C3). `w × h`: its box in canvas px when the drag started.
+   */
+  | {
+      type: 'stretch';
+      id: number;
+      itemId: string;
+      edge: 'n' | 'e' | 's' | 'w';
+      x: number;
+      y: number;
+      tf: Transform;
+      w: number;
+      h: number;
+      moved: boolean;
+    };
 
 /** How the stage view is zoomed and panned (CSS on the frame; the project doesn't change). */
 interface View {
@@ -219,6 +236,8 @@ export function Stage(): ReactElement {
     el.hidden = false;
     el.toggleAttribute('data-locked', locked);
     el.toggleAttribute('data-group', entries.length > 1);
+    // A blurred area also stretches from its sides.
+    el.toggleAttribute('data-sides', entries.length === 1 && entries[0]!.item.kind === 'region');
     // A little air around the item so handles never sit on top of small text or stickers.
     const pad = 6;
     const box: Box =
@@ -252,6 +271,7 @@ export function Stage(): ReactElement {
   // Show the box only while the selection is on screen (playhead subscription, no re-render per
   // frame).
   const previewMode = useUi((s) => s.previewMode);
+  const picking = useUi((s) => s.picking !== null);
   useEffect(() => {
     if (selected.length === 0 || previewMode) {
       placeBox([], false);
@@ -366,8 +386,17 @@ export function Stage(): ReactElement {
     longPress.current = null;
   };
 
+  /** Latest width / height / transform of a blurred area being stretched. */
+  const stretched = useRef<{ width: number; height: number; transform: Transform } | null>(null);
+
   const onPointerDown = (e: React.PointerEvent) => {
     if (scale === 0 || e.button > 0) return;
+    // Green screen "pick from video": this tap picks the colour.
+    if (ctl.ui.getState().picking) {
+      const p = toCanvas(e);
+      void ctl.pickKeyColour(p.x / pw, p.y / ph);
+      return;
+    }
     // Preview mode is for watching: a tap plays or pauses, nothing moves.
     if (ctl.ui.getState().previewMode) {
       ctl.togglePlay();
@@ -424,6 +453,27 @@ export function Stage(): ReactElement {
 
     const handle = (e.target as HTMLElement).dataset.handle;
     const box = selectionBox();
+    const only = members.length === 1 ? ctl.selectedItem() : null;
+    if (
+      (handle === 'n' || handle === 'e' || handle === 's' || handle === 'w') &&
+      box &&
+      only?.kind === 'region'
+    ) {
+      stretched.current = null;
+      drag.current = {
+        type: 'stretch',
+        id: e.pointerId,
+        itemId: only.id,
+        edge: handle,
+        x: p.x,
+        y: p.y,
+        tf: { ...only.transform },
+        w: box.width,
+        h: box.height,
+        moved: false,
+      };
+      return;
+    }
     if (handle && box && members.length) {
       drag.current = {
         type: handle === 'rotate' ? 'rotate' : 'scale',
@@ -593,6 +643,34 @@ export function Stage(): ReactElement {
     const k = scale * view.current.z;
     if (!d.moved && Math.hypot(p.x - d.x, p.y - d.y) * k < 2) return;
     d.moved = true;
+    if (d.type === 'stretch') {
+      // The pointer's move along the box's own axes; the opposite side stays where it is.
+      const rad = (d.tf.rotation * Math.PI) / 180;
+      const cos = Math.cos(rad);
+      const sin = Math.sin(rad);
+      const dx = p.x - d.x;
+      const dy = p.y - d.y;
+      const along = d.edge === 'e' || d.edge === 'w' ? dx * cos + dy * sin : -dx * sin + dy * cos;
+      const sign = d.edge === 'e' || d.edge === 's' ? 1 : -1;
+      const min = 8 / k;
+      const horizontal = d.edge === 'e' || d.edge === 'w';
+      const size = Math.max(min, (horizontal ? d.w : d.h) + sign * along);
+      const grow = size - (horizontal ? d.w : d.h);
+      const shift = (sign * grow) / 2;
+      const cx = d.tf.x * pw + (horizontal ? cos * shift : -sin * shift);
+      const cy = d.tf.y * ph + (horizontal ? sin * shift : cos * shift);
+      const s = d.tf.scale;
+      const next = {
+        width: horizontal ? size / (pw * s) : d.w / (pw * s),
+        height: horizontal ? d.h / (ph * s) : size / (ph * s),
+        transform: { ...d.tf, x: cx / pw, y: cy / ph },
+      };
+      stretched.current = next;
+      const project = ctl.preview((draft) => updateItem(draft, d.itemId, next));
+      const item = project ? findItem(project, d.itemId)?.item : null;
+      if (project && item) placeBox(boxesAt(project, [item], ctl.playhead.time), false);
+      return;
+    }
     if (d.type === 'move') {
       // The selection's centre snaps to the frame's centre lines.
       const sx = snapCentre((d.centre.x + p.x - d.x) / pw, 6 / k / pw);
@@ -669,6 +747,18 @@ export function Stage(): ReactElement {
         bottom: Math.max(d.y, p.y),
       };
       selectInRect(rect, d.add);
+      return;
+    }
+    if (d.type === 'stretch') {
+      if (d.id !== e.pointerId) return;
+      drag.current = null;
+      const next = stretched.current;
+      stretched.current = null;
+      if (cancelled || !next) {
+        ctl.preview(null);
+        return;
+      }
+      ctl.run(l.resize, (draft) => updateItem(draft, d.itemId, next));
       return;
     }
     if (d.type === 'pinch') {
@@ -754,6 +844,7 @@ export function Stage(): ReactElement {
     <div
       ref={stageRef}
       className="vu-stage"
+      data-picking={picking || undefined}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={(e) => finish(e, false)}
@@ -809,10 +900,23 @@ export function Stage(): ReactElement {
           <span className="vu-handle" data-handle="ne" />
           <span className="vu-handle" data-handle="sw" />
           <span className="vu-handle" data-handle="se" />
+          <span className="vu-handle vu-handle-side" data-handle="n" />
+          <span className="vu-handle vu-handle-side" data-handle="e" />
+          <span className="vu-handle vu-handle-side" data-handle="s" />
+          <span className="vu-handle vu-handle-side" data-handle="w" />
           <span className="vu-rotate-stem" aria-hidden="true" />
           <span className="vu-handle vu-handle-rotate" data-handle="rotate" />
         </div>
       </div>
+      {picking ? (
+        <div className="vu-stage-pick" role="status" onPointerDown={(e) => e.stopPropagation()}>
+          <Icon name="eyedropper" size={16} />
+          <span>{l.pickingHint}</span>
+          <button type="button" className="vu-text-button" onClick={() => ctl.startPicking(null)}>
+            {l.pickCancel}
+          </button>
+        </div>
+      ) : null}
       {zoom > 1 ? (
         <button
           type="button"

@@ -25,6 +25,7 @@ import {
   updateItem,
   type ArrangeTo,
   type Asset,
+  type RegionItem,
   type Capabilities,
   type Editor,
   type EditContext,
@@ -50,7 +51,8 @@ import {
   type ProjectStorage,
 } from '@video-ultra/core/internal';
 import { produce } from 'immer';
-import { audioItem, itemTitle, stickerItem, visualItem } from './items';
+import { audioItem, itemTitle, regionItem, stickerItem, visualItem } from './items';
+import { DEFAULT_KEY, isPicture } from './picture';
 import { computeTargets, type Targets } from './targets';
 import type { Labels } from './labels';
 import { createUiStore, Playhead, type LayoutMode, type PanelId, type ToolId } from './state';
@@ -502,6 +504,8 @@ export class EditorController {
       ids.every((id, i) => state.selectedIds[i] === id)
     )
       return;
+    // Picking a green-screen colour belongs to the item it was started for.
+    if (state.picking && state.picking !== primary) this.ui.setState({ picking: null });
     const multi = ids.length > 1;
     const wasMulti = state.selectedIds.length > 1;
     if (options.keepPanel || (multi && wasMulti))
@@ -1069,12 +1073,14 @@ export class EditorController {
 
   #registerMedia(asset: Asset, blob: Blob): void {
     this.media.set(asset.id, blob);
-    this.analyzer?.addMedia(
-      asset.id,
-      blob,
-      asset.kind,
-      asset.audioTrack !== undefined ? { audioTrack: asset.audioTrack } : {},
-    );
+    // LUT files are read by the engine only (no thumbnails or sound to analyse).
+    if (asset.kind !== 'lut')
+      this.analyzer?.addMedia(
+        asset.id,
+        blob,
+        asset.kind,
+        asset.audioTrack !== undefined ? { audioTrack: asset.audioTrack } : {},
+      );
     void this.engine?.addMedia(asset.id, blob).catch(() => {});
   }
 
@@ -1156,6 +1162,114 @@ export class EditorController {
 
   dismissImport(rowId: string): void {
     this.ui.setState((s) => ({ imports: s.imports.filter((r) => r.id !== rowId) }));
+  }
+
+  // ── picture tools (v0.2 C) ─────────────────────────────────────────────
+
+  /** Adds a blurred or pixelated box / oval at the playhead, selected (it can be dragged at once). */
+  addRegion(effect: RegionItem['effect'], shape: RegionItem['shape']): void {
+    const l = this.labels;
+    const { width, height } = this.project.settings;
+    const name =
+      effect === 'pixelate'
+        ? shape === 'ellipse'
+          ? l.pixelateOval
+          : l.pixelateBox
+        : shape === 'ellipse'
+          ? l.blurOval
+          : l.blurBox;
+    this.addLaneItem(l.addBlurArea, (id, start) => ({
+      ...regionItem(id, start, effect, shape, width, height),
+      name,
+    }));
+  }
+
+  /**
+   * Green screen "pick from video": the next tap on the stage picks `itemId`'s key colour
+   * (`null` stops picking).
+   */
+  startPicking(itemId: string | null): void {
+    this.ui.setState({ picking: itemId });
+    if (itemId) this.#announce(this.labels.pickingHint);
+  }
+
+  /**
+   * Picks the key colour of the item being picked for, at canvas point `x, y` (fractions): the
+   * picture's own colour there (without its green screen), from the engine.
+   */
+  async pickKeyColour(x: number, y: number): Promise<void> {
+    const l = this.labels;
+    const itemId = this.ui.getState().picking;
+    this.ui.setState({ picking: null });
+    const engine = this.engine;
+    if (!itemId || !engine) return;
+    const color = await engine.pickColour(itemId, this.playhead.time, x, y).catch(() => null);
+    if (!color) {
+      this.toast(l.pickMissed, 'info');
+      return;
+    }
+    const item = findItem(this.project, itemId)?.item;
+    if (!isPicture(item)) return;
+    this.run(l.greenScreen, (d) =>
+      updateItem(d, itemId, { key: { ...(item.key ?? DEFAULT_KEY), color } }),
+    );
+    this.#announce(l.pickedColour(color.toUpperCase()));
+  }
+
+  /**
+   * Imports a `.cube` LUT: checked in the engine worker (clear message when it can't be used),
+   * stored like media (never inlined in the project), added as a `lut` asset and applied to
+   * `itemId` when that is a picture.
+   */
+  async importLut(file: File, itemId: string | null): Promise<void> {
+    const l = this.labels;
+    const name = file.name;
+    if (!/\.cube$/i.test(name)) {
+      this.toast(l.lutFailed(name, l.lutNotFile), 'error');
+      return;
+    }
+    const engine = this.engine;
+    const storage = this.storage;
+    if (!engine || !storage) {
+      this.toast(l.lutUnavailable, 'error');
+      return;
+    }
+    this.#announce(l.lutImporting(name));
+    try {
+      const info = await engine.checkLut(file);
+      const assetId = randomId();
+      const source = await storage.putMedia(assetId, file);
+      const asset: Asset = {
+        id: assetId,
+        kind: 'lut',
+        name: name.replace(/\.cube$/i, '') || info.title || name,
+        mimeType: 'text/plain',
+        size: file.size,
+        duration: 0,
+        hasAudio: false,
+        source,
+      };
+      this.run(l.lutStep, (d) => {
+        addAsset(d, asset);
+        const target = itemId ? findItem(d, itemId)?.item : null;
+        if (isPicture(target) && !this.isLocked(target.id))
+          updateItem(d, target.id, { lut: { assetId, intensity: 1 } });
+      });
+      this.#registerMedia(asset, file);
+      this.toast(l.lutAdded(asset.name), 'success');
+    } catch (error) {
+      this.toast(
+        l.lutFailed(
+          name,
+          error instanceof StorageFullError
+            ? l.storageFull
+            : error instanceof Error
+              ? error.message
+              : String(error),
+        ),
+        'error',
+      );
+    }
   }
 
   // ── export ─────────────────────────────────────────────────────────────

@@ -18,10 +18,19 @@ import {
   splitItem,
   trimItem,
   ungroupItems,
+  updateItem,
 } from '../edit/ops';
 import type { Project } from '../model/schema';
 import { fromSeconds as s } from '../model/time';
-import { audioItem, fixtureProject, imageItem, stickerItem, textItem, videoItem } from './fixtures';
+import {
+  audioItem,
+  fixtureProject,
+  imageItem,
+  regionItem,
+  stickerItem,
+  textItem,
+  videoItem,
+} from './fixtures';
 
 /** Random edit sequences for property tests (history, autosave recovery). */
 
@@ -44,7 +53,13 @@ export type Op =
   | { op: 'freeze'; pick: number; at: number }
   | { op: 'transition'; pick: number; duration: number }
   | { op: 'addMain'; kind: 'video' | 'image'; seconds: number; sourceIn: number }
-  | { op: 'addLane'; kind: 'text' | 'audio' | 'sticker'; start: number; seconds: number }
+  | {
+      op: 'addLane';
+      kind: 'text' | 'audio' | 'sticker' | 'region';
+      start: number;
+      seconds: number;
+    }
+  | { op: 'picture'; pick: number; tool: 'key' | 'lut' | 'blend' | 'region' | 'clear' }
   | { op: 'flags'; pick: number; locked: boolean; hidden: boolean }
   | { op: 'group'; pick: number; other: number }
   | { op: 'ungroup'; pick: number }
@@ -90,7 +105,7 @@ export const opArb: fc.Arbitrary<Op> = fc.oneof(
   }),
   fc.record({
     op: fc.constant('addLane' as const),
-    kind: fc.constantFrom('text' as const, 'audio' as const, 'sticker' as const),
+    kind: fc.constantFrom('text' as const, 'audio' as const, 'sticker' as const, 'region' as const),
     start: fc.double({ min: 0, max: 20, noNaN: true }),
     seconds: fc.double({ min: 0.05, max: 8, noNaN: true }),
   }),
@@ -113,6 +128,17 @@ export const opArb: fc.Arbitrary<Op> = fc.oneof(
     pick: fc.nat(),
     to: fc.constantFrom('forward' as const, 'backward' as const, 'front' as const, 'back' as const),
     at: fc.double({ min: 0, max: 20, noNaN: true }),
+  }),
+  fc.record({
+    op: fc.constant('picture' as const),
+    pick: fc.nat(),
+    tool: fc.constantFrom(
+      'key' as const,
+      'lut' as const,
+      'blend' as const,
+      'region' as const,
+      'clear' as const,
+    ),
   }),
   fc.record({ op: fc.constant('goTo' as const), position: fc.nat({ max: 12 }) }),
   fc.constant({ op: 'undo' as const }),
@@ -152,7 +178,9 @@ export function run(editor: Editor, step: Op, newId: () => string): void {
             ? textItem(id, step.start, step.seconds)
             : step.kind === 'audio'
               ? audioItem(id, step.start, step.seconds)
-              : stickerItem(id, step.start, step.seconds);
+              : step.kind === 'region'
+                ? regionItem(id, step.start, step.seconds)
+                : stickerItem(id, step.start, step.seconds);
         editor.apply('Add', (d, ctx) => addToLane(d, item, ctx.ids));
         return;
       }
@@ -210,6 +238,23 @@ export function run(editor: Editor, step: Op, newId: () => string): void {
       }
       case 'arrange':
         editor.apply('Arrange', (d, ctx) => arrangeItem(d, item.id, step.to, s(step.at), ctx.ids));
+        break;
+      case 'picture':
+        editor.apply('Picture', (d) =>
+          updateItem(
+            d,
+            item.id,
+            step.tool === 'key'
+              ? { key: { color: '#00b140', tolerance: 0.4, softness: 0.3, spill: 0.5 } }
+              : step.tool === 'lut'
+                ? { lut: { assetId: 'look', intensity: 0.7 } }
+                : step.tool === 'blend'
+                  ? { blend: 'screen' }
+                  : step.tool === 'region'
+                    ? { effect: 'pixelate', shape: 'ellipse', amount: 0.8, width: 0.5 }
+                    : { key: null, lut: null, blend: null },
+          ),
+        );
         break;
       case 'transition':
         editor.apply('Transition', (d) =>

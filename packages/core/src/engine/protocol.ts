@@ -118,6 +118,13 @@ export type EngineRequest =
       height: number;
       frames: number;
     }
+  /** Reads a `.cube` file: its size and title, or a `LutError` saying what's wrong. */
+  | { type: 'lut-check'; blob: Blob }
+  /**
+   * The colour of one picture item (alone, without its green screen) at canvas point `x, y`
+   * (fractions) at timeline `time` — the green screen's "pick from video".
+   */
+  | { type: 'pick-colour'; itemId: string; time: number; x: number; y: number }
   /** Audio output: the port to the AudioWorklet, its sample rate and output latency (s). */
   | { type: 'audio'; port: MessagePort; sampleRate: number; latency: number };
 
@@ -129,7 +136,9 @@ export type EngineResponseData =
   | { type: 'capture'; bitmap: ImageBitmap; backend: RenderBackend }
   | { type: 'filter-previews'; bitmaps: ImageBitmap[] }
   | { type: 'transition-preview'; bitmaps: ImageBitmap[] }
-  | { type: 'item-preview'; bitmaps: ImageBitmap[] };
+  | { type: 'item-preview'; bitmaps: ImageBitmap[] }
+  | { type: 'lut-check'; size: number; title: string | null }
+  | { type: 'pick-colour'; color: string | null };
 
 /** Unsolicited events from the worker. */
 export type EngineEvent =

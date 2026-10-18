@@ -28,6 +28,7 @@ import { itemTitle } from './items';
 import { EASES, easeAt } from '@video-ultra/core/internal';
 import { CategoryBrowser, useNearView } from './browse';
 import { useTargets, type LookItem } from './targets';
+import { LutControls } from './picture';
 
 const TILE = 72;
 const FLICKS = 705_600_000;
@@ -124,6 +125,7 @@ function FilterGrid({ item, note }: { item: LookItem; note: string | null }) {
           coalesceKey={`filter:${item.id}`}
         />
       ) : null}
+      <LutControls item={item} />
       <div className="vu-row">
         <Button
           icon="filter"
@@ -545,7 +547,7 @@ export function TransitionGrid(): ReactElement {
   const { transition, transitionNote, motion, hasClips } = useTargets();
   useAutoSelect(motion ? null : (transition?.id ?? null));
   // Text, stickers and lone layer pictures: their "transition" is how they appear and leave.
-  if (motion && motion.kind !== 'audio') {
+  if (motion && motion.kind !== 'audio' && motion.kind !== 'region') {
     return (
       <AnimateChoices
         item={motion}
@@ -835,7 +837,7 @@ export function AnimatePanel(): ReactElement {
   const onMain = useProject((p) =>
     selectedId ? mainTrack(p).items.some((i) => i.id === selectedId) : false,
   );
-  if (!item || item.kind === 'audio' || onMain) {
+  if (!item || item.kind === 'audio' || item.kind === 'region' || onMain) {
     return <EmptyState icon="sparkle" title={l.animateHint} />;
   }
   return <AnimateChoices item={item} />;

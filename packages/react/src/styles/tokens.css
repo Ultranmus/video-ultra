@@ -197,6 +197,11 @@
     --vu-size-export-go: 48px;
     --vu-size-export-check: 64px;
     --vu-text-emoji: 24px;
+    /* v0.2 C. Picture tools */
+    --vu-clip-region: #9aa3b8;
+    --vu-size-handle-side: 8px;
+    --vu-size-region-swatch: 64px;
+    --vu-size-key-preset: 28px;
 
     /* Layers */
     --vu-z-overlay: 10;
@@ -242,6 +247,7 @@
     --vu-clip-text: #b0742a;
     --vu-clip-sticker: #23a07c;
     --vu-clip-audio: #2f78c4;
+    --vu-clip-region: #5d6b8a;
     --vu-glyph-a: #b9b9c4;
     --vu-glyph-b: #4d194d;
     --vu-glyph-ink: #ffffff;
@@ -293,6 +299,7 @@
       --vu-clip-text: #b0742a;
       --vu-clip-sticker: #23a07c;
       --vu-clip-audio: #2f78c4;
+      --vu-clip-region: #5d6b8a;
       --vu-glyph-a: #b9b9c4;
       --vu-glyph-b: #4d194d;
       --vu-glyph-ink: #ffffff;

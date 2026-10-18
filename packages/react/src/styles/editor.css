@@ -3820,4 +3820,200 @@
   .vu-tool-body[data-locked] {
     opacity: 0.5;
   }
+
+  /* ── v0.2 C. Picture tools ── */
+
+  /* Green screen: the tool stacks like the other tool bodies. */
+  .vu-picture-tool {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-4);
+  }
+
+  .vu-key-current {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vu-space-2);
+    color: var(--vu-text-muted);
+    font-size: var(--vu-text-xs);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .vu-key-row {
+    align-items: center;
+    flex-wrap: wrap;
+    padding: var(--vu-space-1);
+  }
+
+  .vu-key-preset {
+    flex: none;
+    width: var(--vu-size-key-preset);
+    height: var(--vu-size-key-preset);
+    padding: 0;
+    border-radius: var(--vu-radius-full);
+    background: var(--vu-swatch);
+    box-shadow: inset 0 0 0 1px var(--vu-border-strong);
+    cursor: pointer;
+  }
+
+  .vu-root .vu-key-preset[aria-pressed='true'] {
+    box-shadow:
+      inset 0 0 0 1px var(--vu-border-strong),
+      0 0 0 2px var(--vu-surface-1),
+      0 0 0 4px var(--vu-accent);
+  }
+
+  /* "Pick from video": the stage takes the next tap as the colour. */
+  .vu-stage[data-picking] {
+    cursor: crosshair;
+  }
+
+  .vu-stage-pick {
+    position: absolute;
+    top: var(--vu-space-3);
+    left: 50%;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vu-space-2);
+    max-width: calc(100% - var(--vu-space-6));
+    min-height: var(--vu-size-choice);
+    padding: var(--vu-space-1) var(--vu-space-3);
+    border-radius: var(--vu-radius-full);
+    background: var(--vu-overlay);
+    color: var(--vu-on-media);
+    font-size: var(--vu-text-xs);
+    font-weight: var(--vu-weight-medium);
+    transform: translateX(-50%);
+    cursor: default;
+  }
+
+  .vu-root .vu-stage-pick .vu-text-button {
+    color: var(--vu-on-media);
+    font-weight: var(--vu-weight-semibold);
+    text-decoration: underline;
+  }
+
+  /* LUT looks above the filter presets. */
+  .vu-lut {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-3);
+    padding-bottom: var(--vu-space-3);
+    border-bottom: 1px solid var(--vu-border);
+  }
+
+  .vu-lut-title {
+    color: var(--vu-text);
+    font-size: var(--vu-text-sm);
+    font-weight: var(--vu-weight-semibold);
+  }
+
+  .vu-lut .vu-chip {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Blurred areas: the add panel's four choices and the stage's side handles. */
+  .vu-blur-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-3);
+  }
+
+  .vu-region-tiles {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--vu-space-3);
+  }
+
+  .vu-region-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--vu-space-2);
+    padding: var(--vu-space-2);
+    border-radius: var(--vu-radius-md);
+    background: var(--vu-surface-2);
+    color: var(--vu-text);
+    font-size: var(--vu-text-sm);
+    font-weight: var(--vu-weight-medium);
+    text-align: center;
+    transition: background-color var(--vu-duration-fast) var(--vu-ease);
+  }
+
+  .vu-region-tile:hover {
+    background: var(--vu-surface-3);
+  }
+
+  .vu-region-swatch {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: var(--vu-size-region-swatch);
+    border-radius: var(--vu-radius-sm);
+    background: linear-gradient(135deg, var(--vu-glyph-a), var(--vu-surface-3));
+    color: var(--vu-text);
+  }
+
+  /* The shape it adds, as a dashed outline. */
+  .vu-region-swatch::after {
+    content: '';
+    position: absolute;
+    inset: var(--vu-space-2) 22%;
+    border: 1.5px dashed var(--vu-accent-text);
+    border-radius: var(--vu-radius-sm);
+  }
+
+  .vu-region-swatch[data-shape='ellipse']::after {
+    border-radius: 50%;
+  }
+
+  .vu-handle-side {
+    display: none;
+  }
+
+  .vu-selection-box[data-sides] .vu-handle-side {
+    display: block;
+    border-radius: var(--vu-radius-full);
+  }
+
+  .vu-handle-side[data-handle='n'],
+  .vu-handle-side[data-handle='s'] {
+    left: 50%;
+    width: calc(var(--vu-size-handle) * 1.6);
+    height: var(--vu-size-handle-side);
+    margin: calc(var(--vu-size-handle-side) / -2) 0 0 calc(var(--vu-size-handle) * -0.8);
+    cursor: ns-resize;
+  }
+
+  .vu-handle-side[data-handle='n'] {
+    top: 0;
+  }
+
+  .vu-handle-side[data-handle='s'] {
+    top: 100%;
+  }
+
+  .vu-handle-side[data-handle='e'],
+  .vu-handle-side[data-handle='w'] {
+    top: 50%;
+    width: var(--vu-size-handle-side);
+    height: calc(var(--vu-size-handle) * 1.6);
+    margin: calc(var(--vu-size-handle) * -0.8) 0 0 calc(var(--vu-size-handle-side) / -2);
+    cursor: ew-resize;
+  }
+
+  .vu-handle-side[data-handle='e'] {
+    left: 100%;
+  }
+
+  .vu-handle-side[data-handle='w'] {
+    left: 0;
+  }
+
+  .vu-selection-box[data-locked] .vu-handle-side {
+    display: none;
+  }
 }

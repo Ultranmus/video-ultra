@@ -11,13 +11,14 @@ import type {
   AudioItem,
   ImageItem,
   Project,
+  RegionItem,
   StickerItem,
   TextItem,
   VideoItem,
 } from '../model/schema';
 import { fromSeconds } from '../model/time';
 
-/** A project with four assets: 10 s video, 4 s video, a photo, 30 s music. */
+/** A project with five assets: 10 s video, 4 s video, a photo, 30 s music, a LUT file. */
 export function fixtureProject(ids: IdFactory = sequentialIds('p')): Project {
   const project = createProject({ ids, now: '2026-10-17T00:00:00.000Z' });
   const assets: Asset[] = [
@@ -25,6 +26,7 @@ export function fixtureProject(ids: IdFactory = sequentialIds('p')): Project {
     asset('vidB', 'video', 4),
     asset('img', 'image', 0),
     asset('music', 'audio', 30),
+    asset('look', 'lut', 0),
   ];
   for (const a of assets) project.assets[a.id] = a;
   return project;
@@ -35,11 +37,18 @@ function asset(id: string, kind: Asset['kind'], seconds: number): Asset {
     id,
     kind,
     name: `${id}.bin`,
-    mimeType: kind === 'image' ? 'image/jpeg' : kind === 'audio' ? 'audio/mpeg' : 'video/mp4',
+    mimeType:
+      kind === 'image'
+        ? 'image/jpeg'
+        : kind === 'audio'
+          ? 'audio/mpeg'
+          : kind === 'lut'
+            ? 'text/plain'
+            : 'video/mp4',
     size: 1000,
     duration: fromSeconds(seconds),
-    ...(kind === 'audio' ? {} : { width: 1920, height: 1080 }),
-    hasAudio: kind !== 'image',
+    ...(kind === 'audio' || kind === 'lut' ? {} : { width: 1920, height: 1080 }),
+    hasAudio: kind === 'video' || kind === 'audio',
     source: { type: 'opfs', key: id },
   };
 }
@@ -123,5 +132,21 @@ export function stickerItem(id: string, startSeconds: number, seconds = 2): Stic
     transform: { ...DEFAULT_TRANSFORM },
     filter: null,
     adjust: {},
+  };
+}
+
+/** A blurred area (v0.2 C3), a third of the canvas, centred. */
+export function regionItem(id: string, startSeconds: number, seconds = 2): RegionItem {
+  return {
+    id,
+    kind: 'region',
+    start: fromSeconds(startSeconds),
+    duration: fromSeconds(seconds),
+    effect: 'blur',
+    shape: 'rectangle',
+    amount: 0.5,
+    width: 0.3,
+    height: 0.2,
+    transform: { ...DEFAULT_TRANSFORM },
   };
 }

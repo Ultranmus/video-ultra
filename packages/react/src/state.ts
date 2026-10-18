@@ -5,7 +5,16 @@ export type LayoutMode = 'phone' | 'tablet' | 'desktop';
 
 /** Add-content categories (rail on desktop, add tools on phones). */
 export type PanelId =
-  'media' | 'text' | 'audio' | 'stickers' | 'canvas' | 'filters' | 'transitions' | 'layers';
+  | 'media'
+  | 'text'
+  | 'audio'
+  | 'stickers'
+  | 'canvas'
+  | 'filters'
+  | 'transitions'
+  | 'layers'
+  /** Blurred / pixelated areas (v0.2 C3). */
+  | 'blur';
 
 /** Tools whose controls open in the sheet (phone/tablet) or the inspector (desktop). */
 export type ToolId =
@@ -27,7 +36,11 @@ export type ToolId =
   | 'add-text'
   | 'add-sticker'
   | 'add-audio'
-  | 'add-media';
+  | 'add-media'
+  // v0.2 C. Picture tools
+  | 'key'
+  | 'blend'
+  | 'region';
 
 export interface ImportRow {
   id: string;
@@ -83,6 +96,8 @@ export interface UiState {
   readOnly: boolean;
   persistent: boolean | null;
   recording: boolean;
+  /** Green screen "pick from video": the next tap on the stage picks this item's key colour. */
+  picking: string | null;
 }
 
 export function createUiStore() {
@@ -110,6 +125,7 @@ export function createUiStore() {
     readOnly: false,
     persistent: null,
     recording: false,
+    picking: null,
   }));
 }
 

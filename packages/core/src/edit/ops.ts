@@ -16,12 +16,16 @@ import type {
   AnimationLoop,
   Asset,
   Background,
+  BlendMode,
+  ChromaKey,
   Crop,
   Filter,
   FreezeItem,
   Item,
   ItemAnimation,
+  LutRef,
   Project,
+  RegionItem,
   TextStyle,
   Track,
   Transform,
@@ -241,7 +245,10 @@ export function addAsset(project: Project, asset: Asset): void {
 export function removeAsset(project: Project, assetId: string): void {
   if (!project.assets[assetId]) throw new EditError('not-found', `No asset ${assetId}`);
   const used = project.tracks.some((t) =>
-    t.items.some((i) => 'assetId' in i && i.assetId === assetId),
+    t.items.some(
+      (i) =>
+        ('assetId' in i && i.assetId === assetId) || ('lut' in i && i.lut?.assetId === assetId),
+    ),
   );
   if (used) throw new EditError('invalid', 'That media is still used in the timeline');
   Reflect.deleteProperty(project.assets, assetId);
@@ -762,7 +769,26 @@ export interface ItemPatch {
   text?: string;
   style?: TextStyle;
   emoji?: string | null;
+  /** Green screen; `null` turns it off. */
+  key?: ChromaKey | null;
+  /** LUT look (the asset must be a `lut`); `null` removes it. */
+  lut?: LutRef | null;
+  /** Lane items; `'normal'` (or `null`) removes the field. */
+  blend?: BlendMode | null;
+  /** Blurred areas. */
+  effect?: RegionItem['effect'];
+  shape?: RegionItem['shape'];
+  amount?: number;
+  width?: number;
+  height?: number;
 }
+
+/** Fields that `null` (or `blend: 'normal'`) removes instead of setting. */
+const REMOVABLE = new Set(['key', 'lut', 'blend']);
+/** Size limits of a blurred area's box (fractions of the canvas). */
+const REGION_MIN = 0.01;
+const REGION_MAX = 4;
+const clamp01 = (v: number) => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0);
 
 const FIELDS_BY_KIND: Record<Item['kind'], readonly string[]> = {
   video: [
@@ -776,12 +802,16 @@ const FIELDS_BY_KIND: Record<Item['kind'], readonly string[]> = {
     'muted',
     'fadeIn',
     'fadeOut',
+    'key',
+    'lut',
+    'blend',
   ],
-  image: ['name', 'transform', 'crop', 'fit', 'filter', 'adjust'],
-  freeze: ['name', 'transform', 'crop', 'fit', 'filter', 'adjust'],
+  image: ['name', 'transform', 'crop', 'fit', 'filter', 'adjust', 'key', 'lut', 'blend'],
+  freeze: ['name', 'transform', 'crop', 'fit', 'filter', 'adjust', 'key', 'lut', 'blend'],
   audio: ['name', 'volume', 'muted', 'fadeIn', 'fadeOut'],
-  text: ['name', 'text', 'style', 'transform', 'filter', 'adjust'],
-  sticker: ['name', 'transform', 'emoji', 'filter', 'adjust'],
+  text: ['name', 'text', 'style', 'transform', 'filter', 'adjust', 'blend'],
+  sticker: ['name', 'transform', 'emoji', 'filter', 'adjust', 'blend'],
+  region: ['name', 'transform', 'effect', 'shape', 'amount', 'width', 'height'],
 };
 
 /** Changes look/sound properties of an item (transform, filter, volume, text, …). */
@@ -789,10 +819,32 @@ export function updateItem(project: Project, itemId: string, patch: ItemPatch): 
   const { item } = editable(project, itemId);
   const allowed = FIELDS_BY_KIND[item.kind];
   const target = item as Record<string, unknown>;
+  if (patch.lut) {
+    const asset = project.assets[patch.lut.assetId];
+    if (!asset || asset.kind !== 'lut')
+      throw new EditError('not-found', `No LUT file ${patch.lut.assetId}`);
+  }
   for (const [key, value] of Object.entries(patch)) {
     if (value === undefined) continue;
     if (!allowed.includes(key)) throw new EditError('invalid', `${item.kind} items have no ${key}`);
+    if (REMOVABLE.has(key) && (value === null || value === 'normal')) {
+      Reflect.deleteProperty(target, key);
+      continue;
+    }
     target[key] = copy(value);
+  }
+  if ('key' in item && item.key) {
+    item.key.tolerance = clamp01(item.key.tolerance);
+    item.key.softness = clamp01(item.key.softness);
+    item.key.spill = clamp01(item.key.spill);
+  }
+  if ('lut' in item && item.lut) item.lut.intensity = clamp01(item.lut.intensity);
+  if (item.kind === 'region') {
+    item.amount = clamp01(item.amount);
+    const size = (v: number) =>
+      Number.isFinite(v) ? Math.min(REGION_MAX, Math.max(REGION_MIN, v)) : REGION_MIN;
+    item.width = size(item.width);
+    item.height = size(item.height);
   }
   if ('volume' in item) item.volume = Math.min(2, Math.max(0, item.volume));
   if ('fadeIn' in item) {

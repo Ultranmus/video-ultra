@@ -1,3 +1,5 @@
+import type { CubeLut } from '../effects/lut';
+
 /** Which GPU API a renderer uses. */
 export type RenderBackend = 'webgpu' | 'webgl2';
 
@@ -49,6 +51,25 @@ export interface LayerDraw {
    * (effects/colour.ts). Omitted / null = unchanged picture.
    */
   effects?: Float32Array | null;
+  /**
+   * Blend mode (`BLEND_IDS`, effects/colour.ts; also in `effects`). Not normal: the renderer
+   * copies the pixels under the layer first and the shader mixes with them.
+   */
+  blend?: number;
+  /** A 3D LUT look (its amount and size travel in `effects`). */
+  lut?: CubeLut | null;
+  /**
+   * A blurred / pixelated area: `source` is ignored; the renderer copies what's under the layer's
+   * box, shrinks it (blur strength / cell size from `amount` 0…1) and draws it back inside the
+   * box (shape and edge in `effects`).
+   */
+  region?: RegionDraw | null;
+}
+
+/** What a blurred area does (see {@link LayerDraw.region}). */
+export interface RegionDraw {
+  pixelate: boolean;
+  amount: number;
 }
 
 /**

@@ -9,7 +9,8 @@
  *
  * `?golden=1` instead renders fixed golden frames through both GPU backends for
  * scripts/composite-check.ts (filters, adjustments, a sample of every transition family with
- * overlays on lanes, element animations). `?bench=1` measures the GPU draw cost of the heaviest
+ * overlays on lanes, element animations, picture tools: green screen, LUT, blurred / pixelated
+ * areas, blend modes). `?bench=1` measures the GPU draw cost of the heaviest
  * transitions on both backends. `?bg=color` turns the blurred background off.
  */
 import {
@@ -27,6 +28,8 @@ import {
   setBackground,
   setTransition,
   toSeconds,
+  type Asset,
+  type BlendMode,
   type Direction,
   type ExportOptions,
   type ExportResult,
@@ -372,6 +375,171 @@ async function buildAnimationScene(plain: boolean): Promise<{ project: Project; 
   return { project, blobs };
 }
 
+/** Registers a generated file (a PNG or a .cube LUT) as an asset of `project`. */
+function addBlobAsset(
+  project: Project,
+  blobs: Blobs,
+  id: string,
+  blob: Blob,
+  kind: 'image' | 'lut',
+  size: number,
+): string {
+  const asset: Asset = {
+    id,
+    kind,
+    name: kind === 'lut' ? `${id}.cube` : `${id}.png`,
+    mimeType: kind === 'lut' ? 'text/plain' : 'image/png',
+    size: blob.size,
+    duration: 0,
+    ...(kind === 'image' ? { width: size, height: size } : {}),
+    hasAudio: false,
+    source: { type: 'url', url: `/generated/${id}` },
+  };
+  addAsset(project, asset);
+  blobs.set(id, blob);
+  return id;
+}
+
+/**
+ * A 320 px "green screen" photo: chroma green with a shadow falling towards the bottom (keys need
+ * tolerance), a magenta disc in the middle (must stay).
+ */
+async function greenScreenPng(): Promise<Blob> {
+  const c = new OffscreenCanvas(320, 320);
+  const ctx = c.getContext('2d')!;
+  ctx.fillStyle = '#00b140';
+  ctx.fillRect(0, 0, 320, 320);
+  const shade = ctx.createLinearGradient(0, 160, 0, 320);
+  shade.addColorStop(0, 'rgba(0,0,0,0)');
+  shade.addColorStop(1, 'rgba(0,0,0,0.3)');
+  ctx.fillStyle = shade;
+  ctx.fillRect(0, 160, 320, 160);
+  ctx.fillStyle = '#ff00ff';
+  ctx.beginPath();
+  ctx.arc(160, 160, 80, 0, Math.PI * 2);
+  ctx.fill();
+  return c.convertToBlob({ type: 'image/png' });
+}
+
+/** A 64 px solid colour photo (blend-mode checks). */
+async function solidPng(color: string): Promise<Blob> {
+  const c = new OffscreenCanvas(64, 64);
+  const ctx = c.getContext('2d')!;
+  ctx.fillStyle = color;
+  ctx.fillRect(0, 0, 64, 64);
+  return c.convertToBlob({ type: 'image/png' });
+}
+
+/** A 33-point .cube that inverts the picture. */
+function invertCube(size = 33): Blob {
+  const rows: string[] = [`TITLE "Invert"`, `LUT_3D_SIZE ${size}`];
+  for (let b = 0; b < size; b++)
+    for (let g = 0; g < size; g++)
+      for (let r = 0; r < size; r++)
+        rows.push([r, g, b].map((v) => (1 - v / (size - 1)).toFixed(6)).join(' '));
+  return new Blob([rows.join('\n')], { type: 'text/plain' });
+}
+
+/** Blend modes checked by composite-check (normal included as the reference). */
+const GOLDEN_BLENDS: BlendMode[] = [
+  'normal',
+  'multiply',
+  'screen',
+  'overlay',
+  'soft-light',
+  'add',
+  'lighten',
+  'darken',
+  'difference',
+];
+
+/**
+ * Picture tools golden scene (640×640, footage in the middle band): `plain` (footage only),
+ * `key-off` / `key` (a green-screen photo on a layer, without / with its green screen), `lut`
+ * (an inverting 33-point LUT on the footage), `blur` / `pixelate` (a blurred rectangle / a
+ * pixelated ellipse over the middle), `blend-<mode>` (a solid orange photo at 80% over the
+ * middle with that blend mode).
+ */
+async function buildPictureScene(variant: string): Promise<{ project: Project; blobs: Blobs }> {
+  const project = createProject({ name: 'Picture tools', width: 640, height: 640 });
+  const blobs: Blobs = new Map();
+  const clip = video('a', await loadAsset(project, blobs, 'bbb-1080p60.mp4'), 4, 3);
+  if (variant === 'lut') {
+    addBlobAsset(project, blobs, 'invert', invertCube(), 'lut', 0);
+    clip.lut = { assetId: 'invert', intensity: 1 };
+  }
+  insertMain(project, clip);
+  let n = 0;
+  const ids = () => `p${++n}`;
+  if (variant === 'key' || variant === 'key-off') {
+    const id = addBlobAsset(project, blobs, 'green', await greenScreenPng(), 'image', 320);
+    const layer: ImageItem = {
+      id: 'g',
+      kind: 'image',
+      assetId: id,
+      start: 0,
+      duration: fromSeconds(4),
+      ...look(),
+      transform: { ...DEFAULT_TRANSFORM, x: 0.3, y: 0.5, scale: 0.5 },
+    };
+    if (variant === 'key')
+      layer.key = { color: '#00b140', tolerance: 0.4, softness: 0.2, spill: 0.5 };
+    addToLane(project, layer, ids);
+  }
+  if (variant === 'blur' || variant === 'pixelate') {
+    addToLane(
+      project,
+      {
+        id: 'r',
+        kind: 'region',
+        start: 0,
+        duration: fromSeconds(4),
+        effect: variant,
+        shape: variant === 'blur' ? 'rectangle' : 'ellipse',
+        amount: 0.5,
+        width: 0.4,
+        height: 0.3,
+        transform: { ...DEFAULT_TRANSFORM },
+      },
+      ids,
+    );
+  }
+  if (variant.startsWith('blend-')) {
+    const id = addBlobAsset(
+      project,
+      blobs,
+      'orange',
+      await solidPng('rgb(200,120,40)'),
+      'image',
+      64,
+    );
+    const layer: ImageItem = {
+      id: 'b',
+      kind: 'image',
+      assetId: id,
+      start: 0,
+      duration: fromSeconds(4),
+      ...look(),
+      transform: { ...DEFAULT_TRANSFORM, scale: 0.5, opacity: 0.8 },
+    };
+    const mode = variant.slice('blend-'.length) as BlendMode;
+    if (mode !== 'normal') layer.blend = mode;
+    addToLane(project, layer, ids);
+  }
+  return { project, blobs };
+}
+
+/** Picture tools golden variants (captured at 1 s, both backends). */
+const PICTURE_VARIANTS = [
+  'plain',
+  'key-off',
+  'key',
+  'lut',
+  'blur',
+  'pixelate',
+  ...GOLDEN_BLENDS.map((m) => `blend-${m}`),
+];
+
 /** Animation golden times (s): mid entrance, end of entrance, mid loop (a quarter turn). */
 const ANIMATION_TIMES = [0.3, 0.5, 1.5, 2.25];
 
@@ -430,6 +598,15 @@ async function runGolden(engine: EngineInternal): Promise<Record<string, string>
       () => buildTransitionScene(t),
       [1.8],
       (b) => `tx-${t.type}-${b}`,
+      out,
+    );
+  }
+  for (const variant of PICTURE_VARIANTS) {
+    await captureAll(
+      engine,
+      () => buildPictureScene(variant),
+      [1],
+      (b) => `pic-${variant}-${b}`,
       out,
     );
   }

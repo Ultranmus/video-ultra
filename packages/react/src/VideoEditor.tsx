@@ -376,6 +376,7 @@ function useKeyboard(rootRef: React.RefObject<HTMLDivElement | null>) {
         ctl.seek(Number.MAX_SAFE_INTEGER);
       } else if (e.key === 'Escape') {
         if (state.menu) ctl.closeMenu();
+        else if (state.picking) ctl.startPicking(null);
         else if (state.historyOpen) ctl.ui.setState({ historyOpen: false });
         else if (state.previewMode) ctl.setPreviewMode(false);
         else ctl.select(null);

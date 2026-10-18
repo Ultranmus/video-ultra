@@ -113,6 +113,7 @@ function singleTools(
         tip: l.tipTransitions,
         tool: 'transition',
       },
+      { key: 'blur', icon: 'blurArea', label: l.blurAreas, tip: l.tipBlurAreas, panel: 'blur' },
       { key: 'canvas', icon: 'canvas', label: l.canvas, tip: l.tipCanvas, tool: 'canvas' },
       split,
     ];
@@ -157,6 +158,17 @@ function singleTools(
   const opacity: ToolEntry[] = onMain
     ? []
     : [{ key: 'opacity', icon: 'opacity', label: l.opacity, tip: l.tipOpacity, tool: 'opacity' }];
+  // v0.2 C. Picture tools
+  const greenScreen: ToolEntry = {
+    key: 'key',
+    icon: 'greenScreen',
+    label: l.greenScreen,
+    tip: l.tipGreenScreen,
+    tool: 'key',
+  };
+  const blend: ToolEntry[] = onMain
+    ? []
+    : [{ key: 'blend', icon: 'blend', label: l.blend, tip: l.tipBlend, tool: 'blend' }];
   switch (item.kind) {
     case 'video':
       return [
@@ -170,6 +182,7 @@ function singleTools(
           tool: 'volume',
         },
         ...look,
+        greenScreen,
         ...transition,
         { key: 'fade', icon: 'fade', label: l.fade, tip: l.tipFade, tool: 'fade' },
         ...(onMain
@@ -186,6 +199,7 @@ function singleTools(
           : []),
         ...animate,
         ...opacity,
+        ...blend,
         arrange,
         duplicate,
         remove,
@@ -196,9 +210,11 @@ function singleTools(
         split,
         { key: 'duration', icon: 'speed', label: l.duration, tip: l.duration, tool: 'duration' },
         ...look,
+        greenScreen,
         ...transition,
         ...animate,
         ...opacity,
+        ...blend,
         arrange,
         duplicate,
         remove,
@@ -228,6 +244,7 @@ function singleTools(
         look[1]!,
         { key: 'transform', icon: 'rotate', label: l.rotate, tip: l.tipRotate, tool: 'transform' },
         { key: 'opacity', icon: 'opacity', label: l.opacity, tip: l.tipOpacity, tool: 'opacity' },
+        ...blend,
         arrange,
         split,
         duplicate,
@@ -238,6 +255,23 @@ function singleTools(
         ...animate,
         look[0]!,
         look[1]!,
+        { key: 'transform', icon: 'rotate', label: l.rotate, tip: l.tipRotate, tool: 'transform' },
+        { key: 'opacity', icon: 'opacity', label: l.opacity, tip: l.tipOpacity, tool: 'opacity' },
+        ...blend,
+        arrange,
+        split,
+        duplicate,
+        remove,
+      ];
+    case 'region':
+      return [
+        {
+          key: 'region',
+          icon: item.effect === 'pixelate' ? 'pixelate' : 'blurArea',
+          label: l.blurArea,
+          tip: l.tipBlurAreas,
+          tool: 'region',
+        },
         { key: 'transform', icon: 'rotate', label: l.rotate, tip: l.tipRotate, tool: 'transform' },
         { key: 'opacity', icon: 'opacity', label: l.opacity, tip: l.tipOpacity, tool: 'opacity' },
         arrange,
