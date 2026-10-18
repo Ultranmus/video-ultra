@@ -18,6 +18,7 @@ import {
   splitItem,
   trimItem,
   ungroupItems,
+  updateItem,
 } from '../edit/ops';
 import type { Project } from '../model/schema';
 import { fromSeconds as s } from '../model/time';
@@ -50,6 +51,7 @@ export type Op =
   | { op: 'ungroup'; pick: number }
   | { op: 'shift'; pick: number; other: number; delta: number }
   | { op: 'arrange'; pick: number; to: 'forward' | 'backward' | 'front' | 'back'; at: number }
+  | { op: 'duck'; pick: number; amount: number }
   | { op: 'goTo'; position: number }
   | { op: 'undo' }
   | { op: 'redo' };
@@ -113,6 +115,11 @@ export const opArb: fc.Arbitrary<Op> = fc.oneof(
     pick: fc.nat(),
     to: fc.constantFrom('forward' as const, 'backward' as const, 'front' as const, 'back' as const),
     at: fc.double({ min: 0, max: 20, noNaN: true }),
+  }),
+  fc.record({
+    op: fc.constant('duck' as const),
+    pick: fc.nat(),
+    amount: fc.constantFrom(0, 0.3, 0.75, 1, 1.4),
   }),
   fc.record({ op: fc.constant('goTo' as const), position: fc.nat({ max: 12 }) }),
   fc.constant({ op: 'undo' as const }),
@@ -210,6 +217,9 @@ export function run(editor: Editor, step: Op, newId: () => string): void {
       }
       case 'arrange':
         editor.apply('Arrange', (d, ctx) => arrangeItem(d, item.id, step.to, s(step.at), ctx.ids));
+        break;
+      case 'duck':
+        editor.apply('Lower under voice', (d) => updateItem(d, item.id, { duck: step.amount }));
         break;
       case 'transition':
         editor.apply('Transition', (d) =>

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseProject } from './migrate';
 import { PROJECT_VERSION } from './schema';
+import { checkInvariants } from './invariants';
 
 /**
  * A project saved by v0.1 (before transition options and animations): a main track with a filter
@@ -153,6 +154,29 @@ describe('project file back-compat', () => {
     data.tracks[0].items[0].groupId = 'g1';
     const repaired = parseProject(data);
     expect(repaired.ok && repaired.project.tracks[0]!.items[0]!.groupId).toBeUndefined();
+  });
+
+  it('a version-3 project keeps ducking and asset credits; a zero duck is dropped', () => {
+    const data = upgraded(JSON.parse(V01_PROJECT));
+    const sounding = data.tracks
+      .flatMap((t: { items: { kind: string }[] }) => t.items)
+      .find((i: { kind: string }) => i.kind === 'video' || i.kind === 'audio');
+    sounding.duck = 0.75;
+    const assetId = Object.keys(data.assets)[0]!;
+    data.assets[assetId].credit = 'Tone — test, CC0';
+    const result = parseProject(data);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.project).toEqual(data);
+    expect(checkInvariants(result.project)).toEqual([]);
+    sounding.duck = 0;
+    const repaired = parseProject(data);
+    expect(repaired.ok).toBe(true);
+    if (!repaired.ok) return;
+    const item = repaired.project.tracks.flatMap((t) => t.items).find((i) => i.id === sounding.id)!;
+    expect('duck' in item).toBe(false);
+    sounding.duck = 1.5;
+    expect(parseProject(data).ok).toBe(false);
   });
 
   it('opens a v0.1 (version 1) project, changing nothing but the new look fields', () => {

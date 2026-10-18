@@ -759,6 +759,8 @@ export interface ItemPatch {
   muted?: boolean;
   fadeIn?: Time;
   fadeOut?: Time;
+  /** Lower under voice, 0…1 of the volume taken away while someone speaks; 0 = off. */
+  duck?: number;
   text?: string;
   style?: TextStyle;
   emoji?: string | null;
@@ -776,10 +778,11 @@ const FIELDS_BY_KIND: Record<Item['kind'], readonly string[]> = {
     'muted',
     'fadeIn',
     'fadeOut',
+    'duck',
   ],
   image: ['name', 'transform', 'crop', 'fit', 'filter', 'adjust'],
   freeze: ['name', 'transform', 'crop', 'fit', 'filter', 'adjust'],
-  audio: ['name', 'volume', 'muted', 'fadeIn', 'fadeOut'],
+  audio: ['name', 'volume', 'muted', 'fadeIn', 'fadeOut', 'duck'],
   text: ['name', 'text', 'style', 'transform', 'filter', 'adjust'],
   sticker: ['name', 'transform', 'emoji', 'filter', 'adjust'],
 };
@@ -795,6 +798,12 @@ export function updateItem(project: Project, itemId: string, patch: ItemPatch): 
     target[key] = copy(value);
   }
   if ('volume' in item) item.volume = Math.min(2, Math.max(0, item.volume));
+  if ('volume' in item && item.duck !== undefined) {
+    // 0 (or nonsense) turns ducking off: the field goes away rather than storing "off".
+    const duck = Number.isFinite(item.duck) ? Math.min(1, item.duck) : 0;
+    if (duck > 0) item.duck = duck;
+    else delete item.duck;
+  }
   if ('fadeIn' in item) {
     item.fadeIn = snap(project, item.fadeIn);
     item.fadeOut = snap(project, item.fadeOut);

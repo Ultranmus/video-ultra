@@ -2,6 +2,7 @@ import { AudioSampleSink, type AudioSample, type InputAudioTrack } from 'mediabu
 import type { Item, Project } from '../model/schema';
 import { FLICKS_PER_SECOND, type Time } from '../model/time';
 import { gainAt, limit, mixInto, Resampler } from './dsp';
+import { applyDuck, DuckFollower, hasDucking } from './duck';
 import { audioSpan, spanGain, type AudioSpan } from './spans';
 
 const EMPTY_SPAN: AudioSpan = {
@@ -176,20 +177,42 @@ export interface AudioTrackSource {
   sampleRate: number;
 }
 
+/** One audible item to mix in the current block. */
+interface MixJob {
+  item: AudibleItem;
+  span: AudioSpan;
+  source: AudioTrackSource;
+}
+
 /** Mixes a project's audible items for any time range. */
 export class Mixer {
   private readonly readers = new Map<string, ClipReader>();
   private tempL = new Float32Array(0);
   private tempR = new Float32Array(0);
+  private readonly spans = new Map<string, AudioSpan>();
+  private readonly used = new Set<string>();
+  /** This block's items: the voice (everything not ducked) and the ducked ones. Reused. */
+  private readonly keyJobs: MixJob[] = [];
+  private readonly duckJobs: MixJob[] = [];
+  private readonly jobPool: MixJob[] = [];
+  /** Ducking: the block's voice signal (mono), its presence curve, and the follower. */
+  private key = new Float32Array(0);
+  private presence = new Float32Array(0);
+  private readonly follower: DuckFollower;
 
   constructor(
     readonly sampleRate: number,
     /** Resolves an asset id to its audio track (null: no audio / not loaded yet). */
     private readonly audioOf: (assetId: string) => AudioTrackSource | null,
-  ) {}
+  ) {
+    this.follower = new DuckFollower(sampleRate);
+  }
 
   /**
    * Renders `frames` stereo samples starting at timeline time `start` into outL/outR (overwritten).
+   *
+   * Items marked `duck` are mixed last, lowered while the rest — the voice they listen to — is
+   * speaking (`audio/duck.ts`). A project with nothing ducked skips all of that.
    */
   async render(
     project: Project,
@@ -205,8 +228,10 @@ export class Mixer {
       this.tempR = new Float32Array(frames);
     }
     const blockEnd = start + Math.round((frames / this.sampleRate) * FLICKS_PER_SECOND);
-    const jobs: Promise<void>[] = [];
-    const used = new Set<string>();
+    const ducking = hasDucking(project);
+    const { used, keyJobs, duckJobs, jobPool } = this;
+    used.clear();
+    let pooled = 0;
     for (const track of project.tracks) {
       if (track.muted) continue;
       for (let index = 0; index < track.items.length; index++) {
@@ -222,11 +247,35 @@ export class Mixer {
         const source = this.audioOf(item.assetId);
         if (!source) continue;
         used.add(item.id);
-        jobs.push(this.renderItem(item, span, source, start, frames, outL, outR));
+        const job = jobPool[pooled] ?? (jobPool[pooled] = { item, span, source });
+        pooled++;
+        job.item = item;
+        job.span = span;
+        job.source = source;
+        (ducking && item.duck ? duckJobs : keyJobs).push(job);
       }
     }
+    if (ducking && this.key.length < frames) {
+      this.key = new Float32Array(frames);
+      this.presence = new Float32Array(frames);
+    }
+    if (ducking) this.key.fill(0, 0, frames);
     // Clips render one after another into shared temp buffers (they're short and mostly I/O-bound).
-    for (const job of jobs) await job;
+    try {
+      for (const job of keyJobs) await this.renderItem(job, start, frames, outL, outR, ducking);
+      if (ducking) {
+        // The block's first timeline sample (exact: a sample is a whole number of flicks at 44.1
+        // and 48 kHz), so the follower's windows fall at the same places for any block size.
+        const position = Math.round((start / FLICKS_PER_SECOND) * this.sampleRate);
+        this.follower.process(this.key, frames, position, this.presence);
+        for (const job of duckJobs) await this.renderItem(job, start, frames, outL, outR, false);
+      } else {
+        this.follower.reset();
+      }
+    } finally {
+      keyJobs.length = 0;
+      duckJobs.length = 0;
+    }
     limit(outL, frames);
     limit(outR, frames);
     for (const id of this.spans.keys()) if (!used.has(id)) this.spans.delete(id);
@@ -237,55 +286,61 @@ export class Mixer {
     }
   }
 
-  private renderJobChain: Promise<void> = Promise.resolve();
-  private readonly spans = new Map<string, AudioSpan>();
-
-  private renderItem(
-    item: AudibleItem,
-    span: AudioSpan,
-    source: AudioTrackSource,
+  /**
+   * Reads one item's sound for the block and adds it to the output with its volume, fades and
+   * crossfade. `toKey`: also add it (mono) to the voice signal ducked items listen to. A ducked
+   * item is lowered by the block's presence curve first.
+   */
+  private async renderItem(
+    { item, span, source }: MixJob,
     start: Time,
     frames: number,
     outL: Float32Array,
     outR: Float32Array,
+    toKey: boolean,
   ): Promise<void> {
-    // Serialize: the temp buffers are shared.
-    this.renderJobChain = this.renderJobChain.then(async () => {
-      const rate = this.sampleRate;
-      const toFrames = (t: Time) => Math.round((t / FLICKS_PER_SECOND) * rate);
-      const first = Math.max(0, toFrames(span.start - start));
-      const last = Math.min(frames, toFrames(span.end - start));
-      const count = last - first;
-      if (count <= 0) return;
-      const timeAtFirst = start + Math.round((first / rate) * FLICKS_PER_SECOND);
-      const local = (timeAtFirst - item.start) / FLICKS_PER_SECOND;
-      const sourceS = item.sourceIn / FLICKS_PER_SECOND + local * item.speed;
-      let reader = this.readers.get(item.id);
-      if (!reader) {
-        reader = new ClipReader(source.track, source.sampleRate, rate);
-        this.readers.set(item.id, reader);
-      }
-      await reader.read(sourceS, item.speed, count, this.tempL, this.tempR, 0);
-      const duration = item.duration / FLICKS_PER_SECOND;
-      const fadeIn = item.fadeIn / FLICKS_PER_SECOND;
-      const fadeOut = item.fadeOut / FLICKS_PER_SECOND;
-      // The clip's own volume and fades (inside its edges) × the transition crossfade.
-      const clamp = (x: number) => Math.min(duration, Math.max(0, x));
-      const timeAtLast = timeAtFirst + Math.round((count / rate) * FLICKS_PER_SECOND);
-      const g0 =
-        gainAt(clamp(local), duration, item.volume, fadeIn, fadeOut) * spanGain(span, timeAtFirst);
-      const g1 =
-        gainAt(clamp(local + count / rate), duration, item.volume, fadeIn, fadeOut) *
-        spanGain(span, timeAtLast);
-      mixInto(outL, first, this.tempL, 0, count, g0, g1);
-      mixInto(outR, first, this.tempR, 0, count, g0, g1);
-    });
-    return this.renderJobChain;
+    const rate = this.sampleRate;
+    const toFrames = (t: Time) => Math.round((t / FLICKS_PER_SECOND) * rate);
+    const first = Math.max(0, toFrames(span.start - start));
+    const last = Math.min(frames, toFrames(span.end - start));
+    const count = last - first;
+    if (count <= 0) return;
+    const timeAtFirst = start + Math.round((first / rate) * FLICKS_PER_SECOND);
+    const local = (timeAtFirst - item.start) / FLICKS_PER_SECOND;
+    const sourceS = item.sourceIn / FLICKS_PER_SECOND + local * item.speed;
+    let reader = this.readers.get(item.id);
+    if (!reader) {
+      reader = new ClipReader(source.track, source.sampleRate, rate);
+      this.readers.set(item.id, reader);
+    }
+    await reader.read(sourceS, item.speed, count, this.tempL, this.tempR, 0);
+    const duration = item.duration / FLICKS_PER_SECOND;
+    const fadeIn = item.fadeIn / FLICKS_PER_SECOND;
+    const fadeOut = item.fadeOut / FLICKS_PER_SECOND;
+    // The clip's own volume and fades (inside its edges) × the transition crossfade.
+    const clamp = (x: number) => Math.min(duration, Math.max(0, x));
+    const timeAtLast = timeAtFirst + Math.round((count / rate) * FLICKS_PER_SECOND);
+    const g0 =
+      gainAt(clamp(local), duration, item.volume, fadeIn, fadeOut) * spanGain(span, timeAtFirst);
+    const g1 =
+      gainAt(clamp(local + count / rate), duration, item.volume, fadeIn, fadeOut) *
+      spanGain(span, timeAtLast);
+    if (!toKey && item.duck) {
+      applyDuck(this.tempL, count, this.presence, first, item.duck);
+      applyDuck(this.tempR, count, this.presence, first, item.duck);
+    }
+    mixInto(outL, first, this.tempL, 0, count, g0, g1);
+    mixInto(outR, first, this.tempR, 0, count, g0, g1);
+    if (toKey) {
+      mixInto(this.key, first, this.tempL, 0, count, g0 * 0.5, g1 * 0.5);
+      mixInto(this.key, first, this.tempR, 0, count, g0 * 0.5, g1 * 0.5);
+    }
   }
 
   /** Forget reading positions (after a seek the next render seeks every clip). */
   dispose(): void {
     for (const reader of this.readers.values()) reader.dispose();
     this.readers.clear();
+    this.follower.reset();
   }
 }
