@@ -32,6 +32,8 @@ import {
 import {
   assetFromProbe,
   attachAutosave,
+  lockProject,
+  type ProjectLock,
   createEngine,
   createMediaAnalyzer,
   createProjectStorage,
@@ -152,14 +154,9 @@ export class EditorController {
     }
     if (project) this.editor.load(project);
     if (this.options.autosave !== false || this.options.onSave) {
-      this.#autosave = attachAutosave(this.editor, this.storage, {
-        onSave: async (p) => {
-          this.ui.setState({ save: 'saving' });
-          await this.options.onSave?.(p);
-          this.ui.setState({ save: 'saved' });
-        },
-        onError: (error) => this.toast(error.message, 'error'),
-      });
+      // Only the tab holding the project's lock saves it (two writers would corrupt the log).
+      if (await this.#claim(false, generation)) this.#startAutosave();
+      if (generation !== this.#generation) return;
     }
     void this.storage.status().then((s) => this.ui.setState({ persistent: s.persistent }));
     // Tell once (per browser) that local storage may be cleared — after the first real edit, when
@@ -186,6 +183,72 @@ export class EditorController {
         else this.toast(this.labels.mediaMissing(asset.name), 'error');
       }),
     );
+  }
+
+  #lock: ProjectLock | null = null;
+
+  #startAutosave(): void {
+    if (!this.storage) return;
+    this.#autosave?.detach();
+    this.#autosave = attachAutosave(this.editor, this.storage, {
+      onSave: async (p) => {
+        this.ui.setState({ save: 'saving' });
+        await this.options.onSave?.(p);
+        this.ui.setState({ save: 'saved' });
+      },
+      onError: (error) => this.toast(error.message, 'error'),
+    });
+  }
+
+  /**
+   * Takes this project's lock (one tab saves a project at a time). Without it the editor stays
+   * read-only: edits work but aren't saved, and a banner offers to take over. Losing the lock
+   * later (another tab took over) stops saving here at once — no final flush, the other tab owns
+   * the log now.
+   */
+  async #claim(steal: boolean, generation = this.#generation): Promise<boolean> {
+    let lock = await lockProject(this.project.id, { steal }).catch(() => null);
+    // A remount (React strict mode, a host re-rendering) releases its lock a moment late: one
+    // retry before deciding another tab really has it.
+    if (!lock && !steal) {
+      await new Promise((r) => setTimeout(r, 300));
+      if (generation === this.#generation)
+        lock = await lockProject(this.project.id).catch(() => null);
+    }
+    if (generation !== this.#generation) {
+      lock?.release();
+      return false;
+    }
+    if (!lock) {
+      this.ui.setState({ readOnly: true });
+      return false;
+    }
+    this.#lock?.release();
+    this.#lock = lock;
+    this.ui.setState({ readOnly: false });
+    void lock.lost.then(() => {
+      if (this.#lock !== lock) return;
+      this.#lock = null;
+      this.#autosave?.detach();
+      this.#autosave = null;
+      this.ui.setState({ readOnly: true, save: 'idle' });
+    });
+    return true;
+  }
+
+  /**
+   * "Use it here": takes the project over from the other tab, reloads what that tab saved, and
+   * saves from this tab from now on.
+   */
+  async takeOver(): Promise<void> {
+    const storage = this.storage;
+    if (!storage) return;
+    const id = this.project.id;
+    if (!(await this.#claim(true))) return;
+    const latest = await storage.loadProject(id).catch(() => null);
+    if (latest) this.editor.load(latest.project);
+    this.#startAutosave();
+    this.toast(this.labels.tookOver, 'success');
   }
 
   /** Hands the preview canvas to a new engine worker. Returns a disposer. */
@@ -241,6 +304,8 @@ export class EditorController {
     void this.#autosave?.flush();
     this.#autosave?.detach();
     this.#autosave = null;
+    this.#lock?.release();
+    this.#lock = null;
     this.engine?.destroy();
     this.engine = null;
     this.analyzer?.destroy();

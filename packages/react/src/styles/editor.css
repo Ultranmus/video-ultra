@@ -333,6 +333,10 @@
     color: var(--vu-success);
   }
 
+  .vu-save-state[data-state='off'] {
+    color: var(--vu-danger);
+  }
+
   .vu-save-state .vu-spinner {
     width: var(--vu-space-3);
     height: var(--vu-space-3);

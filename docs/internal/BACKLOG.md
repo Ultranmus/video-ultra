@@ -60,7 +60,7 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [ ] **Real Safari (iPhone batch):** storage worker with `createSyncAccessHandle` on iOS 17/18/26,
       `persist()` answer, recovery after the tab is killed by iOS; analyzer thumbnails of iPhone HEVC
       on the phone. Playwright's WebKit has no OPFS, so storage-check only covers memory there.
-- [ ] **Two tabs on one project** corrupt each other's log (both append, both compact). Take a Web
+- [x] (fixed 2026-10-19: Web Lock per project; second tab read-only with "Use it here") **Two tabs on one project** corrupt each other's log (both append, both compact). Take a Web
       Lock (`navigator.locks`) per project in `attachAutosave`; the second tab opens read-only or asks.
 - [ ] `url` sources: `getMedia` fetches the whole file into a Blob. Use range reads (Mediabunny
       `UrlSource`) in the engine/analyzer, or stream it into OPFS once.

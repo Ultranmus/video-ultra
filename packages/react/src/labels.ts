@@ -249,6 +249,10 @@ export const DEFAULT_LABELS = {
   notPersistent:
     'This browser may clear unsaved work after a few days. Save or export to keep it safe.',
   saved: 'Saved',
+  readOnlyBanner: 'This video is open in another tab. Changes here aren’t saved.',
+  takeOver: 'Use it here',
+  tookOver: 'Saving here now',
+  notSavedHere: 'Not saving here',
   saving: 'Saving…',
   dismiss: 'Dismiss',
   mediaMissing: (name: string) =>

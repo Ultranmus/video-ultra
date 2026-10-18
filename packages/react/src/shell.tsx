@@ -37,6 +37,7 @@ export function TopBar({ onClose }: { onClose?: (() => void) | undefined }): Rea
     height: p.settings.height,
   }));
   const save = useUi((s) => s.save);
+  const readOnly = useUi((s) => s.readOnly);
   const layout = useUi((s) => s.layout);
   const ratio = ratioOf(width, height);
   return (
@@ -59,7 +60,12 @@ export function TopBar({ onClose }: { onClose?: (() => void) | undefined }): Rea
             }}
           />
         ) : null}
-        {save !== 'idle' && layout !== 'phone' ? (
+        {readOnly && layout !== 'phone' ? (
+          <span className="vu-save-state" data-state="off">
+            <Icon name="warning" size={14} />
+            <span>{l.notSavedHere}</span>
+          </span>
+        ) : save !== 'idle' && layout !== 'phone' ? (
           <span
             className="vu-save-state"
             data-state={save}
@@ -767,8 +773,18 @@ export function Toasts(): ReactElement {
   const ctl = useController();
   const l = useLabels();
   const toasts = useUi((s) => s.toasts);
+  const readOnly = useUi((st) => st.readOnly);
   return (
     <div className="vu-toasts" role="status" aria-live="polite">
+      {readOnly ? (
+        <div className="vu-toast vu-banner" data-tone="error">
+          <Icon name="warning" size={16} />
+          <span className="vu-toast-text">{l.readOnlyBanner}</span>
+          <button type="button" className="vu-toast-action" onClick={() => void ctl.takeOver()}>
+            {l.takeOver}
+          </button>
+        </div>
+      ) : null}
       {toasts.map((t) => (
         <div key={t.id} className="vu-toast" data-tone={t.tone}>
           {t.tone === 'success' ? (

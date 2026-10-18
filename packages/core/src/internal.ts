@@ -105,4 +105,6 @@ export { StorageFullError, MemoryFileStore } from './storage/files';
 export type { FileStore } from './storage/files';
 export type { HandleStore } from './storage/handles';
 export { attachAutosave } from './storage/autosave';
+export { lockProject } from './storage/lock';
+export type { ProjectLock } from './storage/lock';
 export type { Autosave, AutosaveOptions } from './storage/autosave';

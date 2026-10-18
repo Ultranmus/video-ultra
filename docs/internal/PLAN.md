@@ -102,7 +102,19 @@ Deferred to v0.2+: speed curves, reverse, text animations, templates, keyframes,
 - [x] 4.4 Accessibility audit (axe + keyboard), i18n labels — VoiceOver on the owner's iPhone at the checkpoint
 - [ ] **Checkpoint (iPhone + Android):** create → export → reopen on every device
 
-### Day 7 — Release v0.1
+### v0.1 fix pass (owner, 2026-10-19: release on hold until these are done and v0.2 is planned)
+
+- [x] F1 Two tabs on one project: Web Lock per project; the second tab is read-only with "Use it here"
+- [ ] F2 Fatal engine error → "stopped" screen with Reload (DECISIONS #93)
+- [ ] F3 Export: explicit bitrates per resolution × quality; WebKit encoder cancel error; old export files cleaned on startup
+- [ ] F4 Firefox WebM: measure VP8, use it if faster than VP9
+- [ ] F5 Orphaned media sweep
+- [ ] F6 Chrome startup long tasks (> 50 ms)
+- [ ] F7 Audio crossfade under video transitions
+- [ ] F8 UI polish: toolbar overflow hint, compact storage note, ruler labels fade, hide undrawable emoji, voiceover "mute while recording"
+- [ ] F9 Stage pinch-zoom (nothing selected)
+
+### Day 7 — Release v0.1 (on hold)
 
 - [ ] 5.1 Docs site + API reference + examples (Next.js, Vite)
 - [ ] 5.2 Package checks (publint, attw, size limits), fresh install from npm tarball; turn CI back on for push / PR + add the release workflow

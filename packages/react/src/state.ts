@@ -63,6 +63,8 @@ export interface UiState {
   /** Only the video and play controls (works everywhere, incl. iPhone). */
   previewMode: boolean;
   save: 'idle' | 'saving' | 'saved';
+  /** This project is open (and saving) in another tab: this one doesn't save until it takes over. */
+  readOnly: boolean;
   persistent: boolean | null;
   recording: boolean;
 }
@@ -84,6 +86,7 @@ export function createUiStore() {
     helpOpen: false,
     previewMode: false,
     save: 'idle',
+    readOnly: false,
     persistent: null,
     recording: false,
   }));
