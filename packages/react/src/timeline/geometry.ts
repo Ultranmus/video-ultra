@@ -159,6 +159,8 @@ export function snapCandidates(project: Project, playhead: Time, excludeId?: str
       out.push(item.start, itemEnd(item));
     }
   }
+  // Markers are places to line things up with too (v0.4).
+  for (const marker of project.markers ?? []) out.push(marker.time);
   return out;
 }
 

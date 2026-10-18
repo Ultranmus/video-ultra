@@ -1,5 +1,8 @@
 import {
   KEYFRAME_PROPS,
+  rollEdit,
+  slideItem,
+  slipItem,
   type Keyframes,
   FLICKS_PER_SECOND,
   itemEnd,
@@ -115,7 +118,18 @@ type Drag =
       axis: 'x' | 'y' | null;
       samples: { x: number; t: number }[];
     }
-  | { type: 'trim'; id: number; x: number; item: Item; edge: 'start' | 'end'; delta: Time }
+  | {
+      type: 'trim';
+      id: number;
+      x: number;
+      item: Item;
+      edge: 'start' | 'end';
+      delta: Time;
+      /** Alt (desktop): roll the cut with the touching neighbour instead of trimming. */
+      roll: Item | null;
+    }
+  /** Alt-drag on a clip (desktop, v0.4): slip its media, or with Shift slide it (main video). */
+  | { type: 'slip'; id: number; x: number; item: Item; delta: Time; slide: boolean }
   | {
       type: 'move';
       id: number;
@@ -493,7 +507,21 @@ export class TimelineView {
         if (this.#ctl.ui.getState().layout === 'desktop') this.#ctl.openPanel('transitions');
         else this.#ctl.openTool('transition');
         return;
-      case 'trim':
+      case 'trim': {
+        // Alt: roll the cut — the clip that touches this edge gives or takes the time.
+        let roll: Item | null = null;
+        if (e.altKey && !this.#touch) {
+          const track = this.#ctl.project.tracks.find((t) => t.items.includes(hit.item));
+          const i = track ? track.items.indexOf(hit.item) : -1;
+          const other = hit.edge === 'end' ? track?.items[i + 1] : track?.items[i - 1];
+          if (
+            other &&
+            (hit.edge === 'end'
+              ? other.start === itemEnd(hit.item)
+              : itemEnd(other) === hit.item.start)
+          )
+            roll = hit.edge === 'end' ? hit.item : other;
+        }
         this.#drag = {
           type: 'trim',
           id: e.pointerId,
@@ -501,9 +529,11 @@ export class TimelineView {
           item: hit.item,
           edge: hit.edge,
           delta: 0,
+          roll,
         };
         this.invalidate();
         return;
+      }
       case 'ruler':
         if (!this.#phone) {
           this.#drag = { type: 'scrub', id: e.pointerId };
@@ -528,6 +558,15 @@ export class TimelineView {
       hit,
       timer: null,
     };
+    if (hit.type === 'item' && e.altKey && !this.#touch && !this.#ctl.isLocked(hit.item.id)) {
+      // Alt-drag: slip the media under the clip (video, sound); with Shift, slide a main clip.
+      const slide = e.shiftKey && hit.row.track.kind === 'main';
+      if (slide || hit.item.kind === 'video' || hit.item.kind === 'audio') {
+        this.#ctl.select(hit.item.id);
+        this.#drag = { type: 'slip', id: e.pointerId, x: p.x, item: hit.item, delta: 0, slide };
+        return;
+      }
+    }
     if (hit.type === 'item') {
       // Shift / ⌘-click adds to (or takes from) the selection; nothing moves.
       if (e.shiftKey || e.metaKey || e.ctrlKey) {
@@ -767,8 +806,10 @@ export class TimelineView {
         );
         this.#setSnap(snap.snapped);
         drag.delta = snap.time - edgeTime;
-        const { edge, delta } = drag;
-        this.#ghost = this.#ctl.preview((d) => trimItem(d, item.id, edge, delta));
+        const { edge, delta, roll } = drag;
+        this.#ghost = this.#ctl.preview((d) =>
+          roll ? rollEdit(d, roll.id, delta) : trimItem(d, item.id, edge, delta),
+        );
         // The preview shows the frame at the edge being trimmed; the playhead stays put.
         const trimmed = this.#ghost?.tracks.flatMap((t) => t.items).find((i) => i.id === item.id);
         if (trimmed) {
@@ -777,6 +818,20 @@ export class TimelineView {
             edge === 'start' ? trimmed.start : Math.max(trimmed.start, itemEnd(trimmed) - frame),
           );
         }
+        this.invalidate();
+        return;
+      }
+      case 'slip': {
+        const frame = projectFrame(this.#ctl.project);
+        const raw = ((p.x - drag.x) / this.#pps) * FLICKS_PER_SECOND;
+        drag.delta = Math.round(raw / frame) * frame;
+        const { item, delta, slide } = drag;
+        // Slip shows other media: the media moves the other way under a still clip.
+        this.#ghost = this.#ctl.preview((d) =>
+          slide ? slideItem(d, item.id, delta) : slipItem(d, item.id, -delta),
+        );
+        const now = this.#ghost?.tracks.flatMap((t) => t.items).find((i) => i.id === item.id);
+        if (now && !slide) this.#ctl.previewSeek(now.start);
         this.invalidate();
         return;
       }
@@ -819,8 +874,22 @@ export class TimelineView {
       case 'trim': {
         this.#ghost = null;
         this.#ctl.previewSeek(null);
-        const { item, edge, delta } = drag;
-        if (delta !== 0) this.#ctl.run(l.trim, (d) => trimItem(d, item.id, edge, delta));
+        const { item, edge, delta, roll } = drag;
+        if (delta !== 0)
+          this.#ctl.run(roll ? l.rollCut : l.trim, (d) =>
+            roll ? rollEdit(d, roll.id, delta) : trimItem(d, item.id, edge, delta),
+          );
+        else this.#ctl.preview(null);
+        break;
+      }
+      case 'slip': {
+        this.#ghost = null;
+        this.#ctl.previewSeek(null);
+        const { item, delta, slide } = drag;
+        if (delta !== 0)
+          this.#ctl.run(slide ? l.slideClip : l.slipClip, (d) =>
+            slide ? slideItem(d, item.id, delta) : slipItem(d, item.id, -delta),
+          );
         else this.#ctl.preview(null);
         break;
       }
@@ -2076,6 +2145,30 @@ export class TimelineView {
       }
     }
     ctx.stroke();
+    this.#drawMarkers(scale);
+  }
+
+  /** Markers (v0.4): a small flag on the ruler at each (no allocation per frame). */
+  #drawMarkers(scale: TimeScale): void {
+    const markers = this.#ctl.project.markers;
+    if (!markers?.length) return;
+    const ctx = this.#ctx;
+    const m = this.#m;
+    ctx.save();
+    ctx.fillStyle = this.#c.guide;
+    for (const marker of markers) {
+      const x = Math.round(scale.x0 + (marker.time / FLICKS_PER_SECOND) * scale.pps);
+      if (x < m.header || x > this.#width) continue;
+      ctx.beginPath();
+      ctx.moveTo(x - 4, 1);
+      ctx.lineTo(x + 4, 1);
+      ctx.lineTo(x + 4, m.ruler - 9);
+      ctx.lineTo(x, m.ruler - 5);
+      ctx.lineTo(x - 4, m.ruler - 9);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
   }
 
   /**

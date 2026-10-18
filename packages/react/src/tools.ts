@@ -215,6 +215,11 @@ function singleTools(
     tip: l.tipShape,
     tool: 'mask',
   };
+  // v0.4 Fine trims: clips of the main video, and video / sound anywhere.
+  const protrim: ToolEntry[] =
+    onMain || item.kind === 'video' || item.kind === 'audio'
+      ? [{ key: 'protrim', icon: 'split', label: l.fineTrim, tip: l.tipFineTrim, tool: 'protrim' }]
+      : [];
   // v0.4 Keyframes: anything with a place on the video.
   const keyframes: ToolEntry[] =
     'transform' in item
@@ -262,6 +267,7 @@ function singleTools(
         greenScreen,
         ...transition,
         { key: 'fade', icon: 'fade', label: l.fade, tip: l.tipFade, tool: 'fade' },
+        ...protrim,
         ...(onMain
           ? [
               {
@@ -292,6 +298,7 @@ function singleTools(
         mask,
         greenScreen,
         ...transition,
+        ...protrim,
         ...animate,
         ...keyframes,
         ...opacity,
@@ -312,6 +319,7 @@ function singleTools(
         },
         { key: 'fade', icon: 'fade', label: l.fade, tip: l.tipFade, tool: 'fade' },
         { key: 'speed', icon: 'speed', label: l.speed, tip: l.tipSpeed, tool: 'speed' },
+        ...protrim,
         arrange,
         duplicate,
         remove,

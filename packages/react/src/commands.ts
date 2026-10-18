@@ -45,6 +45,9 @@ export type CommandId =
   | 'duck'
   | 'markIn'
   | 'markOut'
+  | 'marker'
+  | 'prevMarker'
+  | 'nextMarker'
   | 'camera';
 
 /** One action, as it stands right now. */
@@ -200,6 +203,28 @@ export function getCommand(ctl: EditorController, id: CommandId): Command {
         disabledReason: ctl.hasClipboard() ? null : l.nothingToPaste,
         run: () => ctl.paste(),
       };
+    case 'marker':
+      return {
+        id,
+        label: l.addMarker,
+        icon: 'marker',
+        tip: l.tipAddMarker,
+        shortcut: 'M',
+        disabledReason: projectDuration(ctl.project) > 0 ? null : l.needClips,
+        run: () => ctl.addMarkerHere(),
+      };
+    case 'prevMarker':
+    case 'nextMarker': {
+      const target = ctl.markerNear(id === 'nextMarker' ? 1 : -1);
+      return {
+        id,
+        label: id === 'nextMarker' ? l.nextMarker : l.prevMarker,
+        icon: id === 'nextMarker' ? 'next' : 'back',
+        shortcut: id === 'nextMarker' ? '.' : ',',
+        disabledReason: target === null ? l.noMarkers : null,
+        run: () => target !== null && ctl.seek(target),
+      };
+    }
     case 'delete':
       return {
         id,
@@ -405,6 +430,9 @@ export const KEYMAP: readonly KeyBinding[] = [
   { key: '[', mod: true, id: 'back' },
   { key: 's', id: 'split' },
   { key: 'i', id: 'markIn' },
+  { key: 'm', id: 'marker' },
+  { key: ',', id: 'prevMarker' },
+  { key: '.', id: 'nextMarker' },
   { key: 'o', id: 'markOut' },
   { key: 'delete', id: 'delete' },
   { key: 'backspace', id: 'delete' },

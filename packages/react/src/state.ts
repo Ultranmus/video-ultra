@@ -51,7 +51,9 @@ export type ToolId =
   // v0.3 Background removal
   | 'cutout'
   // v0.4 Keyframes
-  | 'keyframes';
+  | 'keyframes'
+  // v0.4 Fine trims
+  | 'protrim';
 
 export interface ImportRow {
   id: string;

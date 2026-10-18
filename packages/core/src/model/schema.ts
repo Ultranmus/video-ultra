@@ -501,6 +501,14 @@ export const AssetSchema = z.object({
   ]),
 });
 
+/** A named point on the timeline (file version 4+): the editor shows it on the ruler. */
+export const MarkerSchema = z.object({
+  id,
+  /** Timeline time (flicks). */
+  time,
+  label: z.optional(z.string().check(z.maxLength(200))),
+});
+
 export const ProjectSchema = z.object({
   version: z.literal(PROJECT_VERSION),
   id,
@@ -521,6 +529,8 @@ export const ProjectSchema = z.object({
   }),
   assets: z.record(z.string(), AssetSchema),
   tracks: z.array(TrackSchema),
+  /** Markers, in time order (file version 4+). */
+  markers: z.optional(z.array(MarkerSchema)),
 });
 
 export type Transform = z.infer<typeof TransformSchema>;
@@ -564,6 +574,8 @@ export type Bezier = z.infer<typeof BezierSchema>;
 export type Keyframe = z.infer<typeof KeyframeSchema>;
 /** An item's keyframes, per transform property (time order). */
 export type Keyframes = z.infer<typeof KeyframesSchema>;
+/** A named point on the timeline. */
+export type Marker = z.infer<typeof MarkerSchema>;
 /** A picture with its background removed. */
 export type Cutout = z.infer<typeof CutoutSchema>;
 /** A picture's shape mask. */

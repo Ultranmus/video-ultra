@@ -32,6 +32,7 @@ import type { ToolId } from './state';
 import { ArrangeControls, LockedNote } from './organize';
 import { BackgroundTool } from './cutout';
 import { KeyframesTool, usePlayheadFor } from './keyframes';
+import { ProTrimTool } from './protrim';
 import { MaskTool } from './mask';
 import { BlendTool, GreenScreenTool, RegionTool } from './picture';
 
@@ -115,6 +116,8 @@ function ItemTool({ tool, item }: { tool: ToolId; item: Item }): ReactElement | 
       return <BackgroundTool item={item} />;
     case 'keyframes':
       return <KeyframesTool item={item} />;
+    case 'protrim':
+      return <ProTrimTool item={item} />;
     default:
       return null;
   }
@@ -138,6 +141,9 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
       <Section title={l.cropRotate} collapsible defaultOpen={false}>
         <TransformTool item={item} />
         <CropTool item={item} />
+      </Section>
+      <Section title={l.fineTrim} collapsible defaultOpen={false}>
+        <ProTrimTool item={item} />
       </Section>
       <Section
         title={l.keyframes}

@@ -71,3 +71,11 @@ Open the branch's Vercel preview (or `pnpm --filter playground dev`), then **`/e
       doesn't jump. Small ◆ marks show on the selected clip in the timeline.
       _Checked here:_ keyframes-check (auto-key by drag, exported positions, curve, undo,
       split) + 9 unit tests.
+- [ ] **Fine trims (desktop timeline).** With 3 clips: hold **Alt (Option)** and drag the trim
+      handle at a cut → the cut moves (one clip longer, the next shorter, the video the same
+      length). Alt-drag a video clip → it shows a different part of the video in the same place.
+      Alt+Shift-drag the middle clip → it slides between its neighbours. On the phone: select a
+      clip → **Fine trim** (slip slider, Move cut ◀ ▶, Slide ◀ ▶). _Checked here:_ protrim-check.
+- [ ] **Markers.** Press **M** to drop a marker (a flag on the ruler); M again on it removes it;
+      **,** and **.** jump between markers; dragging the playhead or clips snaps to them.
+      _Checked here:_ protrim-check.

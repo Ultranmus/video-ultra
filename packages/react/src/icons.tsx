@@ -65,6 +65,7 @@ const paths = {
   back: 'M15 5l-7 7 7 7',
   next: 'M9 5l7 7-7 7',
   keyframe: 'M12 3l9 9-9 9-9-9z',
+  marker: 'M6 3h12v13l-6 5-6-5z',
   alignLeft: 'M4 6h16M4 10h10M4 14h16M4 18h10',
   alignCenter: 'M4 6h16M7 10h10M4 14h16M7 18h10',
   alignRight: 'M4 6h16M10 10h10M4 14h16M10 18h10',

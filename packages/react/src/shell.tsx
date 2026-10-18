@@ -735,7 +735,8 @@ type TitleKey =
   | 'blurArea'
   | 'shape'
   | 'removeBackground'
-  | 'keyframes';
+  | 'keyframes'
+  | 'fineTrim';
 
 const TOOL_TITLE: Record<ToolId, TitleKey> = {
   speed: 'speed',
@@ -763,6 +764,7 @@ const TOOL_TITLE: Record<ToolId, TitleKey> = {
   mask: 'shape',
   cutout: 'removeBackground',
   keyframes: 'keyframes',
+  protrim: 'fineTrim',
 };
 
 /**

@@ -796,3 +796,14 @@ reason; when one changes, edit the entry and note the date.
       keyframes with small ◆. UI values follow the playhead only while paused (React never
       renders per frame). Text with keyframed size re-rasterises at most per quarter-octave in
       the preview (rasterSize), every frame in exports.
+143.  **Fine trims and markers** (v0.4). Core: `rollEdit` (the cut between two touching clips moves;
+      one longer, the other shorter — nothing else moves), `slipItem` (a video / sound shows
+      another part of its media in the same place), `slideItem` (a main-video clip moves between
+      its neighbours, which give and take the time). All clamp to the media both sides have and to
+      one frame; keyframes follow (shift, #142). Desktop timeline: Alt-drag a trim handle = roll,
+      Alt-drag a clip = slip (the media moves the other way, like grabbing the film), Alt+Shift-
+      drag a main clip = slide; previews live, one edit on release. Every device: a **Fine trim**
+      tool (slip slider, Move cut ◀ ▶, Slide ◀ ▶ a frame at a time). Markers:
+      `project.markers` (file version 4); M adds one at the playhead (M on a marker removes it),
+      `,` / `.` jump to the previous / next; flags on the ruler; scrubbing, trims and moves snap
+      to them. Track lock already existed (v0.2 E).

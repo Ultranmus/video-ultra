@@ -1577,6 +1577,26 @@
     pointer-events: none;
   }
 
+  /* v0.4 Fine trims. */
+  .vu-protrim {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-2);
+  }
+
+  .vu-protrim-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: var(--vu-size-touch);
+    color: var(--vu-text-muted);
+  }
+
+  .vu-protrim-steps {
+    display: inline-flex;
+    gap: var(--vu-space-1);
+  }
+
   /* v0.4 Keyframes: ◆ buttons and the graph editor. */
   .vu-keyframes,
   .vu-curve {

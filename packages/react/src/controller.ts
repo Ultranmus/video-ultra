@@ -8,6 +8,8 @@ import {
   deleteItem,
   duplicateItem,
   pasteItems,
+  addMarker,
+  removeMarker,
   setTransformAt,
   transformAt,
   applyTemplate,
@@ -1248,6 +1250,35 @@ export class EditorController {
   }
 
   /** Adds an overlay/lane item at the playhead and selects it. */
+  /** Adds a marker at the playhead (key M) — or removes the one that's there. */
+  addMarkerHere(): void {
+    const at = this.playhead.time;
+    const half = projectFrame(this.project) / 2;
+    const there = this.project.markers?.find((m) => Math.abs(m.time - at) <= half);
+    if (there) {
+      this.run(this.labels.removeMarker, (d) => removeMarker(d, there.id));
+      return;
+    }
+    const id = this.run(this.labels.addMarker, (d, ctx) => addMarker(d, at, ctx.ids));
+    if (!id) return;
+    this.toast(this.labels.markerAdded(formatClock(at)), 'success', {
+      label: this.labels.undo,
+      run: () => this.undo(),
+    });
+  }
+
+  /** The nearest marker after (1) or before (−1) the playhead, or null. */
+  markerNear(direction: 1 | -1): Time | null {
+    const t = this.playhead.time;
+    const frame = projectFrame(this.project);
+    const list = this.project.markers ?? [];
+    const hit =
+      direction === 1
+        ? list.find((m) => m.time > t + frame / 2)
+        : [...list].reverse().find((m) => m.time < t - frame / 2);
+    return hit ? hit.time : null;
+  }
+
   /** Adds a template at the playhead (one group) and selects it. */
   addTemplate(template: TemplatePreset, values: Readonly<Record<string, string>>): void {
     const at = this.playhead.time;

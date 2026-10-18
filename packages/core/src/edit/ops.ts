@@ -38,6 +38,7 @@ import type {
   ItemAnimation,
   Keyframe,
   LutRef,
+  Marker,
   Project,
   RegionItem,
   ShapeMask,
@@ -1463,3 +1464,134 @@ export function transformAt(item: Item, at: Time): Transform | null {
   return keyedTransform(item.transform, item.keyframes, at - item.start, { ...item.transform });
 }
 
+// ── pro trims (v0.4): roll, slip, slide ───────────────────────────────────
+
+/** The source span (flicks) an item may still reach past its current end / before its start. */
+function sourceRoom(project: Project, item: Item): { before: Time; after: Time } {
+  if (!isMedia(item)) {
+    // Photos, freezes, text… can be any length.
+    return { before: Number.MAX_SAFE_INTEGER, after: Number.MAX_SAFE_INTEGER };
+  }
+  return {
+    before: floorToFrame(project, Math.floor(item.sourceIn / item.speed)),
+    after: Math.max(0, maxDuration(project, item) - item.duration),
+  };
+}
+
+/** Trims the start of an item by `delta` (flicks; > 0 shortens it) without moving its end. */
+function trimStartBy(item: Item, delta: Time): void {
+  if (isMedia(item)) item.sourceIn = Math.max(0, item.sourceIn + Math.round(delta * item.speed));
+  retimeItemKeyframes(item, delta);
+  item.start += delta;
+  item.duration -= delta;
+  clampWords(item, delta);
+  clampFades(item);
+}
+
+/**
+ * Roll edit: moves the cut between an item and the one right after it (touching, same track) by
+ * `delta` — one gets longer, the other shorter by the same amount, so nothing else moves.
+ * Clamped to the media both have and to one frame each. Returns the applied delta.
+ */
+export function rollEdit(project: Project, itemId: string, delta: Time): Time {
+  const { track, item: left, index } = editable(project, itemId);
+  const right = track.items[index + 1];
+  if (!right || right.start !== itemEnd(left))
+    throw new EditError('invalid', 'Pick a clip that touches the next one');
+  if (right.locked) throw new EditError('locked', 'The next clip is locked');
+  const frame = projectFrame(project);
+  let d = snapToFrame(delta, project.settings.frameRate);
+  const l = sourceRoom(project, left);
+  const r = sourceRoom(project, right);
+  d = Math.min(d, l.after, right.duration - frame);
+  d = Math.max(d, -(left.duration - frame), -r.before);
+  if (d === 0) return 0;
+  left.duration += d;
+  clampWords(left, 0);
+  clampFades(left);
+  trimStartBy(right, d);
+  if (track.kind === 'main') layoutMain(project);
+  else tidyLaneTransitions(project);
+  return d;
+}
+
+/**
+ * Slip: shows a different part of a video or sound in the same place — the clip keeps its spot
+ * and length, the media slides under it by `delta` (flicks of timeline time; > 0 shows later
+ * media). Returns the applied delta.
+ */
+export function slipItem(project: Project, itemId: string, delta: Time): Time {
+  const { item } = editable(project, itemId);
+  if (!isMedia(item)) throw new EditError('invalid', 'Only video and sound can slip');
+  const room = sourceRoom(project, item);
+  const d = Math.max(
+    -room.before,
+    Math.min(room.after, snapToFrame(delta, project.settings.frameRate)),
+  );
+  item.sourceIn = Math.max(0, item.sourceIn + Math.round(d * item.speed));
+  return d;
+}
+
+/**
+ * Slide: moves a main-video clip by `delta` between its neighbours — the one before gets longer
+ * (or shorter), the one after shorter (or longer); the clip itself and the video's length don't
+ * change. Returns the applied delta.
+ */
+export function slideItem(project: Project, itemId: string, delta: Time): Time {
+  const { track, index } = editable(project, itemId);
+  if (track.kind !== 'main') throw new EditError('invalid', 'Slide moves clips of the main video');
+  const prev = track.items[index - 1];
+  const next = track.items[index + 1];
+  if (!prev || !next) throw new EditError('invalid', 'Slide needs a clip before and after it');
+  if (prev.locked || next.locked) throw new EditError('locked', 'A neighbouring clip is locked');
+  const frame = projectFrame(project);
+  let d = snapToFrame(delta, project.settings.frameRate);
+  const p = sourceRoom(project, prev);
+  const n = sourceRoom(project, next);
+  d = Math.min(d, p.after, next.duration - frame);
+  d = Math.max(d, -(prev.duration - frame), -n.before);
+  if (d === 0) return 0;
+  prev.duration += d;
+  clampWords(prev, 0);
+  clampFades(prev);
+  trimStartBy(next, d);
+  layoutMain(project);
+  return d;
+}
+
+// ── markers (v0.4) ─────────────────────────────────────────────────────────
+
+/** Adds a marker at `time` (snapped to a frame, inside the video). Returns its id. */
+export function addMarker(project: Project, time: Time, ids: IdFactory, label?: string): string {
+  const at = Math.max(0, snap(project, time));
+  const marker: Marker = { id: ids(), time: at, ...(label ? { label: label.slice(0, 200) } : {}) };
+  const list = (project.markers ??= []);
+  const after = list.findIndex((m) => m.time > at);
+  if (after === -1) list.push(marker);
+  else list.splice(after, 0, marker);
+  return marker.id;
+}
+
+/** Changes a marker's time or label (an empty label removes it). */
+export function updateMarker(
+  project: Project,
+  markerId: string,
+  patch: { time?: Time; label?: string },
+): void {
+  const list = project.markers ?? [];
+  const marker = list.find((m) => m.id === markerId);
+  if (!marker) throw new EditError('not-found', 'No such marker');
+  if (patch.time !== undefined) marker.time = Math.max(0, snap(project, patch.time));
+  if (patch.label !== undefined) {
+    if (patch.label.trim()) marker.label = patch.label.slice(0, 200);
+    else delete marker.label;
+  }
+  list.sort((a, b) => a.time - b.time);
+}
+
+/** Removes a marker. */
+export function removeMarker(project: Project, markerId: string): void {
+  if (!project.markers) return;
+  project.markers = project.markers.filter((m) => m.id !== markerId);
+  if (project.markers.length === 0) delete project.markers;
+}

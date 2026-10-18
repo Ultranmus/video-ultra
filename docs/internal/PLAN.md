@@ -203,7 +203,7 @@ _D. Capture & export_
 **v0.4+ — pro layer (behind progressive disclosure)**
 
 - [x] Keyframes on any property, then a curve editor (M, then L) — transform properties + graph editor (#142)
-- [ ] Ripple / roll / slip / slide trims, markers, track lock (M)
+- [x] Ripple / roll / slip / slide trims, markers, track lock (M) — main video is ripple by design; #143
 - [ ] Proxies for heavy 4K clips (also helps budget phones) (M)
 - [ ] More codecs and containers: H.265 / AV1, MOV / MKV, transparent video (S–M each, where the
       device can encode)
