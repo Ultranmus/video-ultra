@@ -95,6 +95,8 @@ export function textItem(
       ...(font ? { fontFamily: font.family, fontWeight: font.weight } : {}),
     },
     transform: { ...DEFAULT_TRANSFORM },
+    filter: null,
+    adjust: {},
   };
 }
 
@@ -113,6 +115,8 @@ export function stickerItem(
     emoji: 'emoji' in content ? content.emoji : null,
     // Upper right, so it doesn't land on a centred title.
     transform: { ...DEFAULT_TRANSFORM, x: 0.72, y: 0.3, scale: 0.3 },
+    filter: null,
+    adjust: {},
   };
 }
 

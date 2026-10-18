@@ -122,6 +122,11 @@
     --vu-size-browser-section: 480px;
     --vu-browser-bar-bg: var(--vu-surface-1);
     --vu-size-dock-tall: 420px;
+    --vu-size-sheet: 460px;
+    /* Top padding of the scroller a sticky bar sits in (set by scrollers that have one). */
+    --vu-scroll-pad-top: 0px;
+    --vu-size-grab-w: 36px;
+    --vu-size-grab-h: 5px;
     --vu-size-sticker: 64px;
     --vu-size-textstyle: 64px;
     --vu-size-cp-square: 140px;

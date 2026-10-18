@@ -11,7 +11,7 @@ import {
   trimItem,
   type Item,
 } from '@video-ultra/core';
-import { useEffect, useRef, type ReactElement } from 'react';
+import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { useController, useHistory, useLabels, useProject, useUi } from './context';
 import { Button, IconButton, Ruler, Section, ToolButton } from './controls';
 import { formatClock } from './format';
@@ -627,31 +627,96 @@ const TOOL_TITLE: Record<ToolId, TitleKey> = {
  * same box, never a second floating panel — with an obvious Done.
  */
 export function Dock(): ReactElement | null {
-  const ctl = useController();
-  const l = useLabels();
   const tool = useUi((s) => s.tool);
   const panel = useUi((s) => s.panel);
   const sheetPanel = useUi((s) => s.sheetPanel);
   const showPanel = !tool && sheetPanel && panel;
   if (!tool && !showPanel) return null;
+  // A new tool is a fresh sheet (default height again).
+  return <Sheet key={tool ?? panel ?? ''} tool={tool} panel={panel} />;
+}
+
+function Sheet({ tool, panel }: { tool: ToolId | null; panel: PanelId | null }): ReactElement {
+  const ctl = useController();
+  const l = useLabels();
+  const [expanded, setExpanded] = useState(false);
+  const ref = useRef<HTMLElement>(null);
+  const drag = useRef<{ id: number; y: number; t: number; h: number; dy: number } | null>(null);
   const close = () => ctl.ui.setState({ tool: null, sheetPanel: false });
   const entry = RAIL.find((r) => r.id === panel);
   const title = tool ? l[TOOL_TITLE[tool]] : entry ? l[entry.key] : l.canvas;
-  return (
-    <section
-      className="vu-dock"
-      aria-label={title}
-      // Libraries (text styles, stickers, filters…) need room; quick tools fit the timeline's box.
-      data-tall={
-        !tool ||
-        tool === 'filter' ||
-        tool === 'transition' ||
-        tool === 'text-style' ||
-        tool === 'animate' ||
-        undefined
+
+  // Dragging the handle / header: down closes, up expands, a short drag springs back. The sheet
+  // follows the finger through inline styles only (no React render per move).
+  const onDown = (e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).closest('button')) return;
+    const sheet = ref.current;
+    if (!sheet) return;
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // Not capturable (already ended): the drag still works while the finger stays on the head.
+    }
+    drag.current = {
+      id: e.pointerId,
+      y: e.clientY,
+      t: performance.now(),
+      h: sheet.getBoundingClientRect().height,
+      dy: 0,
+    };
+    sheet.dataset.dragging = '';
+  };
+  const onMove = (e: React.PointerEvent) => {
+    const d = drag.current;
+    const sheet = ref.current;
+    if (!d || d.id !== e.pointerId || !sheet) return;
+    d.dy = e.clientY - d.y;
+    if (d.dy >= 0) {
+      sheet.style.transform = `translateY(${d.dy}px)`;
+      sheet.style.height = '';
+    } else {
+      // Pulling up grows the sheet (to the expanded height at most).
+      sheet.style.transform = '';
+      sheet.style.height = `${d.h - d.dy}px`;
+    }
+  };
+  const onUp = (e: React.PointerEvent) => {
+    const d = drag.current;
+    const sheet = ref.current;
+    if (!d || d.id !== e.pointerId || !sheet) return;
+    drag.current = null;
+    delete sheet.dataset.dragging;
+    const speed = d.dy / Math.max(1, performance.now() - d.t); // px per ms
+    sheet.style.height = '';
+    if (d.dy > d.h * 0.25 || (d.dy > 24 && speed > 0.5)) {
+      if (expanded && d.dy < d.h * 0.5 && speed <= 0.5) {
+        sheet.style.transform = '';
+        setExpanded(false);
+        return;
       }
-    >
-      <div className="vu-dock-head">
+      sheet.style.transform = 'translateY(100%)';
+      const done = () => {
+        sheet.style.transform = '';
+        close();
+      };
+      if (matchMedia('(prefers-reduced-motion: reduce)').matches) done();
+      else sheet.addEventListener('transitionend', done, { once: true });
+      return;
+    }
+    sheet.style.transform = '';
+    if (d.dy < -48) setExpanded(true);
+  };
+
+  return (
+    <section ref={ref} className="vu-dock" aria-label={title} data-expanded={expanded || undefined}>
+      <div
+        className="vu-dock-head"
+        onPointerDown={onDown}
+        onPointerMove={onMove}
+        onPointerUp={onUp}
+        onPointerCancel={onUp}
+      >
+        <span className="vu-dock-grab" aria-hidden="true" />
         <h2 className="vu-dock-title">{title}</h2>
         <button type="button" className="vu-done" onClick={close}>
           <Icon name="check" size={18} />

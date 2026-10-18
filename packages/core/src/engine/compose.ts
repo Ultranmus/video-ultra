@@ -291,8 +291,8 @@ export class Composer {
     textLayout: TextRevealLayout | null,
   ): Float32Array | null {
     const item = layer.item;
-    if (item.kind === 'video' || item.kind === 'image' || item.kind === 'freeze')
-      colourParams(item.filter, item.adjust, slot.colour);
+    // Pictures, text and stickers all take a colour look.
+    if ('filter' in item) colourParams(item.filter, item.adjust, slot.colour);
     else colourParams(null, NO_ADJUST, slot.colour);
     const fx = slot.fx;
     if (look) Object.assign(fx, look.fx);

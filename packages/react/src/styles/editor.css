@@ -2313,51 +2313,77 @@
     }
   }
 
-  /* The dock covers exactly the timeline area: one box, never a second panel. */
+  /*
+   * Phones and tablets: every tool opens in one bottom sheet, always the same height, over the
+   * timeline (the stage stays in view above it). Drag the handle down to close, up to expand.
+   */
   .vu-dock {
     position: absolute;
-    inset: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     z-index: var(--vu-z-overlay);
     display: flex;
     flex-direction: column;
+    height: min(var(--vu-size-sheet), var(--vu-sheet-max));
+    border-top: 1px solid var(--vu-border-strong);
+    border-radius: var(--vu-radius-lg) var(--vu-radius-lg) 0 0;
     background: var(--vu-surface-1);
-    animation: vu-dock-in var(--vu-duration-base) var(--vu-ease);
+    box-shadow: var(--vu-shadow-popover);
+    animation: vu-dock-in var(--vu-duration-slow) var(--vu-ease-out);
+    transition:
+      transform var(--vu-duration-slow) var(--vu-ease-out),
+      height var(--vu-duration-slow) var(--vu-ease-out);
+    --vu-sheet-max: calc(
+      100cqh - var(--vu-size-topbar) - var(--vu-size-toolbar) - var(--vu-space-8)
+    );
+  }
+
+  .vu-dock[data-expanded] {
+    height: var(--vu-sheet-max);
+  }
+
+  .vu-dock[data-dragging] {
+    transition: none;
   }
 
   .vu-dock .vu-textstyle-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  /* Library docks grow upward over the transport bar (still one box, anchored to the bottom). */
-  .vu-dock[data-tall] {
-    top: auto;
-    height: var(--vu-size-dock-tall);
-    max-height: calc(100cqh - var(--vu-size-topbar) - var(--vu-size-toolbar) - var(--vu-space-8));
-    border-top: 1px solid var(--vu-border-strong);
-    border-radius: var(--vu-radius-lg) var(--vu-radius-lg) 0 0;
-    box-shadow: var(--vu-shadow-popover);
-  }
-
   @keyframes vu-dock-in {
     from {
-      opacity: 0;
-      transform: translateY(var(--vu-space-3));
+      transform: translateY(100%);
     }
   }
 
   .vu-dock-head {
+    position: relative;
     display: flex;
     flex: none;
     align-items: center;
     gap: var(--vu-space-2);
-    min-height: var(--vu-size-touch);
-    padding: 0 var(--vu-space-2) 0 var(--vu-space-4);
+    padding: var(--vu-space-5) var(--vu-space-3) var(--vu-space-3) var(--vu-space-4);
     border-bottom: 1px solid var(--vu-border);
+    touch-action: none;
+    cursor: grab;
+  }
+
+  /* The grab handle: a small pill centred at the top of the sheet. */
+  .vu-dock-grab {
+    position: absolute;
+    top: var(--vu-space-2);
+    left: 50%;
+    width: var(--vu-size-grab-w);
+    height: var(--vu-size-grab-h);
+    border-radius: var(--vu-radius-full);
+    background: var(--vu-border-strong);
+    transform: translateX(-50%);
   }
 
   .vu-dock-title {
     flex: 1;
-    font-size: var(--vu-text-md);
+    font-size: var(--vu-text-lg);
     font-weight: var(--vu-weight-semibold);
   }
 
@@ -2365,8 +2391,8 @@
     display: inline-flex;
     align-items: center;
     gap: var(--vu-space-1);
-    min-height: var(--vu-size-choice-lg);
-    padding: 0 var(--vu-space-3);
+    min-height: var(--vu-size-touch);
+    padding: 0 var(--vu-space-4);
     border-radius: var(--vu-radius-full);
     background: var(--vu-accent);
     color: var(--vu-accent-contrast);
@@ -2383,6 +2409,7 @@
     overflow-y: auto;
     overscroll-behavior: contain;
     padding: var(--vu-space-3) var(--vu-space-4) var(--vu-space-4);
+    --vu-scroll-pad-top: var(--vu-space-3);
   }
 
   /* Category browser: one scrolling list, a sticky chip row that follows it, small headings. */
@@ -2394,7 +2421,8 @@
 
   .vu-browser-bar {
     position: sticky;
-    top: 0;
+    /* Stick flush to the scroller's top edge (past its top padding), so nothing scrolls by above. */
+    top: calc(var(--vu-scroll-pad-top) * -1);
     z-index: 2;
     margin-inline: calc(var(--vu-space-4) * -1);
     padding: var(--vu-space-2) var(--vu-space-4);
@@ -2402,17 +2430,10 @@
     background: var(--vu-browser-bar-bg);
   }
 
-  /* The chip row fades at its edges, so a cut-off chip reads as "scroll for more". */
+  /* The chip row fades at its right edge, so a cut-off chip reads as "scroll for more"; the
+     first chip lines up with the content's left edge. */
   .vu-browser-bar .vu-chips-scroll {
-    mask-image: linear-gradient(
-      to right,
-      transparent,
-      black var(--vu-space-3),
-      black calc(100% - var(--vu-space-8)),
-      transparent
-    );
-    padding-inline: var(--vu-space-3);
-    margin-inline: calc(var(--vu-space-3) * -1);
+    mask-image: linear-gradient(to left, transparent, black var(--vu-space-8));
   }
 
   .vu-browser-section {

@@ -607,8 +607,8 @@ const FIELDS_BY_KIND: Record<Item['kind'], readonly string[]> = {
   image: ['name', 'transform', 'crop', 'fit', 'filter', 'adjust'],
   freeze: ['name', 'transform', 'crop', 'fit', 'filter', 'adjust'],
   audio: ['name', 'volume', 'muted', 'fadeIn', 'fadeOut'],
-  text: ['name', 'text', 'style', 'transform'],
-  sticker: ['name', 'transform', 'emoji'],
+  text: ['name', 'text', 'style', 'transform', 'filter', 'adjust'],
+  sticker: ['name', 'transform', 'emoji', 'filter', 'adjust'],
 };
 
 /** Changes look/sound properties of an item (transform, filter, volume, text, …). */

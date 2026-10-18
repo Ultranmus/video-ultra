@@ -44,6 +44,11 @@ export interface Targets {
   transition: Item | null;
   /** Why there is no transition target (or why it's not the selection's). */
   transitionNote: string | null;
+  /**
+   * A selected element that moves in and out instead (text, sticker, or a layer picture with no
+   * clip touching it): the Transitions panel shows its entrance / exit.
+   */
+  motion: Item | null;
   hasClips: boolean;
 }
 
@@ -109,7 +114,7 @@ export function computeTargets(
   const picture = (i: Item | null | undefined): i is LookItem => !!i && 'filter' in i;
   const fallback = under ?? items[0] ?? null;
   const look: LookItem | null = picture(selected) ? selected : picture(fallback) ? fallback : null;
-  const lookNote = selected && !picture(selected) && look ? l.filtersForPictures : null;
+  const lookNote = selected && !picture(selected) && look ? l.filtersNotForSound : null;
 
   const nearestMainCut = () => {
     if (items.length < 2) return null;
@@ -120,6 +125,7 @@ export function computeTargets(
   };
   let transition: Item | null = null;
   let transitionNote: string | null = null;
+  let motion: Item | null = null;
   const found = selected ? findItem(project, selected.id) : null;
   if (
     found &&
@@ -136,8 +142,14 @@ export function computeTargets(
     };
     if (touches(i)) transition = found.item;
     else if (touches(i + 1)) transition = list[i + 1]!;
-    else
-      transitionNote = found.track.kind === 'main' ? l.transitionsNeedTwo : l.transitionsLayerTouch;
+    else if (found.track.kind === 'main') transitionNote = l.transitionsNeedTwo;
+    else {
+      // A layer picture on its own: it appears and leaves like any element.
+      motion = found.item;
+      transitionNote = l.transitionsLayerTouch;
+    }
+  } else if (found && found.track.kind !== 'main' && found.item.kind !== 'audio') {
+    motion = found.item;
   } else {
     transition = nearestMainCut();
     if (selected && transition) transitionNote = l.transitionsForPictures;
@@ -152,6 +164,7 @@ export function computeTargets(
     lookNote,
     transition,
     transitionNote,
+    motion,
     hasClips,
   };
 }
@@ -168,6 +181,7 @@ function key(t: Targets): string {
     t.lookNote,
     t.transition?.id,
     t.transitionNote,
+    t.motion?.id,
     t.hasClips,
   ].join('|');
 }

@@ -91,6 +91,8 @@ export function textItem(id: string, startSeconds: number, seconds = 2): TextIte
     duration: fromSeconds(seconds),
     style: structuredClone(DEFAULT_TEXT_STYLE),
     transform: { ...DEFAULT_TRANSFORM },
+    filter: null,
+    adjust: {},
   };
 }
 
@@ -119,5 +121,7 @@ export function stickerItem(id: string, startSeconds: number, seconds = 2): Stic
     start: fromSeconds(startSeconds),
     duration: fromSeconds(seconds),
     transform: { ...DEFAULT_TRANSFORM },
+    filter: null,
+    adjust: {},
   };
 }

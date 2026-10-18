@@ -394,8 +394,9 @@ export const DEFAULT_LABELS = {
     name ? `Transition: ${name} — click to change` : 'Add a transition here',
   tipRuler: 'Click or drag to move the playhead',
   rowVideo: 'Video',
-  filtersForPictures: 'Filters change videos and photos — showing the clip under the playhead.',
-  transitionsForPictures: 'Transitions go between video or photo clips — showing the nearest cut.',
+  filtersNotForSound: 'Sound has no picture to filter — showing the clip under the playhead.',
+  transitionsForPictures: 'Sound has no transitions — showing the nearest cut between clips.',
+  motionFor: (name: string) => `How “${name}” appears and leaves`,
   transitionsLayerTouch:
     'To add a transition on this layer, drag another clip right up against this one (they snap together).',
   rowLayer: 'Layer',

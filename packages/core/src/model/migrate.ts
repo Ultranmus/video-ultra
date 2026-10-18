@@ -20,7 +20,30 @@ export type ParseResult =
  * Migrations from older file versions. `MIGRATIONS[n]` turns a version-n project into version
  * n + 1. Never edit a shipped migration — add a new one.
  */
-const MIGRATIONS: Record<number, (old: Record<string, unknown>) => Record<string, unknown>> = {};
+const MIGRATIONS: Record<number, (old: Record<string, unknown>) => Record<string, unknown>> = {
+  /** 1 → 2: text and stickers take filters and adjustments too (none yet). */
+  1: (old) => ({
+    ...old,
+    version: 2,
+    tracks: Array.isArray(old.tracks)
+      ? old.tracks.map((track: unknown) => {
+          if (typeof track !== 'object' || track === null) return track;
+          const t = track as { items?: unknown };
+          if (!Array.isArray(t.items)) return track;
+          return {
+            ...t,
+            items: t.items.map((item: unknown) => {
+              if (typeof item !== 'object' || item === null) return item;
+              const i = item as { kind?: unknown };
+              return i.kind === 'text' || i.kind === 'sticker'
+                ? { filter: null, adjust: {}, ...i }
+                : item;
+            }),
+          };
+        })
+      : old.tracks,
+  }),
+};
 
 /**
  * Opens a project from untrusted JSON (a saved file, the host's database, a crash-recovery

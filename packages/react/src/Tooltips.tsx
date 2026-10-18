@@ -110,14 +110,24 @@ export function Tooltips({
       const next = e.relatedTarget instanceof Node ? e.relatedTarget : null;
       if (current && !(next && current.contains(next))) hide();
     };
+    // Focus tooltips are for keyboard users only: after a tap or click (even when the editor then
+    // moves focus itself, e.g. back to a toolbar button), no tooltip pops up.
+    let keyboard = false;
     const onFocus = (e: FocusEvent) => {
       const target = targetOf(e);
-      if (target?.matches(':focus-visible') && !target.hasAttribute('data-tooltip-follow')) {
+      if (
+        keyboard &&
+        target?.matches(':focus-visible') &&
+        !target.hasAttribute('data-tooltip-follow')
+      ) {
         current = target;
         open(target);
       }
     };
-    const onDown = () => hide();
+    const onDown = (e: Event) => {
+      keyboard = e.type === 'keydown';
+      hide();
+    };
     el.addEventListener('pointerover', onOver);
     el.addEventListener('pointermove', onMove);
     el.addEventListener('pointerout', onOut);

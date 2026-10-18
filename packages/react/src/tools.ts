@@ -170,6 +170,8 @@ export function toolsFor(
         { key: 'text-edit', icon: 'edit', label: l.edit, tool: 'text-edit' },
         { key: 'text-style', icon: 'style', label: l.style, tool: 'text-style' },
         ...animate,
+        look[0]!,
+        look[1]!,
         { key: 'transform', icon: 'rotate', label: l.rotate, tip: l.tipRotate, tool: 'transform' },
         { key: 'opacity', icon: 'opacity', label: l.opacity, tip: l.tipOpacity, tool: 'opacity' },
         split,
@@ -179,6 +181,8 @@ export function toolsFor(
     case 'sticker':
       return [
         ...animate,
+        look[0]!,
+        look[1]!,
         { key: 'transform', icon: 'rotate', label: l.rotate, tip: l.tipRotate, tool: 'transform' },
         { key: 'opacity', icon: 'opacity', label: l.opacity, tip: l.tipOpacity, tool: 'opacity' },
         split,

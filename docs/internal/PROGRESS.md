@@ -217,3 +217,17 @@ OPFS recovery, WebCodecs first, ranged reads.
   could draw over each other) and retry while the engine / media are still starting.
 - Panels follow the selected element, with notes when it can't take the effect.
 - Checks: verify (389 + 11), interaction × 3 browsers, axe 0, composite golden, ui-review.
+
+## 2026-10-19 · Mobile pass (owner list)
+
+- Playground device frames (`/editor?device=phone|phone-small|tablet|tablet-portrait`), so phone
+  and tablet layouts can be checked on a desktop without deploying.
+- One draggable bottom sheet for every phone tool (same height, drag down to close, up to
+  expand); Done has room; the sticky category bar sits flush under the header; chips line up.
+- Phone timeline scrub no longer jitters (paused engine echoes ignored).
+- Text animation previews fit the text to the tile.
+- Filters and adjustments on text and stickers (file version 2 + migration); Transitions for an
+  element shows its entrance / exit; phone toolbar and inspector gained Filter / Adjust for them.
+- Focus tooltips only after keyboard use (no tooltip after a tap).
+- Checks: verify (390 + 11), interaction × 3 browsers, axe 0, composite golden, recovery,
+  ui-review; probes for drag-to-close and text filters (WebKit, iPhone size).

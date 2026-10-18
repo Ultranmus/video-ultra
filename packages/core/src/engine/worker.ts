@@ -498,8 +498,10 @@ async function filterPreviews(
   if (!project) throw new Error('No project');
   const found = findItem(project, request.itemId);
   const item = found?.item;
-  if (!item || (item.kind !== 'video' && item.kind !== 'image' && item.kind !== 'freeze'))
+  if (!found || !item || !('filter' in item))
     return { data: { type: 'filter-previews', bitmaps: [] }, transfer: [] };
+  // Text and stickers are shown alone, centred on a neutral grey, with each look.
+  const element = item.kind === 'text' || item.kind === 'sticker';
   clearTimeout(looksIdle);
   const size = Math.max(16, Math.min(256, Math.round(request.size)));
   if (!looks || looks.size !== size) {
@@ -515,25 +517,32 @@ async function filterPreviews(
     };
   }
   const local = Math.max(0, Math.min(item.duration - 1, Math.round(request.time) - item.start));
-  // The tile shows the clip's own frame, filling the square, with its own adjustments.
-  const base: Extract<Item, { filter: unknown }> = {
-    ...item,
-    start: 0,
-    transitionIn: null,
-    transform: { ...DEFAULT_TRANSFORM },
-    fit: 'fill',
-  };
+  // Pictures: the clip's own frame, filling the square, with its own adjustments.
+  const base = (
+    element
+      ? { ...centredForTile(item, size, size, undefined), start: 0 }
+      : {
+          ...item,
+          start: 0,
+          transitionIn: null,
+          transform: { ...DEFAULT_TRANSFORM },
+          fit: 'fill',
+        }
+  ) as Extract<Item, { filter: unknown }>;
   const mini: Project = {
     ...project,
     settings: {
       ...project.settings,
       width: size,
       height: size,
-      background: { type: 'color', color: '#000000' },
+      background: { type: 'color', color: element ? '#3c3c44' : '#000000' },
     },
-    tracks: [
-      { id: 'looks', kind: 'main', muted: true, hidden: false, locked: false, items: [base] },
-    ],
+    tracks: element
+      ? [
+          { id: 'looks-main', kind: 'main', muted: true, hidden: false, locked: false, items: [] },
+          { ...found.track, muted: true, hidden: false, items: [base] },
+        ]
+      : [{ id: 'looks', kind: 'main', muted: true, hidden: false, locked: false, items: [base] }],
   };
   await mediaReady(mini);
   // A fresh renderer's first draw can land before the frame is decoded: warm it up once.
@@ -593,6 +602,38 @@ function looksDone(): void {
 }
 
 /**
+ * A lane item placed for a picker tile: centred, upright, opaque, and sized to the tile —
+ * pictures fill most of it, stickers about 70%, and text so its longest line fills most of the
+ * width (never more than ~45% of the height), so even a small caption reads in its preview.
+ */
+function centredForTile(
+  item: Item,
+  width: number,
+  height: number,
+  animation: Extract<Item, { kind: 'text' }>['animation'],
+): Item {
+  if (!('transform' in item)) return item;
+  let scale = item.transform.scale;
+  if (item.kind === 'video' || item.kind === 'image' || item.kind === 'freeze') scale = 0.72;
+  else if (item.kind === 'sticker') scale = 0.7;
+  else if (item.kind === 'text') {
+    const lines = item.text.split('\n');
+    const longest = Math.max(1, ...lines.map((line) => line.length));
+    const spacing = 0.56 + Math.max(0, item.style.letterSpacing);
+    const fontPx = Math.min(
+      (height * 0.45) / Math.max(1, lines.length),
+      (width * 0.85) / (longest * spacing),
+    );
+    scale = fontPx / (item.style.size * height);
+  }
+  return {
+    ...item,
+    transform: { ...item.transform, x: 0.5, y: 0.5, rotation: 0, opacity: 1, scale },
+    animation,
+  } as Item;
+}
+
+/**
  * Animation picker: one lane item alone, centred and large in the tile, at the requested times
  * with the requested animation (a still when `animation` is null).
  */
@@ -607,16 +648,7 @@ async function itemPreview(
   const height = Math.max(16, Math.min(320, Math.round(request.height)));
   const l = await looksRenderer(width, height);
   const item = found.item;
-  const shown = {
-    ...item,
-    transform: { ...item.transform, x: 0.5, y: 0.5, rotation: 0, opacity: 1 },
-    animation: request.animation ?? undefined,
-  } as Item;
-  // Pictures fill most of the tile; text and stickers keep their own size, capped to fit.
-  if (item.kind === 'video' || item.kind === 'image' || item.kind === 'freeze')
-    (shown as { transform: { scale: number } }).transform.scale = 0.72;
-  else if (item.kind === 'sticker')
-    (shown as { transform: { scale: number } }).transform.scale = 0.7;
+  const shown = centredForTile(item, width, height, request.animation ?? undefined);
   const mini: Project = {
     ...project,
     settings: {

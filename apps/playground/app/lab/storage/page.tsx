@@ -54,6 +54,8 @@ function applyEdit(editor: Editor, i: number): void {
         duration: fromSeconds(0.5),
         style: structuredClone(DEFAULT_TEXT_STYLE),
         transform: { ...DEFAULT_TRANSFORM },
+        filter: null,
+        adjust: {},
       };
       addToLane(draft, item, ctx.ids);
     }

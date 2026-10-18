@@ -487,3 +487,20 @@ reason; when one changes, edit the entry and note the date.
       text or sticker is selected. Transitions: the selected picture's own cut (main or layer),
       with "drag another clip right up against this one" when a layer clip has no neighbour.
       Picking a look selects the clip it changed.
+103.  **One bottom sheet on phones and tablets** (owner, 2026-10-19). Every tool and library opens
+      in the same sheet: the same height for all (460 px, capped to the room above the toolbar),
+      a grab handle, drag down to close (a quarter of its height, or a flick), drag up to expand,
+      a short drag springs back. It follows the finger through inline styles only (no React
+      render per move). Replaces the timeline-sized dock and the separate "tall" library dock.
+104.  **Text and stickers take filters and adjustments** (owner, 2026-10-19). Project file
+      version 2: text and sticker items gain `filter` and `adjust`; migration 1 → 2 adds empty
+      ones, so every older project opens unchanged otherwise. The compositor's colour stage runs
+      for every item that has a look; filter previews show the element itself on a neutral grey.
+105.  **One menu for all elements; the inspector is the detail view** (owner, 2026-10-19). The
+      left Filters / Transitions act on whatever is selected (nothing selected: the clip under
+      the playhead / the nearest cut). For a text, sticker or lone layer picture, Transitions
+      shows how it appears and leaves (its In / Out / Loop animations) — the element's own
+      transition. Clip-to-clip transitions stay for cuts.
+106.  **While paused, the playhead belongs to the UI** (2026-10-19). The engine's echo of a seek
+      arrives a frame late; applying it pulled a scrubbing phone timeline back and made it
+      jitter. Engine time is applied only while playing and when playback stops.

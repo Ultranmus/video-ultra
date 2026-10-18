@@ -84,6 +84,8 @@ function FilterGrid({ item, note }: { item: LookItem; note: string | null }) {
     'adjust' in item ? item.adjust : null,
     'crop' in item ? item.crop : null,
     item.kind === 'video' ? item.sourceIn : 0,
+    item.kind === 'text' ? [item.text, item.style] : null,
+    item.kind === 'sticker' ? [item.emoji, item.assetId] : null,
   ]);
   const sections = useMemo(
     () => [
@@ -540,8 +542,18 @@ function TransitionTile({
 export function TransitionGrid(): ReactElement {
   const ctl = useController();
   const l = useLabels();
-  const { transition, transitionNote, hasClips } = useTargets();
-  useAutoSelect(transition?.id ?? null);
+  const { transition, transitionNote, motion, hasClips } = useTargets();
+  useAutoSelect(motion ? null : (transition?.id ?? null));
+  // Text, stickers and lone layer pictures: their "transition" is how they appear and leave.
+  if (motion && motion.kind !== 'audio') {
+    return (
+      <AnimateChoices
+        item={motion}
+        title={l.motionFor(itemTitle(motion, ctl.project.assets))}
+        note={transitionNote}
+      />
+    );
+  }
   if (!transition || !('transitionIn' in transition)) {
     return (
       <EmptyState
@@ -829,7 +841,16 @@ export function AnimatePanel(): ReactElement {
   return <AnimateChoices item={item} />;
 }
 
-function AnimateChoices({ item }: { item: Animatable }) {
+function AnimateChoices({
+  item,
+  title,
+  note = null,
+}: {
+  item: Animatable;
+  /** Replaces the "Animating …" line (the Transitions panel words it as appear / leave). */
+  title?: string;
+  note?: string | null;
+}) {
   const ctl = useController();
   const l = useLabels();
   const [slot, setSlot] = useState<AnimationSlot>('in');
@@ -865,8 +886,9 @@ function AnimateChoices({ item }: { item: Animatable }) {
   return (
     <div className="vu-looks">
       <p className="vu-target" data-active="">
-        {l.animateFor(itemTitle(item, ctl.project.assets))}
+        {title ?? l.animateFor(itemTitle(item, ctl.project.assets))}
       </p>
+      {note ? <p className="vu-hint">{note}</p> : null}
       <Segmented
         label={l.animate}
         hideLabel

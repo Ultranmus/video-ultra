@@ -72,6 +72,8 @@ describe('stage geometry', () => {
       assetId: null,
       emoji: '🔥',
       transform: { ...DEFAULT_TRANSFORM, scale: 0.3 },
+      filter: null,
+      adjust: {},
     };
     const box = itemBox(sticker, project(), 1080, 1920, measure)!;
     expect(box.width).toBeCloseTo(324);
@@ -91,6 +93,8 @@ describe('stage geometry', () => {
         background: { color: '#000', padding: 0.5, radius: 0 },
       },
       transform: { ...DEFAULT_TRANSFORM },
+      filter: null,
+      adjust: {},
     };
     const px = DEFAULT_TEXT_STYLE.size * 1920;
     const size = measureTextBox(text, 1080, 1920, measure);

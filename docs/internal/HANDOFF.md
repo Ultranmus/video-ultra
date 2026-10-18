@@ -2,6 +2,13 @@
 
 Where the last session stopped and what comes next. Update before ending every session.
 
+## 2026-10-19 (mobile pass)
+
+Done from the owner's mobile list: device frames in the playground, one draggable bottom sheet,
+sheet spacing / sticky bar / chip alignment, smooth phone scrubbing, readable text previews,
+filters + adjustments for text and stickers (file version 2), element transitions = entrance /
+exit. Owner to check on the iPhone: sheet drag feel, scrub smoothness, text filters.
+
 ## 2026-10-18 (round 4 follow-up)
 
 Owner feedback fixed: grouped, named rows (video first — owner's choice), layer transitions

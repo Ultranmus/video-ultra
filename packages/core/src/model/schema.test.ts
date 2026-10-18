@@ -123,16 +123,29 @@ function clip(id: string, start: number, transitionIn: unknown, filter: unknown)
 }
 
 describe('project file back-compat', () => {
-  it('is still file version 1 (only optional fields were added)', () => {
-    expect(PROJECT_VERSION).toBe(1);
+  /** What a version-1 file becomes: version 2, text and stickers gain an empty look. */
+  const upgraded = (data: ReturnType<typeof JSON.parse>) => {
+    const out = structuredClone(data);
+    out.version = 2;
+    for (const track of out.tracks)
+      for (const item of track.items)
+        if (item.kind === 'text' || item.kind === 'sticker') {
+          item.filter ??= null;
+          item.adjust ??= {};
+        }
+    return out;
+  };
+
+  it('is file version 2 (1 → 2: text and stickers take a look)', () => {
+    expect(PROJECT_VERSION).toBe(2);
   });
 
-  it('opens a v0.1 project unchanged', () => {
+  it('opens a v0.1 (version 1) project, changing nothing but the new look fields', () => {
     const result = parseProject(V01_PROJECT);
     expect(result.ok, result.ok ? '' : result.error).toBe(true);
     if (!result.ok) return;
     expect(result.warnings).toEqual([]);
-    expect(result.project).toEqual(JSON.parse(V01_PROJECT));
+    expect(result.project).toEqual(upgraded(JSON.parse(V01_PROJECT)));
     const b = result.project.tracks[0]!.items[1]!;
     expect('transitionIn' in b && b.transitionIn).toEqual({
       type: 'slide-left',
@@ -154,6 +167,18 @@ describe('project file back-compat', () => {
       loop: { type: 'pulse', speed: 2 },
     };
     data.tracks[2].items[0].animation = { loop: { type: 'spin' } };
+    const result = parseProject(data);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.project).toEqual(upgraded(data));
+  });
+
+  it('a version-2 project keeps a text filter', () => {
+    const data = upgraded(JSON.parse(V01_PROJECT));
+    const text = data.tracks
+      .flatMap((t: { items: { kind: string }[] }) => t.items)
+      .find((i: { kind: string }) => i.kind === 'text');
+    text.filter = { id: 'warm', intensity: 0.5 };
     const result = parseProject(data);
     expect(result.ok).toBe(true);
     if (!result.ok) return;

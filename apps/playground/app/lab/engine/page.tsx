@@ -121,6 +121,8 @@ function title(id: string, text: string, startS: number, seconds: number): TextI
       background: { color: 'rgba(156,71,156,0.85)', padding: 0.3, radius: 0.25 },
     },
     transform: { ...DEFAULT_TRANSFORM, y: 0.12 },
+    filter: null,
+    adjust: {},
   };
 }
 
@@ -133,6 +135,8 @@ function emoji(id: string, char: string, startS: number, seconds: number): Stick
     start: fromSeconds(startS),
     duration: fromSeconds(seconds),
     transform: { ...DEFAULT_TRANSFORM, x: 0.8, y: 0.68, scale: 0.3, rotation: -12 },
+    filter: null,
+    adjust: {},
   };
 }
 

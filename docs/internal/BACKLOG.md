@@ -164,3 +164,9 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [ ] Transition still (A | B) and flip-books are re-fetched when the panel reopens; cache per
       cut signature across opens if it shows on low-tier phones.
 - [ ] Waveform for video clips needs the clip tall enough (≥ 40 px); phone main track checks.
+- [ ] Same-height sheets leave empty space under quick tools (Edit text, Speed, Volume): fill it
+      usefully (e.g. quick styles under Edit) or let the sheet hug short content (owner call).
+- [ ] Phone toolbar scrolls sideways with no hint that more tools are off-screen (Rotate,
+      Opacity, Split… on text): add an edge fade or a "More" entry.
+- [ ] The "browser may clear unsaved work" toast is large on phones and covers the stage.
+- [ ] Device frames bigger than the window scroll (zooming the frame breaks canvas pointer maths).

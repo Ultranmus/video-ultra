@@ -208,6 +208,10 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
           <Section title={l.animate}>
             <AnimatePanel />
           </Section>
+          {look}
+          <Section title={l.adjust} collapsible defaultOpen={false}>
+            <AdjustTool item={item} />
+          </Section>
           <Section title={l.appearance} collapsible defaultOpen={false}>
             <TransformTool item={item} />
             <OpacityTool item={item} />
@@ -219,6 +223,10 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
         <>
           <Section title={l.animate}>
             <AnimatePanel />
+          </Section>
+          {look}
+          <Section title={l.adjust} collapsible defaultOpen={false}>
+            <AdjustTool item={item} />
           </Section>
           <Section title={l.appearance}>
             <TransformTool item={item} />

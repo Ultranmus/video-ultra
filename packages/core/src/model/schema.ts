@@ -10,7 +10,7 @@ import * as z from 'zod/mini';
  *   that fits the item inside the canvas, so changing the aspect ratio keeps layouts sensible.
  */
 
-export const PROJECT_VERSION = 1;
+export const PROJECT_VERSION = 2;
 
 const time = z.int().check(z.nonnegative());
 const positiveTime = z.int().check(z.positive());
@@ -235,6 +235,9 @@ export const TextItemSchema = z.object({
   text: z.string(),
   style: TextStyleSchema,
   transform: TransformSchema,
+  /** A colour look, as on pictures (file version 2+). */
+  filter: z.nullable(FilterSchema),
+  adjust: AdjustSchema,
   /** Entrance / exit / loop animations. */
   animation: z.optional(ItemAnimationSchema),
 });
@@ -249,6 +252,9 @@ export const StickerItemSchema = z.object({
   assetId: z.nullable(id),
   emoji: z.nullable(z.string()),
   transform: TransformSchema,
+  /** A colour look, as on pictures (file version 2+). */
+  filter: z.nullable(FilterSchema),
+  adjust: AdjustSchema,
   /** Entrance / exit / loop animations. */
   animation: z.optional(ItemAnimationSchema),
 });

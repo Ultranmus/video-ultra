@@ -204,6 +204,10 @@ export class EditorController {
     engine.onTime = (time, playing) => {
       // A trim drag shows the edge frame without moving the playhead.
       if (this.#previewSeeking && !playing) return;
+      // While paused the playhead is ours: the engine only echoes seeks we already made, a frame
+      // late — applying them would pull a scrubbing timeline back and make it jitter. Time from
+      // the engine counts while playing and at the moment playback stops.
+      if (!playing && !this.ui.getState().playing) return;
       this.playhead.set(time);
       if (this.ui.getState().playing !== playing) this.ui.setState({ playing });
     };
