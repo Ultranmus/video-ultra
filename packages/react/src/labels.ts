@@ -807,6 +807,46 @@ export const DEFAULT_LABELS = {
     `Runs on this device, nothing is uploaded · one-time ${Math.round(mb)} MB download`,
   backgroundUnavailable: 'Background removal isn’t available here.',
   photoOnly: 'Works on photos and image stickers.',
+  // v0.4 Keyframes
+  keyframes: 'Keyframes',
+  tipKeyframes: 'Animate it: set a keyframe here, move the playhead, change it',
+  keyframesHint:
+    'Tap ◆ to keep how it looks at the playhead. Move the playhead, change it (drag it on the video or use the sliders) — it moves between the two.',
+  addKeyframe: 'Add keyframe',
+  removeKeyframe: 'Remove keyframe',
+  moveKeyframe: 'Move keyframe',
+  addKeyframeOf: (what: string) => `Add a ${what} keyframe here`,
+  removeKeyframeOf: (what: string) => `Remove the ${what} keyframe here`,
+  prevKeyframe: 'Previous keyframe',
+  nextKeyframe: 'Next keyframe',
+  noKeyframeBefore: 'No keyframe before the playhead',
+  noKeyframeAfter: 'No keyframe after the playhead',
+  clearKeyframes: 'Remove all keyframes',
+  graphOf: 'Graph',
+  curve: 'Curve',
+  customCurve: 'Custom',
+  curveOf: (what: string) => `How ${what} changes over time`,
+  curvePickHint:
+    'Drag a ◆ to change its time and value. Tap the line under two ◆ to pick how it moves between them.',
+  curveHint: (fast: boolean) =>
+    fast ? 'Faster at the start of this part.' : 'Slower at the start of this part.',
+  keyGroup: (group: string) =>
+    (
+      ({ position: 'position', scale: 'size', rotation: 'turn', opacity: 'opacity' }) as Record<
+        string,
+        string
+      >
+    )[group] ?? group,
+  keyProp: (prop: string) =>
+    (
+      ({
+        x: 'Left–right',
+        y: 'Up–down',
+        scale: 'Size',
+        rotation: 'Turn',
+        opacity: 'Opacity',
+      }) as Record<string, string>
+    )[prop] ?? prop,
   // v0.3 Templates
   templates: 'Templates',
   tipTemplates: 'Ready-made titles, name tags, quotes and more',

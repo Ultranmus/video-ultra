@@ -8,6 +8,8 @@ import {
   deleteItem,
   duplicateItem,
   pasteItems,
+  setTransformAt,
+  transformAt,
   applyTemplate,
   type TemplatePreset,
   type CopiedItem,
@@ -847,7 +849,7 @@ export class EditorController {
     const out: { item: Item; box: Box }[] = [];
     for (const item of this.selectedItems()) {
       if (!('transform' in item) || this.isLocked(item.id)) continue;
-      const box = itemBox(item, this.project, width, height, measureText);
+      const box = itemBox(item, this.project, width, height, measureText, this.playhead.time);
       if (box) out.push({ item, box });
     }
     return out;
@@ -908,13 +910,9 @@ export class EditorController {
       list.forEach(({ item }, i) => {
         const o = offsets[i]!;
         if (!('transform' in item) || (o.dx === 0 && o.dy === 0)) return;
-        updateItem(d, item.id, {
-          transform: {
-            ...item.transform,
-            x: item.transform.x + o.dx / width,
-            y: item.transform.y + o.dy / height,
-          },
-        });
+        const at = this.playhead.time;
+        const tf = transformAt(item, at)!;
+        setTransformAt(d, item.id, { ...tf, x: tf.x + o.dx / width, y: tf.y + o.dy / height }, at);
       });
     });
   }

@@ -1,5 +1,6 @@
 import type { Input, InputVideoTrack, VideoSample } from 'mediabunny';
 import { shapePreset } from '../effects/shapes';
+import { keyedTransform } from '../model/keyframes';
 import { frameIndexAt, type AnimatedImage } from './animated';
 import {
   animationState,
@@ -149,6 +150,10 @@ interface Slot {
   look: TransitionLook;
   anim: AnimationState;
   pic: PictureFx;
+  /** Keyframes (v0.4): the item it was made for, and a copy whose transform is resampled. */
+  keyedFor: Item | null;
+  keyed: Item | null;
+  keyedTf: Transform;
 }
 
 type Draft =
@@ -360,6 +365,21 @@ export class Composer {
     this.animFrames.delete(itemId);
   }
 
+  /**
+   * The item as it is at `localTime`: itself, or — when it has keyframes — the slot's copy with
+   * the transform sampled there. The copy is made once per edit (when the item changes) and only
+   * its numbers are rewritten each frame.
+   */
+  private keyedItem<T extends Item>(item: T, localTime: Time, slot: Slot): T {
+    if (!('keyframes' in item) || !item.keyframes || !('transform' in item)) return item;
+    if (slot.keyedFor !== item) {
+      slot.keyedFor = item;
+      slot.keyed = { ...item, transform: slot.keyedTf } as Item;
+    }
+    keyedTransform(item.transform, item.keyframes, localTime, slot.keyedTf);
+    return slot.keyed as T;
+  }
+
   private slot(index: number): Slot {
     return (this.slots[index] ??= {
       geometry: new Float32Array(12),
@@ -369,6 +389,9 @@ export class Composer {
       look: plainLook(),
       anim: restingState(),
       pic: noPictureFx(),
+      keyedFor: null,
+      keyed: null,
+      keyedTf: { ...BACKDROP_TRANSFORM },
     });
   }
 
@@ -713,8 +736,8 @@ export class Composer {
     deadlineMs: number | null,
     result: ComposeResult,
   ): Promise<Draft | null> {
-    const item = layer.item;
     const slot = this.slot(index);
+    const item = this.keyedItem(layer.item, layer.localTime, slot);
     // A transition moves only the two clips of its own cut (main track, or two touching pictures
     // on one layer); other layers are never touched by it.
     const transition = layer.transition;

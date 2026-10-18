@@ -3,6 +3,8 @@ import {
   itemEnd,
   mainTrack,
   updateItem,
+  setTransformAt,
+  transformAt,
   type Item,
   type Project,
   type Transform,
@@ -223,7 +225,7 @@ export function Stage(): ReactElement {
     const out: { item: Item; box: Box }[] = [];
     for (const item of items) {
       if (!('transform' in item) || item.hidden || t < item.start || t >= itemEnd(item)) continue;
-      const box = itemBox(item, project, pw, ph, measure);
+      const box = itemBox(item, project, pw, ph, measure, t);
       if (box) out.push({ item, box });
     }
     return out;
@@ -337,7 +339,8 @@ export function Stage(): ReactElement {
       .selectedItems()
       .filter((i): i is Extract<Item, { transform: Transform }> => 'transform' in i)
       .filter((i) => !ctl.isLocked(i.id))
-      .map((i) => ({ id: i.id, tf: { ...i.transform } }));
+      // Where each is now (keyframes sampled at the playhead): gestures start from there.
+      .map((i) => ({ id: i.id, tf: transformAt(i, ctl.playhead.time)! }));
 
   /** The box gestures turn around: the selection box on screen now. */
   const selectionBox = (): Box | null => {
@@ -381,7 +384,7 @@ export function Stage(): ReactElement {
     }
     latest.current = next;
     const project = ctl.preview((d) => {
-      for (const [id, tf] of next) updateItem(d, id, { transform: tf });
+      for (const [id, tf] of next) setTransformAt(d, id, tf, ctl.playhead.time);
     });
     if (project) {
       const items = ctl
@@ -842,7 +845,7 @@ export function Stage(): ReactElement {
       return;
     }
     ctl.run(label, (draft) => {
-      for (const [id, tf] of next) updateItem(draft, id, { transform: tf });
+      for (const [id, tf] of next) setTransformAt(draft, id, tf, ctl.playhead.time);
     });
   };
 
@@ -853,7 +856,7 @@ export function Stage(): ReactElement {
     const hits = visibleItemsAt(project, ctl.playhead.time)
       .filter((i) => !main.items.includes(i))
       .filter((i) => {
-        const box = itemBox(i, project, pw, ph, measure);
+        const box = itemBox(i, project, pw, ph, measure, ctl.playhead.time);
         if (!box) return false;
         const b = boundsOf(box);
         return (

@@ -60,3 +60,14 @@ Open the branch's Vercel preview (or `pnpm --filter playground dev`), then **`/e
       **Share** button, the Media panel has a **Backgrounds** source (search "ocean", tap to
       add), and Duplicate is gone from the menu (⌘D does nothing). On the phone, Brand is in the
       add tools. _Checked here:_ embed-check (all of it, plus every event type arriving).
+
+## 3. v0.4 — pro layer
+
+- [ ] **Keyframes.** Add a title. Select it → Keyframes (inspector section; phone: toolbar) →
+      ◆ next to Position at 0 s. Move the playhead to 2 s, drag the title somewhere else → it
+      animates between the two (play it, export it). Try size / turn / opacity too (sliders key
+      themselves once a ◆ is set). Graph: drag a ◆; tap the bar under two ◆ and pick a curve
+      (Even, Spring, Bounce…, Custom with handles). Split the clip in the middle → the motion
+      doesn't jump. Small ◆ marks show on the selected clip in the timeline.
+      _Checked here:_ keyframes-check (auto-key by drag, exported positions, curve, undo,
+      split) + 9 unit tests.

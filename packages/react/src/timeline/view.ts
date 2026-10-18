@@ -1,4 +1,6 @@
 import {
+  KEYFRAME_PROPS,
+  type Keyframes,
   FLICKS_PER_SECOND,
   itemEnd,
   mainTrack,
@@ -1822,6 +1824,8 @@ export class TimelineView {
       this.#roundRect(bx + 1, top + 1, bw - 2, height - 2, this.#radius);
       ctx.stroke();
       ctx.restore();
+      if ('keyframes' in item && item.keyframes)
+        this.#drawKeyframes(item.keyframes, item.duration, bx, bw, top + height);
       if (alpha > 0.9 && handles) this.#drawTrimHandles(bx, bw, top, height);
     } else if (lifted) {
       ctx.strokeStyle = c.selection;
@@ -1833,6 +1837,42 @@ export class TimelineView {
       ctx.lineWidth = 1;
       this.#roundRect(bx + 0.5, top + 0.5, bw - 1, height - 1, this.#radius);
       ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /** The selected clip's keyframes: small ◆ along its bottom edge (no allocation per frame). */
+  #drawKeyframes(
+    keyframes: Keyframes,
+    duration: number,
+    bx: number,
+    bw: number,
+    bottom: number,
+  ): void {
+    const ctx = this.#ctx;
+    const r = 4;
+    const y = bottom - r - 2;
+    const shift = keyframes.shift ?? 0;
+    ctx.save();
+    ctx.fillStyle = this.#c.selection;
+    ctx.strokeStyle = this.#c.grip;
+    ctx.lineWidth = 1;
+    for (const prop of KEYFRAME_PROPS) {
+      const list = keyframes[prop];
+      if (!list) continue;
+      for (const k of list) {
+        const t = k.t - shift;
+        if (t < 0 || t > duration) continue;
+        const x = bx + (bw * t) / Math.max(1, duration);
+        ctx.beginPath();
+        ctx.moveTo(x, y - r);
+        ctx.lineTo(x + r, y);
+        ctx.lineTo(x, y + r);
+        ctx.lineTo(x - r, y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
     }
     ctx.restore();
   }

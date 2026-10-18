@@ -97,6 +97,37 @@ export const TransitionSchema = z.object({
   ease: z.optional(EaseSchema),
 });
 
+// Keyframes (v0.4, file version 4+; model/keyframes.ts has the maths).
+/** A cubic Bézier timing curve `[x1, y1, x2, y2]` (CSS `cubic-bezier`; x in 0…1). */
+export const BezierSchema = z.tuple([
+  z.number().check(z.gte(0), z.lte(1)),
+  z.number(),
+  z.number().check(z.gte(0), z.lte(1)),
+  z.number(),
+]);
+
+export const KeyframeSchema = z.object({
+  /** Flicks from the item's start. */
+  t: z.int().check(z.nonnegative()),
+  /** The property's value there (transform units: canvas fractions, scale, degrees, 0…1). */
+  v: z.number(),
+  /** The curve from here to the next keyframe. Missing = `smooth`. */
+  ease: z.optional(z.union([EaseSchema, BezierSchema])),
+});
+
+export const KeyframesSchema = z.object({
+  /**
+   * Flicks added to the item's time before sampling: a part of a split (or a clip trimmed at its
+   * start) keeps the whole motion and plays its own share of it, exactly. Missing = 0.
+   */
+  shift: z.optional(z.int()),
+  x: z.optional(z.array(KeyframeSchema)),
+  y: z.optional(z.array(KeyframeSchema)),
+  scale: z.optional(z.array(KeyframeSchema)),
+  rotation: z.optional(z.array(KeyframeSchema)),
+  opacity: z.optional(z.array(KeyframeSchema)),
+});
+
 /** One entrance or exit animation of a lane item: a preset id and how long it plays. */
 export const AnimationClipSchema = z.object({
   /** Animation preset id (`ANIMATION_PRESETS`, slot `in` or `out`). */
@@ -250,6 +281,8 @@ const visual = {
   blend: z.optional(BlendModeSchema),
   /** Shape mask (file version 4+). Missing = the whole picture. */
   mask: z.optional(ShapeMaskSchema),
+  /** Transform keyframes (file version 4+). */
+  keyframes: z.optional(KeyframesSchema),
 };
 
 const audible = {
@@ -337,6 +370,8 @@ export const TextItemSchema = z.object({
    * word highlighting; captions typed or imported without it share their time evenly.
    */
   words: z.optional(z.array(CaptionWordSchema)),
+  /** Transform keyframes (file version 4+). */
+  keyframes: z.optional(KeyframesSchema),
   /**
    * Wrap width as a fraction of the canvas width (file version 3+): lines break at spaces to fit,
    * balanced so they're about the same length. Missing = lines break only where the text does.
@@ -361,6 +396,8 @@ export const StickerItemSchema = z.object({
   animation: z.optional(ItemAnimationSchema),
   /** How the sticker mixes with what's under it (file version 3+). Missing = normal. */
   blend: z.optional(BlendModeSchema),
+  /** Transform keyframes (file version 4+). */
+  keyframes: z.optional(KeyframesSchema),
   /** Image stickers: background removed (file version 4+). */
   cutout: z.optional(CutoutSchema),
 });
@@ -382,6 +419,8 @@ export const RegionItemSchema = z.object({
   width: z.number().check(z.positive()),
   height: z.number().check(z.positive()),
   transform: TransformSchema,
+  /** Transform keyframes (file version 4+). */
+  keyframes: z.optional(KeyframesSchema),
 });
 
 export const ItemSchema = z.discriminatedUnion('kind', [
@@ -519,6 +558,12 @@ export type ChromaKey = z.infer<typeof ChromaKeySchema>;
 export type LutRef = z.infer<typeof LutRefSchema>;
 /** How a layer mixes with what's under it. */
 export type BlendMode = z.infer<typeof BlendModeSchema>;
+/** A custom timing curve `[x1, y1, x2, y2]`. */
+export type Bezier = z.infer<typeof BezierSchema>;
+/** One keyframe: a time (flicks from the item's start), a value, the curve to the next. */
+export type Keyframe = z.infer<typeof KeyframeSchema>;
+/** An item's keyframes, per transform property (time order). */
+export type Keyframes = z.infer<typeof KeyframesSchema>;
 /** A picture with its background removed. */
 export type Cutout = z.infer<typeof CutoutSchema>;
 /** A picture's shape mask. */

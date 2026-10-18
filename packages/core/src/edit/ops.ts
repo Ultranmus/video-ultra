@@ -1,6 +1,15 @@
 import { current, isDraft, type Draft } from 'immer';
 import { shapePreset } from '../effects/shapes';
 import {
+  KEYFRAME_PROPS,
+  hasKeyframes,
+  keyedTransform,
+  keyedValue,
+  retimeKeyframes,
+  sampleKeyframes,
+  type KeyframeProp,
+} from '../model/keyframes';
+import {
   ALLOWED_KINDS,
   DEFAULT_TRANSFORM,
   findItem,
@@ -18,6 +27,8 @@ import type {
   Asset,
   Background,
   BlendMode,
+  Bezier,
+  Ease,
   ChromaKey,
   Crop,
   Cutout,
@@ -25,6 +36,7 @@ import type {
   FreezeItem,
   Item,
   ItemAnimation,
+  Keyframe,
   LutRef,
   Project,
   RegionItem,
@@ -610,6 +622,7 @@ export function trimItem(
     // …and at least one frame must remain.
     shift = Math.min(shift, item.duration - frame);
     if (isMedia(item)) item.sourceIn = Math.max(0, item.sourceIn + Math.round(shift * item.speed));
+    retimeItemKeyframes(item, shift);
     item.duration -= shift;
     // The main track re-lays itself out; lane items keep their end and move their start.
     if (!isMain) item.start += shift;
@@ -635,6 +648,8 @@ export function splitItem(project: Project, itemId: string, at: Time, ids: IdFac
   second.start = cut;
   second.duration = item.duration - offset;
   item.duration = offset;
+  // Each part keeps its own share of the motion (a keyframe holds the value at the cut).
+  retimeItemKeyframes(second, offset);
   if (isMedia(second) && isMedia(item))
     second.sourceIn = item.sourceIn + Math.round(offset * item.speed);
   if ('fadeIn' in second && 'fadeOut' in item) {
@@ -667,6 +682,12 @@ export function splitItem(project: Project, itemId: string, at: Time, ids: IdFac
   if (track.kind === 'main') layoutMain(project);
   else tidyLaneTransitions(project);
   return second.id;
+}
+
+/** Keyframes for a part of the item that starts `offset` later in its old timing (keyframes.ts). */
+function retimeItemKeyframes(item: Item, offset: Time): void {
+  if ('keyframes' in item && item.keyframes)
+    item.keyframes = retimeKeyframes(copy(item.keyframes), offset);
 }
 
 /** Keeps a caption's word times inside it after its start moved by `shift` or its length changed. */
@@ -1275,3 +1296,170 @@ export function mergeCaptionWithNext(project: Project, itemId: string): void {
   if (words) item.words = words;
   track.items.splice(index + 1, 1);
 }
+
+// ── keyframes (v0.4) ──────────────────────────────────────────────────────
+
+type Keyed = Extract<Item, { transform: Transform }>;
+
+function keyed(project: Project, itemId: string): Keyed {
+  const { item } = editable(project, itemId);
+  if (!('transform' in item)) throw new EditError('invalid', 'Sound has no position to animate');
+  return item;
+}
+
+function checkProp(prop: string): asserts prop is KeyframeProp {
+  if (!(KEYFRAME_PROPS as readonly string[]).includes(prop))
+    throw new EditError('invalid', `${prop} can't take keyframes`);
+}
+
+/** Index of the keyframe within half a frame of `t`, or -1. */
+function keyAt(project: Project, list: readonly Keyframe[], t: Time): number {
+  const near = projectFrame(project) / 2;
+  return list.findIndex((k) => Math.abs(k.t - t) < near);
+}
+
+function tidyKeyframes(item: Keyed): void {
+  if (!item.keyframes) return;
+  for (const prop of KEYFRAME_PROPS)
+    if (item.keyframes[prop]?.length === 0) delete item.keyframes[prop];
+  if (!hasKeyframes(item.keyframes)) delete item.keyframes;
+  else if (item.keyframes.shift === 0) delete item.keyframes.shift;
+}
+
+/**
+ * Sets a keyframe of `prop` at `t` (flicks from the item's start, snapped to a frame and kept
+ * inside the item): replaces one there, else adds one. The first keyframe of a property makes
+ * it follow its keyframes instead of the transform.
+ */
+export function setKeyframe(
+  project: Project,
+  itemId: string,
+  prop: KeyframeProp,
+  t: Time,
+  value: number,
+  ease?: Ease | Bezier,
+): void {
+  checkProp(prop);
+  const item = keyed(project, itemId);
+  if (!Number.isFinite(value)) throw new EditError('invalid', 'A keyframe needs a number');
+  const at = Math.max(0, Math.min(item.duration, snap(project, t))) + (item.keyframes?.shift ?? 0);
+  const v = prop === 'opacity' ? clamp01(value) : prop === 'scale' ? Math.max(0.001, value) : value;
+  item.keyframes ??= {};
+  const list = (item.keyframes[prop] ??= []);
+  const i = keyAt(project, list, at);
+  if (i !== -1) {
+    list[i]!.v = v;
+    if (ease !== undefined) list[i]!.ease = copy(ease);
+    return;
+  }
+  const key: Keyframe = { t: at, v, ...(ease !== undefined ? { ease: copy(ease) } : {}) };
+  const after = list.findIndex((k) => k.t > at);
+  if (after === -1) list.push(key);
+  else list.splice(after, 0, key);
+}
+
+/** Removes the keyframe of `prop` at `t` (if there is one). */
+export function removeKeyframe(
+  project: Project,
+  itemId: string,
+  prop: KeyframeProp,
+  t: Time,
+): void {
+  checkProp(prop);
+  const item = keyed(project, itemId);
+  const list = item.keyframes?.[prop];
+  if (!list) return;
+  const i = keyAt(project, list, t + (item.keyframes!.shift ?? 0));
+  if (i === -1) return;
+  // The value the property had there stays as its plain value once the last keyframe goes.
+  if (list.length === 1) item.transform[prop] = list[0]!.v;
+  list.splice(i, 1);
+  tidyKeyframes(item);
+}
+
+/** Moves a keyframe of `prop` from `from` to `to` (and to `value`, when given). */
+export function moveKeyframe(
+  project: Project,
+  itemId: string,
+  prop: KeyframeProp,
+  from: Time,
+  to: Time,
+  value?: number,
+): void {
+  checkProp(prop);
+  const item = keyed(project, itemId);
+  const list = item.keyframes?.[prop];
+  const i = list ? keyAt(project, list, from + (item.keyframes!.shift ?? 0)) : -1;
+  if (!list || i === -1) throw new EditError('not-found', 'No keyframe there');
+  const [key] = list.splice(i, 1);
+  tidyKeyframes(item);
+  setKeyframe(project, itemId, prop, to, value ?? key!.v, key!.ease);
+}
+
+/** Sets the curve from the keyframe of `prop` at `t` to the next (`null`: the default). */
+export function setKeyframeEase(
+  project: Project,
+  itemId: string,
+  prop: KeyframeProp,
+  t: Time,
+  ease: Ease | Bezier | null,
+): void {
+  checkProp(prop);
+  const item = keyed(project, itemId);
+  const list = item.keyframes?.[prop];
+  const i = list ? keyAt(project, list, t + (item.keyframes!.shift ?? 0)) : -1;
+  if (!list || i === -1) throw new EditError('not-found', 'No keyframe there');
+  if (ease === null) delete list[i]!.ease;
+  else list[i]!.ease = copy(ease);
+}
+
+/**
+ * Removes every keyframe of `prop` (or of all properties): the property keeps the value it has
+ * at `bakeAt` (flicks from the item's start) as its plain value.
+ */
+export function clearKeyframes(
+  project: Project,
+  itemId: string,
+  prop?: KeyframeProp,
+  bakeAt: Time = 0,
+): void {
+  const item = keyed(project, itemId);
+  if (!item.keyframes) return;
+  for (const p of prop ? [prop] : KEYFRAME_PROPS) {
+    const list = item.keyframes[p];
+    if (!list?.length) continue;
+    item.transform[p] = sampleKeyframes(list, bakeAt + (item.keyframes.shift ?? 0));
+    delete item.keyframes[p];
+  }
+  tidyKeyframes(item);
+}
+
+/**
+ * Sets an item's transform as it should look at timeline time `at` (the playhead): keyframed
+ * properties get a keyframe there (added, or changed to the new value); the others change for the
+ * whole item, as without keyframes. What stage drags, sliders and align use.
+ */
+export function setTransformAt(
+  project: Project,
+  itemId: string,
+  transform: Readonly<Transform>,
+  at: Time,
+): void {
+  const item = keyed(project, itemId);
+  const local = at - item.start;
+  const next: Transform = { ...item.transform, flipX: transform.flipX, flipY: transform.flipY };
+  for (const prop of KEYFRAME_PROPS) {
+    const now = keyedValue(item.keyframes, prop, local);
+    if (now === null) next[prop] = transform[prop];
+    else if (Math.abs(now - transform[prop]) > 1e-9)
+      setKeyframe(project, itemId, prop, local, transform[prop]);
+  }
+  updateItem(project, itemId, { transform: next });
+}
+
+/** An item's transform at timeline time `at` (keyframes sampled; a new object). */
+export function transformAt(item: Item, at: Time): Transform | null {
+  if (!('transform' in item)) return null;
+  return keyedTransform(item.transform, item.keyframes, at - item.start, { ...item.transform });
+}
+

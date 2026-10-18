@@ -218,6 +218,8 @@
     --vu-size-handle-side: 8px;
     --vu-size-region-swatch: 64px;
     --vu-size-key-preset: 28px;
+    /* v0.4 Keyframes */
+    --vu-size-keyframe: 14px;
     /* v0.3 Templates */
     --vu-size-template: 72px;
     --vu-size-template-max: 180px;

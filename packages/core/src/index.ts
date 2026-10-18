@@ -31,6 +31,21 @@ export { checkInvariants } from './model/invariants';
 
 // Editing
 export * from './edit/ops';
+export {
+  KEYFRAME_PROPS,
+  sampleKeyframes,
+  keyedTransform,
+  keyedValue,
+  keyTime,
+  hasKeyframes,
+  retimeKeyframes,
+  curveAt,
+  bezierAt,
+  type KeyframeProp,
+  type Keyframe,
+  type Keyframes,
+  type Bezier,
+} from './model/keyframes';
 export { createEditor, replayLog } from './edit/history';
 export type {
   Editor,

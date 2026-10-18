@@ -1577,6 +1577,126 @@
     pointer-events: none;
   }
 
+  /* v0.4 Keyframes: ◆ buttons and the graph editor. */
+  .vu-keyframes,
+  .vu-curve {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-3);
+  }
+
+  .vu-keyframe-rows {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-1);
+  }
+
+  .vu-keyframe-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: var(--vu-size-touch);
+    color: var(--vu-text-muted);
+  }
+
+  .vu-keyframe-row > span:first-child::first-letter {
+    text-transform: uppercase;
+  }
+
+  .vu-keyframe {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vu-space-1);
+  }
+
+  .vu-keyframe-diamond {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--vu-size-touch);
+    height: var(--vu-size-touch);
+    border-radius: var(--vu-radius-md);
+    color: var(--vu-text-muted);
+  }
+
+  .vu-keyframe-diamond svg {
+    width: var(--vu-size-keyframe);
+    height: var(--vu-size-keyframe);
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+  }
+
+  .vu-keyframe[data-keyed] .vu-keyframe-diamond {
+    color: var(--vu-accent-text);
+  }
+
+  .vu-keyframe-diamond[aria-pressed='true'] svg {
+    fill: currentColor;
+  }
+
+  .vu-keyframe-diamond:hover:not(:disabled) {
+    background: var(--vu-surface-3);
+  }
+
+  .vu-keyframe-diamond:disabled {
+    opacity: 0.4;
+  }
+
+  .vu-curve-graph {
+    width: 100%;
+    height: auto;
+    border: 1px solid var(--vu-border);
+    border-radius: var(--vu-radius-md);
+    background: var(--vu-surface-2);
+    touch-action: none;
+  }
+
+  .vu-curve-line {
+    fill: none;
+    stroke: var(--vu-accent-text);
+    stroke-width: 2;
+  }
+
+  .vu-curve-playhead {
+    stroke: var(--vu-playhead);
+    stroke-width: 1;
+  }
+
+  .vu-curve-key {
+    fill: var(--vu-surface-1);
+    stroke: var(--vu-accent-text);
+    stroke-width: 2;
+    cursor: grab;
+  }
+
+  .vu-curve-key[data-selected] {
+    fill: var(--vu-accent-text);
+  }
+
+  .vu-curve-segment {
+    stroke: var(--vu-border-strong);
+    stroke-width: 6;
+    stroke-linecap: round;
+    cursor: pointer;
+  }
+
+  .vu-curve-segment[data-selected] {
+    stroke: var(--vu-accent);
+  }
+
+  .vu-curve-arm {
+    stroke: var(--vu-text-subtle);
+    stroke-width: 1;
+  }
+
+  .vu-curve-handle {
+    fill: var(--vu-handle-fill);
+    stroke: var(--vu-accent);
+    stroke-width: 2;
+    cursor: grab;
+  }
+
   /* v0.3 Templates: CSS miniatures sized by the frame (container units). */
   .vu-template-grid {
     display: grid;

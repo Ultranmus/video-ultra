@@ -215,6 +215,19 @@ function singleTools(
     tip: l.tipShape,
     tool: 'mask',
   };
+  // v0.4 Keyframes: anything with a place on the video.
+  const keyframes: ToolEntry[] =
+    'transform' in item
+      ? [
+          {
+            key: 'keyframes',
+            icon: 'keyframe',
+            label: l.keyframes,
+            tip: l.tipKeyframes,
+            tool: 'keyframes',
+          },
+        ]
+      : [];
   // v0.3 Background removal (photos, image stickers; when the host gave a remover).
   const cutout: ToolEntry[] =
     ctl.options.backgroundRemover &&
@@ -262,6 +275,7 @@ function singleTools(
             ]
           : []),
         ...animate,
+        ...keyframes,
         ...opacity,
         ...blend,
         arrange,
@@ -279,6 +293,7 @@ function singleTools(
         greenScreen,
         ...transition,
         ...animate,
+        ...keyframes,
         ...opacity,
         ...blend,
         arrange,
@@ -330,6 +345,7 @@ function singleTools(
         look[0]!,
         look[1]!,
         { key: 'transform', icon: 'rotate', label: l.rotate, tip: l.tipRotate, tool: 'transform' },
+        ...keyframes,
         { key: 'opacity', icon: 'opacity', label: l.opacity, tip: l.tipOpacity, tool: 'opacity' },
         ...blend,
         arrange,
@@ -344,6 +360,7 @@ function singleTools(
         look[0]!,
         look[1]!,
         { key: 'transform', icon: 'rotate', label: l.rotate, tip: l.tipRotate, tool: 'transform' },
+        ...keyframes,
         { key: 'opacity', icon: 'opacity', label: l.opacity, tip: l.tipOpacity, tool: 'opacity' },
         ...blend,
         arrange,
@@ -361,6 +378,7 @@ function singleTools(
           tool: 'region',
         },
         { key: 'transform', icon: 'rotate', label: l.rotate, tip: l.tipRotate, tool: 'transform' },
+        ...keyframes,
         { key: 'opacity', icon: 'opacity', label: l.opacity, tip: l.tipOpacity, tool: 'opacity' },
         arrange,
         split,

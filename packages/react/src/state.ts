@@ -49,7 +49,9 @@ export type ToolId =
   // v0.3 Shape masks
   | 'mask'
   // v0.3 Background removal
-  | 'cutout';
+  | 'cutout'
+  // v0.4 Keyframes
+  | 'keyframes';
 
 export interface ImportRow {
   id: string;

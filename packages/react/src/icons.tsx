@@ -63,6 +63,8 @@ const paths = {
   download: 'M12 4v11M7 10.5l5 5 5-5M5 20h14',
   chevronDown: 'M6 9.5l6 6 6-6',
   back: 'M15 5l-7 7 7 7',
+  next: 'M9 5l7 7-7 7',
+  keyframe: 'M12 3l9 9-9 9-9-9z',
   alignLeft: 'M4 6h16M4 10h10M4 14h16M4 18h10',
   alignCenter: 'M4 6h16M7 10h10M4 14h16M7 18h10',
   alignRight: 'M4 6h16M10 10h10M4 14h16M10 18h10',

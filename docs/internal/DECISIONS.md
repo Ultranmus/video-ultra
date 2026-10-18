@@ -780,3 +780,19 @@ reason; when one changes, edit the entry and note the date.
       `panel` — also `controller.on(listener)`; a listener that throws never breaks the editor.
       Custom labels were already `labels`. Demo: playground `?embed=1`; embed-check covers it.
       The command registry (#91, #116) is what makes hiding consistent everywhere.
+142.  **Keyframes and the graph editor** (v0.4, file version 4). Position (x, y), size, turn and
+      opacity of any element with a place on the video (pictures — main video too — text,
+      stickers, blurred areas) take keyframes: `item.keyframes[prop] = [{ t, v, ease? }]`, `t` in
+      flicks from the item's start, `ease` the curve to the next one (the 13 named curves, or a
+      cubic Bézier from the graph editor). Split and trim-from-start keep the whole list and add
+      a `shift`, so each part plays its share of the motion **exactly** (re-sampling into new
+      keyframes can't reproduce a curve that was cut in the middle — caught by a test). Editing:
+      ◆ per group (position keys x and y together) with previous / next; while a property is
+      keyframed, any change to it (stage drag, sliders, align, nudge) keys it at the playhead
+      (`setTransformAt`); removing the last keyframe keeps its value. The engine samples into a
+      per-slot copy (one object per edit, numbers rewritten per frame — no allocation per frame).
+      Graph editor: SVG, drag a ◆ (time snaps to frames; one edit on release), tap a segment to
+      pick its curve, "Custom" shows two Bézier handles. The timeline marks the selected clip's
+      keyframes with small ◆. UI values follow the playhead only while paused (React never
+      renders per frame). Text with keyframed size re-rasterises at most per quarter-octave in
+      the preview (rasterSize), every frame in exports.

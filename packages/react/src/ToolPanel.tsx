@@ -12,6 +12,8 @@ import {
   setSpeed,
   trimItem,
   updateItem,
+  setTransformAt,
+  transformAt,
   type Adjust,
   type AudioItem,
   type Item,
@@ -29,6 +31,7 @@ import { AnimatePanel, FilterStrip, TransitionGrid } from './looks';
 import type { ToolId } from './state';
 import { ArrangeControls, LockedNote } from './organize';
 import { BackgroundTool } from './cutout';
+import { KeyframesTool, usePlayheadFor } from './keyframes';
 import { MaskTool } from './mask';
 import { BlendTool, GreenScreenTool, RegionTool } from './picture';
 
@@ -110,6 +113,8 @@ function ItemTool({ tool, item }: { tool: ToolId; item: Item }): ReactElement | 
       return <MaskTool item={item} />;
     case 'cutout':
       return <BackgroundTool item={item} />;
+    case 'keyframes':
+      return <KeyframesTool item={item} />;
     default:
       return null;
   }
@@ -133,6 +138,13 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
       <Section title={l.cropRotate} collapsible defaultOpen={false}>
         <TransformTool item={item} />
         <CropTool item={item} />
+      </Section>
+      <Section
+        title={l.keyframes}
+        collapsible
+        defaultOpen={'keyframes' in item && !!item.keyframes}
+      >
+        <KeyframesTool item={item} />
       </Section>
       <Section title={l.shape} collapsible defaultOpen={'mask' in item && !!item.mask}>
         <MaskTool item={item} />
@@ -207,6 +219,13 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
             <OpacityTool item={item} />
             <BlendTool item={item} />
           </Section>
+          <Section
+            title={l.keyframes}
+            collapsible
+            defaultOpen={'keyframes' in item && !!item.keyframes}
+          >
+            <KeyframesTool item={item} />
+          </Section>
         </>
       );
     case 'sticker':
@@ -224,6 +243,13 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
             <TransformTool item={item} />
             <OpacityTool item={item} />
             <BlendTool item={item} />
+          </Section>
+          <Section
+            title={l.keyframes}
+            collapsible
+            defaultOpen={'keyframes' in item && !!item.keyframes}
+          >
+            <KeyframesTool item={item} />
           </Section>
         </>
       );
@@ -519,17 +545,15 @@ function CropTool({ item }: { item: Item }) {
   );
 }
 
-function transformOf(item: Item): Transform | null {
-  return 'transform' in item ? item.transform : null;
-}
-
 function TransformTool({ item }: { item: Item }) {
   const ctl = useController();
   const l = useLabels();
-  const tf = transformOf(item);
+  // Keyframed elements: the values at the playhead; edits key them there (setTransformAt).
+  const time = usePlayheadFor(item);
+  const tf = transformAt(item, time);
   if (!tf) return null;
   const set = (label: string, patch: Partial<Transform>) =>
-    ctl.run(label, (d) => updateItem(d, item.id, { transform: { ...tf, ...patch } }));
+    ctl.run(label, (d) => setTransformAt(d, item.id, { ...tf, ...patch }, time));
   const baseScale = item.kind === 'sticker' ? 0.3 : 1;
   const moved =
     tf.x !== 0.5 ||
@@ -590,7 +614,7 @@ function TransformTool({ item }: { item: Item }) {
         step={0.01}
         defaultValue={baseScale}
         format={percent}
-        recipe={(d, v) => updateItem(d, item.id, { transform: { ...tf, scale: v } })}
+        recipe={(d, v) => setTransformAt(d, item.id, { ...tf, scale: v }, time)}
         commitLabel={l.scale}
         coalesceKey={`scale:${item.id}`}
       />
@@ -603,7 +627,7 @@ function TransformTool({ item }: { item: Item }) {
         defaultValue={0}
         origin={0}
         format={(v) => `${Math.round(v)}°`}
-        recipe={(d, v) => updateItem(d, item.id, { transform: { ...tf, rotation: v } })}
+        recipe={(d, v) => setTransformAt(d, item.id, { ...tf, rotation: v }, time)}
         commitLabel={l.rotate}
         coalesceKey={`rotate:${item.id}`}
       />
@@ -613,7 +637,8 @@ function TransformTool({ item }: { item: Item }) {
 
 function OpacityTool({ item }: { item: Item }) {
   const l = useLabels();
-  const tf = transformOf(item);
+  const time = usePlayheadFor(item);
+  const tf = transformAt(item, time);
   if (!tf) return null;
   return (
     <EditSlider
@@ -624,7 +649,7 @@ function OpacityTool({ item }: { item: Item }) {
       step={0.01}
       defaultValue={1}
       format={percent}
-      recipe={(d, v) => updateItem(d, item.id, { transform: { ...tf, opacity: v } })}
+      recipe={(d, v) => setTransformAt(d, item.id, { ...tf, opacity: v }, time)}
       commitLabel={l.opacity}
       coalesceKey={`opacity:${item.id}`}
     />
