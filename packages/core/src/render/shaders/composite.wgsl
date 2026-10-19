@@ -14,7 +14,7 @@ struct Uniforms {
   pos: vec4f,
   // xy: clip offset · z: opacity · w: 1 = apply the HDR correction
   posT: vec4f,
-  // q → texture uv: uv = mat2(uv) · q + uvT.xy
+  // q → texture uv: uv = mat2(uv) · q + uvT.xy · uvT.z: 1 = the source is premultiplied
   uv: vec4f,
   uvT: vec4f,
   // HDR colour matrix rows (render/hdr.ts).
@@ -101,7 +101,12 @@ fn sampleFrame(uv: vec2f) -> vec4f {
     // Only part of the texture holds the picture (blurred areas' copies): stay inside it.
     p = clamp(p, u.fx.zw * 0.5, u.blend.yz);
   }
-  return textureSample(frame, samp, p); // @sample-frame
+  let c = textureSample(frame, samp, p); // @sample-frame
+  if (u.uvT.z > 0.5) {
+    // A render target (a combined clip drawn first): its colour is premultiplied by its alpha.
+    return vec4f(c.rgb / max(c.a, 0.00001), c.a);
+  }
+  return c;
 }
 
 // Screen offset → texture uv offset (through the layer's geometry).

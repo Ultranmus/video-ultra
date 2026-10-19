@@ -122,6 +122,11 @@ the stage and everything drawn on it don't mirror. Text items in RTL scripts ren
 - The canvas has an accessible DOM layer: each clip is a focusable item with a label
   ("Clip 2, video, 0:04 to 0:09"); arrow keys move, Shift + arrows trim, Delete removes.
 
+- **Lanes move, they don't jump:** when an edit changes which row a lane sits in (a Layers
+  restack, a lane added or removed), it slides there (180 ms ease-out; reduced motion: instant).
+- **Phone main track:** at the start the playhead sits mid-screen, so a "+" also sits before the
+  first clip (adds media at the start) — the left half is never empty.
+
 ## 5b. Layers & organising (v0.2, DECISIONS #116–117)
 
 - **Top bar:** ↶ Undo, ↷ Redo | 🕘 History, ▤ Layers. History is a popover: "Original" and every
@@ -135,7 +140,24 @@ the stage and everything drawn on it don't mirror. Text items in RTL scripts ren
   move / resize / rotate act on all, locked ones stay put. A group selects as one; double-click
   picks one member.
 - **Context menu** (right-click, touch long-press on the stage or a still long-press on a clip,
-  "⋯" in Layers, Shift+F10): the selection's commands in groups; Align as a submenu.
+  "⋯" in Layers, Shift+F10): the selection's commands in groups; Align as a submenu. On desktop the
+  submenu opens beside the menu (flipped left near the right edge); on phones, inline under its
+  item.
+- **Your videos** (#154): a button at the top bar's start (every layout) opens a popover —
+  Make a copy, New video, and the other saved videos (tap to open; a bin asks before
+  deleting). Not shown when the host keeps its own project list.
+- **Several selected** (#153): the desktop inspector shows "Changes here apply to all N
+  selected" and the settings they share (Speed, Sound, Adjust, Opacity & blend); the left
+  menu's Filters and Transitions act on all of them; the phone's multi-selection tools add
+  Speed, Volume, Fade, Filter, Adjust, Animate, Opacity.
+- **Combine into one clip** (#155, pro — context menu only): several selected → "Combine into
+  one clip"; a combined clip → "Open combined clip" / "Separate". Open: a tinted bar over the
+  timeline (Back · the clips it sits in, the current one bold); the timeline, stage and
+  inspector show its inside; Captions and canvas size show a "for the whole video" note with
+  Back. Its film strip shows the pictures inside it.
+- **Typing on the stage** (#151): double-click a text (mouse) or tap a selected text (touch) →
+  a field over it, styled like the text, dashed accent outline; click away or ⌘/Ctrl+Enter keeps
+  it, Esc puts the old text back.
 - **Arrange** (phone tool; desktop inspector section): Order (forward, backward, front, back),
   Align (6; several also distribute), Lock, Hide. Several selected on desktop: the inspector
   becomes the Group / Selection view (Group or Ungroup, Arrange, Duplicate, Delete).

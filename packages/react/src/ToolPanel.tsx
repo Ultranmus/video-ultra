@@ -34,6 +34,7 @@ import { BackgroundTool } from './cutout';
 import { KeyframesTool, usePlayheadFor } from './keyframes';
 import { ProTrimTool } from './protrim';
 import { ScenesTool } from './scenes';
+import { AllSelected, useSharedReps, WholeVideoOnly } from './multiedit';
 import { SoundFxTool } from './soundfx';
 import { ScopesView } from './scopes';
 import { ReadAloudTool } from './speech';
@@ -53,6 +54,56 @@ const signed = (v: number) =>
 
 /** The block for one tool (phone dock / tablet sheet). */
 export function ToolPanel({ tool }: { tool: ToolId }): ReactElement | null {
+  const shared = useSharedReps();
+  if (shared && MULTI_TOOLS.has(tool)) return <SharedTool tool={tool} shared={shared} />;
+  return <OneTool tool={tool} />;
+}
+
+/** Tools that act on several selected at once (DECISIONS #153). */
+const MULTI_TOOLS = new Set<ToolId>([
+  'speed',
+  'volume',
+  'fade',
+  'filter',
+  'adjust',
+  'animate',
+  'opacity',
+]);
+
+/** Several selected: the tool on the representative, acting on all of them. */
+function SharedTool({
+  tool,
+  shared,
+}: {
+  tool: ToolId;
+  shared: NonNullable<ReturnType<typeof useSharedReps>>;
+}): ReactElement | null {
+  const l = useLabels();
+  const { ids, reps } = shared;
+  const rep =
+    tool === 'speed'
+      ? reps.speed
+      : tool === 'volume' || tool === 'fade'
+        ? reps.sound
+        : tool === 'filter' || tool === 'adjust'
+          ? reps.look
+          : reps.layer;
+  if (!rep) return <p className="vu-hint">{l.nothingSelected}</p>;
+  return (
+    <AllSelected ids={ids} subject={rep.id}>
+      <p className="vu-hint vu-shared-note">{l.appliesToAll(ids.length)}</p>
+      {tool === 'filter' ? (
+        <FilterStrip />
+      ) : tool === 'animate' ? (
+        <AnimatePanel />
+      ) : (
+        <ItemTool tool={tool} item={rep} />
+      )}
+    </AllSelected>
+  );
+}
+
+function OneTool({ tool }: { tool: ToolId }): ReactElement | null {
   const l = useLabels();
   const selectedId = useUi((s) => s.selectedId);
   const item = useProject((p) => (selectedId ? (findItem(p, selectedId)?.item ?? null) : null));
@@ -194,9 +245,11 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
           <Section title={l.soundEffects} collapsible defaultOpen={!!item.audioFx}>
             <SoundFxTool item={item} />
           </Section>
-          <Section title={l.splitAtScenes} collapsible defaultOpen={false}>
-            <ScenesTool item={item} />
-          </Section>
+          {ctl.isCombined(item) ? null : (
+            <Section title={l.splitAtScenes} collapsible defaultOpen={false}>
+              <ScenesTool item={item} />
+            </Section>
+          )}
           {picture}
         </>
       );
@@ -301,7 +354,8 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
   }
 }
 
-function SpeedTool({ item }: { item: Item }) {
+/** Speed of a clip (chips and a slider). */
+export function SpeedTool({ item }: { item: Item }) {
   const ctl = useController();
   const l = useLabels();
   if (item.kind !== 'video' && item.kind !== 'audio') return null;
@@ -331,7 +385,8 @@ function SpeedTool({ item }: { item: Item }) {
   );
 }
 
-function VolumeTool({ item }: { item: Item }) {
+/** Volume, mute and the sound options of a clip. */
+export function VolumeTool({ item }: { item: Item }) {
   const ctl = useController();
   const l = useLabels();
   if (!('volume' in item)) return null;
@@ -368,7 +423,15 @@ function VolumeTool({ item }: { item: Item }) {
             label={l.extractAudio}
             variant="secondary"
             tip={l.tipExtract}
-            disabledReason={!asset?.hasAudio ? l.noSound : item.muted ? l.alreadyMuted : null}
+            disabledReason={
+              ctl.isCombined(item)
+                ? l.extractNotCombined
+                : !asset?.hasAudio
+                  ? l.noSound
+                  : item.muted
+                    ? l.alreadyMuted
+                    : null
+            }
             onClick={() => ctl.extractAudio()}
           />
         ) : null}
@@ -436,7 +499,8 @@ function DuckControls({ item }: { item: VideoItem | AudioItem }) {
   );
 }
 
-function FadeTool({ item }: { item: Item }) {
+/** Sound fade in / out. */
+export function FadeTool({ item }: { item: Item }) {
   const l = useLabels();
   if (!('fadeIn' in item)) return null;
   const max = Math.max(0.1, Math.min(5, seconds(item.duration) / 2));
@@ -470,7 +534,8 @@ function FadeTool({ item }: { item: Item }) {
   );
 }
 
-function AdjustTool({ item }: { item: Item }) {
+/** Picture adjustments (light, colour, detail). */
+export function AdjustTool({ item }: { item: Item }) {
   const ctl = useController();
   const l = useLabels();
   const [key, setKey] = useState<keyof Adjust>('brightness');
@@ -668,7 +733,8 @@ function TransformTool({ item }: { item: Item }) {
   );
 }
 
-function OpacityTool({ item }: { item: Item }) {
+/** Opacity of a layer. */
+export function OpacityTool({ item }: { item: Item }) {
   const l = useLabels();
   const time = usePlayheadFor(item);
   const tf = transformAt(item, time);
@@ -1096,11 +1162,13 @@ function RatioPicker({
 export function CanvasTool(): ReactElement {
   const ctl = useController();
   const l = useLabels();
+  const inside = useUi((s) => s.inside.length > 0);
   const { width, height, background } = useProject((p) => ({
     width: p.settings.width,
     height: p.settings.height,
     background: p.settings.background,
   }));
+  if (inside) return <WholeVideoOnly message={l.canvasWholeVideo} />;
   return (
     <>
       <RatioPicker

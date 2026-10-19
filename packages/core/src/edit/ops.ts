@@ -14,6 +14,7 @@ import {
 import {
   ALLOWED_KINDS,
   DEFAULT_TRANSFORM,
+  NO_CROP,
   findItem,
   itemEnd,
   laneKindFor,
@@ -867,6 +868,8 @@ export function freezeFrame(
   if (track.kind !== 'main' || item.kind !== 'video') {
     throw new EditError('invalid', 'Freeze frame works on main-track videos');
   }
+  if (assetOf(project, item)?.kind === 'compound')
+    throw new EditError('invalid', 'Freeze frame works on a video file, not a combined clip');
   const frame = projectFrame(project);
   const cut = snap(project, at);
   if (cut < item.start || cut >= itemEnd(item))
@@ -1632,4 +1635,292 @@ export function removeMarker(project: Project, markerId: string): void {
   if (!project.markers) return;
   project.markers = project.markers.filter((m) => m.id !== markerId);
   if (project.markers.length === 0) delete project.markers;
+}
+
+// ── combined clips (DECISIONS #155) ──────────────────────────────────────
+
+/** Every track list in the project: its own, then each combined clip's. */
+export function allTrackLists(project: Project): Track[][] {
+  const lists = [project.tracks];
+  for (const asset of Object.values(project.assets))
+    if (asset.kind === 'compound' && asset.tracks) lists.push(asset.tracks);
+  return lists;
+}
+
+/** Whether any item (on the timeline or inside a combined clip) uses the asset. */
+export function assetInUse(project: Project, assetId: string): boolean {
+  return allTrackLists(project).some((tracks) =>
+    tracks.some((t) =>
+      t.items.some(
+        (i) =>
+          ('assetId' in i && i.assetId === assetId) || ('lut' in i && i.lut?.assetId === assetId),
+      ),
+    ),
+  );
+}
+
+/** Length of a combined clip's content (its last item's end), at least one frame. */
+export function compoundLength(project: Project, tracks: readonly Track[]): Time {
+  let end = 0;
+  for (const t of tracks) for (const i of t.items) end = Math.max(end, itemEnd(i));
+  return Math.max(projectFrame(project), end);
+}
+
+/** Whether combined clip `assetId` contains itself (directly or through another one). */
+export function compoundCycle(project: Project, assetId: string): boolean {
+  const seen = new Set<string>();
+  const visit = (id: string): boolean => {
+    const asset = project.assets[id];
+    if (!asset || asset.kind !== 'compound' || !asset.tracks) return false;
+    if (seen.has(id)) return false;
+    seen.add(id);
+    for (const t of asset.tracks)
+      for (const i of t.items) {
+        if (!('assetId' in i) || !i.assetId) continue;
+        if (i.assetId === assetId || visit(i.assetId)) return true;
+      }
+    return false;
+  };
+  return visit(assetId);
+}
+
+/**
+ * After the inside of combined clip `assetId` changed: its length and sound follow the content,
+ * and clips that play it are shortened if they now read past its end.
+ */
+export function refreshCompound(project: Project, assetId: string): void {
+  const asset = project.assets[assetId];
+  if (!asset || asset.kind !== 'compound' || !asset.tracks) return;
+  if (compoundCycle(project, assetId))
+    throw new EditError('invalid', "A combined clip can't contain itself");
+  asset.duration = compoundLength(project, asset.tracks);
+  asset.hasAudio = asset.tracks.some(
+    (t) =>
+      t.kind !== 'caption' &&
+      t.items.some(
+        (i) => i.kind === 'audio' || (i.kind === 'video' && !!project.assets[i.assetId]?.hasAudio),
+      ),
+  );
+  const frame = projectFrame(project);
+  for (const tracks of allTrackLists(project)) {
+    const own = tracks === asset.tracks;
+    for (const track of tracks) {
+      if (own) continue;
+      for (const item of track.items) {
+        if (item.kind !== 'video' || item.assetId !== assetId) continue;
+        if (item.sourceIn >= asset.duration) item.sourceIn = 0;
+        if (item.sourceIn + sourceSpan(item) > asset.duration + 1)
+          item.duration = Math.max(
+            frame,
+            Math.floor((asset.duration - item.sourceIn) / item.speed / frame) * frame,
+          );
+        clampFades(item);
+      }
+      if (track.kind === 'main' && tracks === project.tracks) layoutMain(project);
+    }
+  }
+}
+
+/**
+ * Combines items into one clip (a video item playing a new `compound` asset). Main-track clips
+ * must sit next to each other: the combined clip takes their place on the main track (the
+ * transition into the first one comes along); the selected layers inside their span go into it.
+ * Only layers: the combined clip goes on a layer at the first one's start. Captions stay out.
+ * Returns the combined clip's id.
+ */
+export function combineItems(
+  project: Project,
+  itemIds: readonly string[],
+  ids: IdFactory,
+  name = 'Combined clip',
+): string {
+  const picked = [...new Set(itemIds)].map((id) => editable(project, id));
+  if (picked.length === 0) throw new EditError('invalid', 'Nothing to combine');
+  if (picked.some((p) => p.track.kind === 'caption'))
+    throw new EditError('invalid', "Captions can't go into a combined clip");
+  const main = mainTrack(project);
+  const mains = picked.filter((p) => p.track === main).sort((a, b) => a.index - b.index);
+  if (mains.some((p, i) => i > 0 && p.index !== mains[i - 1]!.index + 1))
+    throw new EditError('invalid', 'Pick clips that sit next to each other on the main track');
+  const lanes = picked.filter((p) => p.track !== main);
+  const start = mains.length ? mains[0]!.item.start : Math.min(...lanes.map((p) => p.item.start));
+  if (mains.length && lanes.some((p) => p.item.start < start))
+    throw new EditError(
+      'invalid',
+      'Layers that start before the first picked clip can only be combined on their own',
+    );
+  const frame = projectFrame(project);
+
+  // The inside: a main track, then a lane per original lane (same order and kind).
+  const inner: Track[] = [
+    { id: ids(), kind: 'main', muted: false, hidden: false, locked: false, items: [] },
+  ];
+  let incoming: Transition | null = null;
+  for (const [i, p] of mains.entries()) {
+    const item = copy(p.item);
+    item.start -= start;
+    if (i === 0 && 'transitionIn' in item) {
+      incoming = item.transitionIn;
+      item.transitionIn = null;
+    }
+    inner[0]!.items.push(item);
+  }
+  const laneFor = new Map<string, Track>();
+  for (const track of project.tracks) {
+    if (track === main) continue;
+    for (const p of lanes) {
+      if (p.track !== track) continue;
+      let lane = laneFor.get(track.id);
+      if (!lane) {
+        lane = {
+          id: ids(),
+          kind: track.kind,
+          muted: track.muted,
+          hidden: track.hidden,
+          locked: false,
+          items: [],
+        };
+        laneFor.set(track.id, lane);
+        inner.push(lane);
+      }
+      const item = copy(p.item);
+      item.start -= start;
+      lane.items.push(item);
+    }
+  }
+  for (const lane of inner) lane.items.sort((a, b) => a.start - b.start);
+  // A group only partly picked: its members inside leave it (the ones outside are tidied below).
+  const members = new Map<string, number>();
+  for (const lane of inner)
+    for (const i of lane.items)
+      if (i.groupId) members.set(i.groupId, (members.get(i.groupId) ?? 0) + 1);
+  for (const lane of inner)
+    for (const i of lane.items) {
+      if (!i.groupId) continue;
+      const whole = project.tracks.every((t) =>
+        t.items.every((o) => o.groupId !== i.groupId || picked.some((p) => p.item === o)),
+      );
+      if (!whole || (members.get(i.groupId) ?? 0) < 2 || lane === inner[0]) delete i.groupId;
+    }
+
+  const asset: Asset = {
+    id: ids(),
+    kind: 'compound',
+    name,
+    mimeType: 'application/x-video-ultra-compound',
+    size: 0,
+    duration: compoundLength(project, inner),
+    width: project.settings.width,
+    height: project.settings.height,
+    hasAudio: false,
+    source: { type: 'compound' },
+    tracks: inner,
+  };
+  project.assets[asset.id] = asset;
+  refreshCompound(project, asset.id);
+
+  // Out of the timeline (last index first so the others stay valid).
+  for (const p of [...picked].sort((a, b) => b.index - a.index)) {
+    const at = p.track.items.indexOf(p.item);
+    if (at !== -1) p.track.items.splice(at, 1);
+  }
+  const span = mains.length ? mains.reduce((sum, p) => sum + p.item.duration, 0) : asset.duration;
+  const clip: Item = {
+    id: ids(),
+    kind: 'video',
+    name,
+    assetId: asset.id,
+    start,
+    duration: Math.max(frame, Math.min(span, asset.duration)),
+    sourceIn: 0,
+    speed: 1,
+    volume: 1,
+    muted: false,
+    fadeIn: 0,
+    fadeOut: 0,
+    transform: { ...DEFAULT_TRANSFORM },
+    crop: { ...NO_CROP },
+    fit: 'fit',
+    filter: null,
+    adjust: {},
+    transitionIn: null,
+  };
+  if (mains.length) {
+    main.items.splice(mains[0]!.index, 0, clip);
+    if (clip.kind === 'video') clip.transitionIn = incoming;
+    layoutMain(project);
+  } else {
+    placeInLane(project, clip, ids);
+  }
+  removeEmptyLanes(project);
+  return clip.id;
+}
+
+/**
+ * Puts a combined clip's pieces back on the timeline where it plays them (its trim and speed
+ * applied to them; its own look, size and sound settings don't carry over). Pieces get new ids,
+ * so another clip playing the same combined clip keeps it. Returns the new items' ids.
+ */
+export function separateItem(project: Project, itemId: string, ids: IdFactory): string[] {
+  const { track, item, index } = editable(project, itemId);
+  const asset = assetOf(project, item);
+  if (item.kind !== 'video' || !asset || asset.kind !== 'compound' || !asset.tracks)
+    throw new EditError('invalid', 'Only a combined clip can be separated');
+  const frame = projectFrame(project);
+  const speed = item.speed;
+  const from = item.sourceIn;
+  const to = item.sourceIn + sourceSpan(item);
+  const toOuter = (t: Time) => item.start + Math.round((t - from) / speed);
+  const groups = new Map<string, string>();
+  const made: { piece: Item; main: boolean }[] = [];
+  for (const inner of asset.tracks) {
+    for (const child of inner.items) {
+      const a = Math.max(child.start, from);
+      const b = Math.min(itemEnd(child), to);
+      if (b - a < frame) continue;
+      const piece = copy(child);
+      piece.id = ids();
+      if (piece.groupId) {
+        let g = groups.get(piece.groupId);
+        if (!g) groups.set(piece.groupId, (g = ids()));
+        piece.groupId = g;
+      }
+      const cut = a - child.start;
+      if ('sourceIn' in piece) piece.sourceIn += Math.round(cut * piece.speed);
+      if (cut > 0) retimeItemKeyframes(piece, cut);
+      piece.start = toOuter(a);
+      piece.duration = Math.max(frame, floorToFrame(project, Math.round((b - a) / speed)));
+      clampWords(piece, cut);
+      if ('speed' in piece && speed !== 1)
+        piece.speed = Math.min(10, Math.max(0.1, piece.speed * speed));
+      if ('fadeIn' in piece) {
+        piece.fadeIn = Math.round(piece.fadeIn / speed);
+        piece.fadeOut = Math.round(piece.fadeOut / speed);
+      }
+      clampFades(piece);
+      made.push({ piece, main: inner.kind === 'main' });
+    }
+  }
+  track.items.splice(index, 1);
+  const mainPieces = made.filter((m) => m.main).map((m) => m.piece);
+  if (track.kind === 'main') {
+    if (mainPieces[0] && 'transitionIn' in mainPieces[0])
+      mainPieces[0].transitionIn = item.transitionIn;
+    track.items.splice(index, 0, ...mainPieces);
+    // The pieces fill what the clip filled (rounding to frames can leave a frame either way).
+    const filled = mainPieces.reduce((sum, p) => sum + p.duration, 0);
+    const last = mainPieces.at(-1);
+    if (last && filled !== item.duration)
+      last.duration = Math.max(frame, last.duration + item.duration - filled);
+    layoutMain(project);
+  }
+  for (const { piece, main } of made) {
+    if (main && track.kind === 'main') continue;
+    if ('transitionIn' in piece) piece.transitionIn = null;
+    if (piece.kind === 'video' && main) delete piece.groupId;
+    placeInLane(project, piece, ids);
+  }
+  if (!assetInUse(project, asset.id)) Reflect.deleteProperty(project.assets, asset.id);
+  removeEmptyLanes(project);
+  return made.map((m) => m.piece.id);
 }

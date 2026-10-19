@@ -17,6 +17,7 @@ import {
   reorderMain,
   TRANSITION_PRESETS,
   trimItem,
+  type Asset,
   type Item,
   type Project,
   type Time,
@@ -27,6 +28,7 @@ import { formatClock, formatDurationShort } from '../format';
 import { itemTitle } from '../items';
 import {
   addButtonRect,
+  addStartRect,
   clampPps,
   contentHeight,
   GROUP_ORDER,
@@ -168,14 +170,16 @@ const UNLOCK_PATH = 'M6.5 11h11v9h-11zM8.5 11V8a3.5 3.5 0 016.8-1.2M12 14.5v2';
 const EDGE_ZONE = 48;
 const EDGE_SPEED = 14;
 const DRAG_SLOP = 5;
+/** How long lanes take to slide to new places (Layers restack, lanes added or removed). */
+const ROW_SLIDE_MS = 180;
 const TOUCH_SLOP = 8;
 const FLASH_MS = 700;
 /** Wheel events this close together belong to one gesture (one axis). */
 const WHEEL_GESTURE_MS = 220;
 
 export interface TimelineHooks {
-  /** The "+" at the end of the main track. */
-  onAddMedia(): void;
+  /** The "+" at the end of the main track (`atStart`: the phone's "+" before the first clip). */
+  onAddMedia(atStart: boolean): void;
 }
 
 export class TimelineView {
@@ -246,7 +250,12 @@ export class TimelineView {
     ro.observe(canvas.parentElement!);
     this.#disposers.push(() => ro.disconnect());
     this.#disposers.push(ctl.playhead.subscribe(() => this.#onPlayhead()));
-    this.#disposers.push(ctl.editor.store.subscribe(() => this.invalidate()));
+    this.#disposers.push(
+      ctl.editor.store.subscribe((state, prev) => {
+        if (state.project !== prev.project) this.#startSlide();
+        this.invalidate();
+      }),
+    );
     this.#disposers.push(
       ctl.onCut((t) => {
         this.#flashes.push({ t, until: performance.now() + FLASH_MS });
@@ -259,7 +268,8 @@ export class TimelineView {
           s.selectedId !== prev.selectedId ||
           s.selectedIds !== prev.selectedIds ||
           s.pxPerSecond !== prev.pxPerSecond ||
-          s.layout !== prev.layout
+          s.layout !== prev.layout ||
+          s.inside !== prev.inside
         ) {
           if (s.layout !== prev.layout) this.#applyLayout();
           this.invalidate();
@@ -422,11 +432,60 @@ export class TimelineView {
   }
 
   #rows(project: Project = this.#project()): Row[] {
-    return layoutRows(project, this.#m, this.#scrollY);
+    const rows = layoutRows(project, this.#m, this.#scrollY);
+    const slide = this.#slide;
+    if (!slide) return rows;
+    // Lanes moving to new places (a restack in Layers, a lane added or gone) slide there.
+    const p = Math.min(1, (performance.now() - slide.start) / ROW_SLIDE_MS);
+    if (p >= 1) {
+      this.#slide = null;
+      return rows;
+    }
+    const k = 1 - (1 - p) ** 3;
+    for (const row of rows) {
+      const from = slide.from.get(rowKey(row));
+      if (from === undefined) continue;
+      const to = row.top + this.#scrollY;
+      row.top = from + (to - from) * k - this.#scrollY;
+    }
+    return rows;
+  }
+
+  /** Lanes sliding to new places: where each was (by its key, unscrolled), and since when. */
+  #slide: { from: Map<string, number>; start: number } | null = null;
+  /** Where each lane was last drawn (by its key, unscrolled). */
+  readonly #drawnTops = new Map<string, number>();
+
+  /** After a project change: lanes that moved slide from where they were drawn (#ROW_SLIDE_MS). */
+  #startSlide(): void {
+    if (this.#drawnTops.size === 0 || this.#drag || reducedMotion()) return;
+    const rows = layoutRows(this.#project(), this.#m, this.#scrollY);
+    const from = new Map<string, number>();
+    let moved = false;
+    for (const row of rows) {
+      const key = rowKey(row);
+      // A lane that's new (an element moved onto a lane of its own) starts where its element was.
+      const was =
+        this.#drawnTops.get(key) ??
+        (row.track.items[0] ? this.#drawnTops.get(`item:${row.track.items[0].id}`) : undefined);
+      if (was === undefined) continue;
+      from.set(key, was);
+      if (Math.abs(was - (row.top + this.#scrollY)) > 0.5) moved = true;
+    }
+    if (moved) this.#slide = { from, start: performance.now() };
   }
 
   #hit(x: number, y: number): Hit {
-    return hitTest(this.#rows(), this.#m, this.#scale(), x, y, this.#trimTarget(), this.#touch);
+    return hitTest(
+      this.#rows(),
+      this.#m,
+      this.#scale(),
+      x,
+      y,
+      this.#trimTarget(),
+      this.#touch,
+      this.#phone,
+    );
   }
 
   /** The clip with trim handles: the one selected clip, unless it's locked. */
@@ -498,7 +557,7 @@ export class TimelineView {
         // A file picker may only open from a real activation: for touch that's the finger
         // lifting (pointerup), not pressing — on phones the "+" opens on release.
         if (!this.#touch) {
-          this.#hooks.onAddMedia();
+          this.#hooks.onAddMedia(!!hit.atStart);
           return;
         }
         break;
@@ -866,7 +925,7 @@ export class TimelineView {
         if (drag.timer) clearTimeout(drag.timer);
         if (drag.hit.type === 'row' || drag.hit.type === 'empty') this.#ctl.select(null);
         if (drag.hit.type === 'ruler' && this.#phone) this.#ctl.seek(drag.hit.time);
-        if (drag.hit.type === 'add') this.#hooks.onAddMedia();
+        if (drag.hit.type === 'add') this.#hooks.onAddMedia(!!drag.hit.atStart);
         break;
       case 'pan':
         if (this.#phone && drag.axis === 'x') this.#fling(drag.samples);
@@ -1274,6 +1333,14 @@ export class TimelineView {
     if (drag?.type === 'trim') this.#drawTrimLabel(drag, scale, rows, project);
     if (drag?.type === 'move') this.#drawFloating(drag, project);
     this.#cache.flush();
+    // Remember where lanes (and the elements on them) were drawn, for the next slide.
+    this.#drawnTops.clear();
+    for (const row of rows) {
+      const top = row.top + this.#scrollY;
+      this.#drawnTops.set(rowKey(row), top);
+      for (const item of row.track.items) this.#drawnTops.set(`item:${item.id}`, top);
+    }
+    if (this.#slide) this.invalidate();
   }
 
   /** A row's name: "Video", "Layer", "Text", "Audio" (numbered when a kind has several). */
@@ -1442,23 +1509,13 @@ export class TimelineView {
     const last = items[items.length - 1];
     const end = last ? itemEnd(last) : 0;
     const add = addButtonRect(row, scale, end);
-    ctx.fillStyle = c.surface;
-    ctx.strokeStyle = c.border;
-    ctx.lineWidth = 1;
-    this.#roundRect(add.x + 0.5, add.y + 0.5, add.size - 1, add.size - 1, 10);
-    ctx.fill();
-    ctx.stroke();
-    ctx.strokeStyle = c.label;
-    ctx.lineWidth = 1.75;
-    ctx.lineCap = 'round';
-    const cx = add.x + add.size / 2;
+    this.#drawAdd(add);
+    // Phones: a "+" before the first clip too, so the start isn't half an empty screen.
+    if (this.#phone && items.length > 0) {
+      const first = addStartRect(row, scale);
+      if (first.x + first.size > 0) this.#drawAdd(first);
+    }
     const cy = add.y + add.size / 2;
-    ctx.beginPath();
-    ctx.moveTo(cx - 7, cy);
-    ctx.lineTo(cx + 7, cy);
-    ctx.moveTo(cx, cy - 7);
-    ctx.lineTo(cx, cy + 7);
-    ctx.stroke();
     if (items.length === 0) {
       ctx.fillStyle = c.muted;
       ctx.font = `13px ${c.font}`;
@@ -1689,6 +1746,29 @@ export class TimelineView {
     ctx.fillText(text, lx + 7, ly + 9.5);
   }
 
+  /** A "+" add-media button (canvas px). */
+  #drawAdd(add: { x: number; y: number; size: number }): void {
+    const ctx = this.#ctx;
+    const c = this.#c;
+    ctx.fillStyle = c.surface;
+    ctx.strokeStyle = c.border;
+    ctx.lineWidth = 1;
+    this.#roundRect(add.x + 0.5, add.y + 0.5, add.size - 1, add.size - 1, 10);
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = c.label;
+    ctx.lineWidth = 1.75;
+    ctx.lineCap = 'round';
+    const cx = add.x + add.size / 2;
+    const cy = add.y + add.size / 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - 7, cy);
+    ctx.lineTo(cx + 7, cy);
+    ctx.moveTo(cx, cy - 7);
+    ctx.lineTo(cx, cy + 7);
+    ctx.stroke();
+  }
+
   #roundRect(x: number, y: number, w: number, h: number, r: number): void {
     const ctx = this.#ctx;
     ctx.beginPath();
@@ -1745,15 +1825,7 @@ export class TimelineView {
 
     const asset = 'assetId' in item && item.assetId ? project.assets[item.assetId] : undefined;
     if (picture && asset) {
-      this.#drawFilmStrip(
-        item,
-        asset.width && asset.height ? asset.width / asset.height : 16 / 9,
-        bx,
-        bw,
-        top,
-        height,
-        x1,
-      );
+      this.#drawFilmStrip(item, stripAspect(project, asset), bx, bw, top, height, x1);
       // The clip's own sound as a strip along the bottom (main track, tall enough).
       if (item.kind === 'video' && asset.hasAudio && height >= 40 && !item.muted) {
         const band = Math.round(height * 0.3);
@@ -1993,7 +2065,25 @@ export class TimelineView {
     for (let i = first; x1 + i * tileW < right; i++) {
       const tx = x1 + i * tileW;
       let seconds = 0;
-      const assetId = (item as { assetId: string }).assetId;
+      let assetId = (item as { assetId: string }).assetId;
+      const compound = this.#ctl.project.assets[assetId];
+      if (item.kind === 'video' && compound?.kind === 'compound') {
+        // A combined clip: the picture of what plays inside it at this tile (#155).
+        const local =
+          item.sourceIn + ((i * tileW + tileW / 2) / pps) * item.speed * FLICKS_PER_SECOND;
+        const inner = innerPicture(this.#ctl.project, compound.id, local);
+        if (!inner) continue;
+        assetId = inner.assetId;
+        const step = Math.pow(2, Math.round(Math.log2(Math.max(0.125, tileW / pps))));
+        seconds = Math.floor(inner.seconds / step) * step;
+        const bitmap = this.#cache.thumbnail(assetId, seconds, pxHeight);
+        if (!bitmap) continue;
+        const scale = Math.max(tileW / bitmap.width, tileH / bitmap.height);
+        const dw = bitmap.width * scale;
+        const dh = bitmap.height * scale;
+        ctx.drawImage(bitmap, tx + (tileW - dw) / 2, top + (tileH - dh) / 2, dw, dh);
+        continue;
+      }
       if (item.kind === 'video') {
         const local = (i * tileW + tileW / 2) / pps;
         const raw = item.sourceIn / FLICKS_PER_SECOND + local * item.speed;
@@ -2220,4 +2310,51 @@ export class TimelineView {
     ctx.fillText(text, cx + cw / 2, 2 + (this.#m.ruler - 6) / 2 + 0.5);
     ctx.textAlign = 'left';
   }
+}
+
+/**
+ * What a combined clip shows at its time `t` (flicks): the media asset and second of the picture
+ * on its inside main track — through combined clips inside it too (a few levels). Null: nothing
+ * there (it holds layers only, or a gap).
+ */
+function innerPicture(
+  project: Project,
+  compoundId: string,
+  t: number,
+  depth = 0,
+): { assetId: string; seconds: number } | null {
+  const asset = project.assets[compoundId];
+  const main = asset?.tracks?.[0];
+  if (!main || depth > 3) return null;
+  const child = main.items.find((c) => t >= c.start && t < c.start + c.duration);
+  if (!child || !('assetId' in child) || !child.assetId) return null;
+  if (child.kind === 'video') {
+    const at = child.sourceIn + (t - child.start) * child.speed;
+    if (project.assets[child.assetId]?.kind === 'compound')
+      return innerPicture(project, child.assetId, at, depth + 1);
+    return { assetId: child.assetId, seconds: at / FLICKS_PER_SECOND };
+  }
+  if (child.kind === 'freeze')
+    return { assetId: child.assetId, seconds: child.sourceTime / FLICKS_PER_SECOND };
+  return { assetId: child.assetId, seconds: 0 };
+}
+
+/** Tile shape of a clip's film strip: its media's; a combined clip's, its first inside picture's. */
+function stripAspect(project: Project, asset: Asset): number {
+  let a: Asset | undefined = asset;
+  for (let depth = 0; a?.kind === 'compound' && depth < 4; depth++) {
+    const first: Item | undefined = a.tracks?.[0]?.items[0];
+    a = first && 'assetId' in first && first.assetId ? project.assets[first.assetId] : undefined;
+  }
+  const shape = a ?? asset;
+  return shape.width && shape.height ? shape.width / shape.height : 16 / 9;
+}
+
+/** A lane's identity across edits (its track). */
+function rowKey(row: Row): string {
+  return row.track.id;
+}
+
+function reducedMotion(): boolean {
+  return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 }

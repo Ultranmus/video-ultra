@@ -11,6 +11,7 @@ import {
   trimItem,
   type Item,
 } from '@video-ultra/core';
+import { VideosPopover } from './videos';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactElement } from 'react';
 import { useController, useHistory, useLabels, useProject, useUi } from './context';
 import { Button, IconButton, Ruler, Section, ToolButton } from './controls';
@@ -52,12 +53,27 @@ export function TopBar({ onClose }: { onClose?: (() => void) | undefined }): Rea
   const readOnly = useUi((s) => s.readOnly);
   const layout = useUi((s) => s.layout);
   const historyOpen = useUi((s) => s.historyOpen);
+  const videosOpen = useUi((s) => s.videosOpen);
   const layersOpen = useUi((s) => s.panel === 'layers' && (s.layout !== 'phone' || s.sheetPanel));
   const ratio = ratioOf(width, height);
   return (
     <header className="vu-topbar">
       <div className="vu-topbar-start">
         {onClose ? <IconButton icon="close" label={l.close} onClick={onClose} /> : null}
+        {ctl.options.autosave !== false && !isHidden(ctl.options.customize, 'videos') ? (
+          <span className="vu-popover-anchor vu-videos-anchor" data-videos-toggle="">
+            <IconButton
+              icon="videos"
+              label={l.yourVideos}
+              tip={l.tipYourVideos}
+              pressed={videosOpen}
+              onClick={() =>
+                ctl.ui.setState({ videosOpen: !videosOpen, historyOpen: false, menu: null })
+              }
+            />
+            <VideosPopover />
+          </span>
+        ) : null}
         {layout !== 'phone' ? (
           <input
             className="vu-project-name"
@@ -264,6 +280,13 @@ export function Panel(): ReactElement | null {
   const ctl = useController();
   const l = useLabels();
   const panel = useUi((s) => s.panel);
+  // Each panel keeps its own scroll place (a fresh box per panel, so one panel's place never
+  // carries over to the next); a panel opened for the first time starts at the top.
+  const places = useRef(new Map<string, number>());
+  const scroller = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (panel && scroller.current) scroller.current.scrollTop = places.current.get(panel) ?? 0;
+  }, [panel]);
   if (!panel) return null;
   const entry = RAIL.find((r) => r.id === panel);
   const custom = ctl.options.customize?.panels?.find((p) => `custom:${p.id}` === panel);
@@ -280,7 +303,12 @@ export function Panel(): ReactElement | null {
         <h2 className="vu-panel-title">{title}</h2>
         <IconButton icon="close" label={l.closePanel} onClick={() => ctl.openPanel(null)} />
       </div>
-      <div className="vu-panel-scroll">
+      <div
+        className="vu-panel-scroll"
+        key={panel}
+        ref={scroller}
+        onScroll={(e) => places.current.set(panel, e.currentTarget.scrollTop)}
+      >
         <AddPanel panel={panel} />
       </div>
     </aside>
@@ -350,7 +378,8 @@ export function Inspector(): ReactElement {
         <div className="vu-inspector-title">
           <h2 className="vu-panel-title">{name}</h2>
           <span className="vu-inspector-meta">
-            {kindLabel(l, item.kind, true)} · {(item.duration / FLICKS_PER_SECOND).toFixed(1)} s
+            {ctl.isCombined(item) ? l.combinedKind : kindLabel(l, item.kind, true)} ·{' '}
+            {(item.duration / FLICKS_PER_SECOND).toFixed(1)} s
           </span>
         </div>
         <IconButton
@@ -517,7 +546,7 @@ export function Timeline({
   const viewRef = useRef<TimelineView | null>(null);
   useEffect(() => {
     const view = new TimelineView(rootRef.current!, canvasRef.current!, ctl, {
-      onAddMedia: () => ctl.pickFiles(),
+      onAddMedia: (atStart) => ctl.pickFiles(atStart ? 'start' : 'playhead'),
     });
     viewRef.current = view;
     const offZoom = ctl.setZoomHandler((factor) => view.zoomBy(factor));
@@ -534,12 +563,44 @@ export function Timeline({
       viewRef.current = null;
     };
   }, [ctl, rootRef]);
+  const inside = useUi((s) => s.inside.length > 0);
   return (
-    <div className="vu-timeline">
+    <div className="vu-timeline" data-inside={inside || undefined}>
+      <InsideBar />
       <div className="vu-timeline-canvas">
         <canvas ref={canvasRef} aria-hidden="true" data-tooltip-follow="" />
       </div>
       <TimelineA11y onReveal={(item) => viewRef.current?.reveal(item)} />
+    </div>
+  );
+}
+
+/**
+ * While a combined clip is open (DECISIONS #155): where you are (the clips it sits in) and the way
+ * back out. Over the timeline, on every layout.
+ */
+function InsideBar(): ReactElement | null {
+  const ctl = useController();
+  const l = useLabels();
+  const inside = useUi((s) => s.inside);
+  if (inside.length === 0) return null;
+  return (
+    <div className="vu-inside-bar" role="region" aria-label={l.insideCombined(inside.at(-1)!.name)}>
+      <Button
+        icon="back"
+        label={l.backToTimeline}
+        tip={l.tipBackToTimeline}
+        variant="secondary"
+        onClick={() => ctl.closeCombined()}
+      />
+      <Icon name="combine" size={16} />
+      <span className="vu-inside-path">
+        {inside.map((i, k) => (
+          <span key={i.assetId + k} aria-current={k === inside.length - 1 ? 'location' : undefined}>
+            {i.name}
+          </span>
+        ))}
+      </span>
     </div>
   );
 }

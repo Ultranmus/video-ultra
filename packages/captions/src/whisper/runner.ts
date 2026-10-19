@@ -158,10 +158,16 @@ export class WhisperRunner {
     const unique = said.length ? new Set(said).size / said.length : 1;
     // Measured on real speech vs. made-up text (PERF.md "Captions"): speech scores no-speech
     // ≤ 0.04 and confidence ≥ −0.3; made-up text no-speech ≥ 0.08 and confidence ≤ −0.75.
+    // A high no-speech probability alone doesn't mean nobody spoke: on real Hindi under background
+    // sound it reads 0.4–0.7 while the window is full of words written with confidence (≥ −0.5).
+    // Made-up text is sparse (a word or two: "आप", "Thank you.") or unsure (≤ −0.75), so a
+    // confident, wordy window is kept whatever that probability says.
+    const seconds = audio.length / SAMPLE_RATE;
+    const wordy = said.length >= Math.max(4, seconds * 0.3);
     if (
       avg < -1 ||
       (noSpeech > 0.06 && avg < -0.6) ||
-      noSpeech > 0.5 ||
+      (noSpeech > 0.5 && !(wordy && avg >= -0.6)) ||
       (said.length > 8 && unique < 0.3)
     )
       return { words: [], language: lang };

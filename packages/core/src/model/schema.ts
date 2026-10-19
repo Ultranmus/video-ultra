@@ -10,7 +10,7 @@ import * as z from 'zod/mini';
  *   that fits the item inside the canvas, so changing the aspect ratio keeps layouts sensible.
  */
 
-export const PROJECT_VERSION = 4;
+export const PROJECT_VERSION = 5;
 
 const time = z.int().check(z.nonnegative());
 const positiveTime = z.int().check(z.positive());
@@ -491,8 +491,12 @@ export const TrackSchema = z.object({
 
 export const AssetSchema = z.object({
   id,
-  /** `lut`: a `.cube` colour look file (file version 3+), used by items' `lut`. */
-  kind: z.enum(['video', 'audio', 'image', 'lut']),
+  /**
+   * `lut`: a `.cube` colour look file (file version 3+), used by items' `lut`. `compound`: a
+   * combined clip (file version 5+) — no file; its own timeline in `tracks`, played by video
+   * items like any video.
+   */
+  kind: z.enum(['video', 'audio', 'image', 'lut', 'compound']),
   name: z.string(),
   mimeType: z.string(),
   size: z.int().check(z.nonnegative()),
@@ -520,7 +524,14 @@ export const AssetSchema = z.object({
     z.object({ type: z.literal('opfs'), key: z.string() }),
     z.object({ type: z.literal('handle'), key: z.string() }),
     z.object({ type: z.literal('url'), url: z.string() }),
+    /** A combined clip: made of other items, nothing to store. */
+    z.object({ type: z.literal('compound') }),
   ]),
+  /**
+   * A combined clip's own timeline (file version 5+): a main track first, then lanes, items
+   * timed from 0. Drawn at `width × height` (the canvas size when it was made).
+   */
+  tracks: z.optional(z.array(TrackSchema)),
 });
 
 /** A named point on the timeline (file version 4+): the editor shows it on the ruler. */

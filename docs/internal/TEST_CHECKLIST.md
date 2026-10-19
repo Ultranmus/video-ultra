@@ -6,6 +6,42 @@ Safari) — the rest needs your devices.
 
 Open the branch's Vercel preview (or `pnpm --filter playground dev`), then **`/editor`**.
 
+## 0. 2026-10-20 — your list, edit several, Your videos, combined clips (branch `feat/v0.4-finish`)
+
+- [ ] **Align (desktop).** Right-click a title → hover **Align** → the list opens beside the menu
+      (left of it near the right edge); click it too — it stays open. _Checked here:_ the list is
+      really on top (hit-tested), organize-check.
+- [ ] **Panels keep their own place (desktop).** Scroll Filters down, open Stickers → it starts
+      at the top; back to Filters → where you left it.
+- [ ] **Type on the stage.** Desktop: double-click a title → type, click away (one undo). Phone:
+      tap a title, tap it again → keyboard, type, tap away. Esc / ✕ puts the old text back.
+      _Checked here:_ stage-text-check (Chrome + WebKit).
+- [ ] **No cut-off labels (desktop).** Inspector "Extract audio", Transitions "Play preview" /
+      "Apply to all cuts", Stickers "Animated", filter "Cross process". _Checked here:_ every
+      panel and inspector scanned at 1024 and 1440 px — nothing cut.
+- [ ] **Phone timeline start.** With clips, at 0:00 there's a "+" before the first clip → it adds
+      at the start.
+- [ ] **Film strip flicker (desktop).** Didn't reproduce here (Chrome, WebKit, 1×/2× pixels,
+      clips and video layers). If you still see it: a short screen recording please.
+- [ ] **Hindi captions on the iPhone.** Make captions on the clip that said "No speech" (open the
+      playground over **https**: `pnpm --filter playground dev:https`). Real Hindi under music
+      now comes through (DECISIONS #152); if the phone can't read the sound you get a plain
+      message saying so. Tell me how many lines it made.
+- [ ] **Edit several at once.** Select two clips (Shift-click / Layers "Select several") →
+      Inspector: Speed 2×, Mute, Adjust — all change; Filters panel → a look → both; two titles →
+      Opacity, Transitions → an entrance → both. One undo each. Phone: the same tools in the
+      multi-selection toolbar. _Checked here:_ multiedit-check.
+- [ ] **Your videos.** Top-left button → Make a copy (you're now in "… (copy)"; "Back to
+      original" in the note) → change something → Your videos → open the original: unchanged.
+      New video; delete the copy (it asks). _Checked here:_ videos-check (desktop + phone).
+- [ ] **Combine into one clip.** Select two clips and a title → right-click / long-press →
+      **Combine into one clip** → one clip. Speed it up, add a filter, a transition — all act on
+      it as one. Right-click → **Open combined clip** → the bar over the timeline; change
+      something inside → **Back** → the clip shows the change. **Separate** puts the pieces
+      back. Export a video with one in it and play the file. _Checked here:_ compound-check
+      (frames identical to the pieces on WebGPU and WebGL2, sound, export), combine-ui-check
+      (desktop + phone).
+
 ## 1. Fixes
 
 - [ ] **Hindi captions on the iPhone don't crash the tab any more.** Captions → Hindi → Make

@@ -23,6 +23,9 @@ import {
   findItem,
   freezeFrame,
   groupItems,
+  combineItems,
+  refreshCompound,
+  separateItem,
   groupOf,
   insertMain,
   mainTrack,
@@ -94,6 +97,7 @@ import {
   type Engine,
   type MediaAnalyzer,
   type ProjectStorage,
+  type StoredProjectInfo,
 } from '@video-ultra/core/internal';
 import { produce } from 'immer';
 import {
@@ -122,6 +126,7 @@ import {
 import { alignOffsets, distributeOffsets, type AlignEdge } from './stage/arrange';
 import { itemBox, visibleItemsAt, type Box } from './stage/geometry';
 import { measureText } from './stage/measure';
+import { spread } from './fanout';
 
 /** Options the `<VideoEditor />` passes to its controller. */
 export interface ControllerOptions {
@@ -225,6 +230,7 @@ export class EditorController {
   engine: Engine | null = null;
   caps: Capabilities | null = null;
   #filePicker: (() => void) | null = null;
+  #pickPlace: 'playhead' | 'start' = 'playhead';
   /** Bytes of every asset, for the engine and analyzer (Files/Blobs: no copies in memory). */
   readonly media = new Map<string, Blob>();
   #disposers: (() => void)[] = [];
@@ -283,22 +289,43 @@ export class EditorController {
     this.#disposers.push(
       this.editor.store.subscribe((state, prev) => {
         if (state.project === prev.project) return;
-        if (!this.#previewProject) void this.engine?.setProject(state.project).catch(() => {});
+        // A combined clip that's open but gone (undone, separated): back out of it.
+        const inside = this.ui.getState().inside;
+        const gone = inside.findIndex((i) => state.project.assets[i.assetId]?.kind !== 'compound');
+        if (gone !== -1) this.ui.setState({ inside: inside.slice(0, gone) });
+        const shown = this.view(state.project);
+        if (!this.#previewProject) void this.engine?.setProject(shown).catch(() => {});
         const { selectedId, selectedIds } = this.ui.getState();
-        if (selectedId && !findItem(state.project, selectedId)) this.select(null);
-        else if (selectedIds.some((id) => !findItem(state.project, id)))
+        if (selectedId && !findItem(shown, selectedId)) this.select(null);
+        else if (selectedIds.some((id) => !findItem(shown, id)))
           this.ui.setState({
-            selectedIds: selectedIds.filter((id) => findItem(state.project, id)),
+            selectedIds: selectedIds.filter((id) => findItem(shown, id)),
           });
-        if (this.playhead.time > projectDuration(state.project))
-          this.seek(projectDuration(state.project));
+        if (this.playhead.time > projectDuration(shown)) this.seek(projectDuration(shown));
+      }),
+      this.ui.subscribe((state, prev) => {
+        if (state.inside !== prev.inside) {
+          this.#previewProject = null;
+          void this.engine?.setProject(this.project).catch(() => {});
+        }
+        // Export is the whole video: leave any open combined clip first.
+        if (state.exportOpen && !prev.exportOpen && state.inside.length) this.closeCombined(true);
       }),
     );
   }
 
   /** Opens the file picker (the shell registers it). */
-  pickFiles(): void {
+  /** Opens the file picker; `start`: what's picked goes before the first clip. */
+  pickFiles(place: 'playhead' | 'start' = 'playhead'): void {
+    this.#pickPlace = place;
     this.#filePicker?.();
+  }
+
+  /** Where the files from the last `pickFiles` go (read once by the picker's change handler). */
+  takePickPlace(): 'playhead' | 'start' {
+    const place = this.#pickPlace;
+    this.#pickPlace = 'playhead';
+    return place;
   }
 
   /** Registers the shell's file picker; returns an unregister function. */
@@ -309,8 +336,70 @@ export class EditorController {
     };
   }
 
+  /** The project as the editor shows it: inside the open combined clip, if one is open. */
   get project(): Project {
-    return this.editor.getProject();
+    return this.view(this.editor.getProject());
+  }
+
+  readonly #views = new WeakMap<Project, { assetId: string; view: Project }>();
+
+  /**
+   * `project` as the editor shows it (DECISIONS #155): with a combined clip open, a project whose
+   * tracks are its inside, drawn at its size (no markers or export range — those are the whole
+   * video's). Cached per project object, so selectors stay stable.
+   */
+  view(project: Project): Project {
+    const top = this.ui.getState().inside.at(-1);
+    if (!top) return project;
+    const asset = project.assets[top.assetId];
+    if (!asset || asset.kind !== 'compound' || !asset.tracks) return project;
+    const known = this.#views.get(project);
+    if (known?.assetId === top.assetId) return known.view;
+    const { exportRange: _range, ...settings } = project.settings;
+    void _range;
+    const { markers: _markers, ...rest } = project;
+    void _markers;
+    const view: Project = {
+      ...rest,
+      tracks: asset.tracks,
+      settings: {
+        ...settings,
+        width: asset.width ?? settings.width,
+        height: asset.height ?? settings.height,
+      },
+    };
+    this.#views.set(project, { assetId: top.assetId, view });
+    return view;
+  }
+
+  /**
+   * `recipe` as it runs on the whole project while a combined clip is open: it sees the clip's
+   * inside as the project's tracks; afterwards the clip (and the ones it sits in) follow their
+   * new content (length, sound; clips playing them stay within it).
+   */
+  #scoped<F extends ((draft: Project, ctx: EditContext) => unknown) | null>(recipe: F): F {
+    const chain = this.ui.getState().inside.map((i) => i.assetId);
+    const assetId = chain.at(-1);
+    if (!recipe || !assetId) return recipe;
+    return ((draft: Project, ctx: EditContext) => {
+      const scoped = new Proxy(draft, {
+        get(target, key) {
+          if (key === 'tracks') return target.assets[assetId]?.tracks ?? [];
+          return Reflect.get(target, key);
+        },
+        set(target, key, value) {
+          if (key === 'tracks') {
+            const asset = target.assets[assetId];
+            if (asset) asset.tracks = value as Project['tracks'];
+            return true;
+          }
+          return Reflect.set(target, key, value);
+        },
+      });
+      const result = recipe(scoped, ctx);
+      for (const id of [...chain].reverse()) refreshCompound(draft, id);
+      return result;
+    }) as F;
   }
 
   // ── lifecycle ──────────────────────────────────────────────────────────
@@ -367,14 +456,16 @@ export class EditorController {
       this.toast(this.labels.notPersistent, 'info');
     });
     await Promise.all(
-      Object.values(this.project.assets).map(async (asset) => {
-        const blob =
-          (await this.options.resolveMedia?.(asset).catch(() => null)) ??
-          (await this.storage!.getMedia(asset).catch(() => null));
-        if (generation !== this.#generation) return;
-        if (blob) this.#registerMedia(asset, blob);
-        else this.toast(this.labels.mediaMissing(asset.name), 'error');
-      }),
+      Object.values(this.project.assets)
+        .filter((asset) => asset.kind !== 'compound')
+        .map(async (asset) => {
+          const blob =
+            (await this.options.resolveMedia?.(asset).catch(() => null)) ??
+            (await this.storage!.getMedia(asset).catch(() => null));
+          if (generation !== this.#generation) return;
+          if (blob) this.#registerMedia(asset, blob);
+          else this.toast(this.labels.mediaMissing(asset.name), 'error');
+        }),
     );
   }
 
@@ -442,6 +533,106 @@ export class EditorController {
     if (latest) this.editor.load(latest.project);
     this.#startAutosave();
     this.toast(this.labels.tookOver, 'success');
+  }
+
+  // ── your videos (DECISIONS #154) ──────────────────────────────────────
+
+  /** The videos saved on this device, newest first (empty when the editor doesn't save here). */
+  async listVideos(): Promise<StoredProjectInfo[]> {
+    if (!this.storage || this.options.autosave === false) return [];
+    return this.storage.listProjects().catch(() => []);
+  }
+
+  /**
+   * Makes a copy of this video and opens it: the same media files (nothing is copied but the
+   * project), a new name, its own history. The original stays as it was saved.
+   */
+  async duplicateVideo(): Promise<void> {
+    const storage = this.storage;
+    if (!storage || this.ui.getState().readOnly) return;
+    await this.#autosave?.flush();
+    const original = this.project;
+    const copy: Project = {
+      ...structuredClone(original),
+      id: randomId(),
+      name: this.labels.copyOf(original.name),
+      updatedAt: new Date().toISOString(),
+    };
+    try {
+      await storage.openWriter(copy);
+    } catch (error) {
+      this.toast(error instanceof Error ? error.message : String(error), 'error');
+      return;
+    }
+    await this.#switchTo(copy);
+    this.toast(this.labels.copyMade(copy.name), 'success', {
+      label: this.labels.backToOriginal,
+      run: () => void this.openVideo(original.id),
+    });
+  }
+
+  /** Opens another saved video (the current one is saved first). */
+  async openVideo(id: string): Promise<void> {
+    const storage = this.storage;
+    if (!storage || id === this.project.id) return;
+    await this.#autosave?.flush();
+    const loaded = await storage.loadProject(id).catch((error: unknown) => {
+      this.toast(error instanceof Error ? error.message : String(error), 'error');
+      return null;
+    });
+    if (!loaded) return;
+    await this.#switchTo(loaded.project);
+    for (const warning of loaded.warnings) this.toast(warning, 'info');
+  }
+
+  /** Starts a new, empty video (the current one is saved first and stays in the list). */
+  async newVideo(): Promise<void> {
+    if (!this.storage) return;
+    await this.#autosave?.flush();
+    const fresh = createProject({ name: this.labels.untitledVideo });
+    await this.#switchTo(fresh);
+  }
+
+  /** Deletes a saved video other than the open one, and media only it used. */
+  async deleteVideo(id: string): Promise<void> {
+    if (!this.storage || id === this.project.id) return;
+    await this.storage.deleteProject(id).catch((error: unknown) => {
+      this.toast(error instanceof Error ? error.message : String(error), 'error');
+    });
+  }
+
+  /** Puts `project` in the editor: its own lock, history and saving; its media registered. */
+  async #switchTo(project: Project): Promise<void> {
+    const generation = this.#generation;
+    this.pause();
+    this.#autosave?.detach();
+    this.#autosave = null;
+    this.#lock?.release();
+    this.#lock = null;
+    this.ui.setState({
+      selectedId: null,
+      selectedIds: [],
+      menu: null,
+      historyOpen: false,
+      save: 'idle',
+      inside: [],
+    });
+    this.editor.load(project);
+    this.seek(0);
+    if (await this.#claim(false, generation)) this.#startAutosave();
+    if (generation !== this.#generation) return;
+    await Promise.all(
+      Object.values(project.assets)
+        .filter((asset) => asset.kind !== 'compound' && !this.media.has(asset.id))
+        .map(async (asset) => {
+          const blob =
+            (await this.options.resolveMedia?.(asset).catch(() => null)) ??
+            (await this.storage!.getMedia(asset).catch(() => null));
+          if (generation !== this.#generation) return;
+          if (blob) this.#registerMedia(asset, blob);
+          else this.toast(this.labels.mediaMissing(asset.name), 'error');
+        }),
+    );
   }
 
   /** Hands the preview canvas to a new engine worker. Returns a disposer. */
@@ -586,6 +777,23 @@ export class EditorController {
     this.seek(Math.round(this.playhead.time / frame + frames) * frame);
   }
 
+  // ── editing several at once (DECISIONS #153) ─────────────────────────
+
+  /** While set (a call through `fanOutController`), edits also reach these selected items. */
+  fanOut: readonly string[] | null = null;
+
+  /** `recipe`, spreading what it changes to the fan-out items when a fan-out is on. */
+  #fanned<F extends ((draft: Project, ctx: EditContext) => unknown) | null>(recipe: F): F {
+    const ids = this.fanOut;
+    if (!recipe || !ids) return recipe;
+    const base = this.project;
+    return ((draft: Project, ctx: EditContext) => {
+      const result = recipe(draft, ctx);
+      spread(base, draft, ids, ctx);
+      return result;
+    }) as F;
+  }
+
   // ── transient previews (drags) ─────────────────────────────────────────
 
   /**
@@ -593,6 +801,7 @@ export class EditorController {
    * release). Nothing is written to the store or the undo history. Coalesced per frame.
    */
   preview(recipe: ((draft: Project, ctx: EditContext) => void) | null): Project | null {
+    recipe = this.#fanned(recipe);
     if (!recipe) {
       if (this.#previewProject) void this.engine?.setProject(this.project).catch(() => {});
       this.#previewProject = null;
@@ -622,6 +831,7 @@ export class EditorController {
     recipe: (draft: Project, ctx: EditContext) => R,
     options?: { coalesceKey?: string },
   ): R | undefined {
+    recipe = this.#scoped(this.#fanned(recipe));
     this.#previewProject = null;
     try {
       return this.editor.apply(label, recipe, options);
@@ -803,6 +1013,97 @@ export class EditorController {
     const ids = this.ui.getState().selectedIds;
     const done = this.run(this.labels.group, (d, ctx) => groupItems(d, ids, ctx.ids));
     if (done) this.#announce(this.labels.groupedDone(ids.length));
+  }
+
+  // ── combined clips (DECISIONS #155) ─────────────────────────────────────
+
+  /** Whether `item` plays a combined clip. */
+  isCombined(item: Item | null | undefined): boolean {
+    return (
+      !!item && item.kind === 'video' && this.project.assets[item.assetId]?.kind === 'compound'
+    );
+  }
+
+  /** Why the selection can't be combined (null = it can). */
+  combineReason(): string | null {
+    const items = this.selectedItems();
+    if (items.length < 2) return this.labels.combineNeedsTwo;
+    if (items.some((i) => findItem(this.project, i.id)?.track.kind === 'caption'))
+      return this.labels.combineNoCaptions;
+    const main = mainTrack(this.project).items;
+    const at = items
+      .map((i) => main.indexOf(i))
+      .filter((i) => i !== -1)
+      .sort((a, b) => a - b);
+    if (at.some((v, k) => k > 0 && v !== at[k - 1]! + 1)) return this.labels.combineNextToEach;
+    return null;
+  }
+
+  /** Combines the selection into one clip and selects it. */
+  combineSelected(): void {
+    const reason = this.combineReason();
+    if (reason) {
+      this.toast(reason, 'info');
+      return;
+    }
+    const ids = this.ui.getState().selectedIds;
+    const count = Object.values(this.project.assets).filter((a) => a.kind === 'compound').length;
+    const id = this.run(this.labels.combine, (d, ctx) =>
+      combineItems(d, ids, ctx.ids, this.labels.combinedName(count + 1)),
+    );
+    if (!id) return;
+    this.select(id);
+    this.#announce(this.labels.combinedDone(ids.length));
+  }
+
+  /**
+   * Opens a combined clip to edit its inside (the selected one, or `itemId`): the timeline shows
+   * what's in it, the playhead at the same moment of it. Edits change every place that plays it.
+   */
+  openCombined(itemId?: string): void {
+    const item = itemId ? findItem(this.project, itemId)?.item : this.selectedItem();
+    if (!item || item.kind !== 'video' || !this.isCombined(item)) return;
+    const asset = this.project.assets[item.assetId]!;
+    const outerTime = this.playhead.time;
+    const local = Math.round(
+      item.sourceIn + Math.max(0, Math.min(item.duration, outerTime - item.start)) * item.speed,
+    );
+    this.pause();
+    this.ui.setState((s) => ({
+      inside: [...s.inside, { assetId: asset.id, itemId: item.id, name: asset.name, outerTime }],
+      selectedId: null,
+      selectedIds: [],
+      menu: null,
+    }));
+    this.seek(Math.min(local, Math.max(0, asset.duration - 1)));
+    this.#announce(this.labels.insideCombined(asset.name));
+  }
+
+  /** Back out of the open combined clip (`all`: back to the timeline itself). */
+  closeCombined(all = false): void {
+    const inside = this.ui.getState().inside;
+    const top = inside.at(-1);
+    if (!top) return;
+    const outer = all ? inside[0]! : top;
+    this.pause();
+    this.ui.setState({
+      inside: all ? [] : inside.slice(0, -1),
+      selectedId: null,
+      selectedIds: [],
+      menu: null,
+    });
+    this.seek(outer.outerTime);
+    if (findItem(this.project, outer.itemId)) this.select(outer.itemId);
+  }
+
+  /** Puts the selected combined clip's pieces back on the timeline. */
+  separateSelected(): void {
+    const item = this.selectedItem();
+    if (!item || !this.isCombined(item)) return;
+    const ids = this.run(this.labels.separate, (d, ctx) => separateItem(d, item.id, ctx.ids));
+    if (!ids) return;
+    this.ui.setState({ selectedId: ids[0] ?? null, selectedIds: ids });
+    this.#announce(this.labels.separatedDone(ids.length));
   }
 
   /** The group the selection is (null when it isn't exactly one group). */
@@ -1343,6 +1644,8 @@ export class EditorController {
   // ── media ──────────────────────────────────────────────────────────────
 
   #registerMedia(asset: Asset, blob: Blob): void {
+    // A combined clip has no file (the engine draws it from its inside).
+    if (asset.kind === 'compound') return;
     this.media.set(asset.id, blob);
     // LUT files are read by the engine only (no thumbnails or sound to analyse).
     if (asset.kind !== 'lut')
@@ -1422,9 +1725,12 @@ export class EditorController {
       name?: string;
       /** Select the added sound clip (library sounds: its settings show next). */
       selectSound?: boolean;
+      /** Videos and photos go before the first clip (in the order given), not at the playhead. */
+      atStart?: boolean;
     } = {},
   ): Promise<void> {
     const addToTimeline = options.addToTimeline ?? true;
+    let startIndex = 0;
     for (const original of files) {
       const rowId = randomId();
       // SVG: drawn once into a PNG here (the engine worker can't decode SVG).
@@ -1482,7 +1788,12 @@ export class EditorController {
           } else {
             const main = mainTrack(d).items;
             const under = itemIndexAt(main, this.playhead.time);
-            insertMain(d, visualItem(asset, ctx.ids()), under === -1 ? main.length : under + 1);
+            const at = options.atStart
+              ? Math.min(startIndex++, main.length)
+              : under === -1
+                ? main.length
+                : under + 1;
+            insertMain(d, visualItem(asset, ctx.ids()), at);
           }
         });
         this.#registerMedia(asset, file);
@@ -2226,6 +2537,14 @@ export class EditorController {
     } catch (error) {
       if (abort.signal.aborted || (error instanceof DOMException && error.name === 'AbortError'))
         return;
+      // The video has sound but this browser can't read it here — not "nobody spoke".
+      if (error instanceof Error && error.name === 'SoundUnreadable') {
+        this.toast(
+          globalThis.isSecureContext === false ? l.captionsNeedSecure : l.captionsSoundUnreadable,
+          'info',
+        );
+        return;
+      }
       this.toast(l.captionsFailed(error instanceof Error ? error.message : String(error)), 'error');
     } finally {
       if (this.#captionAbort === abort) {

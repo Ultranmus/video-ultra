@@ -23,7 +23,8 @@ export interface EditorCustomization {
   /**
    * Built-in things to hide, by id: left-menu panels (`'templates'`, `'text'`, `'captions'`,
    * `'audio'`, `'stickers'`, `'filters'`, `'transitions'`, `'blur'`), phone / inspector tools
-   * (`'speed'`, `'mask'`, `'key'`, `'cutout'`, …) and commands (`'duplicate'`, `'copy'`, …).
+   * (`'speed'`, `'mask'`, `'key'`, `'cutout'`, …), commands (`'duplicate'`, `'copy'`, …) and the
+   * top bar's "Your videos" (`'videos'`; hosts that keep their own project list).
    */
   hide?: readonly string[];
   /** The left menu's order, by panel id (built-in and custom); the rest follow in their order. */

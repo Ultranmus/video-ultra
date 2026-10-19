@@ -314,6 +314,8 @@ export function createProjectStorageOn(
 
     async getMedia(asset) {
       const source = asset.source;
+      // A combined clip has no file: it's made of the project's other items.
+      if (source.type === 'compound') return null;
       if (source.type === 'opfs') {
         const file = await files.read(mediaPath(source.key));
         // A copy cut short by a crash has the wrong size: treat it as missing.

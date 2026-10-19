@@ -21,6 +21,7 @@ import type {
   LayerSource,
   Renderer,
   RendererOptions,
+  RenderTarget,
 } from './types';
 
 function compile(gl: WebGL2RenderingContext, type: number, source: string): WebGLShader {
@@ -165,6 +166,31 @@ export function createWebGL2Renderer(
   // Images: uploaded once.
   const images = new Map<ImageBitmap | OffscreenCanvas, WebGLTexture>();
 
+  /**
+   * Render targets (combined clips): an RGBA8 texture with its framebuffer. GL stores them bottom
+   * row first, so as a layer source their v is flipped (see drawQuad).
+   */
+  interface Target extends RenderTarget {
+    readonly texture: WebGLTexture;
+    readonly fbo: WebGLFramebuffer;
+  }
+  const makeTarget = (width: number, height: number): Target => {
+    const texture = newTexture(gl);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    const fbo = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, outFbo);
+    gl.activeTexture(gl.TEXTURE0);
+    return { width, height, texture, fbo };
+  };
+  const targets = new Set<Target>();
+  const isTarget = (x: unknown): x is Target => targets.has(x as Target);
+  /** Where the render in progress draws (null: the canvas) and its size. */
+  let outFbo: WebGLFramebuffer | null = null;
+  let outW = 1;
+  let outH = 1;
+
   // Blurred background: a small render target, reallocated only when its size changes.
   let backdropTarget: {
     texture: WebGLTexture;
@@ -205,11 +231,16 @@ export function createWebGL2Renderer(
       }
       return hdr;
     }
-    let texture = images.get(source);
+    if (isTarget(source)) {
+      gl.bindTexture(gl.TEXTURE_2D, source.texture);
+      return false;
+    }
+    const image = source as ImageBitmap | OffscreenCanvas;
+    let texture = images.get(image);
     if (!texture) {
       texture = newTexture(gl);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
-      images.set(source, texture);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+      images.set(image, texture);
     } else {
       gl.bindTexture(gl.TEXTURE_2D, texture);
     }
@@ -227,6 +258,7 @@ export function createWebGL2Renderer(
     texelW: number,
     texelH: number,
     under: Int32Array | null = null,
+    fromTarget = false,
   ) => {
     writeLayerUniforms(
       uniforms,
@@ -243,12 +275,19 @@ export function createWebGL2Renderer(
     );
     // The copy underneath is bottom row first: texel y = y1 − pixel y.
     if (under) writeBackMapping(uniforms, 0, under[0]!, under[3]!, 1, -1);
+    if (fromTarget) {
+      // A render target: bottom row first (flip v) and premultiplied (the shader divides it out).
+      uniforms[10] = -uniforms[10]!;
+      uniforms[11] = -uniforms[11]!;
+      uniforms[13] = 1 - uniforms[13]!;
+      uniforms[14] = 1;
+    }
     gl.bufferSubData(gl.UNIFORM_BUFFER, 0, uniforms);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   };
 
   const drawBackdrop = (backdrop: Backdrop) => {
-    const size = backdropSize(canvas.width, canvas.height, backdrop.amount);
+    const size = backdropSize(outW, outH, backdrop.amount);
     if (!backdropTarget || backdropTarget.w !== size.width || backdropTarget.h !== size.height) {
       if (backdropTarget) {
         gl.deleteFramebuffer(backdropTarget.fbo);
@@ -287,11 +326,11 @@ export function createWebGL2Renderer(
     fx[25] = radius[1] * 0.75;
     fx[11] = 0; // no sharpening on a blurred picture
     fx[28] = 0; // nor grain
-    drawQuad(backdrop.geometry, 1, correct && hdr, fx, 0, 0);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.viewport(0, 0, canvas.width, canvas.height);
-    targetW = canvas.width;
-    targetH = canvas.height;
+    drawQuad(backdrop.geometry, 1, correct && hdr, fx, 0, 0, null, isTarget(backdrop.source));
+    gl.bindFramebuffer(gl.FRAMEBUFFER, outFbo);
+    gl.viewport(0, 0, outW, outH);
+    targetW = outW;
+    targetH = outH;
     // Pass 2: scaled up over the canvas with a second soft blur.
     gl.bindTexture(gl.TEXTURE_2D, target.texture);
     fx.set(IDENTITY_EFFECTS);
@@ -322,7 +361,7 @@ export function createWebGL2Renderer(
         null,
       );
     }
-    gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, b[0]!, canvas.height - b[3]!, w, h);
+    gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, b[0]!, outH - b[3]!, w, h);
     gl.activeTexture(gl.TEXTURE0);
   };
 
@@ -337,9 +376,9 @@ export function createWebGL2Renderer(
   /** A blurred / pixelated area: copy what's under it, shrink it, draw it back inside the box. */
   const drawRegion = (layer: LayerDraw) => {
     const region = layer.region!;
-    const texel = regionTexel(region.amount, region.pixelate, canvas.height);
+    const texel = regionTexel(region.amount, region.pixelate, outH);
     const pad = regionPad(texel, region.pixelate);
-    if (!layerBounds(layer.geometry, canvas.width, canvas.height, pad, bounds)) return;
+    if (!layerBounds(layer.geometry, outW, outH, pad, bounds)) return;
     const w = bounds[2]! - bounds[0]!;
     const h = bounds[3]! - bounds[1]!;
     copyUnder(bounds);
@@ -358,7 +397,7 @@ export function createWebGL2Renderer(
       const fbo = gl.createFramebuffer();
       gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
       gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, outFbo);
       regionTarget = { texture, fbo, w: rw, h: rh };
     }
     const target = regionTarget;
@@ -393,10 +432,10 @@ export function createWebGL2Renderer(
     gl.disable(gl.BLEND);
     drawQuad(g, 1, false, fx, 1 / grab.w, 1 / grab.h);
     gl.enable(gl.BLEND);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.viewport(0, 0, canvas.width, canvas.height);
-    targetW = canvas.width;
-    targetH = canvas.height;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, outFbo);
+    gl.viewport(0, 0, outW, outH);
+    targetW = outW;
+    targetH = outH;
     // Pass 2: inside the box, the small copy by position (bottom row first, so v runs up).
     regionFx.set(layer.effects ?? IDENTITY_EFFECTS);
     if (!region.pixelate) {
@@ -438,12 +477,18 @@ export function createWebGL2Renderer(
       canvas.width = width;
       canvas.height = height;
     },
-    render(layers, background = [0, 0, 0], backdrop = null) {
+    render(layers, background = [0, 0, 0], backdrop = null, into = null) {
       usedCount = 0;
-      gl.viewport(0, 0, canvas.width, canvas.height);
-      targetW = canvas.width;
-      targetH = canvas.height;
-      gl.clearColor(background[0], background[1], background[2], 1);
+      const out = isTarget(into) ? into : null;
+      outFbo = out ? out.fbo : null;
+      outW = out ? out.width : canvas.width;
+      outH = out ? out.height : canvas.height;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, outFbo);
+      gl.viewport(0, 0, outW, outH);
+      targetW = outW;
+      targetH = outH;
+      if (background) gl.clearColor(background[0], background[1], background[2], 1);
+      else gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.activeTexture(gl.TEXTURE0);
       if (backdrop) drawBackdrop(backdrop);
@@ -455,7 +500,7 @@ export function createWebGL2Renderer(
         // Blend modes read the pixels under the layer: copy them first.
         let under: Int32Array | null = null;
         if (layer.blend) {
-          if (!layerBounds(layer.geometry, canvas.width, canvas.height, 1, bounds)) continue;
+          if (!layerBounds(layer.geometry, outW, outH, 1, bounds)) continue;
           copyUnder(bounds);
           under = bounds;
         }
@@ -472,10 +517,25 @@ export function createWebGL2Renderer(
           1 / w,
           1 / h,
           under,
+          isTarget(source),
         );
       }
       // Don't keep (soon closed) frames referenced between renders.
       for (let i = 0; i < usedCount; i++) usedFrames[i] = null;
+      if (outFbo) {
+        outFbo = null;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      }
+    },
+    createTarget(width, height) {
+      const target = makeTarget(Math.max(1, Math.round(width)), Math.max(1, Math.round(height)));
+      targets.add(target);
+      return target;
+    },
+    destroyTarget(target) {
+      if (!isTarget(target) || !targets.delete(target)) return;
+      gl.deleteFramebuffer(target.fbo);
+      gl.deleteTexture(target.texture);
     },
     draw(frame: VideoFrame, placement: FramePlacement) {
       layerGeometry(
@@ -514,6 +574,11 @@ export function createWebGL2Renderer(
       }
       for (const texture of luts.values()) gl.deleteTexture(texture);
       luts.clear();
+      for (const t of targets) {
+        gl.deleteFramebuffer(t.fbo);
+        gl.deleteTexture(t.texture);
+      }
+      targets.clear();
       gl.deleteTexture(noLut);
       gl.deleteTexture(grab.texture);
       gl.deleteTexture(curve);

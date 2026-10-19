@@ -132,3 +132,36 @@ export function wordsWithSound<W extends { start: number; end: number }>(
     return false;
   });
 }
+
+/**
+ * When the model's word timing collapses (every word stamped within half a second while the
+ * window has much more sound — seen on real Hindi: all words at 29.8–30 s), the words would be
+ * dropped as sitting outside the window's own span. Instead they're laid over the frames that
+ * have sound, in order, each taking room in proportion to its length: rough timing beats no
+ * captions, and the user can nudge them. Words with believable timing come back unchanged.
+ */
+export function spreadCollapsed<W extends { text: string; start: number; end: number }>(
+  words: readonly W[],
+  active: Uint8Array,
+): W[] {
+  if (words.length < 3) return [...words];
+  const first = words[0]!.start;
+  const last = words.at(-1)!.end;
+  const voiced: number[] = [];
+  for (let f = 0; f < active.length; f++) if (active[f]) voiced.push(f);
+  const voicedSeconds = (voiced.length * FRAME) / 16_000;
+  if (last - first > 0.5 || voicedSeconds < 2) return [...words];
+  const weights = words.map((w) => Math.max(1, Array.from(w.text.trim()).length));
+  const total = weights.reduce((a, b) => a + b, 0);
+  const at = (share: number) => {
+    const f = voiced[Math.min(voiced.length - 1, Math.floor(share * voiced.length))]!;
+    return (f * FRAME) / 16_000;
+  };
+  let done = 0;
+  return words.map((w, i) => {
+    const start = at(done / total);
+    done += weights[i]!;
+    const end = Math.max(start + 0.05, at(done / total - 1e-9) + FRAME / 16_000);
+    return { ...w, start, end };
+  });
+}

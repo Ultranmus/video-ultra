@@ -47,6 +47,8 @@ const MIGRATIONS: Record<number, (old: Record<string, unknown>) => Record<string
   2: (old) => ({ ...old, version: 3 }),
   /** 3 → 4: pictures may have a shape mask (optional, none yet). */
   3: (old) => ({ ...old, version: 4 }),
+  /** 4 → 5: combined clips (assets of kind `compound`; none yet). */
+  4: (old) => ({ ...old, version: 5 }),
 };
 
 /**
@@ -104,6 +106,49 @@ export function parseProject(input: unknown, ids: IdFactory = randomId): ParseRe
  * moves overlapping lane items to new lanes, removes empty lanes. Returns what it changed.
  */
 export function repairProject(project: Project, ids: IdFactory = randomId): string[] {
+  const warnings: string[] = [];
+  // Combined clips first (the timeline's clips are then checked against their lengths) (file version 5+): each inside the same way; one that contains itself, or
+  // holds captions, loses those items; its length covers what's inside.
+  for (const asset of Object.values(project.assets)) {
+    if (asset.kind !== 'compound') continue;
+    const inner = { ...project, tracks: asset.tracks ?? [] };
+    warnings.push(...repairTracks(inner, ids));
+    asset.tracks = inner.tracks.filter((t) => t.kind !== 'caption');
+  }
+  for (const asset of Object.values(project.assets)) {
+    if (asset.kind !== 'compound' || !asset.tracks) continue;
+    const reaches = (id: string, seen: Set<string>): boolean => {
+      const a = project.assets[id];
+      if (!a?.tracks || seen.has(id)) return false;
+      seen.add(id);
+      return a.tracks.some((t) =>
+        t.items.some(
+          (i) =>
+            'assetId' in i && !!i.assetId && (i.assetId === asset.id || reaches(i.assetId, seen)),
+        ),
+      );
+    };
+    for (const t of asset.tracks) {
+      const before = t.items.length;
+      t.items = t.items.filter(
+        (i) =>
+          !('assetId' in i) ||
+          !i.assetId ||
+          (i.assetId !== asset.id && !reaches(i.assetId, new Set())),
+      );
+      if (t.items.length !== before)
+        warnings.push(`Removed a combined clip that contained itself.`);
+    }
+    let end = 0;
+    for (const t of asset.tracks) for (const i of t.items) end = Math.max(end, itemEnd(i));
+    asset.duration = Math.max(asset.duration, end, projectFrame(project));
+  }
+  warnings.push(...repairTracks(project, ids));
+  return [...new Set(warnings)];
+}
+
+/** {@link repairProject} for one track list (the timeline, or a combined clip's inside). */
+function repairTracks(project: Project, ids: IdFactory): string[] {
   const warnings: string[] = [];
 
   // Exactly one main track, first.

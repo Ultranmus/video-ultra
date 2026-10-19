@@ -42,9 +42,10 @@ import {
   type TransitionLook,
   type TransitionOptions,
 } from '../effects/transitions';
-import { NO_CROP } from '../model/project';
+import { compoundProject, NO_CROP } from '../model/project';
 import type {
   Adjust,
+  Asset,
   CaptionWord,
   Item,
   ItemAnimation,
@@ -62,7 +63,7 @@ import {
   placedGeometry,
   type LayerMedia,
 } from '../render/layout';
-import type { Backdrop, LayerDraw, LayerSource, Renderer } from '../render/types';
+import type { Backdrop, LayerDraw, LayerSource, Renderer, RenderTarget } from '../render/types';
 import { FrameSource, type DecoderPool } from './frames';
 import { RasterCache } from './rasters';
 import {
@@ -129,6 +130,9 @@ const BACKDROP_TRANSFORM: Transform = Object.freeze({
   flipX: false,
   flipY: false,
 });
+/** Combined clips inside combined clips: this deep, no deeper (a guard, not a design limit). */
+const MAX_NESTING = 4;
+
 /** Animation blur at full strength: radius as a fraction of the picture's shorter side. */
 const ANIMATION_BLUR = 0.12;
 
@@ -254,6 +258,16 @@ export class Composer {
    */
   cheapEffects = false;
   private destroyed = false;
+  /**
+   * Combined clips (DECISIONS #155): per timeline item playing one, a composer for its inside
+   * (its own decode positions) and the render target it draws into.
+   */
+  private readonly children = new Map<
+    string,
+    { composer: Composer; target: RenderTarget | null }
+  >();
+  /** How deep inside combined clips this composer draws (0: the timeline). */
+  depth = 0;
 
   constructor(
     readonly renderer: Renderer,
@@ -296,6 +310,7 @@ export class Composer {
 
   /** Frees decoders and frames of items not in `alive`. */
   prune(alive: Set<string>): void {
+    for (const id of [...this.children.keys()]) if (!alive.has(id)) this.dropChild(id);
     for (const id of [...this.animFrames.keys()]) if (!alive.has(id)) this.dropAnimFrame(id);
     for (const [id, source] of this.sources) {
       if (alive.has(id)) continue;
@@ -308,6 +323,10 @@ export class Composer {
 
   /** Gives back the decoder and held frame of every item not in `keep`. */
   releaseExcept(keep: Set<string>): void {
+    for (const [id, child] of this.children) {
+      if (keep.has(id)) continue;
+      child.composer.releaseExcept(new Set());
+    }
     for (const [id, source] of this.sources) {
       if (keep.has(id)) continue;
       source.releaseDecoder();
@@ -319,6 +338,7 @@ export class Composer {
   /** Frees decoders, frames and rasters. The renderer stays (its owner destroys it). */
   destroy(): void {
     this.destroyed = true;
+    for (const id of [...this.children.keys()]) this.dropChild(id);
     for (const source of this.sources.values()) source.destroy();
     this.sources.clear();
     for (const sample of this.lastFrames.values()) sample.close();
@@ -560,9 +580,19 @@ export class Composer {
   private width = 1;
   private height = 1;
 
+  private dropChild(id: string): void {
+    const child = this.children.get(id);
+    if (!child) return;
+    child.composer.destroy();
+    if (child.target) this.renderer.destroyTarget(child.target);
+    this.children.delete(id);
+  }
+
   /**
    * Draws the frame at timeline time `t` on a `width × height` target. Preview: waits for decoded
    * frames until `deadlineMs` (performance.now() time). Exact (`deadlineMs` null): waits for all.
+   * `into`: a render target instead of the canvas, cleared to transparent (a combined clip's
+   * inside — no background, no blurred backdrop).
    */
   async render(
     project: Project,
@@ -570,6 +600,7 @@ export class Composer {
     width: number,
     height: number,
     deadlineMs: number | null,
+    into: RenderTarget | null = null,
   ): Promise<ComposeResult> {
     const result: ComposeResult = {
       pending: [],
@@ -686,7 +717,7 @@ export class Composer {
 
     const bg = project.settings.background;
     let backdrop: Backdrop | null = null;
-    if (bg.type === 'blur' && backdropDraft && backdropSource) {
+    if (!into && bg.type === 'blur' && backdropDraft && backdropSource) {
       const item = backdropDraft.layer.item;
       if (item.kind === 'video' || item.kind === 'image' || item.kind === 'freeze') {
         layerGeometry(
@@ -710,7 +741,7 @@ export class Composer {
       }
     }
     const t1 = performance.now();
-    this.renderer.render(draws, backgroundColor(project), backdrop);
+    this.renderer.render(draws, into ? null : backgroundColor(project), backdrop, into);
     result.drawMs = performance.now() - t1;
     result.layers = draws.length;
     for (const frame of temporary) frame.close();
@@ -718,6 +749,62 @@ export class Composer {
     for (const draw of draws) draw.source = null as unknown as VideoFrame;
     this.rasters.endFrame();
     return result;
+  }
+
+  /**
+   * Draws a combined clip's inside at its time `at` into its item's render target — sized to
+   * fit the output (as the clip would be at scale 1), so exports stay sharp — and returns it.
+   */
+  private async drawCompound(
+    project: Project,
+    asset: Asset,
+    itemId: string,
+    at: Time,
+    width: number,
+    height: number,
+    deadlineMs: number | null,
+    result: ComposeResult,
+  ): Promise<RenderTarget | null> {
+    if (this.depth >= MAX_NESTING || !asset.tracks) return null;
+    const aw = asset.width ?? project.settings.width;
+    const ah = asset.height ?? project.settings.height;
+    const k = Math.min(width / aw, height / ah);
+    const tw = Math.max(1, Math.round(aw * k));
+    const th = Math.max(1, Math.round(ah * k));
+    let child = this.children.get(itemId);
+    if (!child) {
+      const composer = new Composer(
+        this.renderer,
+        this.pool,
+        this.media,
+        this.exact,
+        this.rasters.budget,
+        this.allowPreviews,
+      );
+      composer.depth = this.depth + 1;
+      composer.cheapEffects = this.cheapEffects;
+      child = { composer, target: null };
+      this.children.set(itemId, child);
+    }
+    if (!child.target || child.target.width !== tw || child.target.height !== th) {
+      if (child.target) this.renderer.destroyTarget(child.target);
+      child.target = this.renderer.createTarget(tw, th);
+    }
+    const inner = compoundProject(project, asset);
+    const time = Math.min(Math.max(0, at), Math.max(0, asset.duration - 1));
+    const drawn = await child.composer.render(inner, time, tw, th, deadlineMs, child.target);
+    if (this.destroyed) return null;
+    result.late ||= drawn.late;
+    result.missing += drawn.missing;
+    for (const p of drawn.pending) result.pending.push(p);
+    // Only what's on screen inside keeps a decoder.
+    child.composer.prune(child.composer.activeIds());
+    return child.target;
+  }
+
+  /** Ids of the items drawn in the last render. */
+  activeIds(): Set<string> {
+    return new Set(this.active.map((a) => a.item.id));
   }
 
   /** Transition options of a layer's transition (reused object). */
@@ -940,6 +1027,40 @@ export class Composer {
       }
       case 'video':
       case 'freeze': {
+        const compound = project.assets[item.assetId];
+        if (item.kind === 'video' && compound?.kind === 'compound') {
+          // A combined clip: its inside drawn into a render target, then shown like a picture.
+          const target = await this.drawCompound(
+            project,
+            compound,
+            item.id,
+            layer.sourceTime,
+            width,
+            height,
+            deadlineMs,
+            result,
+          );
+          if (!target) return null;
+          const media: LayerMedia = {
+            width: target.width,
+            height: target.height,
+            rotation: 0,
+            flip: false,
+          };
+          layerGeometry(width, height, media, item, slot.geometry);
+          finish();
+          const lut = await this.lutOf(item);
+          const draw: LayerDraw = {
+            source: target,
+            geometry: slot.geometry,
+            opacity: item.transform.opacity * opacity,
+            hdr: false,
+            effects: this.effectsFor(layer, slot, look, anim, media.width, media.height, null, lut),
+            blend: slot.pic.blend,
+            lut,
+          };
+          return { kind: 'still', layer, draw, media, slot, visible: !hidden };
+        }
         const found = await this.sourceFor(item.id, item.assetId);
         if (!found) return null;
         const request = found.source.frameAt(layer.sourceTime / FLICKS_PER_SECOND);

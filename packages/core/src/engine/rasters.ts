@@ -16,7 +16,7 @@ export class RasterCache {
   constructor(
     private readonly renderer: Renderer,
     /** Byte budget (RGBA, 4 bytes per pixel). */
-    private readonly budget: number,
+    readonly budget: number,
   ) {}
 
   /** Bytes held now. */

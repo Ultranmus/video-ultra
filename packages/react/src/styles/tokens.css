@@ -102,6 +102,8 @@
     --vu-size-rail: 88px;
     --vu-size-rail-mobile: 64px;
     --vu-size-touch: 40px;
+    /* The bar over the timeline while a combined clip is open (#155). */
+    --vu-size-inside-bar: 44px;
     --vu-size-panel: 280px;
     --vu-size-inspector: 280px;
     --vu-size-toolbar: 64px;

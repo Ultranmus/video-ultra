@@ -180,7 +180,8 @@ export type Hit =
   | { type: 'trim'; item: Item; row: Row; edge: 'start' | 'end' }
   | { type: 'item'; item: Item; row: Row }
   | { type: 'transition'; item: Item; row: Row }
-  | { type: 'add'; row: Row }
+  /** A "+" on the main track: after the last clip, or (`atStart`, phones) before the first. */
+  | { type: 'add'; row: Row; atStart?: boolean }
   | { type: 'row'; row: Row; time: Time }
   | { type: 'empty'; time: Time };
 
@@ -194,6 +195,15 @@ export function addButtonRect(
   return { x: timeToX(scale, end) + 8, y: row.top + (row.height - size) / 2, size };
 }
 
+/**
+ * The "+" before the first clip (phones: their playhead sits mid-screen, so at the start the
+ * left half would otherwise be empty). Adds media at the start.
+ */
+export function addStartRect(row: Row, scale: TimeScale): { x: number; y: number; size: number } {
+  const size = Math.min(row.height - 8, 40);
+  return { x: timeToX(scale, 0) - 8 - size, y: row.top + (row.height - size) / 2, size };
+}
+
 /** Finds what's under (x, y). `selectedId` gets trim handles, which win over the clip body. */
 export function hitTest(
   rows: readonly Row[],
@@ -203,6 +213,8 @@ export function hitTest(
   y: number,
   selectedId: string | null,
   touch: boolean,
+  /** Phones: there's a "+" before the first clip too. */
+  startAdd = false,
 ): Hit {
   const time = Math.max(0, xToTime(scale, x));
   if (y < m.ruler) return { type: 'ruler', time };
@@ -240,6 +252,15 @@ export function hitTest(
         const add = addButtonRect(row, scale, last ? itemEnd(last) : 0);
         if (x >= add.x && x <= add.x + add.size && y >= add.y && y <= add.y + add.size)
           return { type: 'add', row };
+        const first = startAdd && items.length > 0 ? addStartRect(row, scale) : null;
+        if (
+          first &&
+          x >= first.x &&
+          x <= first.x + first.size &&
+          y >= first.y &&
+          y <= first.y + first.size
+        )
+          return { type: 'add', row, atStart: true };
       }
     }
     for (const item of items) {

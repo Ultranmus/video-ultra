@@ -127,7 +127,12 @@ for (const model of models.flatMap((m) => Array<string>(repeat).fill(m))) {
       }
     }, 250);
     for (const file of files) {
-      const ref = manifest[file.replace(/\.m4a$/, '')]!;
+      // Files without a reference (test-media/files/real/, private/): word counts only.
+      const ref = manifest[file.replace(/\.m4a$/, '')] ?? {
+        text: '',
+        language: forced ?? 'auto',
+        seconds: 0,
+      };
       const result = await page.evaluate(
         (config) =>
           (
