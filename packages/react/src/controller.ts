@@ -23,6 +23,8 @@ import {
   findItem,
   freezeFrame,
   groupItems,
+  combineItems,
+  separateItem,
   groupOf,
   insertMain,
   mainTrack,
@@ -379,14 +381,16 @@ export class EditorController {
       this.toast(this.labels.notPersistent, 'info');
     });
     await Promise.all(
-      Object.values(this.project.assets).map(async (asset) => {
-        const blob =
-          (await this.options.resolveMedia?.(asset).catch(() => null)) ??
-          (await this.storage!.getMedia(asset).catch(() => null));
-        if (generation !== this.#generation) return;
-        if (blob) this.#registerMedia(asset, blob);
-        else this.toast(this.labels.mediaMissing(asset.name), 'error');
-      }),
+      Object.values(this.project.assets)
+        .filter((asset) => asset.kind !== 'compound')
+        .map(async (asset) => {
+          const blob =
+            (await this.options.resolveMedia?.(asset).catch(() => null)) ??
+            (await this.storage!.getMedia(asset).catch(() => null));
+          if (generation !== this.#generation) return;
+          if (blob) this.#registerMedia(asset, blob);
+          else this.toast(this.labels.mediaMissing(asset.name), 'error');
+        }),
     );
   }
 
@@ -543,7 +547,7 @@ export class EditorController {
     if (generation !== this.#generation) return;
     await Promise.all(
       Object.values(project.assets)
-        .filter((asset) => !this.media.has(asset.id))
+        .filter((asset) => asset.kind !== 'compound' && !this.media.has(asset.id))
         .map(async (asset) => {
           const blob =
             (await this.options.resolveMedia?.(asset).catch(() => null)) ??
@@ -933,6 +937,57 @@ export class EditorController {
     const ids = this.ui.getState().selectedIds;
     const done = this.run(this.labels.group, (d, ctx) => groupItems(d, ids, ctx.ids));
     if (done) this.#announce(this.labels.groupedDone(ids.length));
+  }
+
+  // ── combined clips (DECISIONS #155) ─────────────────────────────────────
+
+  /** Whether `item` plays a combined clip. */
+  isCombined(item: Item | null | undefined): boolean {
+    return (
+      !!item && item.kind === 'video' && this.project.assets[item.assetId]?.kind === 'compound'
+    );
+  }
+
+  /** Why the selection can't be combined (null = it can). */
+  combineReason(): string | null {
+    const items = this.selectedItems();
+    if (items.length < 2) return this.labels.combineNeedsTwo;
+    if (items.some((i) => findItem(this.project, i.id)?.track.kind === 'caption'))
+      return this.labels.combineNoCaptions;
+    const main = mainTrack(this.project).items;
+    const at = items
+      .map((i) => main.indexOf(i))
+      .filter((i) => i !== -1)
+      .sort((a, b) => a - b);
+    if (at.some((v, k) => k > 0 && v !== at[k - 1]! + 1)) return this.labels.combineNextToEach;
+    return null;
+  }
+
+  /** Combines the selection into one clip and selects it. */
+  combineSelected(): void {
+    const reason = this.combineReason();
+    if (reason) {
+      this.toast(reason, 'info');
+      return;
+    }
+    const ids = this.ui.getState().selectedIds;
+    const count = Object.values(this.project.assets).filter((a) => a.kind === 'compound').length;
+    const id = this.run(this.labels.combine, (d, ctx) =>
+      combineItems(d, ids, ctx.ids, this.labels.combinedName(count + 1)),
+    );
+    if (!id) return;
+    this.select(id);
+    this.#announce(this.labels.combinedDone(ids.length));
+  }
+
+  /** Puts the selected combined clip's pieces back on the timeline. */
+  separateSelected(): void {
+    const item = this.selectedItem();
+    if (!item || !this.isCombined(item)) return;
+    const ids = this.run(this.labels.separate, (d, ctx) => separateItem(d, item.id, ctx.ids));
+    if (!ids) return;
+    this.ui.setState({ selectedId: ids[0] ?? null, selectedIds: ids });
+    this.#announce(this.labels.separatedDone(ids.length));
   }
 
   /** The group the selection is (null when it isn't exactly one group). */
@@ -1473,6 +1528,8 @@ export class EditorController {
   // ── media ──────────────────────────────────────────────────────────────
 
   #registerMedia(asset: Asset, blob: Blob): void {
+    // A combined clip has no file (the engine draws it from its inside).
+    if (asset.kind === 'compound') return;
     this.media.set(asset.id, blob);
     // LUT files are read by the engine only (no thumbnails or sound to analyse).
     if (asset.kind !== 'lut')

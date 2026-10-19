@@ -35,7 +35,16 @@ export interface FramePlacement {
  * (its unpack flags don't apply to them), so a premultiplied bitmap would get its transparency
  * applied twice and look too dark on the WebGL2 backend.
  */
-export type LayerSource = VideoFrame | ImageBitmap | OffscreenCanvas;
+export type LayerSource = VideoFrame | ImageBitmap | OffscreenCanvas | RenderTarget;
+
+/**
+ * An off-screen picture the renderer draws into (a combined clip's frame, DECISIONS #155) and can
+ * then show as a layer like any picture. Made and freed by the renderer that owns it.
+ */
+export interface RenderTarget {
+  readonly width: number;
+  readonly height: number;
+}
 
 /** One layer of a frame, bottom to top. */
 export interface LayerDraw {
@@ -93,14 +102,19 @@ export interface Renderer {
   /** Changes the drawing-buffer size in device pixels. */
   resize(width: number, height: number): void;
   /**
-   * Draws one frame: clears to `background` (RGB 0…1), draws the blurred `backdrop` if given, then
-   * `layers` in order.
+   * Draws one frame: clears to `background` (RGB 0…1; `null` = transparent), draws the blurred
+   * `backdrop` if given, then `layers` in order — on the canvas, or into `target`.
    */
   render(
     layers: readonly LayerDraw[],
-    background?: readonly [number, number, number],
+    background?: readonly [number, number, number] | null,
     backdrop?: Backdrop | null,
+    target?: RenderTarget | null,
   ): void;
+  /** A `width × height` render target (RGBA). Free it with {@link Renderer.destroyTarget}. */
+  createTarget(width: number, height: number): RenderTarget;
+  /** Frees a render target made by this renderer. */
+  destroyTarget(target: RenderTarget): void;
   /**
    * Convenience for a single video frame, contain-fitted (the lab and bench). Does not close
    * `frame`.

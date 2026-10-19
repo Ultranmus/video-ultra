@@ -188,3 +188,30 @@ export function assetKindsFor(kind: ItemKind): readonly Asset['kind'][] {
       return [];
   }
 }
+
+/** A combined clip's inside as a project of its own (its tracks, drawn at its own size). */
+const compoundViews = new WeakMap<
+  Asset,
+  { settings: Project['settings']; assets: Project['assets']; view: Project }
+>();
+/**
+ * The project a combined clip (`asset`, kind `compound`) plays: its tracks, at its own size,
+ * everything else (media, frame rate) shared. Cached per asset, so drawing and mixing every frame
+ * don't allocate.
+ */
+export function compoundProject(project: Project, asset: Asset): Project {
+  const known = compoundViews.get(asset);
+  if (known && known.settings === project.settings && known.assets === project.assets)
+    return known.view;
+  const view: Project = {
+    ...project,
+    tracks: asset.tracks ?? [],
+    settings: {
+      ...project.settings,
+      width: asset.width ?? project.settings.width,
+      height: asset.height ?? project.settings.height,
+    },
+  };
+  compoundViews.set(asset, { settings: project.settings, assets: project.assets, view });
+  return view;
+}

@@ -1,5 +1,6 @@
 import { AudioSampleSink, type AudioSample, type InputAudioTrack } from 'mediabunny';
-import type { Item, Project } from '../model/schema';
+import { compoundProject } from '../model/project';
+import type { Asset, Item, Project } from '../model/schema';
 import { FLICKS_PER_SECOND, type Time } from '../model/time';
 import { gainAt, limit, mixInto, Resampler } from './dsp';
 import { applyDuck, DuckFollower, hasDucking } from './duck';
@@ -181,16 +182,85 @@ export interface AudioTrackSource {
   sampleRate: number;
 }
 
+/** Combined clips inside combined clips: this deep, no deeper (a guard). */
+const MAX_NESTING = 4;
+
+/**
+ * Reads a combined clip's sound (DECISIONS #155): its inside mixed by a mixer of its own at the
+ * clip's source time, resampled (linear) for the clip's speed — like a video's sound, so the
+ * outer mixer adds volume, fades, crossfades, effects and ducking the same way.
+ */
+class CompoundReader {
+  private readonly mixer: Mixer;
+  private l = new Float32Array(0);
+  private r = new Float32Array(0);
+  fx: ClipFx | null = null;
+  /** The inside to mix (set before each read; the project may have changed). */
+  view: Project | null = null;
+
+  constructor(
+    private readonly rate: number,
+    audioOf: (assetId: string) => AudioTrackSource | null,
+    depth: number,
+  ) {
+    this.mixer = new Mixer(rate, audioOf);
+    this.mixer.depth = depth;
+  }
+
+  async read(
+    sourceS: number,
+    speed: number,
+    count: number,
+    outL: Float32Array,
+    outR: Float32Array,
+    offset: number,
+  ): Promise<void> {
+    if (!this.view) {
+      outL.fill(0, offset, offset + count);
+      outR.fill(0, offset, offset + count);
+      return;
+    }
+    const need = speed === 1 ? count : Math.ceil(count * speed) + 2;
+    if (this.l.length < need) {
+      this.l = new Float32Array(need);
+      this.r = new Float32Array(need);
+    }
+    const start = Math.round(sourceS * FLICKS_PER_SECOND);
+    await this.mixer.render(this.view, start, need, this.l, this.r);
+    if (speed === 1) {
+      outL.set(this.l.subarray(0, count), offset);
+      outR.set(this.r.subarray(0, count), offset);
+      return;
+    }
+    for (let i = 0; i < count; i++) {
+      const x = i * speed;
+      const i0 = Math.floor(x);
+      const f = x - i0;
+      outL[offset + i] = this.l[i0]! * (1 - f) + this.l[i0 + 1]! * f;
+      outR[offset + i] = this.r[i0]! * (1 - f) + this.r[i0 + 1]! * f;
+    }
+  }
+
+  dispose(): void {
+    this.mixer.dispose();
+  }
+}
+
 /** One audible item to mix in the current block. */
 interface MixJob {
   item: AudibleItem;
   span: AudioSpan;
-  source: AudioTrackSource;
+  /** A file's audio track, or a combined clip (its inside is mixed). */
+  source: AudioTrackSource | Asset;
 }
 
 /** Mixes a project's audible items for any time range. */
 export class Mixer {
-  private readonly readers = new Map<string, ClipReader>();
+  private readonly readers = new Map<string, ClipReader | CompoundReader>();
+  /** How deep inside combined clips this mixer is (0: the timeline). */
+  depth = 0;
+  /** The project of the block being mixed (combined clips read their inside from it). */
+  private project: Project | null = null;
   private tempL = new Float32Array(0);
   private tempR = new Float32Array(0);
   private readonly spans = new Map<string, AudioSpan>();
@@ -233,6 +303,7 @@ export class Mixer {
     }
     const blockEnd = start + Math.round((frames / this.sampleRate) * FLICKS_PER_SECOND);
     const ducking = hasDucking(project);
+    this.project = project;
     const { used, keyJobs, duckJobs, jobPool } = this;
     used.clear();
     let pooled = 0;
@@ -248,7 +319,13 @@ export class Mixer {
         if (!span) this.spans.set(item.id, (span = { ...EMPTY_SPAN }));
         audioSpan(track, index, project.assets[item.assetId]?.duration ?? 0, span);
         if (span.start >= blockEnd || span.end <= start) continue;
-        const source = this.audioOf(item.assetId);
+        const asset = project.assets[item.assetId];
+        const source =
+          asset?.kind === 'compound'
+            ? asset.hasAudio && this.depth < MAX_NESTING
+              ? asset
+              : null
+            : this.audioOf(item.assetId);
         if (!source) continue;
         used.add(item.id);
         const job = jobPool[pooled] ?? (jobPool[pooled] = { item, span, source });
@@ -314,9 +391,14 @@ export class Mixer {
     const sourceS = item.sourceIn / FLICKS_PER_SECOND + local * item.speed;
     let reader = this.readers.get(item.id);
     if (!reader) {
-      reader = new ClipReader(source.track, source.sampleRate, rate);
+      reader =
+        'track' in source
+          ? new ClipReader(source.track, source.sampleRate, rate)
+          : new CompoundReader(rate, this.audioOf, this.depth + 1);
       this.readers.set(item.id, reader);
     }
+    if (reader instanceof CompoundReader && !('track' in source) && this.project)
+      reader.view = compoundProject(this.project, source);
     await reader.read(sourceS, item.speed, count, this.tempL, this.tempR, 0);
     if (hasAudioFx(item.audioFx, item.speed))
       (reader.fx ??= new ClipFx(rate)).process(

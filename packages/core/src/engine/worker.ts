@@ -1056,14 +1056,27 @@ async function listen(
     // this browser lacks) would mix as silence and read as "nobody spoke": say so instead.
     let expected = 0;
     let readable = 0;
-    for (const track of request.project.tracks)
-      for (const item of track.items) {
-        if (!('muted' in item) || item.muted || track.muted || !('assetId' in item)) continue;
-        const asset = item.assetId ? request.project.assets[item.assetId] : undefined;
-        if (!asset || !(asset.kind === 'audio' || asset.hasAudio)) continue;
-        expected++;
-        if (audioTracks.has(asset.id)) readable++;
-      }
+    const p = request.project;
+    const seen = new Set<string>();
+    const count = (tracks: Project['tracks']) => {
+      for (const track of tracks)
+        for (const item of track.items) {
+          if (!('muted' in item) || item.muted || track.muted || !('assetId' in item)) continue;
+          const asset = item.assetId ? p.assets[item.assetId] : undefined;
+          if (!asset || !(asset.kind === 'audio' || asset.hasAudio)) continue;
+          // A combined clip: what's inside it counts (once).
+          if (asset.kind === 'compound') {
+            if (!seen.has(asset.id) && asset.tracks) {
+              seen.add(asset.id);
+              count(asset.tracks);
+            }
+            continue;
+          }
+          expected++;
+          if (audioTracks.has(asset.id)) readable++;
+        }
+    };
+    count(p.tracks);
     if (expected > 0 && readable === 0) {
       const error = new Error(
         typeof AudioDecoder === 'undefined'

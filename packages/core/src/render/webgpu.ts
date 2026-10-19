@@ -124,22 +124,49 @@ export async function createWebGPURenderer(
     return entry.view;
   };
 
-  // Copy of the pixels under a layer (canvas format, grows in 256-px steps, never shrinks) and
-  // the small target blurred areas are drawn through (grows, never shrinks).
-  let grab: { texture: GPUTexture; view: GPUTextureView; w: number; h: number } | null = null;
+  // Copy of the pixels under a layer (grows in 256-px steps, never shrinks) — one per format
+  // drawn into (the canvas's, and render targets' rgba8unorm) — and the small target blurred
+  // areas are drawn through (grows, never shrinks).
+  type Grab = { texture: GPUTexture; view: GPUTextureView; w: number; h: number };
+  const grabs = new Map<GPUTextureFormat, Grab>();
+  let grab: Grab | null = null;
+  let grabFormat: GPUTextureFormat = format;
   const ensureGrab = (w: number, h: number) => {
-    if (grab && grab.w >= w && grab.h >= h) return grab;
-    const gw = Math.max(grab?.w ?? 0, Math.ceil(w / 256) * 256);
-    const gh = Math.max(grab?.h ?? 0, Math.ceil(h / 256) * 256);
-    grab?.texture.destroy();
+    const old = grabs.get(grabFormat) ?? null;
+    if (old && old.w >= w && old.h >= h) return (grab = old);
+    const gw = Math.max(old?.w ?? 0, Math.ceil(w / 256) * 256);
+    const gh = Math.max(old?.h ?? 0, Math.ceil(h / 256) * 256);
+    old?.texture.destroy();
     const texture = device.createTexture({
       size: [gw, gh],
-      format,
+      format: grabFormat,
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
     });
     grab = { texture, view: texture.createView(), w: gw, h: gh };
+    grabs.set(grabFormat, grab);
     return grab;
   };
+
+  /** Render targets (combined clips): drawn like the canvas, shown like an image. */
+  class Target {
+    readonly texture: GPUTexture;
+    readonly view: GPUTextureView;
+    constructor(
+      readonly width: number,
+      readonly height: number,
+    ) {
+      this.texture = device.createTexture({
+        size: [width, height],
+        format: 'rgba8unorm',
+        usage:
+          GPUTextureUsage.RENDER_ATTACHMENT |
+          GPUTextureUsage.TEXTURE_BINDING |
+          GPUTextureUsage.COPY_SRC,
+      });
+      this.view = this.texture.createView();
+    }
+  }
+  const targets = new Set<Target>();
   let regionTarget: { texture: GPUTexture; view: GPUTextureView; w: number; h: number } | null =
     null;
   const ensureRegionTarget = (w: number, h: number) => {
@@ -241,6 +268,10 @@ export async function createWebGPURenderer(
   const fullscreen = new Float32Array([1, 0, 0, -1, 0, 0, 0.5, 0, 0, 0.5, 0.5, 0.5]);
   const floatsPerSlot = SLOT_BYTES / 4;
 
+  /** Output size of the render in progress (the canvas, or a render target). */
+  let outW = 1;
+  let outH = 1;
+
   const texelOf = (source: LayerSource, axis: 0 | 1) =>
     source instanceof VideoFrame
       ? 1 / (axis === 0 ? source.displayWidth : source.displayHeight)
@@ -258,7 +289,9 @@ export async function createWebGPURenderer(
       ? external(source)
       : source instanceof GPUTextureView
         ? source
-        : imageView(source);
+        : source instanceof Target
+          ? source.view
+          : imageView(source as ImageBitmap | OffscreenCanvas);
     let pipeline: GPURenderPipeline;
     let layout: GPUBindGroupLayout;
     if (small) {
@@ -364,8 +397,8 @@ export async function createWebGPURenderer(
       regionFx,
       1 / target.w,
       1 / target.h,
-      canvas.width,
-      canvas.height,
+      outW,
+      outH,
     );
     writeBackMapping(uniforms, o, b[0]!, b[1]!, sw / w / target.w, sh / h / target.h);
   };
@@ -376,8 +409,14 @@ export async function createWebGPURenderer(
       canvas.width = width;
       canvas.height = height;
     },
-    render(layers, background = [0, 0, 0], backdrop = null) {
+    render(layers, background = [0, 0, 0], backdrop = null, into = null) {
       if (destroyed) return;
+      const out = into instanceof Target ? into : null;
+      outW = out ? out.width : canvas.width;
+      outH = out ? out.height : canvas.height;
+      // A render target is rgba8unorm: its draws use the rgba8unorm pipelines and copies.
+      const toTarget = !!out;
+      grabFormat = toTarget ? 'rgba8unorm' : format;
       const extra = backdrop ? 2 : 0;
       // Plan: uniform slots (a blurred area takes two: shrink, then draw back), rectangles to copy.
       ensurePlan(layers.length);
@@ -387,9 +426,9 @@ export async function createWebGPURenderer(
         planSlot[i] = -1;
         const b = planBounds.subarray(i * 4, i * 4 + 4);
         if (layer.region) {
-          const texel = regionTexel(layer.region.amount, layer.region.pixelate, canvas.height);
+          const texel = regionTexel(layer.region.amount, layer.region.pixelate, outH);
           const pad = regionPad(texel, layer.region.pixelate);
-          if (!layerBounds(layer.geometry, canvas.width, canvas.height, pad, b)) continue;
+          if (!layerBounds(layer.geometry, outW, outH, pad, b)) continue;
           const w = b[2]! - b[0]!;
           const h = b[3]! - b[1]!;
           regionSmallSize(w, h, texel, small);
@@ -401,7 +440,7 @@ export async function createWebGPURenderer(
           used += 2;
         } else {
           if (layer.blend) {
-            if (!layerBounds(layer.geometry, canvas.width, canvas.height, 1, b)) continue;
+            if (!layerBounds(layer.geometry, outW, outH, 1, b)) continue;
             ensureGrab(b[2]! - b[0]!, b[3]! - b[1]!);
           }
           planSlot[i] = used;
@@ -412,7 +451,7 @@ export async function createWebGPURenderer(
       importedCount = 0;
       let target = backdropTarget;
       if (backdrop) {
-        const size = backdropSize(canvas.width, canvas.height, backdrop.amount);
+        const size = backdropSize(outW, outH, backdrop.amount);
         if (!target || target.w !== size.width || target.h !== size.height) {
           target?.texture.destroy();
           const texture = device.createTexture({
@@ -451,6 +490,7 @@ export async function createWebGPURenderer(
           target.w,
           target.h,
         );
+        if (backdrop.source instanceof Target) uniforms[14] = 1;
         fx.set(IDENTITY_EFFECTS);
         fx[24] = UPSCALE_BLUR_TEXELS / target.w;
         fx[25] = UPSCALE_BLUR_TEXELS / target.h;
@@ -464,8 +504,8 @@ export async function createWebGPURenderer(
           fx,
           0,
           0,
-          canvas.width,
-          canvas.height,
+          outW,
+          outH,
         );
       }
       for (let i = 0; i < layers.length; i++) {
@@ -491,9 +531,11 @@ export async function createWebGPURenderer(
           layer.effects ?? null,
           texelOf(layer.source, 0),
           texelOf(layer.source, 1),
-          canvas.width,
-          canvas.height,
+          outW,
+          outH,
         );
+        // A render target's colour is premultiplied (the shader divides it back out).
+        if (layer.source instanceof Target) uniforms[slot * floatsPerSlot + 14] = 1;
         // The copy underneath is top row first, like the canvas: texel = pixel − origin.
         if (layer.blend) writeBackMapping(uniforms, slot * floatsPerSlot, b[0]!, b[1]!, 1, 1);
       }
@@ -517,20 +559,22 @@ export async function createWebGPURenderer(
         small.draw(4);
         small.end();
       }
-      const canvasTexture = context.getCurrentTexture();
-      const canvasView = canvasTexture.createView();
+      const canvasTexture = out ? out.texture : context.getCurrentTexture();
+      const canvasView = out ? out.view : canvasTexture.createView();
       let pass = encoder.beginRenderPass({
         colorAttachments: [
           {
             view: canvasView,
-            clearValue: { r: background[0], g: background[1], b: background[2], a: 1 },
+            clearValue: background
+              ? { r: background[0], g: background[1], b: background[2], a: 1 }
+              : { r: 0, g: 0, b: 0, a: 0 },
             loadOp: 'clear',
             storeOp: 'store',
           },
         ],
       });
       if (backdrop && target) {
-        const { pipeline, group } = bindGroupFor(1, target.view, false);
+        const { pipeline, group } = bindGroupFor(1, target.view, toTarget);
         pass.setPipeline(pipeline);
         pass.setBindGroup(0, group);
         pass.draw(4);
@@ -571,11 +615,11 @@ export async function createWebGPURenderer(
           });
         }
         const { pipeline, group } = layer.region
-          ? bindGroupFor(slot + 1, regionTarget!.view, false)
+          ? bindGroupFor(slot + 1, regionTarget!.view, toTarget)
           : bindGroupFor(
               slot,
               layer.source,
-              false,
+              toTarget,
               layer.blend ? grab!.view : noUnderView,
               lutView(layer.lut),
             );
@@ -607,6 +651,15 @@ export async function createWebGPURenderer(
       single.hdr = placement.hdr ?? false;
       renderer.render(singleList);
     },
+    createTarget(width, height) {
+      const target = new Target(Math.max(1, Math.round(width)), Math.max(1, Math.round(height)));
+      targets.add(target);
+      return target;
+    },
+    destroyTarget(target) {
+      if (!(target instanceof Target) || !targets.delete(target)) return;
+      target.texture.destroy();
+    },
     release(source) {
       const entry = images.get(source);
       if (!entry) return;
@@ -619,7 +672,10 @@ export async function createWebGPURenderer(
       images.clear();
       uniformBuffer?.destroy();
       backdropTarget?.texture.destroy();
-      grab?.texture.destroy();
+      for (const g of grabs.values()) g.texture.destroy();
+      grabs.clear();
+      for (const t of targets) t.texture.destroy();
+      targets.clear();
       regionTarget?.texture.destroy();
       for (const entry of luts.values()) entry.texture.destroy();
       luts.clear();
