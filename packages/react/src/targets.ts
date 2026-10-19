@@ -95,9 +95,12 @@ export function computeTargets(
     splitReason = l.playheadAtEdge;
 
   const freezeBase = selected ?? under;
+  const combined =
+    freezeBase?.kind === 'video' && project.assets[freezeBase.assetId]?.kind === 'compound';
   const freezeItem =
     freezeBase &&
     freezeBase.kind === 'video' &&
+    !combined &&
     items.includes(freezeBase) &&
     t >= freezeBase.start &&
     t < itemEnd(freezeBase)
@@ -107,9 +110,11 @@ export function computeTargets(
     ? l.needClips
     : freezeItem
       ? null
-      : freezeBase && freezeBase.kind !== 'video'
-        ? l.freezeVideoOnly
-        : l.playheadOutsideClips;
+      : combined
+        ? l.freezeNotCombined
+        : freezeBase && freezeBase.kind !== 'video'
+          ? l.freezeVideoOnly
+          : l.playheadOutsideClips;
 
   const picture = (i: Item | null | undefined): i is LookItem => !!i && 'filter' in i;
   const fallback = under ?? items[0] ?? null;
@@ -202,7 +207,8 @@ function key(t: Targets): string {
  */
 export function useTargets(): Targets {
   const ctl = useController();
-  const project = useStore(ctl.editor.store, (s) => s.project);
+  useStore(ctl.ui, (s) => s.inside);
+  const project = ctl.view(useStore(ctl.editor.store, (s) => s.project));
   const primary = useStore(ctl.ui, (s) => s.selectedId);
   const subject = useContext(SubjectContext);
   const selectedId = subject !== undefined ? subject : primary;

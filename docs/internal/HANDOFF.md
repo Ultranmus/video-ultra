@@ -2,6 +2,23 @@
 
 Where the last session stopped and what comes next. Update before ending every session.
 
+## 2026-10-20 (your list fixed, v0.4 finished — merged to main, not pushed)
+
+Branch `feat/v0.4-finish`, merged into main locally. **Not pushed** (waits for the owner's word),
+and the old helper worktrees under `.claude/worktrees/` are still there (owner to say).
+
+- Owner's list (2026-10-19): items 1–5 and 7 fixed (#151, #152); item 6 turned out to be the
+  timeline lanes jumping on a Layers restack — they slide now.
+- v0.4 finished (#153–#155): edit several at once, Your videos (copy / new / open / delete),
+  Combine into one clip (combine / open / separate; engine render targets). Multiple timelines
+  → BACKLOG by the owner's choice.
+- Checks: `pnpm verify` green; every browser check passes except three that fail identically on
+  main without today's work (BACKLOG: editor-check, proxies-check, cutout-check); golden frames
+  unchanged on both backends and browsers.
+- **Next:** owner tests with `docs/internal/TEST_CHECKLIST.md` section 0 (desktop, iPhone over
+  https, Android); then 1.0 hardening (device pass incl. a combined clip on a budget phone, perf
+  tuning, docs) and the v0.1 release steps.
+
 ## 2026-10-19 (night branch merged to main)
 
 `night/v0.3-v0.4` merged into main (21 commits: v0.3 complete; v0.4 keyframes, trims + markers,

@@ -34,7 +34,7 @@ import { BackgroundTool } from './cutout';
 import { KeyframesTool, usePlayheadFor } from './keyframes';
 import { ProTrimTool } from './protrim';
 import { ScenesTool } from './scenes';
-import { AllSelected, useSharedReps } from './multiedit';
+import { AllSelected, useSharedReps, WholeVideoOnly } from './multiedit';
 import { SoundFxTool } from './soundfx';
 import { ScopesView } from './scopes';
 import { ReadAloudTool } from './speech';
@@ -245,9 +245,11 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
           <Section title={l.soundEffects} collapsible defaultOpen={!!item.audioFx}>
             <SoundFxTool item={item} />
           </Section>
-          <Section title={l.splitAtScenes} collapsible defaultOpen={false}>
-            <ScenesTool item={item} />
-          </Section>
+          {ctl.isCombined(item) ? null : (
+            <Section title={l.splitAtScenes} collapsible defaultOpen={false}>
+              <ScenesTool item={item} />
+            </Section>
+          )}
           {picture}
         </>
       );
@@ -421,7 +423,15 @@ export function VolumeTool({ item }: { item: Item }) {
             label={l.extractAudio}
             variant="secondary"
             tip={l.tipExtract}
-            disabledReason={!asset?.hasAudio ? l.noSound : item.muted ? l.alreadyMuted : null}
+            disabledReason={
+              ctl.isCombined(item)
+                ? l.extractNotCombined
+                : !asset?.hasAudio
+                  ? l.noSound
+                  : item.muted
+                    ? l.alreadyMuted
+                    : null
+            }
             onClick={() => ctl.extractAudio()}
           />
         ) : null}
@@ -1152,11 +1162,13 @@ function RatioPicker({
 export function CanvasTool(): ReactElement {
   const ctl = useController();
   const l = useLabels();
+  const inside = useUi((s) => s.inside.length > 0);
   const { width, height, background } = useProject((p) => ({
     width: p.settings.width,
     height: p.settings.height,
     background: p.settings.background,
   }));
+  if (inside) return <WholeVideoOnly message={l.canvasWholeVideo} />;
   return (
     <>
       <RatioPicker

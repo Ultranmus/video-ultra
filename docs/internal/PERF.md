@@ -522,3 +522,18 @@ software). editor-interact logs main-thread tasks of 50–420 ms there — **the
 11), so they come from the machine (software rendering, slow cores), not from the v0.3 / v0.4
 work. Long-task budgets are judged on the owner's devices; per-feature checks (shapes-check)
 count only the tasks a feature adds.
+
+## Combined clips (v0.4, 2026-10-20, DECISIONS #155)
+
+- **Cost per visible combined clip:** one extra render pass into a pooled render target the size
+  of the output (no texture made per frame; re-made only when the output size changes) and its
+  own decoders from the shared pool (backpressure as for any clip). A clip that isn't on screen
+  keeps no target or decoders (pruned with its item); inside, only what's on screen keeps a
+  decoder. No allocation per frame: the inside's project view is cached per asset.
+- **Sound:** a nested mixer per combined clip playing; at speed ≠ 1 a linear resample into
+  reused buffers.
+- **compound-check** (Chrome WebGPU + WebGL2, WebKit WebGL2): frames before / after combining
+  differ by 0.00 / 255 (p99 0); 2× shows the inside's frame at twice the time; opacity 0.502 of
+  the original; sound correlation 1.0000; export 13.03 s with picture and sound, clean decode.
+- Not measured on a phone yet: a combined clip over the main video is two decodes plus one extra
+  pass — the budget phone pass should include one.

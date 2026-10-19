@@ -4,13 +4,25 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 
 ## Open
 
+- [ ] Combined clips (#155): Separate re-makes lanes at the end of their kind (a title can come
+      back above a sticker it was under); keep their old row order.
+- [ ] Combined clips: no waveform on the timeline for a combined clip with sound (mix its inside
+      in the analyzer, cached), and Layers / Media show it as a video.
+- [ ] Combined clips: the inside is drawn at the output size; zoomed past 1× (scale > 1) it's
+      upscaled — draw it at the zoomed size (capped) when that matters.
+- [ ] Combined clips on a budget phone: measure a combined clip over the main video (two
+      decodes + a pass) in the device pass.
+
 - [ ] Multiple timelines in one project (tabs; one dropped into another as a combined clip) —
       left out of v0.4 for edit-several + duplicate project (#153).
 
-- [ ] Owner's "frame lane flickers when changing the selection in Layers" (2026-10-19) didn't
-      reproduce (2026-10-20): Chrome and WebKit, 1× and 2× pixels, clips and video layers — no new
-      thumbnail requests, Layers pictures kept, the timeline canvas changes once per click (the
-      selection outline). Needs a screen recording of it.
+- [x] Owner's "frame lane flickers" (2026-10-19): it was the timeline lanes jumping when a
+      Layers drag restacks — lanes now slide to their new places (180 ms, ease-out; reduced
+      motion: instant). Measured: 12 in-between timeline frames instead of one jump.
+- [ ] Checks that fail on this Mac before and after today's work (same numbers on main without
+      it, 2026-10-20): editor-check (two 404s in the console + long tasks 58–137 ms on startup),
+      proxies-check (preview luma 130 vs 128: the threshold is too tight here), cutout-check
+      ("background gone" 35 → 10 with the test chart — it needs a real portrait as its argument).
 - [ ] Captions: when the model ends a window early (a few words, then end of text), hear the
       rest of the window again from the last word (like a seek), so long speech isn't cut (#152).
 - [ ] Captions: speech far under room sound (a phone re-recording) gives nothing — the model

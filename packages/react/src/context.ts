@@ -27,11 +27,17 @@ export function useUi<T>(selector: (state: UiState) => T): T {
   return useStore(useController().ui, useShallow(selector));
 }
 
-/** Part of the project, re-rendering only when it changes (shallow compare). */
+/**
+ * Part of the project as the editor shows it (inside an open combined clip, its inside),
+ * re-rendering only when it changes (shallow compare).
+ */
 export function useProject<T>(selector: (project: Project) => T): T {
+  const ctl = useController();
+  // Opening / closing a combined clip changes what's shown without changing the project.
+  useStore(ctl.ui, (s) => s.inside);
   return useStore(
-    useController().editor.store,
-    useShallow((s) => selector(s.project)),
+    ctl.editor.store,
+    useShallow((s) => selector(ctl.view(s.project))),
   );
 }
 

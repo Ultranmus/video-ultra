@@ -7,8 +7,10 @@
  * Usage: playground running, then node scripts/compound-check.ts [--shots <dir>] [--browser chrome|webkit]
  */
 import { chromium, webkit, type Page } from '@playwright/test';
-import { writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 
 const arg = (name: string) =>
   process.argv.includes(`--${name}`)
@@ -228,6 +230,44 @@ for (const b of backends) {
 const soundAfter = await sound(page, 6);
 const corr = correlation(soundBefore, soundAfter);
 check('its sound is the pieces’ sound', corr > 0.98, corr.toFixed(4));
+
+// Export: a real file with the combined clip, full length, both streams, decodes cleanly.
+const bytes = await page.evaluate(async () => {
+  const c = (window as any).vuEditor;
+  const out = await c.engine.export({ format: 'mp4', height: 480, fps: 30, quality: 'low' });
+  return Array.from(new Uint8Array(await out.blob.arrayBuffer()));
+});
+const file = join(mkdtempSync(join(tmpdir(), 'vu-compound-')), 'combined.mp4');
+writeFileSync(file, Buffer.from(bytes));
+const probe = JSON.parse(
+  execFileSync('ffprobe', [
+    '-v',
+    'error',
+    '-show_streams',
+    '-show_format',
+    '-of',
+    'json',
+    file,
+  ]).toString(),
+) as { format: { duration: string }; streams: { codec_type: string }[] };
+const length = Number(probe.format.duration);
+check(
+  'export: the whole video, combined clip included',
+  Math.abs(length - 13) < 0.2,
+  `${length.toFixed(2)} s`,
+);
+check(
+  'export: picture and sound',
+  probe.streams.some((x) => x.codec_type === 'video') &&
+    probe.streams.some((x) => x.codec_type === 'audio'),
+);
+let decodeErrors = '';
+try {
+  execFileSync('ffmpeg', ['-v', 'error', '-i', file, '-f', 'null', '-'], { stdio: 'pipe' });
+} catch (e) {
+  decodeErrors = String(e);
+}
+check('export: decodes without errors', decodeErrors === '', decodeErrors.slice(0, 120));
 
 // 2×: the frame at 1 s is the inside at 2 s.
 await page.evaluate((id) => {

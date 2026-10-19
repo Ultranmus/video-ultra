@@ -2996,6 +2996,48 @@
     touch-action: none;
   }
 
+  /* Inside a combined clip (#155): a bar over the timeline says where you are; the way back. */
+  .vu-timeline[data-inside] .vu-timeline-canvas {
+    top: var(--vu-size-inside-bar);
+  }
+
+  .vu-inside-bar {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--vu-space-2);
+    height: var(--vu-size-inside-bar);
+    padding: 0 var(--vu-space-3);
+    border-bottom: 1px solid var(--vu-border);
+    background: var(--vu-accent-soft);
+    color: var(--vu-text);
+    font-size: var(--vu-text-sm);
+  }
+
+  .vu-inside-path {
+    display: flex;
+    min-width: 0;
+    gap: var(--vu-space-1);
+    overflow: hidden;
+    color: var(--vu-text-muted);
+    white-space: nowrap;
+  }
+
+  .vu-inside-path > span + span::before {
+    content: '›';
+    margin-inline-end: var(--vu-space-1);
+  }
+
+  .vu-inside-path > [aria-current] {
+    overflow: hidden;
+    color: var(--vu-text);
+    font-weight: var(--vu-weight-semibold);
+    text-overflow: ellipsis;
+  }
+
   .vu-timeline-canvas canvas {
     display: block;
   }

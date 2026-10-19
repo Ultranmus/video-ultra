@@ -10,6 +10,7 @@ import {
 } from '@video-ultra/core';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { useController, useLabels, useProject, useUi } from './context';
+import { WholeVideoOnly } from './multiedit';
 import { Button, Chips, ColorField, IconButton, Section, Segmented } from './controls';
 import { formatClock } from './format';
 
@@ -70,6 +71,13 @@ function startLanguage(): string {
 export function CaptionsPanel(): ReactElement {
   const l = useLabels();
   const has = useProject((p) => (captionTrack(p)?.items.length ?? 0) > 0);
+  const inside = useUi((s) => s.inside.length > 0);
+  if (inside)
+    return (
+      <div className="vu-panel-body vu-captions">
+        <WholeVideoOnly message={l.captionsWholeVideo} />
+      </div>
+    );
   return (
     <div className="vu-panel-body vu-captions">
       <AutoCaptions has={has} />

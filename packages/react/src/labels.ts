@@ -513,6 +513,9 @@ export const DEFAULT_LABELS = {
   groupNoMainVideo: 'Clips in the main video can’t be grouped',
   groupedDone: (n: number) => `Grouped ${n} elements`,
   combine: 'Combine into one clip',
+  combinedKind: 'Combined clip',
+  extractNotCombined: 'Open the combined clip to take the sound out of what’s inside',
+  freezeNotCombined: 'Freeze works on a video file — open the combined clip to freeze inside it',
   tipCombine:
     'Make the selected clips and layers one clip: move, trim, speed up and filter it as one',
   combineNeedsTwo: 'Select two or more clips or layers first',
@@ -527,6 +530,12 @@ export const DEFAULT_LABELS = {
   separatedDone: (n: number) => `Separated into ${n} pieces`,
   insideCombined: (name: string) => `Inside ${name}`,
   backToTimeline: 'Back',
+  wholeVideoMarkers:
+    'Markers and the export part are the whole video’s — go back out of the combined clip',
+  captionsWholeVideo:
+    'Captions are for the whole video. Go back out of the combined clip to add or change them.',
+  canvasWholeVideo:
+    'The size and background are the whole video’s. Go back out of the combined clip to change them.',
   tipBackToTimeline: 'Back to the timeline it’s in',
   ungroupedDone: 'Ungrouped',
   groupBadge: 'Group',

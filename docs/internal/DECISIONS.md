@@ -950,3 +950,33 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       and registers only the media not already loaded. Shown only when the editor saves
       locally (`autosave` on) and not hidden (`customize.hide: ['videos']`) — hosts with their
       own project list keep theirs. Checked by videos-check (desktop + phone).
+
+155.  **Combine into one clip** (#153 part 3; a pro tool in the context menu only). **Model:** a
+      combined clip is an ordinary video item playing an asset of the new kind `compound` (file
+      version 5; 4 → 5 changes nothing) that holds its own tracks (main track first, timed from
+      0), the canvas size it was made at, its length and whether it has sound — no file. Being a
+      video item, it trims, splits, speeds up, takes filters, LUT, opacity, blend, transitions,
+      animations, keyframes, copy / paste like any clip with no new code; several items may play
+      one combined clip (a split, a copy), and editing its inside changes them all. Freeze,
+      Extract audio and Split at scenes need a real file: refused with a reason. Combine takes
+      next-to-each-other main clips (the transition into the first one comes along) plus the
+      layers inside their span, or layers alone (a new layer); captions stay out. Separate puts
+      the pieces back where it played them, its trim and speed applied (its own look doesn't
+      carry over); pieces get new ids so other clips playing it keep it. Invariants and repair
+      cover every inside (ids unique across all; no clip containing itself; the inside fits the
+      length); the property tests include combine / separate. **Engine:** renderers gain render
+      targets (WebGPU: rgba8unorm texture, its own pipelines and copy-under texture; WebGL2: an
+      FBO, read bottom row first); a target is cleared transparent and, used as a layer, its
+      premultiplied colour is divided back out in the shader (`uvT.z`, one flag). Each item
+      playing a combined clip gets a child composer (its own decode positions, the shared
+      decoder pool and media) that draws the inside into that item's target, sized to fit the
+      output (exports stay sharp); the target then goes through the normal picture path. Sound:
+      a nested mixer behind the clip-reader interface, resampled for speed. Nesting stops at 4
+      levels. Measured: frames identical to the pieces on both backends (0.00 mean difference);
+      sound correlation 1.0; exports carry picture and sound. **Editing inside ("Open"):** the
+      editor shows a view of the project whose tracks are the clip's inside (cached per project
+      object); edits run on the real project through a draft whose `tracks` are the clip's, then
+      its length / sound follow and clips playing it stay within it — so the timeline, stage,
+      inspector, history and saving all work unchanged inside. A bar over the timeline names
+      where you are with Back; Captions and the canvas size say they're the whole video's;
+      Export and undoing past the Combine leave the clip. Multiple timelines stay out (#153).

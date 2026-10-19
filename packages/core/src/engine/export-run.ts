@@ -392,9 +392,40 @@ function hasSound(project: Project, audioOf: ExportDeps['audioOf'], span?: Expor
       )
         continue;
       if (audioOf(item.assetId)) return true;
+      // A combined clip: some sound inside it the mixer can read (#155).
+      const asset = project.assets[item.assetId];
+      if (
+        asset?.kind === 'compound' &&
+        asset.hasAudio &&
+        compoundSound(project, asset.id, audioOf, 0)
+      )
+        return true;
     }
   }
   return false;
+}
+
+/** Whether combined clip `assetId` holds sound the mixer can read (through ones inside it). */
+function compoundSound(
+  project: Project,
+  assetId: string,
+  audioOf: ExportDeps['audioOf'],
+  depth: number,
+): boolean {
+  const asset = project.assets[assetId];
+  if (!asset?.tracks || depth > 4) return false;
+  return asset.tracks.some(
+    (t) =>
+      !t.muted &&
+      t.items.some((i) => {
+        if (i.kind !== 'video' && i.kind !== 'audio') return false;
+        if (i.muted || i.volume === 0) return false;
+        if (audioOf(i.assetId)) return true;
+        return project.assets[i.assetId]?.kind === 'compound'
+          ? compoundSound(project, i.assetId, audioOf, depth + 1)
+          : false;
+      }),
+  );
 }
 
 /** Runs one export. Throws {@link ExportCancelled} when cancelled (the partial file is deleted). */

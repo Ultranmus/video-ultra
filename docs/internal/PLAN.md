@@ -212,6 +212,6 @@ _D. Capture & export_
 - [x] Text-to-speech voiceover (L) — #150
 - [x] Edit several at once (M) — #153 (owner's choice over multiple sequences)
 - [x] Duplicate project, sharing media (S) — #153, #154 ("Your videos")
-- [ ] Combine into one clip (compound clip; context menu only) (L) — #153; multiple timelines →
-      BACKLOG
+- [x] Combine into one clip (compound clip; context menu only) (L) — #153, #155; multiple
+      timelines → BACKLOG
 - [x] Optional AI editing plugin (bring-your-own endpoint) driving the op-based Project (M) — #149

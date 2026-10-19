@@ -122,6 +122,8 @@ the stage and everything drawn on it don't mirror. Text items in RTL scripts ren
 - The canvas has an accessible DOM layer: each clip is a focusable item with a label
   ("Clip 2, video, 0:04 to 0:09"); arrow keys move, Shift + arrows trim, Delete removes.
 
+- **Lanes move, they don't jump:** when an edit changes which row a lane sits in (a Layers
+  restack, a lane added or removed), it slides there (180 ms ease-out; reduced motion: instant).
 - **Phone main track:** at the start the playhead sits mid-screen, so a "+" also sits before the
   first clip (adds media at the start) — the left half is never empty.
 
@@ -148,6 +150,11 @@ the stage and everything drawn on it don't mirror. Text items in RTL scripts ren
   selected" and the settings they share (Speed, Sound, Adjust, Opacity & blend); the left
   menu's Filters and Transitions act on all of them; the phone's multi-selection tools add
   Speed, Volume, Fade, Filter, Adjust, Animate, Opacity.
+- **Combine into one clip** (#155, pro — context menu only): several selected → "Combine into
+  one clip"; a combined clip → "Open combined clip" / "Separate". Open: a tinted bar over the
+  timeline (Back · the clips it sits in, the current one bold); the timeline, stage and
+  inspector show its inside; Captions and canvas size show a "for the whole video" note with
+  Back. Its film strip shows the pictures inside it.
 - **Typing on the stage** (#151): double-click a text (mouse) or tap a selected text (touch) →
   a field over it, styled like the text, dashed accent outline; click away or ⌘/Ctrl+Enter keeps
   it, Esc puts the old text back.

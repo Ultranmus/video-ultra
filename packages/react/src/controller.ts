@@ -24,6 +24,7 @@ import {
   freezeFrame,
   groupItems,
   combineItems,
+  refreshCompound,
   separateItem,
   groupOf,
   insertMain,
@@ -288,15 +289,27 @@ export class EditorController {
     this.#disposers.push(
       this.editor.store.subscribe((state, prev) => {
         if (state.project === prev.project) return;
-        if (!this.#previewProject) void this.engine?.setProject(state.project).catch(() => {});
+        // A combined clip that's open but gone (undone, separated): back out of it.
+        const inside = this.ui.getState().inside;
+        const gone = inside.findIndex((i) => state.project.assets[i.assetId]?.kind !== 'compound');
+        if (gone !== -1) this.ui.setState({ inside: inside.slice(0, gone) });
+        const shown = this.view(state.project);
+        if (!this.#previewProject) void this.engine?.setProject(shown).catch(() => {});
         const { selectedId, selectedIds } = this.ui.getState();
-        if (selectedId && !findItem(state.project, selectedId)) this.select(null);
-        else if (selectedIds.some((id) => !findItem(state.project, id)))
+        if (selectedId && !findItem(shown, selectedId)) this.select(null);
+        else if (selectedIds.some((id) => !findItem(shown, id)))
           this.ui.setState({
-            selectedIds: selectedIds.filter((id) => findItem(state.project, id)),
+            selectedIds: selectedIds.filter((id) => findItem(shown, id)),
           });
-        if (this.playhead.time > projectDuration(state.project))
-          this.seek(projectDuration(state.project));
+        if (this.playhead.time > projectDuration(shown)) this.seek(projectDuration(shown));
+      }),
+      this.ui.subscribe((state, prev) => {
+        if (state.inside !== prev.inside) {
+          this.#previewProject = null;
+          void this.engine?.setProject(this.project).catch(() => {});
+        }
+        // Export is the whole video: leave any open combined clip first.
+        if (state.exportOpen && !prev.exportOpen && state.inside.length) this.closeCombined(true);
       }),
     );
   }
@@ -323,8 +336,70 @@ export class EditorController {
     };
   }
 
+  /** The project as the editor shows it: inside the open combined clip, if one is open. */
   get project(): Project {
-    return this.editor.getProject();
+    return this.view(this.editor.getProject());
+  }
+
+  readonly #views = new WeakMap<Project, { assetId: string; view: Project }>();
+
+  /**
+   * `project` as the editor shows it (DECISIONS #155): with a combined clip open, a project whose
+   * tracks are its inside, drawn at its size (no markers or export range — those are the whole
+   * video's). Cached per project object, so selectors stay stable.
+   */
+  view(project: Project): Project {
+    const top = this.ui.getState().inside.at(-1);
+    if (!top) return project;
+    const asset = project.assets[top.assetId];
+    if (!asset || asset.kind !== 'compound' || !asset.tracks) return project;
+    const known = this.#views.get(project);
+    if (known?.assetId === top.assetId) return known.view;
+    const { exportRange: _range, ...settings } = project.settings;
+    void _range;
+    const { markers: _markers, ...rest } = project;
+    void _markers;
+    const view: Project = {
+      ...rest,
+      tracks: asset.tracks,
+      settings: {
+        ...settings,
+        width: asset.width ?? settings.width,
+        height: asset.height ?? settings.height,
+      },
+    };
+    this.#views.set(project, { assetId: top.assetId, view });
+    return view;
+  }
+
+  /**
+   * `recipe` as it runs on the whole project while a combined clip is open: it sees the clip's
+   * inside as the project's tracks; afterwards the clip (and the ones it sits in) follow their
+   * new content (length, sound; clips playing them stay within it).
+   */
+  #scoped<F extends ((draft: Project, ctx: EditContext) => unknown) | null>(recipe: F): F {
+    const chain = this.ui.getState().inside.map((i) => i.assetId);
+    const assetId = chain.at(-1);
+    if (!recipe || !assetId) return recipe;
+    return ((draft: Project, ctx: EditContext) => {
+      const scoped = new Proxy(draft, {
+        get(target, key) {
+          if (key === 'tracks') return target.assets[assetId]?.tracks ?? [];
+          return Reflect.get(target, key);
+        },
+        set(target, key, value) {
+          if (key === 'tracks') {
+            const asset = target.assets[assetId];
+            if (asset) asset.tracks = value as Project['tracks'];
+            return true;
+          }
+          return Reflect.set(target, key, value);
+        },
+      });
+      const result = recipe(scoped, ctx);
+      for (const id of [...chain].reverse()) refreshCompound(draft, id);
+      return result;
+    }) as F;
   }
 
   // ── lifecycle ──────────────────────────────────────────────────────────
@@ -540,6 +615,7 @@ export class EditorController {
       menu: null,
       historyOpen: false,
       save: 'idle',
+      inside: [],
     });
     this.editor.load(project);
     this.seek(0);
@@ -755,7 +831,7 @@ export class EditorController {
     recipe: (draft: Project, ctx: EditContext) => R,
     options?: { coalesceKey?: string },
   ): R | undefined {
-    recipe = this.#fanned(recipe);
+    recipe = this.#scoped(this.#fanned(recipe));
     this.#previewProject = null;
     try {
       return this.editor.apply(label, recipe, options);
@@ -978,6 +1054,46 @@ export class EditorController {
     if (!id) return;
     this.select(id);
     this.#announce(this.labels.combinedDone(ids.length));
+  }
+
+  /**
+   * Opens a combined clip to edit its inside (the selected one, or `itemId`): the timeline shows
+   * what's in it, the playhead at the same moment of it. Edits change every place that plays it.
+   */
+  openCombined(itemId?: string): void {
+    const item = itemId ? findItem(this.project, itemId)?.item : this.selectedItem();
+    if (!item || item.kind !== 'video' || !this.isCombined(item)) return;
+    const asset = this.project.assets[item.assetId]!;
+    const outerTime = this.playhead.time;
+    const local = Math.round(
+      item.sourceIn + Math.max(0, Math.min(item.duration, outerTime - item.start)) * item.speed,
+    );
+    this.pause();
+    this.ui.setState((s) => ({
+      inside: [...s.inside, { assetId: asset.id, itemId: item.id, name: asset.name, outerTime }],
+      selectedId: null,
+      selectedIds: [],
+      menu: null,
+    }));
+    this.seek(Math.min(local, Math.max(0, asset.duration - 1)));
+    this.#announce(this.labels.insideCombined(asset.name));
+  }
+
+  /** Back out of the open combined clip (`all`: back to the timeline itself). */
+  closeCombined(all = false): void {
+    const inside = this.ui.getState().inside;
+    const top = inside.at(-1);
+    if (!top) return;
+    const outer = all ? inside[0]! : top;
+    this.pause();
+    this.ui.setState({
+      inside: all ? [] : inside.slice(0, -1),
+      selectedId: null,
+      selectedIds: [],
+      menu: null,
+    });
+    this.seek(outer.outerTime);
+    if (findItem(this.project, outer.itemId)) this.select(outer.itemId);
   }
 
   /** Puts the selected combined clip's pieces back on the timeline. */

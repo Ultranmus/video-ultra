@@ -1789,6 +1789,19 @@ export function combineItems(
     }
   }
   for (const lane of inner) lane.items.sort((a, b) => a.start - b.start);
+  // A group only partly picked: its members inside leave it (the ones outside are tidied below).
+  const members = new Map<string, number>();
+  for (const lane of inner)
+    for (const i of lane.items)
+      if (i.groupId) members.set(i.groupId, (members.get(i.groupId) ?? 0) + 1);
+  for (const lane of inner)
+    for (const i of lane.items) {
+      if (!i.groupId) continue;
+      const whole = project.tracks.every((t) =>
+        t.items.every((o) => o.groupId !== i.groupId || picked.some((p) => p.item === o)),
+      );
+      if (!whole || (members.get(i.groupId) ?? 0) < 2 || lane === inner[0]) delete i.groupId;
+    }
 
   const asset: Asset = {
     id: ids(),

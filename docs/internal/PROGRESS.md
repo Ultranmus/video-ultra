@@ -309,3 +309,22 @@ merged and re-verified on main; A (captions) and E (layers) here.
 - Checks added: shapes-, stickers-, templates-, cutout-, embed-, keyframes-, protrim-, codecs-,
   scenes-, soundfx-, scopes-check; composite-check mask goldens; organize-check marquee + paste;
   a11y-check --contrast. Core unit tests 493, react 18.
+
+## 2026-10-20 · Owner's list, then the rest of v0.4 (branch `feat/v0.4-finish`)
+
+- Merged `night/v0.3-v0.4` into main (local; not pushed).
+- **Owner's list:** Align submenu (outside the scrolling menu, flips left; hover + click keeps it
+  open); each desktop panel its own scroll box and place; typing on the stage (#151); cut-off
+  labels (row buttons wrap to a full line, tabs by label, filter names / sound credits two
+  lines); phone "+" before the first clip; captions on real speech under sound, collapsed word
+  timing, unreadable sound, Safari-on-http sound note (#152). Film strip "flicker" in Layers:
+  the owner clarified it's the timeline lanes jumping on a Layers restack (fixing next).
+- **Edit several at once** (#153): fan-out controller; inspector / left menu / phone tools.
+- **Your videos** (#154): make a copy (shared media), new, open, delete.
+- **Combine into one clip** (#155): file version 5; combine / separate in core (property tests);
+  render targets in both renderers + child composer + nested mixer; Open / Back with a scoped
+  view; export carries picture and sound.
+- Dev: the React package's watch build no longer deletes styles.css (tsup clean off, `build`
+  empties dist).
+- Checks added: stage-text, multiedit, videos, compound, combine-ui. Golden frames unchanged on
+  both backends and browsers.

@@ -378,7 +378,8 @@ export function Inspector(): ReactElement {
         <div className="vu-inspector-title">
           <h2 className="vu-panel-title">{name}</h2>
           <span className="vu-inspector-meta">
-            {kindLabel(l, item.kind, true)} · {(item.duration / FLICKS_PER_SECOND).toFixed(1)} s
+            {ctl.isCombined(item) ? l.combinedKind : kindLabel(l, item.kind, true)} ·{' '}
+            {(item.duration / FLICKS_PER_SECOND).toFixed(1)} s
           </span>
         </div>
         <IconButton
@@ -562,12 +563,44 @@ export function Timeline({
       viewRef.current = null;
     };
   }, [ctl, rootRef]);
+  const inside = useUi((s) => s.inside.length > 0);
   return (
-    <div className="vu-timeline">
+    <div className="vu-timeline" data-inside={inside || undefined}>
+      <InsideBar />
       <div className="vu-timeline-canvas">
         <canvas ref={canvasRef} aria-hidden="true" data-tooltip-follow="" />
       </div>
       <TimelineA11y onReveal={(item) => viewRef.current?.reveal(item)} />
+    </div>
+  );
+}
+
+/**
+ * While a combined clip is open (DECISIONS #155): where you are (the clips it sits in) and the way
+ * back out. Over the timeline, on every layout.
+ */
+function InsideBar(): ReactElement | null {
+  const ctl = useController();
+  const l = useLabels();
+  const inside = useUi((s) => s.inside);
+  if (inside.length === 0) return null;
+  return (
+    <div className="vu-inside-bar" role="region" aria-label={l.insideCombined(inside.at(-1)!.name)}>
+      <Button
+        icon="back"
+        label={l.backToTimeline}
+        tip={l.tipBackToTimeline}
+        variant="secondary"
+        onClick={() => ctl.closeCombined()}
+      />
+      <Icon name="combine" size={16} />
+      <span className="vu-inside-path">
+        {inside.map((i, k) => (
+          <span key={i.assetId + k} aria-current={k === inside.length - 1 ? 'location' : undefined}>
+            {i.name}
+          </span>
+        ))}
+      </span>
     </div>
   );
 }

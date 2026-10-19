@@ -28,6 +28,9 @@ export type CommandId =
   | 'deselect'
   | 'group'
   | 'ungroup'
+  | 'combine'
+  | 'openCombined'
+  | 'separate'
   | 'lock'
   | 'hide'
   | 'forward'
@@ -210,7 +213,11 @@ export function getCommand(ctl: EditorController, id: CommandId): Command {
         icon: 'marker',
         tip: l.tipAddMarker,
         shortcut: 'M',
-        disabledReason: projectDuration(ctl.project) > 0 ? null : l.needClips,
+        disabledReason: ctl.ui.getState().inside.length
+          ? l.wholeVideoMarkers
+          : projectDuration(ctl.project) > 0
+            ? null
+            : l.needClips,
         run: () => ctl.addMarkerHere(),
       };
     case 'prevMarker':
@@ -264,6 +271,33 @@ export function getCommand(ctl: EditorController, id: CommandId): Command {
         shortcut: '⌘G',
         disabledReason: ctl.groupReason(),
         run: () => ctl.groupSelected(),
+      };
+    case 'combine':
+      return {
+        id,
+        label: l.combine,
+        icon: 'combine',
+        tip: l.tipCombine,
+        disabledReason: ctl.combineReason(),
+        run: () => ctl.combineSelected(),
+      };
+    case 'openCombined':
+      return {
+        id,
+        label: l.openCombined,
+        icon: 'edit',
+        tip: l.tipOpenCombined,
+        disabledReason: ctl.isCombined(ctl.selectedItem()) ? null : l.selectFirst,
+        run: () => ctl.openCombined(),
+      };
+    case 'separate':
+      return {
+        id,
+        label: l.separate,
+        icon: 'separate',
+        tip: l.tipSeparate,
+        disabledReason: ctl.isCombined(ctl.selectedItem()) ? null : l.selectFirst,
+        run: () => ctl.separateSelected(),
       };
     case 'ungroup':
       return {
@@ -351,7 +385,11 @@ export function getCommand(ctl: EditorController, id: CommandId): Command {
         icon: 'range',
         tip: id === 'markIn' ? l.markInTip : l.markOutTip,
         shortcut: id === 'markIn' ? 'I' : 'O',
-        disabledReason: empty ? l.needClips : null,
+        disabledReason: ctl.ui.getState().inside.length
+          ? l.wholeVideoMarkers
+          : empty
+            ? l.needClips
+            : null,
         run: () => (id === 'markIn' ? ctl.setExportIn() : ctl.setExportOut()),
       };
     }
@@ -496,11 +534,15 @@ function builtInMenu(ctl: EditorController): {
     };
   const main = mainTrack(ctl.project);
   const onMain = items.length === 1 && main.items.includes(items[0]!);
+  // A combined clip: open it or take it apart, then what any clip has.
+  const combined: (CommandId | 'align')[][] = ctl.isCombined(items[0])
+    ? [['openCombined', 'separate']]
+    : [];
   if (items.length > 1) {
     return {
       heading: l.selectedCount(items.length),
       sections: [
-        [ctl.selectedGroup() ? 'ungroup' : 'group'],
+        [ctl.selectedGroup() ? 'ungroup' : 'group', 'combine'],
         ['copy', 'cut', 'paste'],
         ['duplicate', 'delete'],
         ['align', 'front', 'back'],
@@ -512,7 +554,8 @@ function builtInMenu(ctl: EditorController): {
     return {
       heading: null,
       sections: [
-        ['split', 'freeze'],
+        ...combined,
+        combined.length ? ['split'] : ['split', 'freeze'],
         ['copy', 'cut', 'paste'],
         ['duplicate', 'delete'],
         ['lock', 'hide'],
@@ -526,6 +569,7 @@ function builtInMenu(ctl: EditorController): {
   return {
     heading: null,
     sections: [
+      ...combined,
       ['split'],
       ['copy', 'cut', 'paste'],
       ['duplicate', 'delete'],

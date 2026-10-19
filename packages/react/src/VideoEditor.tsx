@@ -483,6 +483,8 @@ function useKeyboard(rootRef: React.RefObject<HTMLDivElement | null>) {
         else if (state.picking) ctl.startPicking(null);
         else if (state.historyOpen) ctl.ui.setState({ historyOpen: false });
         else if (state.previewMode) ctl.setPreviewMode(false);
+        // Nothing selected inside a combined clip: Esc goes back out of it.
+        else if (!state.selectedId && state.inside.length) ctl.closeCombined();
         else ctl.select(null);
       } else if (e.key === '?') {
         ctl.ui.setState({ helpOpen: true });

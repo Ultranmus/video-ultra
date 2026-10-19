@@ -180,7 +180,8 @@ export function layerStack(project: Project, t: Time): { item: Item; main: boole
 /** The playhead time, re-rendering at most when the stack under it changes. */
 function useStackTime(): Time {
   const ctl = useController();
-  const project = useStore(ctl.editor.store, (s) => s.project);
+  useStore(ctl.ui, (s) => s.inside);
+  const project = ctl.view(useStore(ctl.editor.store, (s) => s.project));
   const [t, setT] = useState(ctl.playhead.time);
   useEffect(() => {
     let key = '';

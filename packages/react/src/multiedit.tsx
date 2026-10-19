@@ -1,6 +1,14 @@
 import { findItem, mainTrack, type Item, type Project } from '@video-ultra/core';
 import { useMemo, type ReactElement, type ReactNode } from 'react';
-import { ControllerContext, SubjectContext, useController, useProject, useUi } from './context';
+import {
+  ControllerContext,
+  SubjectContext,
+  useController,
+  useLabels,
+  useProject,
+  useUi,
+} from './context';
+import { Button } from './controls';
 import { fanOutController } from './fanout';
 
 /**
@@ -89,4 +97,26 @@ export function AllSelected({
       children
     );
   return <ControllerContext.Provider value={fan}>{inner}</ControllerContext.Provider>;
+}
+
+/**
+ * Inside a combined clip, in place of what's for the whole video only (captions, canvas size):
+ * says so, with the way back out (DECISIONS #155). Null on the timeline itself.
+ */
+export function WholeVideoOnly({ message }: { message: string }): ReactElement | null {
+  const ctl = useController();
+  const l = useLabels();
+  const inside = useUi((s) => s.inside.length > 0);
+  if (!inside) return null;
+  return (
+    <div className="vu-whole-video-only" role="note">
+      <p className="vu-hint">{message}</p>
+      <Button
+        icon="back"
+        label={l.backToTimeline}
+        variant="secondary"
+        onClick={() => ctl.closeCombined(true)}
+      />
+    </div>
+  );
 }

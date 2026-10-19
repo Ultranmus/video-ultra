@@ -103,6 +103,11 @@ export interface UiState {
    */
   selectedIds: readonly string[];
   /** The History popover is open. */
+  /**
+   * Combined clips opened for editing, outermost first (DECISIONS #155): the timeline, stage and
+   * inspector show the innermost one's inside. `outerTime`: the playhead before it opened.
+   */
+  inside: readonly { assetId: string; itemId: string; name: string; outerTime: number }[];
   /** "Your videos" popover (top bar). */
   videosOpen: boolean;
   historyOpen: boolean;
@@ -165,6 +170,7 @@ export function createUiStore() {
     selectedIds: [],
     historyOpen: false,
     videosOpen: false,
+    inside: [],
     layersSelecting: false,
     menu: null,
     announcement: '',
