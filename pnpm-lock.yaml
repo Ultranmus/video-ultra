@@ -275,7 +275,7 @@ importers:
         version: 1.31.0-dev.20260914-8d85527a0
     devDependencies:
       '@video-ultra/core':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
       '@webgpu/types':
         specifier: ^0.1.74
@@ -297,7 +297,7 @@ importers:
         version: 1.31.0-dev.20260914-8d85527a0
     devDependencies:
       '@video-ultra/core':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
       '@webgpu/types':
         specifier: ^0.1.74
@@ -349,7 +349,7 @@ importers:
   packages/react:
     dependencies:
       '@video-ultra/core':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
       immer:
         specifier: ^11.1.21

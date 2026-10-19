@@ -25,7 +25,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
-    "./styles.css": "./dist/styles.css",
+    "./styles.css": {
+      "types": "./dist/styles.css.d.ts",
+      "default": "./dist/styles.css"
+    },
     "./package.json": "./package.json"
   },
   "files": [
@@ -39,7 +42,7 @@
     "typescript"
   ],
   "scripts": {
-    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsup",
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsup && node -e \"require('node:fs').writeFileSync('dist/styles.css.d.ts', '// The editor stylesheet (a side-effect import).\\nexport {};\\n')\"",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
@@ -59,7 +62,7 @@
     "vitest": "^5.0.5"
   },
   "dependencies": {
-    "@video-ultra/core": "workspace:*",
+    "@video-ultra/core": "workspace:^",
     "immer": "^11.1.21",
     "zustand": "^5.0.15"
   }
