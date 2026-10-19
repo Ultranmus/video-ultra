@@ -303,6 +303,8 @@ export const AudioFxSchema = z.object({
   pitch: z.optional(z.number().check(z.gte(-12), z.lte(12))),
   /** Keep the original pitch when the clip is sped up or slowed down (speeds 0.5×…2×). */
   keepPitch: z.optional(z.boolean()),
+  /** Clean up noise: 0 = off … 1 = strong; steady background noise (hiss, hum, fans) goes down. */
+  denoise: z.optional(unit),
 });
 
 const audible = {
