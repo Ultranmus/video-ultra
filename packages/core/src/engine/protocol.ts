@@ -174,7 +174,13 @@ export type EngineResponseData =
 
 /** Unsolicited events from the worker. */
 export type EngineEvent =
-  | { type: 'time'; time: number; playing: boolean }
+  | {
+      type: 'time';
+      time: number;
+      playing: boolean;
+      /** While playing with sound: the loudest sample per side just heard (left, right). */
+      levels?: [number, number];
+    }
   | { type: 'ended' }
   | { type: 'error'; message: string }
   | { type: 'export-progress'; jobId: number; progress: ExportProgress };

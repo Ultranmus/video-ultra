@@ -32,6 +32,9 @@ export class AudioOutput {
   private report: Report | null = null;
   private generation = 0;
   private underrunsAtStart = 0;
+  /** Loudest sample per side in the last report (0…1+), for level meters. 0 when stopped. */
+  peakL = 0;
+  peakR = 0;
 
   constructor(
     private readonly port: MessagePort,
@@ -48,10 +51,14 @@ export class AudioOutput {
         played: number;
         buffered: number;
         underruns: number;
+        peakL?: number;
+        peakR?: number;
       }>,
     ) => {
       if (event.data.type !== 'progress') return;
       this.report = { ...event.data, at: performance.now() };
+      this.peakL = this.active ? (event.data.peakL ?? 0) : 0;
+      this.peakR = this.active ? (event.data.peakR ?? 0) : 0;
       if (this.active) void this.pump();
     };
   }
@@ -82,6 +89,8 @@ export class AudioOutput {
   /** Stops and drops queued audio (pause, seek). */
   stop(): void {
     this.active = false;
+    this.peakL = 0;
+    this.peakR = 0;
     this.generation++;
     this.port.postMessage({ type: 'flush' });
   }

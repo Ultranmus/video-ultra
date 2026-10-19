@@ -103,7 +103,14 @@ import { formatClock } from './format';
 import { DEFAULT_KEY, isPicture } from './picture';
 import { computeTargets, type Targets } from './targets';
 import type { Labels } from './labels';
-import { createUiStore, Playhead, type LayoutMode, type PanelId, type ToolId } from './state';
+import {
+  createUiStore,
+  Levels,
+  Playhead,
+  type LayoutMode,
+  type PanelId,
+  type ToolId,
+} from './state';
 import { alignOffsets, distributeOffsets, type AlignEdge } from './stage/arrange';
 import { itemBox, visibleItemsAt, type Box } from './stage/geometry';
 import { measureText } from './stage/measure';
@@ -191,6 +198,8 @@ export class EditorController {
   readonly editor: Editor;
   readonly ui = createUiStore();
   readonly playhead = new Playhead();
+  /** Sound levels while playing (meters). */
+  readonly levels = new Levels();
   readonly labels: Labels;
   readonly options: ControllerOptions;
   analyzer: MediaAnalyzer | null = null;
@@ -430,7 +439,8 @@ export class EditorController {
       return () => {};
     }
     this.engine = engine;
-    engine.onTime = (time, playing) => {
+    engine.onTime = (time, playing, levels) => {
+      this.levels.set(levels?.[0] ?? 0, levels?.[1] ?? 0);
       // A trim drag shows the edge frame without moving the playhead.
       if (this.#previewSeeking && !playing) return;
       // While paused the playhead is ours: the engine only echoes seeks we already made, a frame

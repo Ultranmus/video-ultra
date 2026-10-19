@@ -827,3 +827,20 @@ reason; when one changes, edit the entry and note the date.
       one clip) — a deliberate limit for now. UI: a "Split at scenes" section / tool on video
       clips with Big changes / Normal / Small changes too, progress and Cancel. Test media:
       `scenes-cuts.mp4` (real footage cut at known times) and the Sintel trailer (CC BY).
+146.  **Sound effects and level meter** (v0.4). `audioFx` on video and sound clips (file version
+      4, optional): three-band EQ (shelf 120 Hz, peak 1 kHz, shelf 8 kHz; ±12 dB), **Even out**
+      (stereo-linked compressor with soft knee and make-up gain: one 0…1 amount sets threshold
+      −12…−30 dB and ratio 1.5…6), **Pitch** (±12 semitones, speed unchanged) and **Keep the
+      voice natural** (undoes a speed change's pitch for 0.5×–2×; BACKLOG's "speed shifts pitch"
+      for that range). In TypeScript (DECISIONS #13: WASM only after measuring TS too slow — a
+      minute of stereo through every effect takes well under a second). Pitch: a two-tap
+      delay-line shifter whose taps, when they jump, line up with the other tap by
+      cross-correlation (≤ 12 ms) — without that, a tone came out as side lines 25 Hz apart (a
+      warble); with it the spectrum is clean (440 → 880 Hz exactly). Runs in the shared mixer on
+      each clip's sound before volume / fades, so preview and export match; state resets on seek;
+      off stages cost nothing. 13 ready-made looks (Clear voice, Podcast, More bass, Phone call,
+      Radio, Deep / High voice, Chipmunk, Monster…) then the sliders. **Meter**: the AudioWorklet
+      tracks the peak per side per report (~21 ms), the engine sends it with the per-frame time
+      event, `ctl.levels` → a two-bar meter in the desktop timeline bar drawn through refs (no
+      React renders; −48…0 dB, amber over −6 dB, red at full scale). Phones: no meter (space;
+      InShot-simple), effects in the toolbar.

@@ -128,7 +128,13 @@ function reportError(error: unknown): void {
 }
 
 function emitTime(time: Time): void {
-  post({ id: -1, event: { type: 'time', time, playing } });
+  // While sound plays, the level of what's audible now rides along (level meters).
+  if (playing && audioOut)
+    post({
+      id: -1,
+      event: { type: 'time', time, playing, levels: [audioOut.peakL, audioOut.peakR] },
+    });
+  else post({ id: -1, event: { type: 'time', time, playing } });
 }
 
 // ── media ────────────────────────────────────────────────────────────────

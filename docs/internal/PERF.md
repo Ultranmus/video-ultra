@@ -469,6 +469,15 @@ No main-thread long task while it runs; 0 frames left open. Hardware decode will
 the owner's devices; budget phones decode slower but the job is cancellable and yields to
 thumbnails.
 
+## Sound effects (v0.4, 2026-10-19, `fx.test.ts`, `scripts/soundfx-check.ts`)
+
+- All effects on (EQ 3 bands + compressor + pitch), one minute of 48 kHz stereo: under 1.5 s in
+  Node on the cloud machine (the unit test's bound) — ≈ 2 % of real time; each off stage costs 0.
+- Exported WAV measurements: Pitch +12 on 440 Hz → 880 Hz; 2× speed → 880 Hz, Keep the voice
+  natural → 440 Hz; More bass (+8 dB shelf) lifts 60 Hz by 7.5 dB; Even out (1.0) narrows a
+  24.1 dB loud / quiet gap to 4.4 dB. Meter: reads the tone's level (−13 dB → 0.72 of the bar),
+  0 when paused; no React renders (refs).
+
 ## Cloud sandbox note (2026-10-19)
 
 The night's checks ran on a Linux container without a GPU (Chrome 155, 4 cores; WebGL2 in

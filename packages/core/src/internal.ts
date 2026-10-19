@@ -89,6 +89,7 @@ export { applyDuck, DUCK_TUNING, DuckFollower, hasDucking, presenceFor } from '.
 export type { DuckTuning } from './audio/duck';
 
 // Media analysis (import probing, thumbnails, waveforms) — runs in its own worker.
+export { ClipFx, hasAudioFx } from './audio/fx';
 export { createMediaAnalyzer } from './media/analyzer';
 export type {
   MediaAnalyzer,

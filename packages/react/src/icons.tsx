@@ -65,6 +65,8 @@ const paths = {
   back: 'M15 5l-7 7 7 7',
   next: 'M9 5l7 7-7 7',
   keyframe: 'M12 3l9 9-9 9-9-9z',
+  // Three sliders at different heights.
+  equalizer: 'M6 4v16M12 4v16M18 4v16M4 14h4M10 8h4M16 16h4',
   // Three frames with cuts between them.
   scenes: 'M3 7h5v10H3zM10 7h4v10h-4zM16 7h5v10h-5zM9 4v16M15 4v16',
   marker: 'M6 3h12v13l-6 5-6-5z',

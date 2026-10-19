@@ -285,6 +285,26 @@ const visual = {
   keyframes: z.optional(KeyframesSchema),
 };
 
+/**
+ * Sound effects on a clip's audio (file version 4+, v0.4). Every field optional; missing = off.
+ */
+export const AudioFxSchema = z.object({
+  /** Three-band equaliser, dB each (−12…12): bass (shelf, 120 Hz), middle (1 kHz), treble (shelf, 8 kHz). */
+  eq: z.optional(
+    z.object({
+      low: z.number().check(z.gte(-12), z.lte(12)),
+      mid: z.number().check(z.gte(-12), z.lte(12)),
+      high: z.number().check(z.gte(-12), z.lte(12)),
+    }),
+  ),
+  /** Compressor ("even out"): 0 = off … 1 = strong; quiet parts come up, loud ones go down. */
+  compress: z.optional(unit),
+  /** Pitch shift in semitones (−12…12), the speed unchanged. */
+  pitch: z.optional(z.number().check(z.gte(-12), z.lte(12))),
+  /** Keep the original pitch when the clip is sped up or slowed down (speeds 0.5×…2×). */
+  keepPitch: z.optional(z.boolean()),
+});
+
 const audible = {
   /** Gain: 1 = original, 0…2. */
   volume: z.number().check(z.gte(0), z.lte(2)),
@@ -297,6 +317,8 @@ const audible = {
    * `1 − duck` of its volume (eased in and out). 0…1; missing = off.
    */
   duck: z.optional(unit),
+  /** Sound effects (file version 4+). Missing = none. */
+  audioFx: z.optional(AudioFxSchema),
 };
 
 export const VideoItemSchema = z.object({
@@ -538,6 +560,7 @@ export type Crop = z.infer<typeof CropSchema>;
 export type Filter = z.infer<typeof FilterSchema>;
 export type Adjust = z.infer<typeof AdjustSchema>;
 export type Transition = z.infer<typeof TransitionSchema>;
+export type AudioFx = z.infer<typeof AudioFxSchema>;
 /** Which way a transition moves. */
 export type Direction = z.infer<typeof DirectionSchema>;
 /** A transition's timing curve. */

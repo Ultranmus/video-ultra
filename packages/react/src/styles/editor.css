@@ -2794,6 +2794,39 @@
     content: '/ ';
   }
 
+  /* v0.4 Level meter: two thin bars (left, right), drawn through refs while playing. */
+  .vu-meter {
+    display: inline-flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: var(--vu-space-1);
+    inline-size: var(--vu-size-meter-width);
+  }
+
+  .vu-meter-bar {
+    block-size: var(--vu-size-meter-bar);
+    border-radius: var(--vu-radius-sm);
+    background: var(--vu-meter-track);
+    overflow: hidden;
+  }
+
+  .vu-meter-fill {
+    display: block;
+    block-size: 100%;
+    inline-size: 100%;
+    background: var(--vu-meter-fill);
+    transform-origin: left center;
+    transform: scaleX(0);
+  }
+
+  .vu-meter-fill[data-level='hot'] {
+    background: var(--vu-meter-hot);
+  }
+
+  .vu-meter-fill[data-level='clip'] {
+    background: var(--vu-meter-clip);
+  }
+
   .vu-zoom {
     display: flex;
     align-items: center;

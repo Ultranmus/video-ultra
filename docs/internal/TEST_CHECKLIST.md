@@ -91,3 +91,14 @@ Open the branch's Vercel preview (or `pnpm --filter playground dev`), then **`/e
       Slow cross-fades stay in one clip (by design for now). _Checked here:_ scenes-check (exact
       cuts at 3 / 6 / 8 s in real footage, at 2× speed too, Sintel trailer, no false cut, Cancel,
       no long tasks, phone toolbar) + 6 unit tests.
+- [ ] **Sound effects (listen with headphones).** Select a video where someone talks →
+      **Sound effects** (inspector; phone: toolbar) → try **Clear voice**, **Podcast**, **Phone
+      call**, **Deep voice**, **Chipmunk**; then Bass / Middle / Treble, **Even out** and
+      **Pitch**. Does the voice sound clean (no warble, no clicks while playing)? Speed a clip to
+      1.5× → turn on **Keep the voice natural** → normal pitch, faster talk. Export → the file
+      sounds the same as the preview. _Checked here:_ soundfx-check (pitch, keep pitch, EQ,
+      compressor measured on exported WAVs; axe) + 7 unit tests. Nobody has listened yet — your
+      ears are the test.
+- [ ] **Level meter (desktop).** Play a video: two thin bars next to the time move with the
+      sound, amber near the top, red if it's too loud; they rest when paused. _Checked here:_
+      soundfx-check (reads the tone's level, rests at 0).

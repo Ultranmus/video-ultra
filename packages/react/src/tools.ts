@@ -220,6 +220,14 @@ function singleTools(
     onMain || item.kind === 'video' || item.kind === 'audio'
       ? [{ key: 'protrim', icon: 'split', label: l.fineTrim, tip: l.tipFineTrim, tool: 'protrim' }]
       : [];
+  // v0.4 Sound effects: video and sound clips.
+  const soundfx: ToolEntry = {
+    key: 'soundfx',
+    icon: 'equalizer',
+    label: l.soundEffects,
+    tip: l.tipSoundEffects,
+    tool: 'soundfx',
+  };
   // v0.4 Keyframes: anything with a place on the video.
   const keyframes: ToolEntry[] =
     'transform' in item
@@ -262,6 +270,7 @@ function singleTools(
           tip: l.tipVolume,
           tool: 'volume',
         },
+        soundfx,
         ...look,
         mask,
         greenScreen,
@@ -324,6 +333,7 @@ function singleTools(
           tip: l.tipVolume,
           tool: 'volume',
         },
+        soundfx,
         { key: 'fade', icon: 'fade', label: l.fade, tip: l.tipFade, tool: 'fade' },
         { key: 'speed', icon: 'speed', label: l.speed, tip: l.tipSpeed, tool: 'speed' },
         ...protrim,

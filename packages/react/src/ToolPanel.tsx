@@ -34,6 +34,7 @@ import { BackgroundTool } from './cutout';
 import { KeyframesTool, usePlayheadFor } from './keyframes';
 import { ProTrimTool } from './protrim';
 import { ScenesTool } from './scenes';
+import { SoundFxTool } from './soundfx';
 import { MaskTool } from './mask';
 import { BlendTool, GreenScreenTool, RegionTool } from './picture';
 
@@ -119,6 +120,8 @@ function ItemTool({ tool, item }: { tool: ToolId; item: Item }): ReactElement | 
       return <KeyframesTool item={item} />;
     case 'protrim':
       return <ProTrimTool item={item} />;
+    case 'soundfx':
+      return item.kind === 'video' || item.kind === 'audio' ? <SoundFxTool item={item} /> : null;
     case 'scenes':
       return item.kind === 'video' ? <ScenesTool item={item} /> : null;
     default:
@@ -181,6 +184,9 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
             <VolumeTool item={item} />
             <FadeTool item={item} />
           </Section>
+          <Section title={l.soundEffects} collapsible defaultOpen={!!item.audioFx}>
+            <SoundFxTool item={item} />
+          </Section>
           <Section title={l.splitAtScenes} collapsible defaultOpen={false}>
             <ScenesTool item={item} />
           </Section>
@@ -211,6 +217,9 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
           </Section>
           <Section title={l.speed}>
             <SpeedTool item={item} />
+          </Section>
+          <Section title={l.soundEffects} collapsible defaultOpen={!!item.audioFx}>
+            <SoundFxTool item={item} />
           </Section>
         </>
       );

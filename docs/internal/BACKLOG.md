@@ -86,7 +86,11 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [x] Engine: blur background, text and sticker layers (Day 5), transitions (Day 5).
 - [ ] Engine: count project frames lost to display timing (60 Hz tick vs 30 fps) separately.
 - [ ] Speed changes shift pitch (plain resampling). Pitch-preserving time-stretch (Rust → WASM,
-      DECISIONS #13) for v0.2 speed curves.
+      DECISIONS #13) for v0.2 speed curves. _2026-10-19: "Keep the voice natural" (DECISIONS
+      #146) does it in TS for 0.5×–2×; beyond that range and for speed curves it's still open._
+- [ ] Sound effects (#146): owner to listen on real voices — if the pitch shifter warbles on a
+      voice, try a longer window (30 → 40 ms) or a WSOLA stretcher; compressor make-up gain may
+      want tuning by ear.
 - [ ] WebKit (Playwright) has late frames at cuts where a new video starts (2 s, 7 s in the demo):
       check on the iPhone; widen prefetch (1 s → 1.5 s) if real.
 - [ ] Next iPhone batch: audio plays, A/V offset, underruns on a real phone (engine lab page).

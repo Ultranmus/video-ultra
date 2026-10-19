@@ -135,8 +135,11 @@ export interface Engine {
    * while recording a voiceover without headphones.
    */
   setOutputMuted(muted: boolean): void;
-  /** Playhead updates (every frame while playing). */
-  onTime: ((time: Time, playing: boolean) => void) | null;
+  /**
+   * Playhead updates (every frame while playing). `levels`: while sound plays, the loudest
+   * sample per side just heard (0…1; level meters).
+   */
+  onTime: ((time: Time, playing: boolean, levels?: [number, number]) => void) | null;
   onEnded: (() => void) | null;
   onError: ((message: string) => void) | null;
   /**
@@ -203,7 +206,7 @@ export async function createEngine(
     const message = event.data;
     if ('event' in message) {
       const e: EngineEvent = message.event;
-      if (e.type === 'time') handlers.onTime?.(e.time, e.playing);
+      if (e.type === 'time') handlers.onTime?.(e.time, e.playing, e.levels);
       else if (e.type === 'ended') handlers.onEnded?.();
       else if (e.type === 'export-progress') progressHandlers.get(e.jobId)?.(e.progress);
       else handlers.onError?.(e.message);

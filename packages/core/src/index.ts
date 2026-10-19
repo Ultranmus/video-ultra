@@ -141,6 +141,8 @@ export {
   shapeCoverage,
   type ShapePreset,
 } from './effects/shapes';
+// Sound effects (v0.4): ready-made looks and the equaliser's band frequencies.
+export { AUDIO_FX_PRESETS, EQ_BANDS, pitchRatio } from './audio/fx';
 export type { CaptionPreset } from './captions/presets';
 // Background removal: the remover interface (a picture in, the same with no background out)
 export type {

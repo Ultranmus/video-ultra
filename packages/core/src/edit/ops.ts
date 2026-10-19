@@ -1,5 +1,7 @@
 import { current, isDraft, type Draft } from 'immer';
+import { hasAudioFx } from '../audio/fx';
 import { shapePreset } from '../effects/shapes';
+import { AudioFxSchema } from '../model/schema';
 import {
   KEYFRAME_PROPS,
   hasKeyframes,
@@ -42,6 +44,7 @@ import type {
   Project,
   RegionItem,
   ShapeMask,
+  AudioFx,
   TextStyle,
   Track,
   Transform,
@@ -915,6 +918,8 @@ export interface ItemPatch {
   fadeOut?: Time;
   /** Lower under voice, 0…1 of the volume taken away while someone speaks; 0 = off. */
   duck?: number;
+  /** Sound effects (EQ, compressor, pitch); `null` removes them. */
+  audioFx?: AudioFx | null;
   text?: string;
   style?: TextStyle;
   emoji?: string | null;
@@ -937,7 +942,7 @@ export interface ItemPatch {
 }
 
 /** Fields that `null` (or `blend: 'normal'`) removes instead of setting. */
-const REMOVABLE = new Set(['key', 'lut', 'blend', 'mask', 'cutout']);
+const REMOVABLE = new Set(['key', 'lut', 'blend', 'mask', 'cutout', 'audioFx']);
 /** Size limits of a blurred area's box (fractions of the canvas). */
 const REGION_MIN = 0.01;
 const REGION_MAX = 4;
@@ -956,6 +961,7 @@ const FIELDS_BY_KIND: Record<Item['kind'], readonly string[]> = {
     'fadeIn',
     'fadeOut',
     'duck',
+    'audioFx',
     'key',
     'lut',
     'blend',
@@ -975,7 +981,7 @@ const FIELDS_BY_KIND: Record<Item['kind'], readonly string[]> = {
     'cutout',
   ],
   freeze: ['name', 'transform', 'crop', 'fit', 'filter', 'adjust', 'key', 'lut', 'blend', 'mask'],
-  audio: ['name', 'volume', 'muted', 'fadeIn', 'fadeOut', 'duck'],
+  audio: ['name', 'volume', 'muted', 'fadeIn', 'fadeOut', 'duck', 'audioFx'],
   text: ['name', 'text', 'style', 'transform', 'filter', 'adjust', 'blend'],
   sticker: ['name', 'transform', 'emoji', 'filter', 'adjust', 'blend', 'cutout'],
   region: ['name', 'transform', 'effect', 'shape', 'amount', 'width', 'height'],
@@ -991,6 +997,10 @@ export function updateItem(project: Project, itemId: string, patch: ItemPatch): 
     if (!asset || asset.kind !== 'image')
       throw new EditError('not-found', `No image ${patch.cutout.assetId}`);
   }
+  if (patch.audioFx && !AudioFxSchema.safeParse(patch.audioFx).success)
+    throw new EditError('invalid', 'Sound effect settings out of range');
+  if (patch.audioFx && !hasAudioFx(patch.audioFx, 1) && !patch.audioFx.keepPitch)
+    patch = { ...patch, audioFx: null };
   if (patch.mask && !shapePreset(patch.mask.shape))
     throw new EditError('invalid', `No mask shape ${patch.mask.shape}`);
   if (patch.lut) {

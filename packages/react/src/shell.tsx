@@ -27,6 +27,7 @@ import { clampPps, MAX_PPS, MIN_PPS } from './timeline/geometry';
 import { TimelineView } from './timeline/view';
 import { CanvasTool, InspectorSections, ToolPanel } from './ToolPanel';
 import { toolsFor } from './tools';
+import { LevelMeter } from './meter';
 import {
   ArrangeControls,
   CommandButton,
@@ -428,6 +429,7 @@ export function TimelineBar(): ReactElement {
       <div className="vu-bar-start">
         <PlayButton />
         <Clock />
+        {desktop ? <LevelMeter /> : null}
       </div>
       {desktop ? (
         <div className="vu-bar-actions" role="toolbar" aria-label={l.clipActions}>
@@ -737,7 +739,8 @@ type TitleKey =
   | 'removeBackground'
   | 'keyframes'
   | 'fineTrim'
-  | 'splitAtScenes';
+  | 'splitAtScenes'
+  | 'soundEffects';
 
 const TOOL_TITLE: Record<ToolId, TitleKey> = {
   speed: 'speed',
@@ -767,6 +770,7 @@ const TOOL_TITLE: Record<ToolId, TitleKey> = {
   keyframes: 'keyframes',
   protrim: 'fineTrim',
   scenes: 'splitAtScenes',
+  soundfx: 'soundEffects',
 };
 
 /**

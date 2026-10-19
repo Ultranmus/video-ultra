@@ -55,7 +55,9 @@ export type ToolId =
   // v0.4 Fine trims
   | 'protrim'
   // v0.4 Scene detection
-  | 'scenes';
+  | 'scenes'
+  // v0.4 Sound effects
+  | 'soundfx';
 
 export interface ImportRow {
   id: string;
@@ -185,6 +187,28 @@ export class Playhead {
   }
 
   subscribe(listener: (time: number) => void): () => void {
+    this.#listeners.add(listener);
+    return () => this.#listeners.delete(listener);
+  }
+}
+
+/**
+ * Sound levels while playing (v0.4 meters): the loudest sample per side just heard, 0…1.
+ * Updated per frame from the engine; components subscribe and draw through refs (no renders).
+ */
+export class Levels {
+  left = 0;
+  right = 0;
+  #listeners = new Set<(left: number, right: number) => void>();
+
+  set(left: number, right: number): void {
+    if (left === this.left && right === this.right) return;
+    this.left = left;
+    this.right = right;
+    for (const listener of this.#listeners) listener(left, right);
+  }
+
+  subscribe(listener: (left: number, right: number) => void): () => void {
     this.#listeners.add(listener);
     return () => this.#listeners.delete(listener);
   }

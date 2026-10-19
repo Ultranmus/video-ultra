@@ -220,6 +220,13 @@
     --vu-size-key-preset: 28px;
     /* v0.4 Keyframes */
     --vu-size-keyframe: 14px;
+    /* v0.4 Sound: level meter, equaliser */
+    --vu-size-meter-width: 56px;
+    --vu-size-meter-bar: 4px;
+    --vu-meter-track: var(--vu-border);
+    --vu-meter-fill: var(--vu-success);
+    --vu-meter-hot: var(--vu-warning);
+    --vu-meter-clip: var(--vu-danger);
     /* v0.3 Templates */
     --vu-size-template: 72px;
     --vu-size-template-max: 180px;
