@@ -3,6 +3,7 @@ import type { Item, Project } from '../model/schema';
 import { FLICKS_PER_SECOND, type Time } from '../model/time';
 import { gainAt, limit, mixInto, Resampler } from './dsp';
 import { applyDuck, DuckFollower, hasDucking } from './duck';
+import { ClipFx, hasAudioFx } from './fx';
 import { audioSpan, spanGain, type AudioSpan } from './spans';
 
 const EMPTY_SPAN: AudioSpan = {
@@ -76,6 +77,8 @@ class ClipReader {
   private expected = NaN;
   private ended = false;
   private scratch = new Float32Array(4096);
+  /** The clip's sound effects and their state (made on first use; reset when the clip seeks). */
+  fx: ClipFx | null = null;
 
   constructor(
     private readonly track: InputAudioTrack,
@@ -120,6 +123,7 @@ class ClipReader {
   }
 
   private async seek(sourceS: number): Promise<void> {
+    this.fx?.reset();
     void this.iterator?.return?.(undefined).catch(() => undefined);
     this.iterator = this.sink.samples(Math.max(0, sourceS))[Symbol.asyncIterator]();
     this.left.clear();
@@ -314,6 +318,14 @@ export class Mixer {
       this.readers.set(item.id, reader);
     }
     await reader.read(sourceS, item.speed, count, this.tempL, this.tempR, 0);
+    if (hasAudioFx(item.audioFx, item.speed))
+      (reader.fx ??= new ClipFx(rate)).process(
+        item.audioFx!,
+        item.speed,
+        this.tempL,
+        this.tempR,
+        count,
+      );
     const duration = item.duration / FLICKS_PER_SECOND;
     const fadeIn = item.fadeIn / FLICKS_PER_SECOND;
     const fadeOut = item.fadeOut / FLICKS_PER_SECOND;

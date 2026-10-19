@@ -149,6 +149,10 @@ export const DEFAULT_LABELS = {
   animLoopTip: 'Keeps moving while on screen',
   delete: 'Delete',
   duplicate: 'Duplicate',
+  copy: 'Copy',
+  cutItems: 'Cut',
+  paste: 'Paste',
+  nothingToPaste: 'Copy something first',
   speed: 'Speed',
   volume: 'Volume',
   mute: 'Mute',
@@ -274,6 +278,9 @@ export const DEFAULT_LABELS = {
   // Tool tips (what each tool does)
   tipSplit: 'Cut the clip in two at the playhead',
   tipDuplicate: 'Make a copy right after it',
+  tipCopy: 'Copy, to paste at the playhead',
+  tipCut: 'Remove, to paste at the playhead',
+  tipPaste: 'Paste what you copied at the playhead',
   tipDelete: 'Remove from the timeline',
   tipFreeze: 'Hold this frame for 3 seconds',
   tipSpeed: 'Make it faster or slower',
@@ -296,6 +303,11 @@ export const DEFAULT_LABELS = {
   splitDone: 'Split into 2 clips',
   deletedDone: (what: string) => `Deleted ${what}`,
   duplicatedDone: 'Duplicated',
+  copiedDone: (n: number) => (n === 1 ? 'Copied' : `Copied ${n}`),
+  pastedDone: 'Pasted',
+  stickersAnimated: 'Animated',
+  animatedSticker: (name: string) => `${name} (animated)`,
+  svgFailed: (name: string) => `"${name}" couldn't be drawn — is it a valid SVG file?`,
   frozenDone: 'Added a 3-second freeze frame',
   extractedDone: 'Sound moved to its own track',
   appliedToAll: (what: string) => `${what} added between all clips`,
@@ -776,6 +788,223 @@ export const DEFAULT_LABELS = {
   captionsOnDevice: (mb: number) =>
     `Runs on this device, nothing is uploaded · about ${Math.round(mb)} MB to download the first time`,
   captionsOnDeviceCached: 'Runs on this device, nothing is uploaded',
+  // v0.3 Embedding API: the host's media sources
+  mediaSources: 'More media',
+  searchMedia: 'Search videos and photos',
+  noMediaFound: 'Nothing found',
+  mediaSourceError: 'Couldn’t load these — check the connection and try again.',
+  mediaSourceFailed: (name: string) => `Couldn't add "${name}"`,
+  addNamed: (name: string) => `Add ${name}`,
+  loadingResults: 'Loading…',
+  // v0.3 Background removal
+  removeBackground: 'Remove background',
+  restoreBackground: 'Restore background',
+  tipRemoveBackground: 'Keep only the subject — the background becomes see-through',
+  backgroundRemoved: 'Background removed',
+  removingBackground: 'Removing the background…',
+  backgroundFailed: (why: string) => `Couldn't remove the background: ${why}`,
+  backgroundOnDevice: (mb: number) =>
+    `Runs on this device, nothing is uploaded · one-time ${Math.round(mb)} MB download`,
+  backgroundUnavailable: 'Background removal isn’t available here.',
+  photoOnly: 'Works on photos and image stickers.',
+  // v0.4 Export codecs
+  videoCodec: 'Codec',
+  codecStandardTip: 'Plays everywhere',
+  codecHevcTip: 'About 40 % smaller; plays on most phones and Macs, not every PC browser',
+  codecAv1Tip: 'About half the size; plays in new browsers and phones',
+  // v0.4 Sound effects and meters
+  soundLevel: 'Sound level',
+  soundEffects: 'Sound effects',
+  tipSoundEffects: 'Voice clarity, bass, even out, pitch',
+  soundLook: 'Sound',
+  soundPresets: {
+    none: 'Original',
+    voice: 'Clear voice',
+    podcast: 'Podcast',
+    bass: 'More bass',
+    bright: 'Brighter',
+    warm: 'Warm',
+    telephone: 'Phone call',
+    radio: 'Radio',
+    loud: 'Louder, even',
+    deep: 'Deep voice',
+    high: 'High voice',
+    chipmunk: 'Chipmunk',
+    monster: 'Monster',
+  },
+  bass: 'Bass',
+  middle: 'Middle',
+  treble: 'Treble',
+  evenOut: 'Even out',
+  pitch: 'Pitch',
+  keepPitch: 'Keep the voice natural',
+  tipKeepPitch: 'Sped up or slowed down, the voice keeps its own pitch (0.5×–2×)',
+  soundFxHint: 'Even out brings quiet words up and loud parts down.',
+  off: 'Off',
+  // v0.4 AI editing
+  assistant: 'Assistant',
+  tipAssistant: 'Say what you want changed — the assistant edits for you (one Undo takes it back)',
+  assistantPlaceholder: 'e.g. “Add a title ‘Day one’ at the start” or “make it warmer”',
+  assistantSend: 'Send',
+  assistantThinking: 'Working on it…',
+  assistantEdit: 'Assistant edit',
+  assistantApplied: (n: number) => (n === 1 ? 'Made 1 change' : `Made ${n} changes`),
+  assistantNothing: 'No changes',
+  assistantFailed: (why: string) => `The assistant couldn’t answer: ${why}`,
+  assistantNotApplied: 'Nothing was changed',
+  assistantPrivacy:
+    'A description of your project (names, texts, timings — no video or sound) goes to the assistant.',
+  assistantExamples: [
+    'Add a title “My trip” at the start',
+    'Make the whole video warmer',
+    'Add a fade between every clip',
+    'Make it square for Instagram',
+  ],
+  // v0.4 Text to speech
+  textToSpeech: 'Text to speech',
+  speechPlaceholder: 'Type what the voice should say',
+  speechVoice: 'Voice',
+  speechSpeed: 'Speed',
+  speechMake: 'Add voice',
+  speechMaking: 'Making the voice…',
+  readAloud: 'Read aloud',
+  tipReadAloud: 'A voice reads this text — added as a sound clip where the text starts',
+  voiceFile: 'Voice',
+  speechFailed: (why: string) => `Couldn't make the voice: ${why}`,
+  speechHint: 'The text goes to the voice service; the voice is added at the playhead.',
+  // v0.4 Proxies
+  makingProxy: (name: string) =>
+    `Making a lighter copy of "${name}" for smooth editing — your export still uses the original`,
+  // v0.4 Scopes
+  scopes: 'Scopes',
+  scopeView: 'Scope',
+  scopeWaveform: 'Wave',
+  scopeParade: 'RGB',
+  scopeHistogram: 'Levels',
+  scopeVector: 'Colour',
+  tipScopeWaveform:
+    'Waveform: brightness across the picture, left to right — top is white, bottom black',
+  tipScopeParade:
+    'RGB parade: the waveform for red, green and blue side by side — level them to fix a colour cast',
+  tipScopeHistogram: 'Histogram: how many pixels at each brightness, per colour',
+  tipScopeVector:
+    'Vectorscope: hue around the circle, saturation from the centre; skin sits on the line',
+  scopeAria: (view: string) => `${view} scope of the picture under the playhead`,
+  // v0.4 Scene detection
+  splitAtScenes: 'Split at scenes',
+  tipSplitAtScenes: 'Find where the shot changes and cut the clip there',
+  findingScenes: 'Finding the scene changes…',
+  sceneSensitivity: 'Find',
+  sceneFewer: 'Big changes',
+  sceneNormal: 'Normal',
+  sceneMore: 'Small changes too',
+  scenesHint: 'Looks at every frame on this device. Each scene becomes its own clip.',
+  noScenesFound: 'No scene changes found in this clip',
+  scenesSplit: (parts: number) => `Split into ${parts} scenes`,
+  scenesFailed: 'Couldn’t read this video to find its scenes',
+  // v0.4 Pro trims and markers
+  rollCut: 'Move cut',
+  fineTrim: 'Fine trim',
+  tipFineTrim: 'Slip, move the cut, slide — a frame at a time',
+  earlier: (what: string) => `${what}: a frame earlier`,
+  later: (what: string) => `${what}: a frame later`,
+  slipClip: 'Slip',
+  slideClip: 'Slide',
+  addMarker: 'Add marker',
+  tipAddMarker: 'Mark this moment (M); jump between marks with , and .',
+  markerAdded: (time: string) => `Marker at ${time}`,
+  removeMarker: 'Remove marker',
+  prevMarker: 'Previous marker',
+  nextMarker: 'Next marker',
+  noMarkers: 'No markers yet — press M to add one at the playhead',
+  markerAt: (time: string, label?: string) => (label ? `${label} · ${time}` : `Marker · ${time}`),
+  proTrimHint:
+    'Desktop timeline: Alt-drag a cut to move it between two clips · Alt-drag a video to show another part of it · Alt+Shift-drag a clip in the main video to slide it.',
+  // v0.4 Keyframes
+  keyframes: 'Keyframes',
+  tipKeyframes: 'Animate it: set a keyframe here, move the playhead, change it',
+  keyframesHint:
+    'Tap ◆ to keep how it looks at the playhead. Move the playhead, change it (drag it on the video or use the sliders) — it moves between the two.',
+  addKeyframe: 'Add keyframe',
+  removeKeyframe: 'Remove keyframe',
+  moveKeyframe: 'Move keyframe',
+  addKeyframeOf: (what: string) => `Add a ${what} keyframe here`,
+  removeKeyframeOf: (what: string) => `Remove the ${what} keyframe here`,
+  prevKeyframe: 'Previous keyframe',
+  nextKeyframe: 'Next keyframe',
+  noKeyframeBefore: 'No keyframe before the playhead',
+  noKeyframeAfter: 'No keyframe after the playhead',
+  clearKeyframes: 'Remove all keyframes',
+  graphOf: 'Graph',
+  curve: 'Curve',
+  customCurve: 'Custom',
+  curveOf: (what: string) => `How ${what} changes over time`,
+  curvePickHint:
+    'Drag a ◆ to change its time and value. Tap the line under two ◆ to pick how it moves between them.',
+  curveHint: (fast: boolean) =>
+    fast ? 'Faster at the start of this part.' : 'Slower at the start of this part.',
+  keyGroup: (group: string) =>
+    (
+      ({ position: 'position', scale: 'size', rotation: 'turn', opacity: 'opacity' }) as Record<
+        string,
+        string
+      >
+    )[group] ?? group,
+  keyProp: (prop: string) =>
+    (
+      ({
+        x: 'Left–right',
+        y: 'Up–down',
+        scale: 'Size',
+        rotation: 'Turn',
+        opacity: 'Opacity',
+      }) as Record<string, string>
+    )[prop] ?? prop,
+  // v0.3 Templates
+  templates: 'Templates',
+  tipTemplates: 'Ready-made titles, name tags, quotes and more',
+  templatesHint: 'Tap a template, fill in your words, add it.',
+  addTemplate: 'Add to video',
+  templateAdded: 'Template added — drag it to move it, double-tap a text to edit',
+  templateCategory: (category: string) =>
+    (
+      ({
+        intro: 'Titles & intros',
+        'lower-third': 'Name tags',
+        quote: 'Quotes',
+        social: 'Social',
+        sale: 'Sales & promos',
+        list: 'Steps & lists',
+        event: 'Events',
+        vlog: 'Vlog & recipes',
+        outro: 'Endings',
+      }) as Record<string, string>
+    )[category] ?? category,
+  // v0.3 Shape masks
+  shape: 'Shape',
+  tipShape: 'Show the picture inside a shape',
+  shapeHint: 'Pick a shape — the picture shows only inside it.',
+  shapeNone: 'No shape',
+  shapeFeather: 'Soft edge',
+  shapeInvert: 'Show outside the shape',
+  shapeCategory: (category: string) =>
+    (
+      ({
+        basic: 'Basic',
+        polygons: 'Polygons',
+        stars: 'Stars & bursts',
+        flowers: 'Flowers & cogs',
+        organic: 'Organic',
+        symbols: 'Symbols',
+      }) as Record<string, string>
+    )[category] ?? category,
+  /** A shape's name from its id ('star-5-soft' → 'Star 5 soft'). */
+  shapeName: (id: string) => {
+    const words = id.split('-').join(' ');
+    return words.charAt(0).toUpperCase() + words.slice(1);
+  },
+  captionsMemoryRisk:
+    'This language needs the large speech model. It may not fit in a phone’s memory — if the page reloads, use a computer for this language.',
   captionsByHost: 'Made by this app’s captions service',
   captionsUnavailable: 'Auto captions aren’t available here — import a file or type them.',
   captionsAbout: (minutes: number) =>

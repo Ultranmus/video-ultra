@@ -590,7 +590,9 @@ const GOLDEN_BLENDS: BlendMode[] = [
  * `key-off` / `key` (a green-screen photo on a layer, without / with its green screen), `lut`
  * (an inverting 33-point LUT on the footage), `blur` / `pixelate` (a blurred rectangle / a
  * pixelated ellipse over the middle), `blend-<mode>` (a solid orange photo at 80% over the
- * middle with that blend mode).
+ * middle with that blend mode), `mask-circle` / `mask-star-invert` (the orange photo, opaque,
+ * through a circle / outside a five-point star), `mask-heart-main` (the footage itself in a
+ * feathered heart).
  */
 async function buildPictureScene(variant: string): Promise<{ project: Project; blobs: Blobs }> {
   const project = createProject({ name: 'Picture tools', width: 640, height: 640 });
@@ -600,6 +602,7 @@ async function buildPictureScene(variant: string): Promise<{ project: Project; b
     addBlobAsset(project, blobs, 'invert', invertCube(), 'lut', 0);
     clip.lut = { assetId: 'invert', intensity: 1 };
   }
+  if (variant === 'mask-heart-main') clip.mask = { shape: 'heart', feather: 0.3 };
   insertMain(project, clip);
   let n = 0;
   const ids = () => `p${++n}`;
@@ -632,6 +635,33 @@ async function buildPictureScene(variant: string): Promise<{ project: Project; b
         width: 0.4,
         height: 0.3,
         transform: { ...DEFAULT_TRANSFORM },
+      },
+      ids,
+    );
+  }
+  if (variant === 'mask-circle' || variant === 'mask-star-invert') {
+    const id = addBlobAsset(
+      project,
+      blobs,
+      'orange',
+      await solidPng('rgb(200,120,40)'),
+      'image',
+      64,
+    );
+    addToLane(
+      project,
+      {
+        id: 'm',
+        kind: 'image',
+        assetId: id,
+        start: 0,
+        duration: fromSeconds(4),
+        ...look(),
+        transform: { ...DEFAULT_TRANSFORM, scale: 0.5 },
+        mask:
+          variant === 'mask-circle'
+            ? { shape: 'circle', feather: 0 }
+            : { shape: 'star-5', feather: 0, invert: true },
       },
       ids,
     );
@@ -670,6 +700,9 @@ const PICTURE_VARIANTS = [
   'blur',
   'pixelate',
   ...GOLDEN_BLENDS.map((m) => `blend-${m}`),
+  'mask-circle',
+  'mask-star-invert',
+  'mask-heart-main',
 ];
 
 /** Animation golden times (s): mid entrance, end of entrance, mid loop (a quarter turn). */

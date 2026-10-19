@@ -1,5 +1,6 @@
 import { mainTrack, projectDuration, type ArrangeTo } from '@video-ultra/core';
 import type { EditorController } from './controller';
+import { isHidden } from './embed';
 import type { IconName } from './icons';
 import { isSounding } from './items';
 import type { AlignEdge } from './stage/arrange';
@@ -18,6 +19,9 @@ export type CommandId =
   | 'layers'
   | 'split'
   | 'duplicate'
+  | 'copy'
+  | 'cut'
+  | 'paste'
   | 'freeze'
   | 'delete'
   | 'selectAll'
@@ -41,6 +45,9 @@ export type CommandId =
   | 'duck'
   | 'markIn'
   | 'markOut'
+  | 'marker'
+  | 'prevMarker'
+  | 'nextMarker'
   | 'camera';
 
 /** One action, as it stands right now. */
@@ -166,6 +173,58 @@ export function getCommand(ctl: EditorController, id: CommandId): Command {
         disabledReason: selectReason,
         run: () => ctl.duplicateSelected(),
       };
+    case 'copy':
+      return {
+        id,
+        label: l.copy,
+        icon: 'duplicate',
+        tip: l.tipCopy,
+        shortcut: '⌘C',
+        disabledReason: selectReason,
+        run: () => ctl.copySelected(),
+      };
+    case 'cut':
+      return {
+        id,
+        label: l.cutItems,
+        icon: 'cut',
+        tip: l.tipCut,
+        shortcut: '⌘X',
+        disabledReason: selectReason ?? (locked ? l.lockedReason : null),
+        run: () => ctl.cutSelected(),
+      };
+    case 'paste':
+      return {
+        id,
+        label: l.paste,
+        icon: 'paste',
+        tip: l.tipPaste,
+        shortcut: '⌘V',
+        disabledReason: ctl.hasClipboard() ? null : l.nothingToPaste,
+        run: () => ctl.paste(),
+      };
+    case 'marker':
+      return {
+        id,
+        label: l.addMarker,
+        icon: 'marker',
+        tip: l.tipAddMarker,
+        shortcut: 'M',
+        disabledReason: projectDuration(ctl.project) > 0 ? null : l.needClips,
+        run: () => ctl.addMarkerHere(),
+      };
+    case 'prevMarker':
+    case 'nextMarker': {
+      const target = ctl.markerNear(id === 'nextMarker' ? 1 : -1);
+      return {
+        id,
+        label: id === 'nextMarker' ? l.nextMarker : l.prevMarker,
+        icon: id === 'nextMarker' ? 'next' : 'back',
+        shortcut: id === 'nextMarker' ? '.' : ',',
+        disabledReason: target === null ? l.noMarkers : null,
+        run: () => target !== null && ctl.seek(target),
+      };
+    }
     case 'delete':
       return {
         id,
@@ -335,8 +394,12 @@ export function getCommand(ctl: EditorController, id: CommandId): Command {
 /** Runs a command if it can run; otherwise says why (never silently nothing). */
 export function runCommand(ctl: EditorController, id: CommandId): void {
   const command = getCommand(ctl, id);
+  if (isHidden(ctl.options.customize, id)) return; // the host took it out
   if (command.disabledReason) ctl.toast(command.disabledReason, 'info');
-  else command.run();
+  else {
+    command.run();
+    ctl.notify({ type: 'command', id });
+  }
 }
 
 /** A keyboard shortcut. `mod` = ⌘ on Apple devices, Ctrl elsewhere. */
@@ -353,6 +416,9 @@ export const KEYMAP: readonly KeyBinding[] = [
   { key: 'z', mod: true, shift: true, id: 'redo' },
   { key: 'y', mod: true, id: 'redo' },
   { key: 'd', mod: true, id: 'duplicate' },
+  { key: 'c', mod: true, id: 'copy' },
+  { key: 'x', mod: true, id: 'cut' },
+  { key: 'v', mod: true, id: 'paste' },
   { key: 'a', mod: true, id: 'selectAll' },
   { key: 'g', mod: true, id: 'group' },
   { key: 'g', mod: true, shift: true, id: 'ungroup' },
@@ -364,6 +430,9 @@ export const KEYMAP: readonly KeyBinding[] = [
   { key: '[', mod: true, id: 'back' },
   { key: 's', id: 'split' },
   { key: 'i', id: 'markIn' },
+  { key: 'm', id: 'marker' },
+  { key: ',', id: 'prevMarker' },
+  { key: '.', id: 'nextMarker' },
   { key: 'o', id: 'markOut' },
   { key: 'delete', id: 'delete' },
   { key: 'backspace', id: 'delete' },
@@ -400,9 +469,31 @@ export function menuSections(ctl: EditorController): {
   heading: string | null;
   sections: (CommandId | 'align')[][];
 } {
+  const all = builtInMenu(ctl);
+  const hide = ctl.options.customize?.hide;
+  if (!hide?.length) return all;
+  return {
+    heading: all.heading,
+    sections: all.sections
+      .map((group) => group.filter((id) => !hide.includes(id)))
+      .filter((group) => group.length > 0),
+  };
+}
+
+function builtInMenu(ctl: EditorController): {
+  heading: string | null;
+  sections: (CommandId | 'align')[][];
+} {
   const l = ctl.labels;
   const items = ctl.selectedItems();
-  if (items.length === 0) return { heading: null, sections: [['selectAll'], ['undo', 'redo']] };
+  if (items.length === 0)
+    return {
+      heading: null,
+      sections: [
+        ['paste', 'selectAll'],
+        ['undo', 'redo'],
+      ],
+    };
   const main = mainTrack(ctl.project);
   const onMain = items.length === 1 && main.items.includes(items[0]!);
   if (items.length > 1) {
@@ -410,6 +501,7 @@ export function menuSections(ctl: EditorController): {
       heading: l.selectedCount(items.length),
       sections: [
         [ctl.selectedGroup() ? 'ungroup' : 'group'],
+        ['copy', 'cut', 'paste'],
         ['duplicate', 'delete'],
         ['align', 'front', 'back'],
         ['lock', 'hide'],
@@ -421,16 +513,21 @@ export function menuSections(ctl: EditorController): {
       heading: null,
       sections: [
         ['split', 'freeze'],
+        ['copy', 'cut', 'paste'],
         ['duplicate', 'delete'],
         ['lock', 'hide'],
       ],
     };
   if (items[0]!.kind === 'audio')
-    return { heading: null, sections: [['split'], ['duck'], ['duplicate', 'delete'], ['lock']] };
+    return {
+      heading: null,
+      sections: [['split'], ['duck'], ['copy', 'cut', 'paste'], ['duplicate', 'delete'], ['lock']],
+    };
   return {
     heading: null,
     sections: [
       ['split'],
+      ['copy', 'cut', 'paste'],
       ['duplicate', 'delete'],
       ['forward', 'backward', 'front', 'back'],
       ['align'],

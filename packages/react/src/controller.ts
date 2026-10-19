@@ -1,4 +1,9 @@
+import type { EditorCustomization, EditorEvent } from './embed';
 import {
+  applyEditActions,
+  describeProject,
+  type EditingAssistant,
+  type SpeechGenerator,
   addAsset,
   addToLane,
   arrangeItem,
@@ -6,6 +11,14 @@ import {
   createProject,
   deleteItem,
   duplicateItem,
+  pasteItems,
+  addMarker,
+  removeMarker,
+  setTransformAt,
+  transformAt,
+  applyTemplate,
+  type TemplatePreset,
+  type CopiedItem,
   EditError,
   findItem,
   freezeFrame,
@@ -26,6 +39,7 @@ import {
   setTransition,
   LAYER_SCALE,
   splitItem,
+  splitItemAt,
   ungroupItems,
   updateItem,
   type ArrangeTo,
@@ -43,6 +57,8 @@ import {
   type CaptionLookPatch,
   type SubtitleCue,
   type Transcriber,
+  type BackgroundRemover,
+  type BackgroundRemoverCheck,
   type TranscriberCheck,
   type Asset,
   type RegionItem,
@@ -68,7 +84,12 @@ import {
   createEngine,
   createMediaAnalyzer,
   createProjectStorage,
+  createProxyMaker,
   itemIndexAt,
+  proxyHeightFor,
+  type ProxyMaker,
+  sceneCutTimes,
+  type SceneSensitivity,
   StorageFullError,
   type Engine,
   type MediaAnalyzer,
@@ -89,7 +110,15 @@ import { formatClock } from './format';
 import { DEFAULT_KEY, isPicture } from './picture';
 import { computeTargets, type Targets } from './targets';
 import type { Labels } from './labels';
-import { createUiStore, Playhead, type LayoutMode, type PanelId, type ToolId } from './state';
+import {
+  createUiStore,
+  Levels,
+  Playhead,
+  type AssistantTurn,
+  type LayoutMode,
+  type PanelId,
+  type ToolId,
+} from './state';
 import { alignOffsets, distributeOffsets, type AlignEdge } from './stage/arrange';
 import { itemBox, visibleItemsAt, type Box } from './stage/geometry';
 import { measureText } from './stage/measure';
@@ -112,10 +141,30 @@ export interface ControllerOptions {
   autosave?: boolean;
   /** Base URL of the 3D sticker art (self-host it), or `false` to hide 3D stickers. */
   stickerLibrary?: string | false;
+  /**
+   * Where animated emoji stickers come from (Noto Emoji Animation, CC BY 4.0): a base URL whose
+   * `<code>/512.webp` files are the animations, or `false` to hide the Animated tab. Default:
+   * Google's public copy. Placed stickers are stored in the project.
+   */
+  animatedStickerLibrary?: string | false;
+  /**
+   * Lighter copies of heavy videos for smooth editing (v0.4): `auto` (default) makes them for
+   * videos this device would struggle with (4K; 1080p on budget phones), `always` for every
+   * video over 540p, `off` never. Previews use the copy; exports always use the original.
+   */
+  proxies?: 'auto' | 'always' | 'off';
   /** The host's music & sound-effects source for the Audio panel. */
   audioLibrary?: AudioLibrary;
   /** Turns speech into timed words for auto captions (on-device or the host's service). */
   transcriber?: Transcriber;
+  /** Host customisation: hidden tools, own panels, buttons and media sources (embed.ts). */
+  customize?: EditorCustomization;
+  /** Removes photo backgrounds (`createBackgroundRemover()` from `@video-ultra/ai`, or yours). */
+  backgroundRemover?: BackgroundRemover;
+  /** AI editing with the host's model (`createChatAssistant()` from `@video-ultra/ai`, or yours). */
+  assistant?: EditingAssistant;
+  /** Text to speech (`createSpeechEndpoint()` from `@video-ultra/ai`, or yours). */
+  speech?: SpeechGenerator;
 }
 
 /**
@@ -123,10 +172,52 @@ export interface ControllerOptions {
  * media analyzer, storage, UI state and the playhead. React components read from it with
  * selectors and call its methods; nothing here renders.
  */
+/**
+ * What ⌘C copied: shared by every editor on the page, so a copy in one project pastes into
+ * another (with the media it uses). Plain objects from the project — never mutated.
+ */
+let clipboard: { items: CopiedItem[]; assets: Record<string, Asset> } | null = null;
+
+/** An SVG file (by type or name — some systems send SVGs without a type). */
+function isSvg(file: File): boolean {
+  return file.type === 'image/svg+xml' || /\.svg$/i.test(file.name);
+}
+
+/** Longest side of an SVG drawn into a PNG (crisp at full-screen 4K, small enough to keep). */
+const SVG_RASTER_PX = 2048;
+
+/**
+ * Draws an SVG into a PNG with transparency, at up to {@link SVG_RASTER_PX} on its longest side
+ * (its own aspect; 1024 px square when it has no size).
+ */
+async function svgToPng(file: File): Promise<File> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = url;
+    await img.decode();
+    const w = img.naturalWidth || 1024;
+    const h = img.naturalHeight || 1024;
+    const k = SVG_RASTER_PX / Math.max(w, h);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(w * k));
+    canvas.height = Math.max(1, Math.round(h * k));
+    canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+    if (!blob) throw new Error('SVG could not be drawn');
+    return new File([blob], file.name.replace(/\.svg$/i, '') + '.png', { type: 'image/png' });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 export class EditorController {
   readonly editor: Editor;
   readonly ui = createUiStore();
   readonly playhead = new Playhead();
+  /** Sound levels while playing (meters). */
+  readonly levels = new Levels();
   readonly labels: Labels;
   readonly options: ControllerOptions;
   analyzer: MediaAnalyzer | null = null;
@@ -146,10 +237,49 @@ export class EditorController {
   /** Bumped by stop(); async work from an older start() checks it and backs out. */
   #generation = 0;
 
+  #listeners = new Set<(event: EditorEvent) => void>();
+
+  /** Listens to what happens in the editor (edits, selection, playback, …); returns an unsubscribe. */
+  on(listener: (event: EditorEvent) => void): () => void {
+    this.#listeners.add(listener);
+    return () => {
+      this.#listeners.delete(listener);
+    };
+  }
+
+  /** Tells the listeners (a host's listener throwing never breaks the editor). */
+  notify(event: EditorEvent): void {
+    for (const listener of this.#listeners) {
+      try {
+        listener(event);
+      } catch (error) {
+        console.error(error);
+      }
+    }
+  }
+
   constructor(options: ControllerOptions, project?: Project) {
     this.options = options;
     this.labels = options.labels;
     this.editor = createEditor(project ?? createProject());
+    this.#disposers.push(
+      this.ui.subscribe((state, prev) => {
+        if (!this.#listeners.size) return;
+        if (state.selectedIds !== prev.selectedIds)
+          this.notify({ type: 'selection', ids: state.selectedIds });
+        if (state.playing !== prev.playing)
+          this.notify({ type: 'playback', playing: state.playing });
+        if (state.panel !== prev.panel) this.notify({ type: 'panel', id: state.panel });
+      }),
+      this.editor.store.subscribe((state, prev) => {
+        if (state.project === prev.project || !this.#listeners.size) return;
+        const { labels, position } = this.editor.history();
+        this.notify({
+          type: 'change',
+          label: position > 0 ? (labels[position - 1] ?? null) : null,
+        });
+      }),
+    );
     this.#disposers.push(
       this.editor.store.subscribe((state, prev) => {
         if (state.project === prev.project) return;
@@ -327,7 +457,8 @@ export class EditorController {
       return () => {};
     }
     this.engine = engine;
-    engine.onTime = (time, playing) => {
+    engine.onTime = (time, playing, levels) => {
+      this.levels.set(levels?.[0] ?? 0, levels?.[1] ?? 0);
       // A trim drag shows the edge frame without moving the playhead.
       if (this.#previewSeeking && !playing) return;
       // While paused the playhead is ours: the engine only echoes seeks we already made, a frame
@@ -356,6 +487,7 @@ export class EditorController {
     };
     await engine.setProject(this.project);
     for (const [assetId, blob] of this.media) await engine.addMedia(assetId, blob);
+    for (const [assetId, proxy] of this.proxies) await engine.setProxy(assetId, proxy);
     await engine.seek(this.playhead.time);
     return () => {
       if (this.engine === engine) this.engine = null;
@@ -377,6 +509,10 @@ export class EditorController {
     this.engine?.destroy();
     this.engine = null;
     this.analyzer?.destroy();
+    this.#proxyAbort.abort();
+    this.#proxyAbort = new AbortController();
+    this.#proxyMaker?.destroy();
+    this.#proxyMaker = null;
     this.analyzer = null;
     // Close after the autosave flush above has been handed its writes.
     const storage = this.storage;
@@ -751,7 +887,7 @@ export class EditorController {
     const out: { item: Item; box: Box }[] = [];
     for (const item of this.selectedItems()) {
       if (!('transform' in item) || this.isLocked(item.id)) continue;
-      const box = itemBox(item, this.project, width, height, measureText);
+      const box = itemBox(item, this.project, width, height, measureText, this.playhead.time);
       if (box) out.push({ item, box });
     }
     return out;
@@ -812,13 +948,9 @@ export class EditorController {
       list.forEach(({ item }, i) => {
         const o = offsets[i]!;
         if (!('transform' in item) || (o.dx === 0 && o.dy === 0)) return;
-        updateItem(d, item.id, {
-          transform: {
-            ...item.transform,
-            x: item.transform.x + o.dx / width,
-            y: item.transform.y + o.dy / height,
-          },
-        });
+        const at = this.playhead.time;
+        const tf = transformAt(item, at)!;
+        setTransformAt(d, item.id, { ...tf, x: tf.x + o.dx / width, y: tf.y + o.dy / height }, at);
       });
     });
   }
@@ -981,6 +1113,58 @@ export class EditorController {
     });
   }
 
+  /** Copies the selection (and the media it uses) for {@link paste}. */
+  copySelected(): number {
+    const items = this.selectedItems();
+    if (items.length === 0) return 0;
+    const main = mainTrack(this.project);
+    const assets: Record<string, Asset> = {};
+    for (const item of items) {
+      const ids = [
+        'assetId' in item ? item.assetId : null,
+        'lut' in item && item.lut ? item.lut.assetId : null,
+        'cutout' in item && item.cutout ? item.cutout.assetId : null,
+      ];
+      for (const id of ids) if (id && this.project.assets[id]) assets[id] = this.project.assets[id];
+    }
+    clipboard = {
+      items: items.map((item) => ({ item, fromMain: main.items.includes(item) })),
+      assets,
+    };
+    this.toast(this.labels.copiedDone(items.length), 'success');
+    return items.length;
+  }
+
+  /** Copies the selection, then deletes it. */
+  cutSelected(): void {
+    if (this.copySelected() === 0) return;
+    this.deleteSelected();
+  }
+
+  /** Whether {@link paste} has something to paste. */
+  hasClipboard(): boolean {
+    return clipboard !== null;
+  }
+
+  /** Pastes what was copied at the playhead, and selects it. */
+  paste(): void {
+    const copied = clipboard;
+    if (!copied) {
+      this.toast(this.labels.nothingToPaste, 'info');
+      return;
+    }
+    const at = this.playhead.time;
+    const ids = this.run(this.labels.paste, (d, ctx) =>
+      pasteItems(d, copied.items, copied.assets, at, ctx.ids),
+    );
+    if (!ids?.length) return;
+    this.ui.setState({ selectedId: ids[ids.length - 1]!, selectedIds: ids, tool: null });
+    this.toast(this.labels.pastedDone, 'success', {
+      label: this.labels.undo,
+      run: () => this.undo(),
+    });
+  }
+
   freezeSelected(): void {
     const { freeze } = this.targets();
     if (!freeze.item) {
@@ -1102,6 +1286,51 @@ export class EditorController {
   }
 
   /** Adds an overlay/lane item at the playhead and selects it. */
+  /** Adds a marker at the playhead (key M) — or removes the one that's there. */
+  addMarkerHere(): void {
+    const at = this.playhead.time;
+    const half = projectFrame(this.project) / 2;
+    const there = this.project.markers?.find((m) => Math.abs(m.time - at) <= half);
+    if (there) {
+      this.run(this.labels.removeMarker, (d) => removeMarker(d, there.id));
+      return;
+    }
+    const id = this.run(this.labels.addMarker, (d, ctx) => addMarker(d, at, ctx.ids));
+    if (!id) return;
+    this.toast(this.labels.markerAdded(formatClock(at)), 'success', {
+      label: this.labels.undo,
+      run: () => this.undo(),
+    });
+  }
+
+  /** The nearest marker after (1) or before (−1) the playhead, or null. */
+  markerNear(direction: 1 | -1): Time | null {
+    const t = this.playhead.time;
+    const frame = projectFrame(this.project);
+    const list = this.project.markers ?? [];
+    const hit =
+      direction === 1
+        ? list.find((m) => m.time > t + frame / 2)
+        : [...list].reverse().find((m) => m.time < t - frame / 2);
+    return hit ? hit.time : null;
+  }
+
+  /** Adds a template at the playhead (one group) and selects it. */
+  addTemplate(template: TemplatePreset, values: Readonly<Record<string, string>>): void {
+    const at = this.playhead.time;
+    const ids = this.run(this.labels.templates, (d, ctx) =>
+      applyTemplate(d, template, values, at, ctx.ids),
+    );
+    if (!ids?.length) return;
+    this.ui.setState({ selectedId: ids[ids.length - 1]!, selectedIds: ids, tool: null });
+    // Entrances start invisible: show the template once it's in.
+    this.seek(at + Math.min(fromSeconds(1.2), fromSeconds(template.duration / 2)));
+    this.toast(this.labels.templateAdded, 'success', {
+      label: this.labels.undo,
+      run: () => this.undo(),
+    });
+  }
+
   addLaneItem(label: string, make: (id: string, start: Time) => Item): void {
     const id = this.run(label, (d, ctx) => {
       const item = make(ctx.ids(), this.playhead.time);
@@ -1124,6 +1353,57 @@ export class EditorController {
         asset.audioTrack !== undefined ? { audioTrack: asset.audioTrack } : {},
       );
     void this.engine?.addMedia(asset.id, blob).catch(() => {});
+    if (asset.kind === 'video') void this.#ensureProxy(asset, blob);
+  }
+
+  // ── proxies (v0.4) ─────────────────────────────────────────────────────
+
+  /** Lighter copies in use for previews, by asset id (device-local, not in the project). */
+  readonly proxies = new Map<string, File>();
+  #proxyMaker: ProxyMaker | null = null;
+  #proxyAbort = new AbortController();
+
+  /** Finds or makes the proxy a heavy video needs on this device, then previews from it. */
+  async #ensureProxy(asset: Asset, blob: Blob): Promise<void> {
+    const mode = this.options.proxies ?? 'auto';
+    if (mode === 'off' || asset.kind !== 'video' || asset.hdr || this.proxies.has(asset.id)) return;
+    if (!asset.width || !asset.height || typeof Worker === 'undefined') return;
+    const turned = asset.rotation === 90 || asset.rotation === 270;
+    const w = turned ? asset.height : asset.width;
+    const h = turned ? asset.width : asset.height;
+    const height =
+      mode === 'always'
+        ? Math.min(w, h) > 540
+          ? 540
+          : null
+        : proxyHeightFor(w, h, this.caps?.tier ?? 'mid');
+    if (!height) return;
+    const maker = (this.#proxyMaker ??= createProxyMaker(this.caps?.tier ?? 'mid'));
+    const signal = this.#proxyAbort.signal;
+    let file = await maker.find(asset.id, height);
+    if (!file) {
+      if (signal.aborted) return;
+      this.ui.setState((s) => ({ proxyJobs: { ...s.proxyJobs, [asset.id]: 0 } }));
+      this.toast(this.labels.makingProxy(asset.name), 'info');
+      try {
+        file = await maker.make(asset.id, blob, height, {
+          signal,
+          onProgress: (done) =>
+            this.ui.setState((s) =>
+              asset.id in s.proxyJobs ? { proxyJobs: { ...s.proxyJobs, [asset.id]: done } } : {},
+            ),
+        });
+      } finally {
+        this.ui.setState((s) => {
+          const rest = { ...s.proxyJobs };
+          Reflect.deleteProperty(rest, asset.id);
+          return { proxyJobs: rest };
+        });
+      }
+    }
+    if (!file || signal.aborted || !this.media.has(asset.id)) return;
+    this.proxies.set(asset.id, file);
+    await this.engine?.setProxy(asset.id, file).catch(() => {});
   }
 
   /**
@@ -1145,8 +1425,28 @@ export class EditorController {
     } = {},
   ): Promise<void> {
     const addToTimeline = options.addToTimeline ?? true;
-    for (const file of files) {
+    for (const original of files) {
       const rowId = randomId();
+      // SVG: drawn once into a PNG here (the engine worker can't decode SVG).
+      let file = original;
+      if (isSvg(original)) {
+        try {
+          file = await svgToPng(original);
+        } catch {
+          this.ui.setState((s) => ({
+            imports: [
+              ...s.imports,
+              {
+                id: rowId,
+                name: original.name,
+                status: 'error',
+                message: this.labels.svgFailed(original.name),
+              },
+            ],
+          }));
+          continue;
+        }
+      }
       this.ui.setState((s) => ({
         imports: [...s.imports, { id: rowId, name: file.name, status: 'working' }],
       }));
@@ -1186,6 +1486,7 @@ export class EditorController {
           }
         });
         this.#registerMedia(asset, file);
+        this.notify({ type: 'import', assetId: asset.id, name: asset.name });
         if (selectId) this.select(selectId);
         this.ui.setState((s) => ({ imports: s.imports.filter((r) => r.id !== rowId) }));
       } catch (error) {
@@ -1413,7 +1714,15 @@ export class EditorController {
     const engine = this.engine;
     if (!engine) throw new Error(this.labels.exportUnavailable);
     this.pause();
-    const result = await engine.export(options, onProgress, signal);
+    this.notify({ type: 'export', phase: 'start' });
+    let result: ExportResult;
+    try {
+      result = await engine.export(options, onProgress, signal);
+    } catch (error) {
+      this.notify({ type: 'export', phase: signal.aborted ? 'cancelled' : 'error' });
+      throw error;
+    }
+    this.notify({ type: 'export', phase: 'done' });
     for (const warning of result.warnings) this.toast(warning, 'info');
     this.options.onExport?.(result);
     return result;
@@ -1560,6 +1869,294 @@ export class EditorController {
     return result.ok
       ? { project: result.project, error: null }
       : { project: null, error: result.error };
+  }
+
+  // ── background removal (v0.3) ────────────────────────────────────────────
+
+  #cutoutAbort: AbortController | null = null;
+
+  /** Whether background removal can run here (null: the host gave no remover). */
+  async checkBackgroundRemoval(): Promise<BackgroundRemoverCheck | null> {
+    const r = this.options.backgroundRemover;
+    if (!r) return null;
+    return (await r.check?.().catch(() => null)) ?? { available: true, onDevice: false };
+  }
+
+  /**
+   * Removes the background of a photo or image sticker: the remover makes a transparent copy,
+   * stored as a new image the item shows instead (its own image stays: Restore takes the copy
+   * away). One undo step. Progress is in `ui.cutoutJob`; `cancelBackgroundRemoval()` stops it.
+   */
+  async removeBackground(itemId: string): Promise<void> {
+    const remover = this.options.backgroundRemover;
+    const l = this.labels;
+    const found = findItem(this.project, itemId)?.item;
+    const assetId =
+      found && (found.kind === 'image' || found.kind === 'sticker') ? found.assetId : null;
+    const asset = assetId ? this.project.assets[assetId] : undefined;
+    if (!remover || !asset || !this.storage) return;
+    const blob =
+      this.media.get(asset.id) ??
+      (await this.options.resolveMedia?.(asset).catch(() => null)) ??
+      (await this.storage.getMedia(asset).catch(() => null));
+    if (!blob) {
+      this.toast(l.mediaMissing(asset.name), 'error');
+      return;
+    }
+    this.#cutoutAbort?.abort();
+    const abort = new AbortController();
+    this.#cutoutAbort = abort;
+    this.ui.setState({ cutoutJob: { itemId, stage: 'work', fraction: 0 } });
+    try {
+      const png = await remover.remove({
+        image: blob,
+        signal: abort.signal,
+        onProgress: (p) =>
+          this.ui.setState({ cutoutJob: { itemId, stage: p.stage, fraction: p.fraction } }),
+      });
+      if (abort.signal.aborted) return;
+      const name = `${asset.name.replace(/\.[^.]+$/, '')} (no background).png`;
+      const file = new File([png], name, { type: 'image/png' });
+      const probe = await this.analyzer!.probe(file, name);
+      if (!probe.ok) throw new Error(probe.message);
+      const cutId = randomId();
+      const source = await this.storage.putMedia(cutId, file);
+      const cutAsset = assetFromProbe(probe.media, cutId, source);
+      this.run(l.removeBackground, (d) => {
+        addAsset(d, cutAsset);
+        updateItem(d, itemId, { cutout: { assetId: cutId } });
+      });
+      this.#registerMedia(cutAsset, file);
+      this.toast(l.backgroundRemoved, 'success', { label: l.undo, run: () => this.undo() });
+    } catch (error) {
+      if (abort.signal.aborted || (error instanceof DOMException && error.name === 'AbortError'))
+        return;
+      this.toast(
+        error instanceof StorageFullError
+          ? l.storageFull
+          : l.backgroundFailed(error instanceof Error ? error.message : String(error)),
+        'error',
+      );
+    } finally {
+      if (this.#cutoutAbort === abort) {
+        this.#cutoutAbort = null;
+        this.ui.setState({ cutoutJob: null });
+      }
+    }
+  }
+
+  cancelBackgroundRemoval(): void {
+    this.#cutoutAbort?.abort();
+    this.#cutoutAbort = null;
+    this.ui.setState({ cutoutJob: null });
+  }
+
+  /** Shows the photo's own background again. */
+  restoreBackground(itemId: string): void {
+    this.run(this.labels.restoreBackground, (d) => updateItem(d, itemId, { cutout: null }));
+  }
+
+  // ── text to speech (v0.4) ──────────────────────────────────────────────
+
+  #speechAbort: AbortController | null = null;
+
+  /**
+   * Speaks `text` with the host's voice service and adds it as a sound clip at `at` (default:
+   * the playhead). Progress: `ui.speechBusy`. Returns false when it failed or was stopped.
+   */
+  async speak(
+    text: string,
+    options: { voice?: string; speed?: number; at?: number } = {},
+  ): Promise<boolean> {
+    const speech = this.options.speech;
+    const words = text.trim();
+    if (!speech || !words) return false;
+    const l = this.labels;
+    this.#speechAbort?.abort();
+    const abort = new AbortController();
+    this.#speechAbort = abort;
+    this.ui.setState({ speechBusy: true });
+    try {
+      const voice = options.voice ?? (await speech.voices())[0]?.id ?? 'default';
+      const audio = await speech.speak({
+        text: words,
+        voice,
+        speed: options.speed ?? 1,
+        signal: abort.signal,
+      });
+      if (abort.signal.aborted) return false;
+      const extension = /wav/.test(audio.type)
+        ? 'wav'
+        : /ogg|opus/.test(audio.type)
+          ? 'ogg'
+          : /aac|mp4/.test(audio.type)
+            ? 'm4a'
+            : 'mp3';
+      const short =
+        words.length > 32 ? `${words.slice(0, 32).trimEnd()}…` : words.replace(/[.!?\s]+$/, '');
+      const name = `${l.voiceFile} · ${short}.${extension}`;
+      if (options.at !== undefined) this.seek(options.at);
+      await this.importFiles([new File([audio], name, { type: audio.type })], {
+        selectSound: true,
+      });
+      return true;
+    } catch (error) {
+      if (!abort.signal.aborted)
+        this.toast(l.speechFailed(error instanceof Error ? error.message : String(error)), 'error');
+      return false;
+    } finally {
+      if (this.#speechAbort === abort) {
+        this.#speechAbort = null;
+        this.ui.setState({ speechBusy: false });
+      }
+    }
+  }
+
+  /** Stops a running {@link speak}. */
+  cancelSpeech(): void {
+    this.#speechAbort?.abort();
+    this.#speechAbort = null;
+    this.ui.setState({ speechBusy: false });
+  }
+
+  // ── AI editing (v0.4) ───────────────────────────────────────────────────
+
+  #assistantAbort: AbortController | null = null;
+  #assistantTurn = 0;
+
+  /**
+   * Sends `instruction` to the host's assistant with a description of the project, then applies
+   * the edits it answers with as one undo step — all of them or, if one is invalid, none (the
+   * reason shows in the conversation). Returns the turn.
+   */
+  async askAssistant(instruction: string): Promise<AssistantTurn | null> {
+    const assistant = this.options.assistant;
+    const text = instruction.trim();
+    if (!assistant || !text) return null;
+    this.#assistantAbort?.abort();
+    const abort = new AbortController();
+    this.#assistantAbort = abort;
+    this.ui.setState({ assistantBusy: true });
+    const l = this.labels;
+    const state = this.ui.getState();
+    let turn: AssistantTurn = {
+      id: ++this.#assistantTurn,
+      instruction: text,
+      reply: '',
+      applied: 0,
+      error: null,
+    };
+    try {
+      const answer = await assistant.edit({
+        instruction: text,
+        project: describeProject(this.project),
+        selection: [...state.selectedIds],
+        playhead: this.playhead.time / FLICKS_PER_SECOND,
+        history: state.assistantTurns
+          .slice(-6)
+          .map((t) => ({ instruction: t.instruction, reply: t.reply })),
+        signal: abort.signal,
+      });
+      if (abort.signal.aborted) return null;
+      turn = { ...turn, reply: answer.reply };
+      if (answer.actions.length > 0) {
+        try {
+          this.editor.apply(l.assistantEdit, (d, ctx) =>
+            applyEditActions(d, answer.actions, ctx.ids),
+          );
+          turn = { ...turn, applied: answer.actions.length };
+          this.toast(l.assistantApplied(answer.actions.length), 'success', {
+            label: l.undo,
+            run: () => this.undo(),
+          });
+        } catch (error) {
+          turn = { ...turn, error: error instanceof EditError ? error.message : String(error) };
+        }
+      }
+    } catch (error) {
+      if (abort.signal.aborted) return null;
+      turn = {
+        ...turn,
+        error: l.assistantFailed(error instanceof Error ? error.message : String(error)),
+      };
+    } finally {
+      if (this.#assistantAbort === abort) {
+        this.#assistantAbort = null;
+        this.ui.setState({ assistantBusy: false });
+      }
+    }
+    this.ui.setState((s) => ({ assistantTurns: [...s.assistantTurns, turn] }));
+    return turn;
+  }
+
+  /** Stops a request to the assistant. */
+  cancelAssistant(): void {
+    this.#assistantAbort?.abort();
+    this.#assistantAbort = null;
+    this.ui.setState({ assistantBusy: false });
+  }
+
+  // ── scene detection (v0.4) ──────────────────────────────────────────────
+
+  #sceneAbort: AbortController | null = null;
+
+  /**
+   * Finds where the scenes change in a video clip (in the analyzer worker, frame by frame) and
+   * splits the clip there — one undo step. Progress is in `ui.sceneJob`. Returns the number of
+   * parts (1 = no scene changes), or `null` when stopped or the video couldn't be read.
+   */
+  async splitAtScenes(
+    itemId: string,
+    sensitivity: SceneSensitivity = 'normal',
+  ): Promise<number | null> {
+    const l = this.labels;
+    const item = findItem(this.project, itemId)?.item;
+    if (!item || item.kind !== 'video' || !this.analyzer) return null;
+    this.#sceneAbort?.abort();
+    const abort = new AbortController();
+    this.#sceneAbort = abort;
+    this.ui.setState({ sceneJob: { itemId, fraction: 0 } });
+    try {
+      const from = item.sourceIn / FLICKS_PER_SECOND;
+      const cuts = await this.analyzer.scenes(item.assetId, {
+        from,
+        to: from + (item.duration * item.speed) / FLICKS_PER_SECOND,
+        sensitivity,
+        signal: abort.signal,
+        onProgress: (fraction) => {
+          if (!abort.signal.aborted) this.ui.setState({ sceneJob: { itemId, fraction } });
+        },
+      });
+      if (abort.signal.aborted) return null;
+      if (!cuts) {
+        this.toast(l.scenesFailed, 'error');
+        return null;
+      }
+      // The clip may have changed while the worker looked: map onto it as it is now.
+      const now = findItem(this.project, itemId)?.item;
+      if (!now || now.kind !== 'video') return null;
+      const times = sceneCutTimes(cuts, now, FLICKS_PER_SECOND, projectFrame(this.project));
+      if (times.length === 0) {
+        this.toast(l.noScenesFound, 'info');
+        return 1;
+      }
+      const parts = this.run(l.splitAtScenes, (d, ctx) => splitItemAt(d, itemId, times, ctx.ids));
+      if (!parts) return null;
+      this.toast(l.scenesSplit(parts.length), 'success', { label: l.undo, run: () => this.undo() });
+      return parts.length;
+    } finally {
+      if (this.#sceneAbort === abort) {
+        this.#sceneAbort = null;
+        this.ui.setState({ sceneJob: null });
+      }
+    }
+  }
+
+  /** Stops a running {@link splitAtScenes}. */
+  cancelSceneDetection(): void {
+    this.#sceneAbort?.abort();
+    this.#sceneAbort = null;
+    this.ui.setState({ sceneJob: null });
   }
 
   // ── captions (v0.2 A) ──────────────────────────────────────────────────

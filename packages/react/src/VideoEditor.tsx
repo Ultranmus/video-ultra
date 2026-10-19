@@ -4,6 +4,9 @@ import {
   type Capabilities,
   type Project,
   type Transcriber,
+  type BackgroundRemover,
+  type EditingAssistant,
+  type SpeechGenerator,
   type ExportResult,
   type AudioExportResult,
   type FrameImage,
@@ -11,6 +14,7 @@ import {
 import { useEffect, useRef, useState, type CSSProperties, type ReactElement } from 'react';
 import { ControllerContext, useController, useLabels, useUi } from './context';
 import { EditorController } from './controller';
+import type { EditorCustomization, EditorEvent } from './embed';
 import { CameraRecorder } from './Camera';
 import { ExportDialog } from './ExportDialog';
 import { Icon } from './icons';
@@ -64,6 +68,18 @@ export interface VideoEditorProps {
    */
   stickerLibrary?: string | false;
   /**
+   * Where animated emoji stickers come from (Noto Emoji Animation, CC BY 4.0): a base URL whose
+   * `<code>/512.webp` files are the animations, or `false` to hide the Animated tab. Default:
+   * Google's public copy. Placed stickers are stored in the project.
+   */
+  animatedStickerLibrary?: string | false;
+  /**
+   * Lighter copies of heavy videos for smooth editing, kept on this device: `auto` (default)
+   * for videos this device would struggle with (4K; 1080p on budget phones), `always` for every
+   * video over 540p, `off` never. Previews use the copy; exports always use the original.
+   */
+  proxies?: 'auto' | 'always' | 'off';
+  /**
    * A music & sound-effects source for the Audio panel: search, categories, a ▶ preview and the
    * licence line per sound, and Add (at the playhead). The picked file is stored in the project
    * like an import (its licence line on the asset as `credit`), so exports never depend on the
@@ -78,10 +94,47 @@ export interface VideoEditorProps {
    * service. Without it, captions can still be imported (.srt / .vtt) or typed.
    */
   transcriber?: Transcriber;
+  /**
+   * Removes photo backgrounds: `createBackgroundRemover()` from the optional `@video-ultra/ai`
+   * package (runs on the device, nothing uploaded), or your own service. Without it the option
+   * isn't shown.
+   */
+  backgroundRemover?: BackgroundRemover;
+  /**
+   * AI editing (v0.4): an Assistant panel where people type what they want ("make it warmer",
+   * "add a title at the start") and your model's answer is applied as one undo step. Use
+   * `createChatAssistant({ endpoint })` from `@video-ultra/ai` with your own server, or implement
+   * `EditingAssistant`. A description of the project (no media) is sent to it. Without it the
+   * panel isn't shown.
+   */
+  assistant?: EditingAssistant;
+  /**
+   * Text to speech (v0.4): "Text to speech" in the Audio panel and "Read aloud" on texts add a
+   * spoken sound clip. Use `createSpeechEndpoint({ endpoint })` from `@video-ultra/ai` with
+   * your own server, or implement `SpeechGenerator`. Without it these aren't shown.
+   */
+  speech?: SpeechGenerator;
+  /**
+   * Embedding API: hide or reorder built-in tools, add your own panels, top-bar buttons and
+   * media sources (see {@link EditorCustomization}).
+   */
+  customize?: EditorCustomization;
+  /** Everything that happens in the editor (edits, selection, playback, commands, export…). */
+  onEvent?: (event: EditorEvent) => void;
   /** `dark` (default), `light` or `auto` (follow the OS). */
   theme?: ThemeMode;
   /** Typed overrides for the common theme tokens. */
   themeOverrides?: ThemeOverrides;
+  /**
+   * `normal` (default), `high` (stronger text, borders and focus rings — for low vision or bright
+   * sunlight), or `auto` (high when the OS asks for more contrast).
+   */
+  contrast?: 'normal' | 'high' | 'auto';
+  /**
+   * Control sizes: `auto` (default — thumb-sized on touch screens), `touch` (thumb-sized
+   * everywhere) or `compact` (mouse sizes, also on touch screens).
+   */
+  density?: 'auto' | 'touch' | 'compact';
   /** Replace any of the editor's text (translation). */
   labels?: Partial<Labels>;
   /** Text direction of the editor chrome. The timeline always runs left to right. */
@@ -94,7 +147,7 @@ export interface VideoEditorProps {
   style?: CSSProperties;
 }
 
-const ACCEPT = 'video/*,audio/*,image/*,.mov,.mkv,.heic,.heif,.m4a,.mp3,.wav';
+const ACCEPT = 'video/*,audio/*,image/*,.mov,.mkv,.heic,.heif,.m4a,.mp3,.wav,.svg';
 
 /**
  * The video editor. Drop it anywhere — it fills its container and picks the phone, tablet or
@@ -122,8 +175,16 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
         ...(props.resolveMedia ? { resolveMedia: props.resolveMedia } : {}),
         ...(props.autosave !== undefined ? { autosave: props.autosave } : {}),
         ...(props.stickerLibrary !== undefined ? { stickerLibrary: props.stickerLibrary } : {}),
+        ...(props.animatedStickerLibrary !== undefined
+          ? { animatedStickerLibrary: props.animatedStickerLibrary }
+          : {}),
+        ...(props.proxies ? { proxies: props.proxies } : {}),
         ...(props.audioLibrary ? { audioLibrary: props.audioLibrary } : {}),
         ...(props.transcriber ? { transcriber: props.transcriber } : {}),
+        ...(props.backgroundRemover ? { backgroundRemover: props.backgroundRemover } : {}),
+        ...(props.assistant ? { assistant: props.assistant } : {}),
+        ...(props.speech ? { speech: props.speech } : {}),
+        ...(props.customize ? { customize: props.customize } : {}),
       },
       parsed?.project ?? undefined,
     );
@@ -132,6 +193,13 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
   });
   const controller = ctl.controller;
   const rootRef = useRef<HTMLDivElement>(null);
+
+  // The host's event listener (latest one; it may change between renders).
+  const onEvent = useRef(props.onEvent);
+  useEffect(() => {
+    onEvent.current = props.onEvent;
+  });
+  useEffect(() => controller.on((event) => onEvent.current?.(event)), [controller]);
 
   // Start: capabilities, storage, media. Strict mode mounts twice — `cancelled` guards async work.
   useEffect(() => {
@@ -211,6 +279,10 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
         ref={rootRef}
         className={`vu-root${props.className ? ` ${props.className}` : ''}`}
         data-vu-theme={theme === 'auto' ? undefined : theme}
+        data-vu-contrast={
+          props.contrast && props.contrast !== 'normal' ? props.contrast : undefined
+        }
+        data-vu-density={props.density && props.density !== 'auto' ? props.density : undefined}
         dir={props.dir ?? 'ltr'}
         tabIndex={-1}
         onPointerDown={(e) => {

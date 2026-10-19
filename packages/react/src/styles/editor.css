@@ -1577,6 +1577,319 @@
     pointer-events: none;
   }
 
+  /* v0.4 Fine trims. */
+  .vu-protrim {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-2);
+  }
+
+  .vu-protrim-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: var(--vu-size-touch);
+    color: var(--vu-text-muted);
+  }
+
+  .vu-protrim-steps {
+    display: inline-flex;
+    gap: var(--vu-space-1);
+  }
+
+  /* v0.4 Keyframes: ◆ buttons and the graph editor. */
+  .vu-keyframes,
+  .vu-curve {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-3);
+  }
+
+  .vu-keyframe-rows {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-1);
+  }
+
+  .vu-keyframe-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: var(--vu-size-touch);
+    color: var(--vu-text-muted);
+  }
+
+  .vu-keyframe-row > span:first-child::first-letter {
+    text-transform: uppercase;
+  }
+
+  .vu-keyframe {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vu-space-1);
+  }
+
+  .vu-keyframe-diamond {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--vu-size-touch);
+    height: var(--vu-size-touch);
+    border-radius: var(--vu-radius-md);
+    color: var(--vu-text-muted);
+  }
+
+  .vu-keyframe-diamond svg {
+    width: var(--vu-size-keyframe);
+    height: var(--vu-size-keyframe);
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+  }
+
+  .vu-keyframe[data-keyed] .vu-keyframe-diamond {
+    color: var(--vu-accent-text);
+  }
+
+  .vu-keyframe-diamond[aria-pressed='true'] svg {
+    fill: currentColor;
+  }
+
+  .vu-keyframe-diamond:hover:not(:disabled) {
+    background: var(--vu-surface-3);
+  }
+
+  .vu-keyframe-diamond:disabled {
+    opacity: 0.4;
+  }
+
+  .vu-curve-graph {
+    width: 100%;
+    height: auto;
+    border: 1px solid var(--vu-border);
+    border-radius: var(--vu-radius-md);
+    background: var(--vu-surface-2);
+    touch-action: none;
+  }
+
+  .vu-curve-line {
+    fill: none;
+    stroke: var(--vu-accent-text);
+    stroke-width: 2;
+  }
+
+  .vu-curve-playhead {
+    stroke: var(--vu-playhead);
+    stroke-width: 1;
+  }
+
+  .vu-curve-key {
+    fill: var(--vu-surface-1);
+    stroke: var(--vu-accent-text);
+    stroke-width: 2;
+    cursor: grab;
+  }
+
+  .vu-curve-key[data-selected] {
+    fill: var(--vu-accent-text);
+  }
+
+  .vu-curve-segment {
+    stroke: var(--vu-border-strong);
+    stroke-width: 6;
+    stroke-linecap: round;
+    cursor: pointer;
+  }
+
+  .vu-curve-segment[data-selected] {
+    stroke: var(--vu-accent);
+  }
+
+  .vu-curve-arm {
+    stroke: var(--vu-text-subtle);
+    stroke-width: 1;
+  }
+
+  .vu-curve-handle {
+    fill: var(--vu-handle-fill);
+    stroke: var(--vu-accent);
+    stroke-width: 2;
+    cursor: grab;
+  }
+
+  /* v0.3 Templates: CSS miniatures sized by the frame (container units). */
+  .vu-template-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--vu-size-template), 1fr));
+    gap: var(--vu-space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .vu-template {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: var(--vu-space-1);
+    border: 1px solid var(--vu-border);
+    border-radius: var(--vu-radius-md);
+    background: var(--vu-surface-2);
+    transition:
+      border-color var(--vu-duration-fast) var(--vu-ease),
+      transform var(--vu-duration-fast) var(--vu-ease);
+  }
+
+  .vu-template:hover {
+    border-color: var(--vu-accent);
+  }
+
+  .vu-template:active {
+    transform: scale(0.97);
+  }
+
+  .vu-template-frame {
+    position: relative;
+    display: block;
+    width: 100%;
+    max-height: var(--vu-size-template-max);
+    overflow: hidden;
+    container-type: size;
+    border-radius: var(--vu-radius-sm);
+    background: var(--vu-template-bg);
+    pointer-events: none;
+  }
+
+  .vu-template-el {
+    position: absolute;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+  }
+
+  .vu-template-el[data-kind='emoji'] {
+    line-height: 1;
+  }
+
+  .vu-template-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-3);
+  }
+
+  .vu-template-form-head {
+    display: flex;
+    align-items: center;
+    gap: var(--vu-space-2);
+  }
+
+  .vu-template-form-title {
+    margin: 0;
+    font-size: var(--vu-text-lg);
+    font-weight: var(--vu-weight-semibold);
+  }
+
+  .vu-template-preview {
+    display: flex;
+    justify-content: center;
+  }
+
+  .vu-template-preview .vu-template-frame {
+    width: auto;
+    height: var(--vu-size-template-preview);
+    max-height: none;
+  }
+
+  .vu-template-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-1);
+  }
+
+  .vu-template-field input {
+    height: var(--vu-size-touch);
+    padding: 0 var(--vu-space-3);
+    border: 1px solid var(--vu-border-strong);
+    border-radius: var(--vu-radius-md);
+    background: var(--vu-surface-2);
+    color: var(--vu-text);
+  }
+
+  .vu-template-field input:focus-visible {
+    border-color: var(--vu-accent);
+    outline: none;
+    box-shadow: 0 0 0 3px var(--vu-accent-soft);
+  }
+
+  /* v0.3 Shape masks: tiles are alpha images coloured by tokens (mask.tsx). */
+  .vu-shape-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-2);
+  }
+
+  .vu-shape-heading {
+    margin: 0;
+    color: var(--vu-text-muted);
+    font-size: var(--vu-text-sm);
+    font-weight: var(--vu-weight-semibold);
+  }
+
+  .vu-shape-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--vu-size-shape-tile), 1fr));
+    gap: var(--vu-space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .vu-shape-tile {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    aspect-ratio: 1;
+    padding: var(--vu-space-2);
+    border: 1px solid transparent;
+    border-radius: var(--vu-radius-md);
+    background: var(--vu-surface-2);
+    transition:
+      background-color var(--vu-duration-fast) var(--vu-ease),
+      transform var(--vu-duration-fast) var(--vu-ease);
+  }
+
+  .vu-shape-tile:hover {
+    background: var(--vu-surface-3);
+  }
+
+  .vu-shape-tile:active {
+    transform: scale(0.95);
+  }
+
+  .vu-shape-tile[aria-pressed='true'] {
+    border-color: var(--vu-selection);
+    background: var(--vu-accent-soft);
+  }
+
+  .vu-shape-glyph {
+    width: 100%;
+    height: 100%;
+    background: var(--vu-text);
+    mask: var(--vu-shape-url) center / contain no-repeat;
+  }
+
+  .vu-shape-tile[aria-pressed='true'] .vu-shape-glyph {
+    background: var(--vu-accent-text);
+  }
+
+  .vu-shape-none {
+    width: 70%;
+    height: 70%;
+    border: 2px dashed var(--vu-text-muted);
+    border-radius: var(--vu-radius-sm);
+  }
+
   .vu-textstyle-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2479,6 +2792,130 @@
 
   .vu-timecode-total::before {
     content: '/ ';
+  }
+
+  /* v0.4 Level meter: two thin bars (left, right), drawn through refs while playing. */
+  .vu-meter {
+    display: inline-flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: var(--vu-space-1);
+    inline-size: var(--vu-size-meter-width);
+  }
+
+  .vu-meter-bar {
+    block-size: var(--vu-size-meter-bar);
+    border-radius: var(--vu-radius-sm);
+    background: var(--vu-meter-track);
+    overflow: hidden;
+  }
+
+  .vu-meter-fill {
+    display: block;
+    block-size: 100%;
+    inline-size: 100%;
+    background: var(--vu-meter-fill);
+    transform-origin: left center;
+    transform: scaleX(0);
+  }
+
+  .vu-meter-fill[data-level='hot'] {
+    background: var(--vu-meter-hot);
+  }
+
+  .vu-meter-fill[data-level='clip'] {
+    background: var(--vu-meter-clip);
+  }
+
+  /* v0.4 AI editing */
+  .vu-assistant {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-3);
+  }
+
+  .vu-assistant-turns {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .vu-assistant-turn {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-1);
+  }
+
+  .vu-assistant-turn p {
+    margin: 0;
+  }
+
+  .vu-assistant-you {
+    align-self: flex-end;
+    max-inline-size: 90%;
+    padding: var(--vu-space-2) var(--vu-space-3);
+    border-radius: var(--vu-radius-md);
+    background: var(--vu-accent-soft);
+  }
+
+  .vu-assistant-reply {
+    padding: var(--vu-space-2) var(--vu-space-3);
+    border-radius: var(--vu-radius-md);
+    background: var(--vu-surface-2);
+  }
+
+  .vu-assistant-result {
+    color: var(--vu-text-muted);
+    font-size: var(--vu-text-sm);
+  }
+
+  .vu-assistant-result[data-state='done'] {
+    color: var(--vu-success);
+  }
+
+  .vu-assistant-result[data-state='error'] {
+    color: var(--vu-danger);
+  }
+
+  .vu-assistant-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-2);
+  }
+
+  .vu-assistant-input {
+    font-size: var(--vu-text-md);
+  }
+
+  /* v0.4 Text to speech */
+  .vu-tts {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-2);
+  }
+
+  /* v0.4 Scopes */
+  .vu-scopes {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-2);
+  }
+
+  .vu-scope-canvas {
+    display: block;
+    inline-size: 100%;
+    block-size: auto;
+    border-radius: var(--vu-radius-sm);
+    background: var(--vu-scope-bg);
+    image-rendering: auto;
+  }
+
+  .vu-scope-canvas[data-mode='vector'] {
+    inline-size: min(100%, var(--vu-size-scope-vector));
+    align-self: center;
   }
 
   .vu-zoom {

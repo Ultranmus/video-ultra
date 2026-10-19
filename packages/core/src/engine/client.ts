@@ -1,3 +1,4 @@
+import type { ScopeData } from '../effects/scopes';
 import type { DeviceTier } from '../capabilities';
 import type { BackendChoice } from '../lab/protocol';
 import type { ItemAnimation, Project, Transition } from '../model/schema';
@@ -31,6 +32,11 @@ export interface Engine {
   setProject(project: Project): Promise<void>;
   /** Gives the engine the bytes of an asset (a `File` from an input, or a Blob). */
   addMedia(assetId: string, blob: Blob): Promise<void>;
+  /**
+   * Previews `assetId` from `proxy` (a lighter copy, same timing); exports and saved frames keep
+   * reading the original. `null` goes back to the original.
+   */
+  setProxy(assetId: string, proxy: Blob | null): Promise<void>;
   /** The size of the element showing the preview changed (device pixels). */
   setViewSize(width: number, height: number): Promise<void>;
   seek(time: Time): Promise<void>;
@@ -131,12 +137,20 @@ export interface Engine {
    */
   pickColour(itemId: string, time: Time, x: number, y: number): Promise<string | null>;
   /**
+   * Video scopes (histogram, waveform, parade, vectorscope) of the whole picture at `time`,
+   * measured on a small render in the worker. For the Scopes view; ask at most a few per second.
+   */
+  scopes(time: Time): Promise<ScopeData>;
+  /**
    * Silences (or restores) the engine's sound output without touching playback timing — e.g.
    * while recording a voiceover without headphones.
    */
   setOutputMuted(muted: boolean): void;
-  /** Playhead updates (every frame while playing). */
-  onTime: ((time: Time, playing: boolean) => void) | null;
+  /**
+   * Playhead updates (every frame while playing). `levels`: while sound plays, the loudest
+   * sample per side just heard (0…1; level meters).
+   */
+  onTime: ((time: Time, playing: boolean, levels?: [number, number]) => void) | null;
   onEnded: (() => void) | null;
   onError: ((message: string) => void) | null;
   /**
@@ -203,7 +217,7 @@ export async function createEngine(
     const message = event.data;
     if ('event' in message) {
       const e: EngineEvent = message.event;
-      if (e.type === 'time') handlers.onTime?.(e.time, e.playing);
+      if (e.type === 'time') handlers.onTime?.(e.time, e.playing, e.levels);
       else if (e.type === 'ended') handlers.onEnded?.();
       else if (e.type === 'export-progress') progressHandlers.get(e.jobId)?.(e.progress);
       else handlers.onError?.(e.message);
@@ -377,6 +391,9 @@ export async function createEngine(
     async setProject(project: Project) {
       await send({ type: 'project', project });
     },
+    async setProxy(assetId: string, proxy: Blob | null) {
+      await send({ type: 'proxy', assetId, blob: proxy });
+    },
     async addMedia(assetId: string, blob: Blob) {
       await send({ type: 'media', assetId, blob });
     },
@@ -503,6 +520,11 @@ export async function createEngine(
       const data = await send({ type: 'lut-check', blob });
       if (data.type !== 'lut-check') throw new Error('Unexpected engine response');
       return { size: data.size, title: data.title };
+    },
+    async scopes(time: Time) {
+      const data = await send({ type: 'scopes', time });
+      if (data.type !== 'scopes') throw new Error('Unexpected engine response');
+      return data.scopes;
     },
     async pickColour(itemId: string, time: Time, x: number, y: number) {
       const data = await send({ type: 'pick-colour', itemId, time, x, y });

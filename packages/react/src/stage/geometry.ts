@@ -1,4 +1,4 @@
-import { itemEnd, type Item, type Project, type Time } from '@video-ultra/core';
+import { itemEnd, transformAt, type Item, type Project, type Time } from '@video-ultra/core';
 import { measureTextBox, type MeasureText } from '@video-ultra/core/internal';
 
 /** A layer's box on the canvas, in canvas pixels: centre, size, clockwise rotation (degrees). */
@@ -20,8 +20,12 @@ export function itemBox(
   canvasW: number,
   canvasH: number,
   measure: MeasureText,
+  /** Timeline time, for items with keyframes (their place then). */
+  at?: Time,
 ): Box | null {
   if (item.kind === 'audio') return null;
+  // Keyframes: the item as it is at `at` (text measures with that size too).
+  if (at !== undefined && item.keyframes) item = { ...item, transform: transformAt(item, at)! };
   const tf = item.transform;
   const box = (width: number, height: number): Box => ({
     cx: tf.x * canvasW,
@@ -88,7 +92,7 @@ export function hitStage(
   slop: number,
 ): Item | null {
   for (const item of visibleItemsAt(project, t)) {
-    const box = itemBox(item, project, canvasW, canvasH, measure);
+    const box = itemBox(item, project, canvasW, canvasH, measure, t);
     if (box && boxContains(box, x, y, slop)) return item;
   }
   return null;

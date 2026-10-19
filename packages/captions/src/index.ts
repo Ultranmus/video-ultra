@@ -66,6 +66,8 @@ export interface DeviceSupport {
   speed: number;
   /** Why not, when `ok` is false. */
   reason?: string;
+  /** The model may need more memory than this phone has (measured ~1.2 GB for `small`). */
+  memoryRisk: boolean;
 }
 
 /** Model files per size and runtime (measured, PERF.md "Captions"). */
@@ -119,6 +121,55 @@ const NEEDS_SMALL = new Set([
 ]);
 
 /**
+ * A model build the page didn't survive (the phone ran out of memory and the browser closed the
+ * tab: DECISIONS #132). While a model is being built and heard for the first time, its name is
+ * kept in storage; if the page dies then, the next visit finds it and won't load that model on
+ * this device again (for a week), so captions never crash the page twice.
+ */
+const BUILDING_KEY = 'video-ultra-captions-building';
+const CRASHED_KEY = 'video-ultra-captions-crashed';
+const CRASH_MEMORY_MS = 7 * 24 * 3600 * 1000;
+
+function storage(): Storage | null {
+  try {
+    return typeof localStorage !== 'undefined' ? localStorage : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Setups (`model/device`) that crashed the page here, with when. */
+function crashedSetups(): Record<string, number> {
+  const store = storage();
+  if (!store) return {};
+  try {
+    const crashed = JSON.parse(store.getItem(CRASHED_KEY) ?? '{}') as Record<string, number>;
+    // A build that was still running when the page last closed: it crashed.
+    const building = store.getItem(BUILDING_KEY);
+    if (building) {
+      crashed[building] = Date.now();
+      store.removeItem(BUILDING_KEY);
+    }
+    const recent = Object.fromEntries(
+      Object.entries(crashed).filter(([, at]) => Date.now() - at <= CRASH_MEMORY_MS),
+    );
+    store.setItem(CRASHED_KEY, JSON.stringify(recent));
+    return recent;
+  } catch {
+    return {};
+  }
+}
+
+function markBuilding(setup: string | null): void {
+  try {
+    if (setup) storage()?.setItem(BUILDING_KEY, setup);
+    else storage()?.removeItem(BUILDING_KEY);
+  } catch {
+    /* storage off: no crash memory */
+  }
+}
+
+/**
  * Picks the model and runtime for this device and language (DECISIONS #120): English and other
  * well-heard languages use `base` on WebGPU, `tiny` on WebAssembly; languages that need it (e.g.
  * Hindi) use `small` and only run on WebGPU. Under 4 GB of memory or 4 cores it isn't offered
@@ -160,16 +211,35 @@ export async function chooseModel(
         : 'wasm';
   const cores = nav?.hardwareConcurrency ?? 4;
   const tooSmall = (memory !== undefined && memory < 4) || cores < 4;
-  const reason = tooSmall ? 'This device is too small to make captions on its own.' : undefined;
+  // A setup that crashed the page here before: the other runtime once (WebAssembly holds no
+  // second copy on the GPU), then a smaller model if the language allows it, else not offered.
+  const crashed = crashedSetups();
+  let pickedModel = model;
+  let pickedDevice = device;
+  const chosen = options.model && options.model !== 'auto';
+  if (crashed[`${pickedModel}/${pickedDevice}`] && pickedDevice === 'webgpu') pickedDevice = 'wasm';
+  if (crashed[`${pickedModel}/${pickedDevice}`] && !chosen && !needsSmall) {
+    pickedModel = pickedModel === 'small' ? 'base' : 'tiny';
+    pickedDevice = 'wasm';
+  }
+  const outOfMemory = !!crashed[`${pickedModel}/${pickedDevice}`];
+  const reason = tooSmall
+    ? 'This device is too small to make captions on its own.'
+    : outOfMemory
+      ? "This device ran out of memory with this language's speech model. Try on a computer."
+      : undefined;
   // Phones are ~3× slower than the laptop the speeds were measured on (the estimate says so).
   const phone =
     typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches && cores <= 8;
   return {
     ok: !reason,
-    device,
-    model,
-    downloadMB: FILES[model][device].mb,
-    speed: SPEED[model][device] / (phone ? 3 : 1),
+    device: pickedDevice,
+    model: pickedModel,
+    downloadMB: FILES[pickedModel][pickedDevice].mb,
+    speed: SPEED[pickedModel][pickedDevice] / (phone ? 3 : 1),
+    // `small` peaks at ~1.2 GB while it hears (PERF.md "Captions"): too close to what a phone's
+    // browser gives one tab.
+    memoryRisk: phone && pickedModel === 'small',
     ...(reason ? { reason } : {}),
   };
 }
@@ -210,6 +280,7 @@ export function createOnDeviceTranscriber(options: OnDeviceTranscriberOptions = 
         worker!.onmessage = (e: MessageEvent<FromWorker>) => {
           const msg = e.data;
           if (msg.type === 'download') onDownload?.(msg.loaded, msg.total);
+          else if (msg.type === 'building') markBuilding(`${support.model}/${support.device}`);
           else if (msg.type === 'ready') resolve(msg.device);
           else if (msg.type === 'words') {
             pending.get(msg.id)?.resolve({ words: msg.words, language: msg.language });
@@ -275,6 +346,7 @@ export function createOnDeviceTranscriber(options: OnDeviceTranscriberOptions = 
         onDevice: true,
         downloadMB: support.downloadMB,
         speed: support.speed,
+        memoryRisk: support.memoryRisk,
         ...(support.reason ? { reason: support.reason } : {}),
       };
     },
@@ -321,6 +393,7 @@ export function createOnDeviceTranscriber(options: OnDeviceTranscriberOptions = 
           // Detecting: keep this window, in case the language heard needs another model.
           const again = language === 'auto' ? w.audio.slice() : null;
           let heard = await hear(w.audio, language);
+          markBuilding(null); // built and heard once: it fits in memory here
           if (language === 'auto') {
             language = heard.language;
             const need = await chooseModel(options, language);
@@ -337,6 +410,7 @@ export function createOnDeviceTranscriber(options: OnDeviceTranscriberOptions = 
               await start(language);
               onDownload = null;
               heard = await hear(again, language);
+              markBuilding(null);
             }
           }
           const spoken = wordsWithSound(heard.words, active);
@@ -348,6 +422,7 @@ export function createOnDeviceTranscriber(options: OnDeviceTranscriberOptions = 
         }
         return { words, language };
       } finally {
+        markBuilding(null);
         signal.removeEventListener('abort', abort);
         onDownload = null;
         // WebAssembly memory never shrinks: close the worker so the page gets it back.

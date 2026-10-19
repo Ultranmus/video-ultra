@@ -549,6 +549,62 @@ make(
     ]),
 );
 
+// A real trailer with many shots (scene detection; free licence). Optional: skipped when offline.
+make(
+  {
+    file: 'sintel-trailer-480p.mp4',
+    label: 'Real footage: Sintel trailer 480p24 (52 s, many shots, CC BY 3.0 Blender Foundation)',
+    kind: 'video',
+    expect: { codec: 'avc' },
+  },
+  (p) =>
+    execFileSync('curl', [
+      '-fsSL',
+      '--max-time',
+      '180',
+      '-o',
+      p,
+      'https://download.blender.org/durian/trailer/sintel_trailer-480p.mp4',
+    ]),
+);
+// Real footage cut together at known times (3 s, 6 s, 8 s): scene detection must find exactly
+// these. Needs the two downloads above.
+make(
+  {
+    file: 'scenes-cuts.mp4',
+    label: 'Real footage with hard cuts at 3 s, 6 s and 8 s (scene detection)',
+    kind: 'video',
+    expect: { codec: 'avc', durationS: 10 },
+  },
+  (p) => {
+    const bbb = join(out, 'bbb-1080p60.mp4');
+    const sintel = join(out, 'sintel-trailer-480p.mp4');
+    if (!existsSync(bbb) || !existsSync(sintel)) throw new Error('needs bbb + sintel');
+    const part = (input: number, from: number, length: number, label: string) =>
+      `[${input}:v]trim=start=${from}:duration=${length},setpts=PTS-STARTPTS,` +
+      `scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,fps=30,setsar=1[${label}]`;
+    ffmpeg([
+      '-i',
+      bbb,
+      '-i',
+      sintel,
+      '-filter_complex',
+      [
+        part(0, 1, 3, 'a'),
+        part(1, 36, 3, 'b'),
+        part(0, 6, 2, 'c'),
+        part(1, 19, 2, 'd'),
+        '[a][b][c][d]concat=n=4:v=1:a=0[v]',
+      ].join(';'),
+      '-map',
+      '[v]',
+      ...x264,
+      ...faststart,
+      p,
+    ]);
+  },
+);
+
 // The owner's own phone files (test-media/private, git-ignored) are served at /media/private/.
 const privateDir = join(root, 'private');
 if (existsSync(privateDir)) {

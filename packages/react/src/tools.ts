@@ -1,7 +1,8 @@
 import { findItem, type Item, type Project } from '@video-ultra/core';
 import { getCommand, type CommandId } from './commands';
 import type { EditorController } from './controller';
-import type { IconName } from './icons';
+import type { IconSpec } from './icons';
+import { inHostOrder, isHidden } from './embed';
 import type { Labels } from './labels';
 import type { PanelId, ToolId } from './state';
 import { hasCutInto, type Targets } from './targets';
@@ -9,7 +10,7 @@ import { hasCutInto, type Targets } from './targets';
 /** One entry of the phone/tablet contextual toolbar. */
 export interface ToolEntry {
   key: string;
-  icon: IconName;
+  icon: IconSpec;
   label: string;
   /** What it does (tooltip). */
   tip?: string;
@@ -36,6 +37,33 @@ export function toolsFor(
   targets: Targets,
   /** How many items are selected (several: the selection's tools). */
   count = item ? 1 : 0,
+): ToolEntry[] {
+  const customize = ctl.options.customize;
+  const entries = builtInTools(item, project, ctl, l, targets, count).filter(
+    (t) => !isHidden(customize, t.key),
+  );
+  if (item || count > 0 || !customize?.panels?.length) return entries;
+  // Nothing selected: the host's panels join the add tools, in its order.
+  const custom: ToolEntry[] = customize.panels.map((p) => ({
+    key: p.id,
+    icon: { path: p.icon },
+    label: p.label,
+    ...(p.tip ? { tip: p.tip } : {}),
+    panel: `custom:${p.id}`,
+  }));
+  return inHostOrder(
+    [...entries.map((e) => ({ ...e, id: e.key })), ...custom.map((e) => ({ ...e, id: e.key }))],
+    customize.railOrder,
+  );
+}
+
+function builtInTools(
+  item: Item | null,
+  project: Project,
+  ctl: EditorController,
+  l: Labels,
+  targets: Targets,
+  count: number,
 ): ToolEntry[] {
   const command = (id: CommandId, key = id): ToolEntry => {
     const c = getCommand(ctl, id);
@@ -96,6 +124,13 @@ function singleTools(
   if (!item) {
     return [
       { key: 'media', icon: 'media', label: l.media, tip: l.tipAddMedia, panel: 'media' },
+      {
+        key: 'templates',
+        icon: 'template',
+        label: l.templates,
+        tip: l.tipTemplates,
+        panel: 'templates',
+      },
       { key: 'text', icon: 'text', label: l.text, tip: l.tipText, panel: 'text' },
       {
         key: 'captions',
@@ -123,6 +158,17 @@ function singleTools(
       { key: 'blur', icon: 'blurArea', label: l.blurAreas, tip: l.tipBlurAreas, panel: 'blur' },
       { key: 'canvas', icon: 'canvas', label: l.canvas, tip: l.tipCanvas, tool: 'canvas' },
       split,
+      ...(ctl.options.assistant
+        ? [
+            {
+              key: 'assistant',
+              icon: 'sparkle',
+              label: l.assistant,
+              tip: l.tipAssistant,
+              panel: 'assistant',
+            } as ToolEntry,
+          ]
+        : []),
     ];
   }
   const duplicate: ToolEntry = {
@@ -173,6 +219,53 @@ function singleTools(
     tip: l.tipGreenScreen,
     tool: 'key',
   };
+  const mask: ToolEntry = {
+    key: 'mask',
+    icon: 'shape',
+    label: l.shape,
+    tip: l.tipShape,
+    tool: 'mask',
+  };
+  // v0.4 Fine trims: clips of the main video, and video / sound anywhere.
+  const protrim: ToolEntry[] =
+    onMain || item.kind === 'video' || item.kind === 'audio'
+      ? [{ key: 'protrim', icon: 'split', label: l.fineTrim, tip: l.tipFineTrim, tool: 'protrim' }]
+      : [];
+  // v0.4 Sound effects: video and sound clips.
+  const soundfx: ToolEntry = {
+    key: 'soundfx',
+    icon: 'equalizer',
+    label: l.soundEffects,
+    tip: l.tipSoundEffects,
+    tool: 'soundfx',
+  };
+  // v0.4 Keyframes: anything with a place on the video.
+  const keyframes: ToolEntry[] =
+    'transform' in item
+      ? [
+          {
+            key: 'keyframes',
+            icon: 'keyframe',
+            label: l.keyframes,
+            tip: l.tipKeyframes,
+            tool: 'keyframes',
+          },
+        ]
+      : [];
+  // v0.3 Background removal (photos, image stickers; when the host gave a remover).
+  const cutout: ToolEntry[] =
+    ctl.options.backgroundRemover &&
+    (item.kind === 'image' || (item.kind === 'sticker' && item.assetId))
+      ? [
+          {
+            key: 'cutout',
+            icon: 'cutout',
+            label: l.removeBackground,
+            tip: l.tipRemoveBackground,
+            tool: 'cutout',
+          },
+        ]
+      : [];
   const blend: ToolEntry[] = onMain
     ? []
     : [{ key: 'blend', icon: 'blend', label: l.blend, tip: l.tipBlend, tool: 'blend' }];
@@ -188,10 +281,20 @@ function singleTools(
           tip: l.tipVolume,
           tool: 'volume',
         },
+        soundfx,
         ...look,
+        mask,
         greenScreen,
         ...transition,
         { key: 'fade', icon: 'fade', label: l.fade, tip: l.tipFade, tool: 'fade' },
+        ...protrim,
+        {
+          key: 'scenes',
+          icon: 'scenes',
+          label: l.splitAtScenes,
+          tip: l.tipSplitAtScenes,
+          tool: 'scenes',
+        },
         ...(onMain
           ? [
               {
@@ -205,6 +308,7 @@ function singleTools(
             ]
           : []),
         ...animate,
+        ...keyframes,
         ...opacity,
         ...blend,
         arrange,
@@ -216,10 +320,14 @@ function singleTools(
       return [
         split,
         { key: 'duration', icon: 'speed', label: l.duration, tip: l.duration, tool: 'duration' },
+        ...cutout,
         ...look,
+        mask,
         greenScreen,
         ...transition,
+        ...protrim,
         ...animate,
+        ...keyframes,
         ...opacity,
         ...blend,
         arrange,
@@ -236,8 +344,10 @@ function singleTools(
           tip: l.tipVolume,
           tool: 'volume',
         },
+        soundfx,
         { key: 'fade', icon: 'fade', label: l.fade, tip: l.tipFade, tool: 'fade' },
         { key: 'speed', icon: 'speed', label: l.speed, tip: l.tipSpeed, tool: 'speed' },
+        ...protrim,
         arrange,
         duplicate,
         remove,
@@ -267,10 +377,22 @@ function singleTools(
       return [
         { key: 'text-edit', icon: 'edit', label: l.edit, tool: 'text-edit' },
         { key: 'text-style', icon: 'style', label: l.style, tool: 'text-style' },
+        ...(ctl.options.speech
+          ? [
+              {
+                key: 'readaloud',
+                icon: 'audio',
+                label: l.readAloud,
+                tip: l.tipReadAloud,
+                tool: 'readaloud',
+              } as ToolEntry,
+            ]
+          : []),
         ...animate,
         look[0]!,
         look[1]!,
         { key: 'transform', icon: 'rotate', label: l.rotate, tip: l.tipRotate, tool: 'transform' },
+        ...keyframes,
         { key: 'opacity', icon: 'opacity', label: l.opacity, tip: l.tipOpacity, tool: 'opacity' },
         ...blend,
         arrange,
@@ -280,10 +402,12 @@ function singleTools(
       ];
     case 'sticker':
       return [
+        ...cutout,
         ...animate,
         look[0]!,
         look[1]!,
         { key: 'transform', icon: 'rotate', label: l.rotate, tip: l.tipRotate, tool: 'transform' },
+        ...keyframes,
         { key: 'opacity', icon: 'opacity', label: l.opacity, tip: l.tipOpacity, tool: 'opacity' },
         ...blend,
         arrange,
@@ -301,6 +425,7 @@ function singleTools(
           tool: 'region',
         },
         { key: 'transform', icon: 'rotate', label: l.rotate, tip: l.tipRotate, tool: 'transform' },
+        ...keyframes,
         { key: 'opacity', icon: 'opacity', label: l.opacity, tip: l.tipOpacity, tool: 'opacity' },
         arrange,
         split,

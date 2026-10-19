@@ -17,11 +17,12 @@ export { FILTER_PARAMS };
  */
 
 /**
- * Floats of per-layer effect uniforms (24 × vec4): the colour pipeline and the extras of
+ * Floats of per-layer effect uniforms (26 × vec4): the colour pipeline and the extras of
  * transitions / animations (19 × vec4), then the picture tools ({@link PictureFx}: green screen,
- * LUT, blurred area, where the renderer's copy of the pixels underneath sits, blend mode).
+ * LUT, blurred area, where the renderer's copy of the pixels underneath sits, blend mode, shape
+ * mask).
  */
-export const EFFECT_FLOATS = 96;
+export const EFFECT_FLOATS = 104;
 
 /** The colour pipeline's parameters. Identity = {@link identityColour}. */
 export interface ColourParams {
@@ -392,6 +393,17 @@ export interface PictureFx {
   regionEdgeY: number;
   /** {@link BLEND_IDS}. */
   blend: number;
+  /** Shape mask (`ShapeFamily`, effects/shapes.ts; 0 = none) and its parameters. */
+  shape: number;
+  shapeA: number;
+  shapeB: number;
+  shapeC: number;
+  /** Turn of the shape, degrees clockwise. */
+  shapeRotation: number;
+  shapeStretch: boolean;
+  shapeInvert: boolean;
+  /** Soft edge, in shape units (0 = sharp). */
+  shapeFeather: number;
 }
 
 /** "No picture tools". */
@@ -414,12 +426,20 @@ export function resetPictureFx(p: PictureFx): PictureFx {
   p.regionEdgeX = 0;
   p.regionEdgeY = 0;
   p.blend = 0;
+  p.shape = 0;
+  p.shapeA = 0;
+  p.shapeB = 0;
+  p.shapeC = 0;
+  p.shapeRotation = 0;
+  p.shapeStretch = false;
+  p.shapeInvert = false;
+  p.shapeFeather = 0;
   return p;
 }
 
 /** True when `p` changes nothing. */
 export function isNoPictureFx(p: Readonly<PictureFx>): boolean {
-  return !p.key && p.lutAmount === 0 && p.region === 0 && p.blend === 0;
+  return !p.key && p.lutAmount === 0 && p.region === 0 && p.blend === 0 && p.shape === 0;
 }
 
 /** BT.709 chroma (Cb, Cr) of an RGB colour (0…1) — the same maths as the shader's key. */
@@ -567,6 +587,14 @@ export function writeEffects(
   out[o + 93] = 0;
   out[o + 94] = 0;
   out[o + 95] = 0;
+  out[o + 96] = pic.shape;
+  out[o + 97] = pic.shapeA;
+  out[o + 98] = pic.shapeB;
+  out[o + 99] = pic.shapeC;
+  out[o + 100] = (pic.shapeRotation * Math.PI) / 180;
+  out[o + 101] = (pic.shapeStretch ? 1 : 0) + (pic.shapeInvert ? 2 : 0);
+  out[o + 102] = pic.shapeFeather;
+  out[o + 103] = 0;
 }
 
 const NO_PICTURE: Readonly<PictureFx> = Object.freeze(noPictureFx());

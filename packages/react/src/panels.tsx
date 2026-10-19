@@ -19,6 +19,10 @@ import { TEXT_STYLE_CATEGORIES, TEXT_STYLE_PRESETS } from './library/textStyles'
 import { FilterStrip, TransitionGrid } from './looks';
 import { CanvasTool } from './ToolPanel';
 import { BlurPanel } from './picture';
+import { TemplatesPanel } from './templates';
+import { AssistantPanel } from './assistant';
+import { TextToSpeech } from './speech';
+import { MediaSources } from './library/MediaSources';
 
 /** The browse panel for an add-content category (desktop panel, phone sheet). */
 export function AddPanel({ panel }: { panel: PanelId }): ReactElement {
@@ -43,6 +47,12 @@ export function AddPanel({ panel }: { panel: PanelId }): ReactElement {
       return <CaptionsPanel />;
     case 'blur':
       return <BlurPanel />;
+    case 'templates':
+      return <TemplatesPanel />;
+    case 'assistant':
+      return <AssistantPanel />;
+    default:
+      return <CustomPanelBody id={panel.slice('custom:'.length)} />;
   }
 }
 
@@ -113,6 +123,9 @@ function MediaPanel() {
         <span>{l.recordCamera}</span>
       </button>
       <ImportRows />
+      {ctl.options.customize?.mediaSources?.length ? (
+        <MediaSources sources={ctl.options.customize.mediaSources} />
+      ) : null}
       {assets.length ? (
         <>
           <p className="vu-hint">{l.tapToAdd}</p>
@@ -171,6 +184,13 @@ function AssetTile({ asset }: { asset: Asset }) {
       ) : null}
     </button>
   );
+}
+
+/** A host's own panel (embedding API): whatever it renders. */
+function CustomPanelBody({ id }: { id: string }): ReactElement {
+  const ctl = useController();
+  const panel = ctl.options.customize?.panels?.find((p) => p.id === id);
+  return <div className="vu-panel-body">{panel ? panel.render(ctl) : null}</div>;
 }
 
 /** CSS that approximates a text style for the picker tiles (the engine draws the real thing). */
@@ -301,6 +321,7 @@ function AudioPanel() {
         }}
       />
       <Voiceover />
+      <TextToSpeech />
       <ImportRows />
       {assets.length && library ? <h3 className="vu-audiolib-title">{l.yourAudio}</h3> : null}
       {assets.length ? (

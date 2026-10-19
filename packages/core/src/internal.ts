@@ -89,7 +89,17 @@ export { applyDuck, DUCK_TUNING, DuckFollower, hasDucking, presenceFor } from '.
 export type { DuckTuning } from './audio/duck';
 
 // Media analysis (import probing, thumbnails, waveforms) — runs in its own worker.
+export { ClipFx, hasAudioFx } from './audio/fx';
+export {
+  computeScopes,
+  vectorPoint,
+  SCOPE_MAX_SIDE,
+  SCOPE_ROWS,
+  VECTOR_SIZE,
+  type ScopeData,
+} from './effects/scopes';
 export { createMediaAnalyzer } from './media/analyzer';
+export { createProxyMaker, proxyHeightFor, PROXY_BUDGET, type ProxyMaker } from './media/proxy';
 export type {
   MediaAnalyzer,
   MediaAnalyzerOptions,
@@ -98,6 +108,13 @@ export type {
   ThumbnailMode,
 } from './media/analyzer';
 export type { Waveform } from './media/peaks';
+export {
+  SceneDetector,
+  sceneCutTimes,
+  SCENE_FRAME_WIDTH,
+  SCENE_FRAME_HEIGHT,
+} from './media/scenes';
+export type { SceneSensitivity, SceneOptions } from './media/scenes';
 export { accumulatePeaks, peaksPerSecondFor, MAX_PEAKS } from './media/peaks';
 
 // Persistence: media storage, autosave via the op log, crash recovery.

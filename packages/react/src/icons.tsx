@@ -23,6 +23,8 @@ const paths = {
   split: 'M12 3v18M6 7h3v10H6M18 7h-3v10h3',
   delete: 'M4.5 7h15M10 11v6M14 11v6M6 7l1 12.5h10L18 7M9 7V4.5h6V7',
   duplicate: 'M8 8h11v11H8zM5 16V5h11',
+  cut: 'M6 18a2.5 2.5 0 100-.1M6 6a2.5 2.5 0 100 .1M8 7.5L20 18M8 16.5L20 6',
+  paste: 'M9 4h6v3H9zM7 5.5H5V21h14V5.5h-2M9 12h6M9 16h4',
   speed: 'M12 20a8 8 0 118-8M12 12l4.5-4.5M20 12h-2',
   volume: 'M4 9.5h3.5L12 5v14l-4.5-4.5H4zM16 9a4 4 0 010 6M18.5 6.5a7.5 7.5 0 010 11',
   muted: 'M4 9.5h3.5L12 5v14l-4.5-4.5H4zM16 9.5l5 5M21 9.5l-5 5',
@@ -61,6 +63,13 @@ const paths = {
   download: 'M12 4v11M7 10.5l5 5 5-5M5 20h14',
   chevronDown: 'M6 9.5l6 6 6-6',
   back: 'M15 5l-7 7 7 7',
+  next: 'M9 5l7 7-7 7',
+  keyframe: 'M12 3l9 9-9 9-9-9z',
+  // Three sliders at different heights.
+  equalizer: 'M6 4v16M12 4v16M18 4v16M4 14h4M10 8h4M16 16h4',
+  // Three frames with cuts between them.
+  scenes: 'M3 7h5v10H3zM10 7h4v10h-4zM16 7h5v10h-5zM9 4v16M15 4v16',
+  marker: 'M6 3h12v13l-6 5-6-5z',
   alignLeft: 'M4 6h16M4 10h10M4 14h16M4 18h10',
   alignCenter: 'M4 6h16M7 10h10M4 14h16M7 18h10',
   alignRight: 'M4 6h16M10 10h10M4 14h16M10 18h10',
@@ -105,6 +114,10 @@ const paths = {
   greenScreen: 'M3 5h18v14H3zM12 8.5a2 2 0 110 4 2 2 0 010-4zM8 19c.5-2.5 2-4 4-4s3.5 1.5 4 4',
   eyedropper: 'M13 6l5 5M16.5 3.5a2.1 2.1 0 013 3L17 9l-2-2zM15 8l-8.5 8.5L4 20l3.5-2.5L16 9',
   blend: 'M9 15a6 6 0 100-12 6 6 0 000 12zM15 21a6 6 0 100-12 6 6 0 000 12z',
+  template: 'M4 4h16v16H4zM4 9h16M9 9v11',
+  cutout:
+    'M12 4a3 3 0 110 6 3 3 0 010-6zM6 20c0-4 2.7-7 6-7s6 3 6 7M3 3l2 2M21 3l-2 2M3 21l2-2M21 21l-2-2',
+  shape: 'M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z',
   lut: 'M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 12l8-4.5M12 12v9M12 12L4 7.5',
   rectangle: 'M4 6h16v12H4z',
   oval: 'M12 18c4.4 0 8-2.7 8-6s-3.6-6-8-6-8 2.7-8 6 3.6 6 8 6z',
@@ -117,8 +130,11 @@ const paths = {
 /** Name of an editor icon. */
 export type IconName = keyof typeof paths;
 
+/** An editor icon by name, or a host's own (`{ path }`: one SVG path on a 24 × 24 grid). */
+export type IconSpec = IconName | { path: string };
+
 /** An editor icon. Decorative: pair it with a visible label. */
-export function Icon({ name, size = 20 }: { name: IconName; size?: number }): ReactElement {
+export function Icon({ name, size = 20 }: { name: IconSpec; size?: number }): ReactElement {
   return (
     <svg
       className="vu-icon"
@@ -133,7 +149,7 @@ export function Icon({ name, size = 20 }: { name: IconName; size?: number }): Re
       aria-hidden="true"
       focusable="false"
     >
-      <path d={paths[name]} />
+      <path d={typeof name === 'string' ? paths[name] : name.path} />
     </svg>
   );
 }

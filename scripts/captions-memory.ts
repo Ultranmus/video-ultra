@@ -3,14 +3,18 @@
  * Captions memory over time (v0.2 A0): the test browser's own processes only (renderer = page +
  * speech worker), sampled every 200 ms through two runs and 3 s after.
  * Usage: playground running, then node scripts/captions-memory.ts [wasm|webgpu] [tiny|base|small]
- *   [file] [session-options-json]
+ *   [file] [session-options-json] [files-json, e.g. {"encoder":"encoder_model_q4.onnx",…}]
  */
 import { chromium } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 const device = process.argv[2] ?? 'wasm';
 const model = process.argv[3] ?? 'tiny';
 const file = process.argv[4] ?? 'speech-en-gb.m4a';
 const session = process.argv[5] ? JSON.parse(process.argv[5]) : undefined;
+const files = process.argv[6] ? JSON.parse(process.argv[6]) : undefined;
+const speech = JSON.parse(readFileSync('test-media/files/speech.json', 'utf8'));
+const reference: string = speech[file.replace(/\.m4a$/, '')]?.text ?? '';
 const b = await chromium.launch({
   channel: 'chrome',
   args: ['--enable-unsafe-webgpu', '--vu-mem-probe'],
@@ -53,19 +57,21 @@ const t0 = Date.now();
 const timer = setInterval(() => samples.push([Date.now() - t0, tree()]), 200);
 for (let i = 0; i < 2; i++) {
   const r = await p.evaluate(
-    ([f, dev, m, s]) =>
+    ([f, dev, m, s, fs, ref]) =>
       (window as any).runCaptions({
         file: f,
         model: m,
         device: dev,
         language: f.includes('hi') ? 'hi' : 'en',
-        reference: '',
-        ...(s ? { debug: { session: s } } : {}),
+        reference: ref,
+        ...(s || fs
+          ? { debug: { ...(s ? { session: s } : {}), ...(fs ? { files: fs } : {}) } }
+          : {}),
       }),
-    [file, device, model, session] as const,
+    [file, device, model, session, files, reference] as const,
   );
   console.log(
-    `run ${i}: load ${r.loadMs} ms, transcribe ${r.transcribeMs} ms, ${r.words} words @ ${Date.now() - t0} ${r.error ?? ''}`,
+    `run ${i}: load ${r.loadMs} ms, transcribe ${r.transcribeMs} ms, ${r.words} words, WER ${(r.wer * 100).toFixed(0)} % @ ${Date.now() - t0} ${r.error ?? ''}`,
   );
 }
 await p.waitForTimeout(3000);

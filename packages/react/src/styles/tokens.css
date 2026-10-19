@@ -218,6 +218,32 @@
     --vu-size-handle-side: 8px;
     --vu-size-region-swatch: 64px;
     --vu-size-key-preset: 28px;
+    /* v0.4 Keyframes */
+    --vu-size-keyframe: 14px;
+    /* v0.4 Sound: level meter, equaliser */
+    --vu-size-meter-width: 56px;
+    --vu-size-meter-bar: 4px;
+    --vu-meter-track: var(--vu-border);
+    --vu-meter-fill: var(--vu-success);
+    --vu-meter-hot: var(--vu-warning);
+    --vu-meter-clip: var(--vu-danger);
+    /* v0.4 Scopes (drawn in a canvas; read once) */
+    --vu-scope-bg: #0b0b0e;
+    --vu-scope-trace: #8fe3a8;
+    --vu-scope-red: #ff4d4d;
+    --vu-scope-green: #4dff7a;
+    --vu-scope-blue: #4d8dff;
+    --vu-scope-grid: rgba(255, 255, 255, 0.18);
+    --vu-size-scope-vector: 200px;
+    /* v0.3 Templates */
+    --vu-size-template: 72px;
+    --vu-size-template-max: 180px;
+    --vu-size-template-preview: 260px;
+    /* Template tiles stand in for footage: a dusky gradient (same in both themes). */
+    --vu-template-bg: linear-gradient(160deg, #3a3550, #1d2433 55%, #12151d);
+    /* v0.3 Shape masks */
+    --vu-size-shape-tile: 52px;
+    --vu-shape-url: none;
 
     /* Layers */
     --vu-z-overlay: 10;
@@ -336,12 +362,170 @@
     }
   }
 
-  /* Touch screens: bigger trim handles and choices for thumbs. */
+  /* Touch screens: bigger trim handles and choices for thumbs (density="auto"). */
   @media (pointer: coarse) {
-    .vu-root {
+    .vu-root:not([data-vu-density]) {
       --vu-size-trim-handle: 20px;
       --vu-size-choice: 36px;
       --vu-size-handle: 14px;
+    }
+  }
+
+  /* density="touch": thumb-sized everywhere, also with a mouse (tablets with a trackpad). */
+  .vu-root[data-vu-density='touch'] {
+    --vu-size-trim-handle: 20px;
+    --vu-size-choice: 36px;
+    --vu-size-handle: 14px;
+    --vu-size-touch: 48px;
+    --vu-size-track: 52px;
+    --vu-size-track-main: 64px;
+    --vu-size-slider-thumb: 24px;
+    --vu-size-layer-row: 56px;
+  }
+
+  /* High contrast (contrast="high", or "auto" when the OS asks for more contrast). */
+  .vu-root[data-vu-contrast='high'] {
+    --vu-bg: #000000;
+    --vu-stage: #0a0a0a;
+    --vu-surface-1: #000000;
+    --vu-surface-2: #0d0d0f;
+    --vu-surface-3: #1f1f24;
+    --vu-border: rgba(255, 255, 255, 0.55);
+    --vu-border-strong: #ffffff;
+    --vu-text: #ffffff;
+    --vu-text-muted: #e4e4e7;
+    --vu-text-subtle: #c4c4cc;
+    --vu-accent: #c879c8;
+    --vu-accent-hover: #d996d9;
+    --vu-accent-contrast: #000000;
+    --vu-accent-soft: rgba(200, 121, 200, 0.35);
+    --vu-accent-text: #f0c4f0;
+    --vu-danger: #ff8a95;
+    --vu-success: #7cf0a0;
+    --vu-warning: #ffd27a;
+    --vu-timeline-bg: #000000;
+    --vu-track-bg: #0d0d0f;
+    --vu-clip-video: #4a4a58;
+    --vu-clip-lane: #26262e;
+    --vu-waveform: rgba(255, 255, 255, 0.85);
+    --vu-slider-rail: rgba(255, 255, 255, 0.5);
+    --vu-scrollbar: rgba(255, 255, 255, 0.5);
+    --vu-focus-ring: 0 0 0 2px var(--vu-bg), 0 0 0 5px #ffffff;
+  }
+  .vu-root[data-vu-contrast='high'][data-vu-theme='light'] {
+    --vu-bg: #ffffff;
+    --vu-stage: #f0f0f0;
+    --vu-surface-1: #ffffff;
+    --vu-surface-2: #f5f5f5;
+    --vu-surface-3: #e6e6e6;
+    --vu-border: rgba(0, 0, 0, 0.6);
+    --vu-border-strong: #000000;
+    --vu-text: #000000;
+    --vu-text-muted: #1f1f23;
+    --vu-text-subtle: #3a3a40;
+    --vu-accent: #3a0f3a;
+    --vu-accent-hover: #240824;
+    --vu-accent-contrast: #ffffff;
+    --vu-accent-soft: rgba(58, 15, 58, 0.18);
+    --vu-accent-text: #3a0f3a;
+    --vu-danger: #9b0f1f;
+    --vu-success: #0b5c2b;
+    --vu-warning: #6b3f00;
+    --vu-timeline-bg: #ffffff;
+    --vu-track-bg: #f5f5f5;
+    --vu-clip-video: #c4c4cc;
+    --vu-clip-lane: #ffffff;
+    --vu-waveform: rgba(0, 0, 0, 0.85);
+    --vu-slider-rail: rgba(0, 0, 0, 0.55);
+    --vu-scrollbar: rgba(0, 0, 0, 0.55);
+    --vu-focus-ring: 0 0 0 2px var(--vu-bg), 0 0 0 5px #000000;
+  }
+  @media (prefers-color-scheme: light) {
+    .vu-root:not([data-vu-theme])[data-vu-contrast='high'] {
+      --vu-bg: #ffffff;
+      --vu-stage: #f0f0f0;
+      --vu-surface-1: #ffffff;
+      --vu-surface-2: #f5f5f5;
+      --vu-surface-3: #e6e6e6;
+      --vu-border: rgba(0, 0, 0, 0.6);
+      --vu-border-strong: #000000;
+      --vu-text: #000000;
+      --vu-text-muted: #1f1f23;
+      --vu-text-subtle: #3a3a40;
+      --vu-accent: #3a0f3a;
+      --vu-accent-hover: #240824;
+      --vu-accent-contrast: #ffffff;
+      --vu-accent-soft: rgba(58, 15, 58, 0.18);
+      --vu-accent-text: #3a0f3a;
+      --vu-danger: #9b0f1f;
+      --vu-success: #0b5c2b;
+      --vu-warning: #6b3f00;
+      --vu-timeline-bg: #ffffff;
+      --vu-track-bg: #f5f5f5;
+      --vu-clip-video: #c4c4cc;
+      --vu-clip-lane: #ffffff;
+      --vu-waveform: rgba(0, 0, 0, 0.85);
+      --vu-slider-rail: rgba(0, 0, 0, 0.55);
+      --vu-scrollbar: rgba(0, 0, 0, 0.55);
+      --vu-focus-ring: 0 0 0 2px var(--vu-bg), 0 0 0 5px #000000;
+    }
+  }
+  @media (prefers-contrast: more) {
+    .vu-root[data-vu-contrast='auto'] {
+      --vu-bg: #000000;
+      --vu-stage: #0a0a0a;
+      --vu-surface-1: #000000;
+      --vu-surface-2: #0d0d0f;
+      --vu-surface-3: #1f1f24;
+      --vu-border: rgba(255, 255, 255, 0.55);
+      --vu-border-strong: #ffffff;
+      --vu-text: #ffffff;
+      --vu-text-muted: #e4e4e7;
+      --vu-text-subtle: #c4c4cc;
+      --vu-accent: #c879c8;
+      --vu-accent-hover: #d996d9;
+      --vu-accent-contrast: #000000;
+      --vu-accent-soft: rgba(200, 121, 200, 0.35);
+      --vu-accent-text: #f0c4f0;
+      --vu-danger: #ff8a95;
+      --vu-success: #7cf0a0;
+      --vu-warning: #ffd27a;
+      --vu-timeline-bg: #000000;
+      --vu-track-bg: #0d0d0f;
+      --vu-clip-video: #4a4a58;
+      --vu-clip-lane: #26262e;
+      --vu-waveform: rgba(255, 255, 255, 0.85);
+      --vu-slider-rail: rgba(255, 255, 255, 0.5);
+      --vu-scrollbar: rgba(255, 255, 255, 0.5);
+      --vu-focus-ring: 0 0 0 2px var(--vu-bg), 0 0 0 5px #ffffff;
+    }
+    .vu-root[data-vu-contrast='auto'][data-vu-theme='light'] {
+      --vu-bg: #ffffff;
+      --vu-stage: #f0f0f0;
+      --vu-surface-1: #ffffff;
+      --vu-surface-2: #f5f5f5;
+      --vu-surface-3: #e6e6e6;
+      --vu-border: rgba(0, 0, 0, 0.6);
+      --vu-border-strong: #000000;
+      --vu-text: #000000;
+      --vu-text-muted: #1f1f23;
+      --vu-text-subtle: #3a3a40;
+      --vu-accent: #3a0f3a;
+      --vu-accent-hover: #240824;
+      --vu-accent-contrast: #ffffff;
+      --vu-accent-soft: rgba(58, 15, 58, 0.18);
+      --vu-accent-text: #3a0f3a;
+      --vu-danger: #9b0f1f;
+      --vu-success: #0b5c2b;
+      --vu-warning: #6b3f00;
+      --vu-timeline-bg: #ffffff;
+      --vu-track-bg: #f5f5f5;
+      --vu-clip-video: #c4c4cc;
+      --vu-clip-lane: #ffffff;
+      --vu-waveform: rgba(0, 0, 0, 0.85);
+      --vu-slider-rail: rgba(0, 0, 0, 0.55);
+      --vu-scrollbar: rgba(0, 0, 0, 0.55);
+      --vu-focus-ring: 0 0 0 2px var(--vu-bg), 0 0 0 5px #000000;
     }
   }
 }

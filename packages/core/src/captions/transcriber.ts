@@ -56,6 +56,11 @@ export interface TranscriberCheck {
   /** Roughly how many seconds of speech it hears per second (for "about N min"). */
   speed?: number;
   reason?: string;
+  /**
+   * True when it should work but may need more memory than this device can give (a large model
+   * on a phone): the editor says so before the user starts.
+   */
+  memoryRisk?: boolean;
 }
 
 /** Turns speech into timed words. Implement this to use your own speech service. */

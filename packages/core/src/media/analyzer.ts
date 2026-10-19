@@ -7,6 +7,7 @@ import type {
 } from './analyzer-protocol';
 import type { Waveform } from './peaks';
 import type { ProbeResult } from './probe';
+import type { SceneSensitivity } from './scenes';
 
 export type { AnalyzerStats, ThumbnailMode } from './analyzer-protocol';
 export type { Waveform } from './peaks';
@@ -51,6 +52,21 @@ export interface MediaAnalyzer {
    * decodable sound, or when aborted.
    */
   waveform(assetId: string, signal?: AbortSignal): Promise<Waveform | null>;
+  /**
+   * Where new scenes start in a video (seconds of its media, in order; v0.4). Decodes the range
+   * `from`…`to` in the worker at low priority (thumbnails go first). `null` when the asset isn't a
+   * decodable video, or when aborted. `onProgress` gets 0…1.
+   */
+  scenes(
+    assetId: string,
+    options: {
+      from?: number;
+      to?: number;
+      sensitivity?: SceneSensitivity;
+      signal?: AbortSignal;
+      onProgress?: (done: number) => void;
+    },
+  ): Promise<number[] | null>;
   /** Worker counters (tests, bench). */
   stats(): Promise<AnalyzerStats>;
   /** Stops the worker. Pending requests resolve `null` (probes reject). */
@@ -86,6 +102,11 @@ type Pending =
   | { kind: 'probe'; resolve: (r: ProbeResult) => void; reject: (e: Error) => void }
   | { kind: 'thumb'; resolve: (b: ImageBitmap | null) => void }
   | { kind: 'wave'; resolve: (w: Waveform | null) => void }
+  | {
+      kind: 'scenes';
+      resolve: (cuts: number[] | null) => void;
+      progress: ((done: number) => void) | undefined;
+    }
   | { kind: 'stats'; resolve: (s: AnalyzerStats) => void; reject: (e: Error) => void };
 
 /**
@@ -107,6 +128,10 @@ export function createMediaAnalyzer(options: MediaAnalyzerOptions = {}): MediaAn
   worker.onmessage = (event: MessageEvent<AnalyzerResponse>) => {
     const message = event.data;
     const entry = pending.get(message.id);
+    if (message.type === 'scenes-progress') {
+      if (entry?.kind === 'scenes') entry.progress?.(message.done);
+      return;
+    }
     if (!entry) {
       // Answer to a request that was aborted meanwhile.
       if (message.type === 'thumb') message.bitmap?.close();
@@ -122,6 +147,7 @@ export function createMediaAnalyzer(options: MediaAnalyzerOptions = {}): MediaAn
     if (entry.kind === 'probe' && message.type === 'probe') entry.resolve(message.result);
     else if (entry.kind === 'thumb' && message.type === 'thumb') entry.resolve(message.bitmap);
     else if (entry.kind === 'wave' && message.type === 'wave') entry.resolve(message.waveform);
+    else if (entry.kind === 'scenes' && message.type === 'scenes') entry.resolve(message.cuts);
     else if (entry.kind === 'stats' && message.type === 'stats') entry.resolve(message.stats);
   };
   worker.onerror = (event) => {
@@ -243,6 +269,28 @@ export function createMediaAnalyzer(options: MediaAnalyzerOptions = {}): MediaAn
           },
           () => resolve(null),
         );
+      });
+    },
+
+    scenes(assetId, { from = 0, to = Infinity, sensitivity = 'normal', signal, onProgress }) {
+      if (destroyed || signal?.aborted) return Promise.resolve(null);
+      const id = nextId++;
+      return new Promise<number[] | null>((resolve) => {
+        const onAbort = () => {
+          if (!pending.delete(id)) return;
+          send({ type: 'cancel', id });
+          resolve(null);
+        };
+        pending.set(id, {
+          kind: 'scenes',
+          progress: onProgress,
+          resolve: (cuts) => {
+            signal?.removeEventListener('abort', onAbort);
+            resolve(cuts);
+          },
+        });
+        signal?.addEventListener('abort', onAbort, { once: true });
+        send({ type: 'scenes', id, assetId, from, to, sensitivity });
       });
     },
 

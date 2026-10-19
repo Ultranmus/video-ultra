@@ -1,3 +1,4 @@
+import type { ScopeData } from '../effects/scopes';
 import type { DeviceTier } from '../capabilities';
 import type { ItemAnimation, Project, Transition } from '../model/schema';
 import type { BackendChoice } from '../lab/protocol';
@@ -79,6 +80,8 @@ export type EngineRequest =
     }
   | { type: 'project'; project: Project }
   | { type: 'media'; assetId: string; blob: Blob }
+  /** A lighter copy of a video for previews (v0.4 proxies); null = back to the original. */
+  | { type: 'proxy'; assetId: string; blob: Blob | null }
   | { type: 'view'; viewWidth: number; viewHeight: number }
   | { type: 'seek'; time: number }
   | { type: 'play' }
@@ -150,6 +153,8 @@ export type EngineRequest =
    * (fractions) at timeline `time` — the green screen's "pick from video".
    */
   | { type: 'pick-colour'; itemId: string; time: number; x: number; y: number }
+  /** Video scopes of the whole picture at `time` (v0.4). */
+  | { type: 'scopes'; time: number }
   /** Audio output: the port to the AudioWorklet, its sample rate and output latency (s). */
   | { type: 'audio'; port: MessagePort; sampleRate: number; latency: number };
 
@@ -170,11 +175,18 @@ export type EngineResponseData =
   | { type: 'transition-preview'; bitmaps: ImageBitmap[] }
   | { type: 'item-preview'; bitmaps: ImageBitmap[] }
   | { type: 'lut-check'; size: number; title: string | null }
-  | { type: 'pick-colour'; color: string | null };
+  | { type: 'pick-colour'; color: string | null }
+  | { type: 'scopes'; scopes: ScopeData };
 
 /** Unsolicited events from the worker. */
 export type EngineEvent =
-  | { type: 'time'; time: number; playing: boolean }
+  | {
+      type: 'time';
+      time: number;
+      playing: boolean;
+      /** While playing with sound: the loudest sample per side just heard (left, right). */
+      levels?: [number, number];
+    }
   | { type: 'ended' }
   | { type: 'error'; message: string }
   | { type: 'export-progress'; jobId: number; progress: ExportProgress };

@@ -10,7 +10,7 @@ import * as z from 'zod/mini';
  *   that fits the item inside the canvas, so changing the aspect ratio keeps layouts sensible.
  */
 
-export const PROJECT_VERSION = 3;
+export const PROJECT_VERSION = 4;
 
 const time = z.int().check(z.nonnegative());
 const positiveTime = z.int().check(z.positive());
@@ -95,6 +95,37 @@ export const TransitionSchema = z.object({
   direction: z.optional(DirectionSchema),
   /** Timing curve. Missing = the preset's own curve. */
   ease: z.optional(EaseSchema),
+});
+
+// Keyframes (v0.4, file version 4+; model/keyframes.ts has the maths).
+/** A cubic Bézier timing curve `[x1, y1, x2, y2]` (CSS `cubic-bezier`; x in 0…1). */
+export const BezierSchema = z.tuple([
+  z.number().check(z.gte(0), z.lte(1)),
+  z.number(),
+  z.number().check(z.gte(0), z.lte(1)),
+  z.number(),
+]);
+
+export const KeyframeSchema = z.object({
+  /** Flicks from the item's start. */
+  t: z.int().check(z.nonnegative()),
+  /** The property's value there (transform units: canvas fractions, scale, degrees, 0…1). */
+  v: z.number(),
+  /** The curve from here to the next keyframe. Missing = `smooth`. */
+  ease: z.optional(z.union([EaseSchema, BezierSchema])),
+});
+
+export const KeyframesSchema = z.object({
+  /**
+   * Flicks added to the item's time before sampling: a part of a split (or a clip trimmed at its
+   * start) keeps the whole motion and plays its own share of it, exactly. Missing = 0.
+   */
+  shift: z.optional(z.int()),
+  x: z.optional(z.array(KeyframeSchema)),
+  y: z.optional(z.array(KeyframeSchema)),
+  scale: z.optional(z.array(KeyframeSchema)),
+  rotation: z.optional(z.array(KeyframeSchema)),
+  opacity: z.optional(z.array(KeyframeSchema)),
 });
 
 /** One entrance or exit animation of a lane item: a preset id and how long it plays. */
@@ -218,6 +249,19 @@ export const BlendModeSchema = z.enum([
   'difference',
 ]);
 
+/**
+ * A shape mask (file version 4+, optional): the picture shows only inside the shape (or only
+ * outside it, `invert`). The shape fits the picture's box (effects/shapes.ts).
+ */
+export const ShapeMaskSchema = z.object({
+  /** Shape preset id (`SHAPE_PRESETS`), e.g. `'circle'`, `'star-5'`, `'heart'`. */
+  shape: id,
+  /** Soft edge, 0 (sharp) … 1 (very soft). */
+  feather: unit,
+  /** Show the outside of the shape instead. */
+  invert: z.optional(z.boolean()),
+});
+
 const visual = {
   transform: TransformSchema,
   crop: CropSchema,
@@ -235,7 +279,31 @@ const visual = {
   lut: z.optional(LutRefSchema),
   /** Lanes only: how the picture mixes with what's under it (file version 3+). */
   blend: z.optional(BlendModeSchema),
+  /** Shape mask (file version 4+). Missing = the whole picture. */
+  mask: z.optional(ShapeMaskSchema),
+  /** Transform keyframes (file version 4+). */
+  keyframes: z.optional(KeyframesSchema),
 };
+
+/**
+ * Sound effects on a clip's audio (file version 4+, v0.4). Every field optional; missing = off.
+ */
+export const AudioFxSchema = z.object({
+  /** Three-band equaliser, dB each (−12…12): bass (shelf, 120 Hz), middle (1 kHz), treble (shelf, 8 kHz). */
+  eq: z.optional(
+    z.object({
+      low: z.number().check(z.gte(-12), z.lte(12)),
+      mid: z.number().check(z.gte(-12), z.lte(12)),
+      high: z.number().check(z.gte(-12), z.lte(12)),
+    }),
+  ),
+  /** Compressor ("even out"): 0 = off … 1 = strong; quiet parts come up, loud ones go down. */
+  compress: z.optional(unit),
+  /** Pitch shift in semitones (−12…12), the speed unchanged. */
+  pitch: z.optional(z.number().check(z.gte(-12), z.lte(12))),
+  /** Keep the original pitch when the clip is sped up or slowed down (speeds 0.5×…2×). */
+  keepPitch: z.optional(z.boolean()),
+});
 
 const audible = {
   /** Gain: 1 = original, 0…2. */
@@ -249,6 +317,8 @@ const audible = {
    * `1 − duck` of its volume (eased in and out). 0…1; missing = off.
    */
   duck: z.optional(unit),
+  /** Sound effects (file version 4+). Missing = none. */
+  audioFx: z.optional(AudioFxSchema),
 };
 
 export const VideoItemSchema = z.object({
@@ -263,11 +333,20 @@ export const VideoItemSchema = z.object({
   speed: z.number().check(z.gte(0.05), z.lte(100)),
 });
 
+/**
+ * A picture with its background removed (file version 4+): the engine draws this image asset
+ * (same size, transparent background) instead of the item's own. The original stays, so
+ * restoring the background is removing this.
+ */
+export const CutoutSchema = z.object({ assetId: id });
+
 export const ImageItemSchema = z.object({
   ...base,
   ...visual,
   kind: z.literal('image'),
   assetId: id,
+  /** Background removed (file version 4+). */
+  cutout: z.optional(CutoutSchema),
 });
 
 /** A still frame taken from a video at `sourceTime`. */
@@ -313,6 +392,8 @@ export const TextItemSchema = z.object({
    * word highlighting; captions typed or imported without it share their time evenly.
    */
   words: z.optional(z.array(CaptionWordSchema)),
+  /** Transform keyframes (file version 4+). */
+  keyframes: z.optional(KeyframesSchema),
   /**
    * Wrap width as a fraction of the canvas width (file version 3+): lines break at spaces to fit,
    * balanced so they're about the same length. Missing = lines break only where the text does.
@@ -337,6 +418,10 @@ export const StickerItemSchema = z.object({
   animation: z.optional(ItemAnimationSchema),
   /** How the sticker mixes with what's under it (file version 3+). Missing = normal. */
   blend: z.optional(BlendModeSchema),
+  /** Transform keyframes (file version 4+). */
+  keyframes: z.optional(KeyframesSchema),
+  /** Image stickers: background removed (file version 4+). */
+  cutout: z.optional(CutoutSchema),
 });
 
 /**
@@ -356,6 +441,8 @@ export const RegionItemSchema = z.object({
   width: z.number().check(z.positive()),
   height: z.number().check(z.positive()),
   transform: TransformSchema,
+  /** Transform keyframes (file version 4+). */
+  keyframes: z.optional(KeyframesSchema),
 });
 
 export const ItemSchema = z.discriminatedUnion('kind', [
@@ -436,6 +523,14 @@ export const AssetSchema = z.object({
   ]),
 });
 
+/** A named point on the timeline (file version 4+): the editor shows it on the ruler. */
+export const MarkerSchema = z.object({
+  id,
+  /** Timeline time (flicks). */
+  time,
+  label: z.optional(z.string().check(z.maxLength(200))),
+});
+
 export const ProjectSchema = z.object({
   version: z.literal(PROJECT_VERSION),
   id,
@@ -456,6 +551,8 @@ export const ProjectSchema = z.object({
   }),
   assets: z.record(z.string(), AssetSchema),
   tracks: z.array(TrackSchema),
+  /** Markers, in time order (file version 4+). */
+  markers: z.optional(z.array(MarkerSchema)),
 });
 
 export type Transform = z.infer<typeof TransformSchema>;
@@ -463,6 +560,7 @@ export type Crop = z.infer<typeof CropSchema>;
 export type Filter = z.infer<typeof FilterSchema>;
 export type Adjust = z.infer<typeof AdjustSchema>;
 export type Transition = z.infer<typeof TransitionSchema>;
+export type AudioFx = z.infer<typeof AudioFxSchema>;
 /** Which way a transition moves. */
 export type Direction = z.infer<typeof DirectionSchema>;
 /** A transition's timing curve. */
@@ -493,6 +591,18 @@ export type ChromaKey = z.infer<typeof ChromaKeySchema>;
 export type LutRef = z.infer<typeof LutRefSchema>;
 /** How a layer mixes with what's under it. */
 export type BlendMode = z.infer<typeof BlendModeSchema>;
+/** A custom timing curve `[x1, y1, x2, y2]`. */
+export type Bezier = z.infer<typeof BezierSchema>;
+/** One keyframe: a time (flicks from the item's start), a value, the curve to the next. */
+export type Keyframe = z.infer<typeof KeyframeSchema>;
+/** An item's keyframes, per transform property (time order). */
+export type Keyframes = z.infer<typeof KeyframesSchema>;
+/** A named point on the timeline. */
+export type Marker = z.infer<typeof MarkerSchema>;
+/** A picture with its background removed. */
+export type Cutout = z.infer<typeof CutoutSchema>;
+/** A picture's shape mask. */
+export type ShapeMask = z.infer<typeof ShapeMaskSchema>;
 /** Anything that sits on a track. */
 export type Item = z.infer<typeof ItemSchema>;
 export type ItemKind = Item['kind'];

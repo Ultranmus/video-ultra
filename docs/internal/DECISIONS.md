@@ -687,3 +687,211 @@ reason; when one changes, edit the entry and note the date.
       test ran on. The old `^1.30.0` range had resolved to that pre-release, which the range does
       not allow, so `pnpm install --frozen-lockfile` refused the lockfile. Move to the next
       stable release only after re-running the caption checks on it.
+
+132.  **Large speech model: lean download and crash memory** (owner's iPhone: the tab died after
+      the ~300 MB Hindi model downloaded, "A problem repeatedly occurred", 2026-10-19). (a) Model
+      files stream straight into Cache Storage (`cache.put` with the response stream, progress
+      counted in a TransformStream) and are read back once, just before their session is built —
+      the old path held each file three times (chunks, joined copy, cache copy). Without Cache
+      Storage, one buffer sized from Content-Length. (b) While a model is built and hears its
+      first window, `video-ultra-captions-building` names it in localStorage; a page that dies
+      there leaves it set, and the next visit records that setup as crashed (kept a week): the
+      other runtime once (WebAssembly), else a smaller model when the language allows, else not
+      offered, with "ran out of memory… try on a computer" — never a second crash. (c) On phones
+      the panel says before starting that `small` may not fit (`TranscriberCheck.memoryRisk`).
+      Measured on desktop Chrome (PERF.md "Captions"): `small` peaks at ~1.2 GB while it hears
+      (the encoder's attention), so the download fix alone may not be enough on an iPhone. Tried
+      and rejected: `graphOptimizationLevel: 'basic'` (wrong output), no arenas (no saving),
+      4-bit encoder (no words) and 4-bit decoder (+500 MB).
+133.  **Shape masks** (v0.3, file version 4). A picture (video, photo, freeze) can show only
+      inside a shape, or only outside it (`mask: { shape, feather, invert? }`). Shapes are signed
+      distance fields drawn in the compositor (one more `vec4` pair of uniforms; no textures, no
+      memory), mirrored in TypeScript (`effects/shapes.ts`) for the picker tiles and tests; 126
+      presets in 6 groups from 15 families (polygons, stars, rounded boxes, ellipse, squircle,
+      heart, cross, ring, flower, cog, blob, crescent, arrow, bubble, cloud). Proportional shapes
+      fit the picture's smaller side; `stretch` ones fill its box. Feather 0…1 = up to a quarter
+      of the radius; one pixel of anti-aliasing from the layer's on-screen size. Masks apply on
+      the main track too (the background shows outside). Golden frames: WebGL2 matches the
+      TypeScript reference with 0.00 / 255 mean error (circle, inverted star, feathered heart on
+      the main video); WebGPU runs the same WGSL (owner's Mac: composite-check). Uniform slot
+      528 bytes → WebGPU slots 768. GLSL generated with naga 30.0.1.
+134.  **Copy / paste** (⌘C / ⌘X / ⌘V; backlog). `pasteItems` places copies at the playhead with
+      their spacing; groups stay groups (new group ids); clips copied from the main video go back
+      into it after the clip under the playhead; media from another project comes with the copy.
+      The clipboard is in memory, shared by every editor on the page (not the system clipboard —
+      a project item isn't useful to other apps).
+135.  **A mouse drag on the main video draws a selection box** (owner: "check grouping on canvas
+      by cursor"). The main video fills the frame, so a drag almost always started on it and
+      moved it off the canvas. While the main video isn't selected, a drag on it now draws the
+      selection box (lane items only, as before) and a click selects it; once selected it drags.
+      Touch is unchanged (a drag on the video still moves it: no box on phones).
+136.  **High contrast and density** (v0.3). `contrast` ('normal' | 'high' | 'auto' — follows
+      `prefers-contrast: more`) and `density` ('auto' | 'touch' | 'compact') on `<VideoEditor>`,
+      as data attributes that redefine tokens only (THEMING.md). axe: 0 violations on every
+      a11y-check page with high contrast, dark and light.
+137.  **Release after v0.4** (owner, 2026-10-19): v0.1 isn't published on its own; v0.3 and v0.4
+      are built first, then the Day 7 packaging and the owner's publish.
+138.  **Animated and vector stickers** (v0.3). (a) GIF, animated WebP and APNG stickers and photos
+      play: the engine worker opens them with WebCodecs `ImageDecoder`, times every frame once
+      (each closed at once), then decodes only the frame on screen per item, by the item's own
+      time (it loops) — one bitmap per item, the old one's GPU copy released when it changes, so
+      memory stays flat for any length. No `ImageDecoder` (older Safari): the first frame, as
+      before. Same time → same frame (exports are exact). (b) An **Animated** sticker tab: the
+      611 Noto Emoji Animation emoji (Google, CC BY 4.0) that match our emoji list, shown as the
+      device's own emoji glyphs (cheap); a tap fetches `<library><code>/512.webp` (~370 KB) and
+      stores it in the project with the licence line on the asset. `animatedStickerLibrary` (a
+      base URL or `false`) lets hosts self-host or hide it; default Google's public copy.
+      (c) SVG files (upload, drop, sticker upload) are drawn once on import into a PNG of up to
+      2048 px on the longest side, keeping their aspect (the engine worker can't decode SVG).
+      Lottie files: not supported (needs a Lottie runtime; the animated WebP library covers the
+      common case) — BACKLOG.
+139.  **Templates** (v0.3). 192 templates = 32 layouts (titles & intros, name tags, quotes, social,
+      sales & promos, steps & lists, events, vlog & recipes, endings) × 6 themes (Bold, Clean,
+      Elegant, Neon, Retro, Playful: fonts, colours, boxes, shadows, entrance / exit). A template
+      is styled, animated text and emoji elements with timing; texts hold `{variables}` the
+      editor asks for (examples filled in) before adding — that is the "placeholders and text
+      variables" of PLAN v0.3. `applyTemplate` (core) adds them at the playhead as lane items,
+      grouped; empty texts are skipped. The tiles are CSS miniatures on the project's canvas shape
+      (text sized with container units), not engine renders — cheap, and close enough to choose
+      by. After adding, the playhead moves ~1 s in so the template shows (entrances start
+      invisible). Media placeholders ("drop your clip here") are not in this round — BACKLOG.
+      Headings in every library browser are `h3` now (they were `h4` under the panel's `h2`: an
+      axe heading-order issue).
+140.  **Background removal** (v0.3; photos and image stickers; video is v0.4). A
+      `BackgroundRemover` interface in core (like the transcriber) and an on-device one in the new
+      optional package `@video-ultra/ai`: a segmentation model in a worker (single-threaded
+      WebAssembly, no cross-origin isolation), downloaded once into Cache Storage (streamed, as
+      #132). Two Apache-2.0 models: `people` = MODNet 8-bit (6.6 MB, shorter side 512) and
+      `objects` = ormbg / ISNet 8-bit (44 MB, 1024²). Measured (PERF.md): people 5 s / +260 MB,
+      objects 15 s / +716 MB, both back to baseline after (the worker closes). So phones and
+      tablets (coarse pointer) and devices under 4 GB use `people`; computers use `objects`
+      (cleaner edges, any subject). The matte is scaled up by the canvas while it cuts the
+      full-size photo (`destination-in`) — no full-size matte copy; results are capped at 4096 px.
+      Non-destructive: the transparent PNG is a new image asset and the item gets
+      `cutout: { assetId }` (file version 4); the engine draws it instead; Restore removes the
+      field. Copy / paste carries the cutout asset.
+141.  **Embedding API** (v0.3). `<VideoEditor customize={…} onEvent={…}>`: `hide` (built-in panel,
+      tool and command ids — hidden commands leave menus and their shortcuts do nothing),
+      `railOrder`, `panels` (the host's own left-menu panels, also phone add tools; rendered
+      with the controller), `buttons` (top bar, before Export), `mediaSources` (search + load,
+      shown in the Media panel, credit kept on the asset; like `audioLibrary`). Icons are one SVG
+      path on a 24 × 24 grid (our stroke style). Events: `change` (with the undo label),
+      `selection`, `playback`, `command`, `import`, `export` (start / done / cancelled / error),
+      `panel` — also `controller.on(listener)`; a listener that throws never breaks the editor.
+      Custom labels were already `labels`. Demo: playground `?embed=1`; embed-check covers it.
+      The command registry (#91, #116) is what makes hiding consistent everywhere.
+142.  **Keyframes and the graph editor** (v0.4, file version 4). Position (x, y), size, turn and
+      opacity of any element with a place on the video (pictures — main video too — text,
+      stickers, blurred areas) take keyframes: `item.keyframes[prop] = [{ t, v, ease? }]`, `t` in
+      flicks from the item's start, `ease` the curve to the next one (the 13 named curves, or a
+      cubic Bézier from the graph editor). Split and trim-from-start keep the whole list and add
+      a `shift`, so each part plays its share of the motion **exactly** (re-sampling into new
+      keyframes can't reproduce a curve that was cut in the middle — caught by a test). Editing:
+      ◆ per group (position keys x and y together) with previous / next; while a property is
+      keyframed, any change to it (stage drag, sliders, align, nudge) keys it at the playhead
+      (`setTransformAt`); removing the last keyframe keeps its value. The engine samples into a
+      per-slot copy (one object per edit, numbers rewritten per frame — no allocation per frame).
+      Graph editor: SVG, drag a ◆ (time snaps to frames; one edit on release), tap a segment to
+      pick its curve, "Custom" shows two Bézier handles. The timeline marks the selected clip's
+      keyframes with small ◆. UI values follow the playhead only while paused (React never
+      renders per frame). Text with keyframed size re-rasterises at most per quarter-octave in
+      the preview (rasterSize), every frame in exports.
+143.  **Fine trims and markers** (v0.4). Core: `rollEdit` (the cut between two touching clips moves;
+      one longer, the other shorter — nothing else moves), `slipItem` (a video / sound shows
+      another part of its media in the same place), `slideItem` (a main-video clip moves between
+      its neighbours, which give and take the time). All clamp to the media both sides have and to
+      one frame; keyframes follow (shift, #142). Desktop timeline: Alt-drag a trim handle = roll,
+      Alt-drag a clip = slip (the media moves the other way, like grabbing the film), Alt+Shift-
+      drag a main clip = slide; previews live, one edit on release. Every device: a **Fine trim**
+      tool (slip slider, Move cut ◀ ▶, Slide ◀ ▶ a frame at a time). Markers:
+      `project.markers` (file version 4); M adds one at the playhead (M on a marker removes it),
+      `,` / `.` jump to the previous / next; flags on the ruler; scrubbing, trims and moves snap
+      to them. Track lock already existed (v0.2 E).
+144.  **More export codecs** (v0.4). `ExportOptions.videoCodec`: `auto` (as before: H.264 in MP4,
+      VP9 / VP8 in WebM), `hevc` (MP4) and `av1` (MP4 or WebM), offered in the export dialog only
+      at sizes this device's encoder accepts (`ExportLimits.hevc / av1`, probed with
+      `isConfigSupported`); bitrates 60 % (HEVC) and 50 % (AV1) of H.264's for the same look.
+      Measured (codecs-check, Chrome on Linux): AV1 140 KB vs H.264 293 KB for the same 2 s at
+      480p, every frame decodes in ffmpeg; HEVC isn't offered there (no encoder) and asking for it
+      says so — Macs and iPhones have hardware HEVC. MOV / MKV containers and transparent video:
+      not in this round (BACKLOG).
+145.  **Scene detection + auto-split** (v0.4). In the media analyzer worker (no new worker, no
+      model): the clip's range is decoded frame by frame, each frame drawn at 64×36 and scored
+      against the previous one (half colour-histogram change, half brightness change per pixel).
+      A cut = score over the sensitivity's threshold **and** 2–3× the last 12 frames' average
+      (fast motion lifts every score; a cut is a spike) **and** ≥ 0.4 s after the previous cut (a
+      flash isn't two scenes). Lowest priority in the analyzer: it steps aside every 2 s of video
+      for waiting thumbnails. Buffers are reused (no per-frame allocation except the 9 KB
+      `getImageData`). Cuts map onto the clip as it is now (speed, trims), then one
+      `splitItemAt` edit = one undo. Slow cross-fades are not cuts (a trailer's dissolves stay in
+      one clip) — a deliberate limit for now. UI: a "Split at scenes" section / tool on video
+      clips with Big changes / Normal / Small changes too, progress and Cancel. Test media:
+      `scenes-cuts.mp4` (real footage cut at known times) and the Sintel trailer (CC BY).
+146.  **Sound effects and level meter** (v0.4). `audioFx` on video and sound clips (file version
+      4, optional): three-band EQ (shelf 120 Hz, peak 1 kHz, shelf 8 kHz; ±12 dB), **Even out**
+      (stereo-linked compressor with soft knee and make-up gain: one 0…1 amount sets threshold
+      −12…−30 dB and ratio 1.5…6), **Pitch** (±12 semitones, speed unchanged) and **Keep the
+      voice natural** (undoes a speed change's pitch for 0.5×–2×; BACKLOG's "speed shifts pitch"
+      for that range). In TypeScript (DECISIONS #13: WASM only after measuring TS too slow — a
+      minute of stereo through every effect takes well under a second). Pitch: a two-tap
+      delay-line shifter whose taps, when they jump, line up with the other tap by
+      cross-correlation (≤ 12 ms) — without that, a tone came out as side lines 25 Hz apart (a
+      warble); with it the spectrum is clean (440 → 880 Hz exactly). Runs in the shared mixer on
+      each clip's sound before volume / fades, so preview and export match; state resets on seek;
+      off stages cost nothing. 13 ready-made looks (Clear voice, Podcast, More bass, Phone call,
+      Radio, Deep / High voice, Chipmunk, Monster…) then the sliders. **Meter**: the AudioWorklet
+      tracks the peak per side per report (~21 ms), the engine sends it with the per-frame time
+      event, `ctl.levels` → a two-bar meter in the desktop timeline bar drawn through refs (no
+      React renders; −48…0 dB, amber over −6 dB, red at full scale). Phones: no meter (space;
+      InShot-simple), effects in the toolbar.
+147.  **Video scopes** (v0.4). Waveform, RGB parade, histogram ("Levels") and vectorscope
+      ("Colour", with 75 % targets and the skin-tone line) of the **whole picture** under the
+      playhead. The engine worker renders the project at ≤ 256 px on the long side with the
+      warm looks renderer (no new GPU context), reads it back once and counts (`computeScopes`,
+      pure, unit-tested); the counts are transferred, the UI draws them into one small canvas
+      (one view at a time — the inspector is narrow). Lives as a collapsed **Scopes** section in
+      the desktop inspector (video settings, and every picture item next to Adjust — where colour
+      gets fixed). Measures only while open: one request at a time, ≤ 4 per second while playing,
+      60 ms after a seek or edit while paused. Phones: none (pro tool, progressive disclosure).
+      Scope colours are tokens read once (`--vu-scope-*`).
+148.  **Proxies** (v0.4). A lighter copy of a heavy video is made automatically when this device
+      would struggle (`proxyHeightFor`: low tier > 720p → 540p, mid > 1080p → 720p, high > 4K →
+      1080p; `proxies: 'always'` = anything over 540p, `'off'`). Made in its **own worker**
+      (`proxy.worker.js`; one at a time, so the analyzer's thumbnails aren't blocked) with
+      Mediabunny's Conversion: H.264, a keyframe every second (quick seeks), no sound (sound
+      comes from the original), rotation metadata kept (shows exactly like the original). Written
+      straight to OPFS with a sync access handle (never in memory) under
+      `video-ultra-proxies/`, marked finished with a `.ok` file; a byte budget per tier (1 / 2 /
+      4 GB) deletes the oldest; skipped when free space < 2× the estimate + 200 MB. Device-local:
+      not in the project file; a reopened project finds its copies. The engine keeps two video
+      maps: previews and the small looks renders (scopes, pickers) read the copy, **exports and
+      saved frames always read the original** (checked by giving a clip a deliberately different
+      copy). HDR clips get no copy (it would lose the HDR look). One info toast says a copy is
+      being made and that exports use the original; `ui.proxyJobs` has the progress.
+149.  **AI editing, bring-your-own endpoint** (v0.4, optional). The model never edits the project
+      JSON: it answers in an **edit-action language** (`EditActionSchema`, 14 actions in seconds
+      and ids — split, trim, delete, move, speed, sound (incl. sound looks), filter, adjust,
+      transition, addText, editText, animate, canvas, marker) that `applyEditActions` validates
+      and maps onto the existing ops; the whole plan is one edit (one undo) or, if any action is
+      invalid, nothing changes and the conversation says which action and why. The model reads
+      `describeProject` (ids, kinds, times, names, texts, catalogue ids — no media; < 8 KB).
+      Interface `EditingAssistant` in core (like BackgroundRemover); `createChatAssistant({
+endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with JSON
+      output so keys stay on the host's server. UI: an **Assistant** panel (last in the rail /
+      phone tools, only when the host passes `assistant`): example chips, conversation, Enter
+      to send, Cancel, a privacy line. Playground: `/api/assistant` forwards to any
+      OpenAI-compatible model when `ASSISTANT_API_KEY` (+ `ASSISTANT_URL`, `ASSISTANT_MODEL`) is
+      set; otherwise an offline demo understands a few phrases (warmer, title "…", fades,
+      square…), so the panel can be tried with no account.
+150.  **Text to speech through the host's voice service** (v0.4). On-device voices were weighed and
+      left out: the good small open models need an espeak-based phonemizer (GPL — can't ship in
+      an MIT package) or carry non-commercial licences, and the big character-level ones are
+      hundreds of MB. So, like captions and AI editing: an interface (`SpeechGenerator`: voices +
+      speak → audio Blob) and `createSpeechEndpoint` in `@video-ultra/ai` for OpenAI-compatible
+      `/audio/speech` endpoints (hosted services, or a self-hosted open voice model behind the
+      host's server). The answer is imported like a recording (stored, a sound clip, one undo).
+      UI: **Text to speech** in the Audio panel (text, voice chips, speed, Add voice → at the
+      playhead) and **Read aloud** on texts (the text's words, where it starts; phone tool +
+      inspector section). Playground: `/api/speech` forwards when `SPEECH_API_KEY` (or the
+      assistant's key) is set; otherwise an offline demo "voice" (tones per syllable) so the flow
+      can be tried. BACKLOG: revisit on-device voices when an MIT-compatible phonemizer exists.

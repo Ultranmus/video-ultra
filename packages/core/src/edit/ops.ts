@@ -1,4 +1,16 @@
 import { current, isDraft, type Draft } from 'immer';
+import { hasAudioFx } from '../audio/fx';
+import { shapePreset } from '../effects/shapes';
+import { AudioFxSchema } from '../model/schema';
+import {
+  KEYFRAME_PROPS,
+  hasKeyframes,
+  keyedTransform,
+  keyedValue,
+  retimeKeyframes,
+  sampleKeyframes,
+  type KeyframeProp,
+} from '../model/keyframes';
 import {
   ALLOWED_KINDS,
   DEFAULT_TRANSFORM,
@@ -17,15 +29,22 @@ import type {
   Asset,
   Background,
   BlendMode,
+  Bezier,
+  Ease,
   ChromaKey,
   Crop,
+  Cutout,
   Filter,
   FreezeItem,
   Item,
   ItemAnimation,
+  Keyframe,
   LutRef,
+  Marker,
   Project,
   RegionItem,
+  ShapeMask,
+  AudioFx,
   TextStyle,
   Track,
   Transform,
@@ -607,6 +626,7 @@ export function trimItem(
     // …and at least one frame must remain.
     shift = Math.min(shift, item.duration - frame);
     if (isMedia(item)) item.sourceIn = Math.max(0, item.sourceIn + Math.round(shift * item.speed));
+    retimeItemKeyframes(item, shift);
     item.duration -= shift;
     // The main track re-lays itself out; lane items keep their end and move their start.
     if (!isMain) item.start += shift;
@@ -632,6 +652,8 @@ export function splitItem(project: Project, itemId: string, at: Time, ids: IdFac
   second.start = cut;
   second.duration = item.duration - offset;
   item.duration = offset;
+  // Each part keeps its own share of the motion (a keyframe holds the value at the cut).
+  retimeItemKeyframes(second, offset);
   if (isMedia(second) && isMedia(item))
     second.sourceIn = item.sourceIn + Math.round(offset * item.speed);
   if ('fadeIn' in second && 'fadeOut' in item) {
@@ -664,6 +686,40 @@ export function splitItem(project: Project, itemId: string, at: Time, ids: IdFac
   if (track.kind === 'main') layoutMain(project);
   else tidyLaneTransitions(project);
   return second.id;
+}
+
+/**
+ * Splits an item at every time in `times` (timeline flicks; e.g. scene cuts) in one edit. Times
+ * outside the item or within a frame of its ends or of each other are skipped. Returns the ids
+ * of the item's parts in order (the first is `itemId`).
+ */
+export function splitItemAt(
+  project: Project,
+  itemId: string,
+  times: readonly Time[],
+  ids: IdFactory,
+): string[] {
+  const { item } = editable(project, itemId);
+  const frame = projectFrame(project);
+  const cuts: Time[] = [];
+  for (const t of [...times].map((x) => snap(project, x)).sort((a, b) => a - b)) {
+    if (t < item.start + frame || t > itemEnd(item) - frame) continue;
+    if (cuts.length && t - cuts[cuts.length - 1]! < frame) continue;
+    cuts.push(t);
+  }
+  const parts = [itemId];
+  let current = itemId;
+  for (const t of cuts) {
+    current = splitItem(project, current, t, ids);
+    parts.push(current);
+  }
+  return parts;
+}
+
+/** Keyframes for a part of the item that starts `offset` later in its old timing (keyframes.ts). */
+function retimeItemKeyframes(item: Item, offset: Time): void {
+  if ('keyframes' in item && item.keyframes)
+    item.keyframes = retimeKeyframes(copy(item.keyframes), offset);
 }
 
 /** Keeps a caption's word times inside it after its start moved by `shift` or its length changed. */
@@ -703,6 +759,72 @@ export function duplicateItem(project: Project, itemId: string, ids: IdFactory):
     placeInLane(project, dup, ids, track.id);
   }
   return dup.id;
+}
+
+/** A copied item and whether it was a clip of the main video (see {@link pasteItems}). */
+export interface CopiedItem {
+  item: Item;
+  fromMain: boolean;
+}
+
+/**
+ * Pastes copied items at `at` (usually the playhead), keeping their timing relative to each
+ * other. Copies get new ids; groups stay groups (as new groups). Clips copied from the main
+ * video go back into it, after the clip under `at`; everything else goes to a lane. Media the
+ * project doesn't have yet (copied from another project) is added from `assets`. Returns the new
+ * ids, in the order given.
+ */
+export function pasteItems(
+  project: Project,
+  copied: readonly CopiedItem[],
+  assets: Readonly<Record<string, Asset>>,
+  at: Time,
+  ids: IdFactory,
+): string[] {
+  if (copied.length === 0) return [];
+  let first = Infinity;
+  for (const c of copied) if (!c.fromMain) first = Math.min(first, c.item.start);
+  const groups = new Map<string, string>();
+  const main = mainTrack(project);
+  // After the clip under the playhead (its end is the next cut).
+  let mainIndex = main.items.findIndex((i) => i.start <= at && at < itemEnd(i)) + 1;
+  if (mainIndex === 0) mainIndex = at <= 0 ? 0 : main.items.length;
+  const made: string[] = [];
+  for (const { item: original, fromMain } of copied) {
+    const item = copy(original) as Item;
+    if ('assetId' in item && item.assetId && !project.assets[item.assetId]) {
+      const asset = assets[item.assetId];
+      if (!asset) throw new EditError('invalid', 'The copied media is no longer available');
+      project.assets[asset.id] = copy(asset);
+    }
+    if ('cutout' in item && item.cutout && !project.assets[item.cutout.assetId]) {
+      const cut = assets[item.cutout.assetId];
+      if (cut) project.assets[cut.id] = copy(cut);
+      else delete item.cutout;
+    }
+    if ('lut' in item && item.lut && !project.assets[item.lut.assetId]) {
+      const lut = assets[item.lut.assetId];
+      if (lut) project.assets[lut.id] = copy(lut);
+      else delete item.lut;
+    }
+    item.id = ids();
+    delete item.locked;
+    delete item.groupId;
+    if (fromMain) {
+      insertMain(project, item, mainIndex++);
+    } else {
+      if (original.groupId) {
+        const group = groups.get(original.groupId) ?? ids();
+        groups.set(original.groupId, group);
+        item.groupId = group;
+      }
+      item.start = at + (original.start - first);
+      addToLane(project, item, ids);
+    }
+    made.push(item.id);
+  }
+  tidyGroups(project);
+  return made;
 }
 
 /** Changes playback speed; the item gets shorter or longer on the timeline. */
@@ -796,6 +918,8 @@ export interface ItemPatch {
   fadeOut?: Time;
   /** Lower under voice, 0…1 of the volume taken away while someone speaks; 0 = off. */
   duck?: number;
+  /** Sound effects (EQ, compressor, pitch); `null` removes them. */
+  audioFx?: AudioFx | null;
   text?: string;
   style?: TextStyle;
   emoji?: string | null;
@@ -805,6 +929,10 @@ export interface ItemPatch {
   lut?: LutRef | null;
   /** Lane items; `'normal'` (or `null`) removes the field. */
   blend?: BlendMode | null;
+  /** Pictures: shape mask (the shape must be one of `SHAPE_PRESETS`); `null` removes it. */
+  mask?: ShapeMask | null;
+  /** Photos and image stickers: background removed (an image asset); `null` restores it. */
+  cutout?: Cutout | null;
   /** Blurred areas. */
   effect?: RegionItem['effect'];
   shape?: RegionItem['shape'];
@@ -814,7 +942,7 @@ export interface ItemPatch {
 }
 
 /** Fields that `null` (or `blend: 'normal'`) removes instead of setting. */
-const REMOVABLE = new Set(['key', 'lut', 'blend']);
+const REMOVABLE = new Set(['key', 'lut', 'blend', 'mask', 'cutout', 'audioFx']);
 /** Size limits of a blurred area's box (fractions of the canvas). */
 const REGION_MIN = 0.01;
 const REGION_MAX = 4;
@@ -833,15 +961,29 @@ const FIELDS_BY_KIND: Record<Item['kind'], readonly string[]> = {
     'fadeIn',
     'fadeOut',
     'duck',
+    'audioFx',
     'key',
     'lut',
     'blend',
+    'mask',
   ],
-  image: ['name', 'transform', 'crop', 'fit', 'filter', 'adjust', 'key', 'lut', 'blend'],
-  freeze: ['name', 'transform', 'crop', 'fit', 'filter', 'adjust', 'key', 'lut', 'blend'],
-  audio: ['name', 'volume', 'muted', 'fadeIn', 'fadeOut', 'duck'],
+  image: [
+    'name',
+    'transform',
+    'crop',
+    'fit',
+    'filter',
+    'adjust',
+    'key',
+    'lut',
+    'blend',
+    'mask',
+    'cutout',
+  ],
+  freeze: ['name', 'transform', 'crop', 'fit', 'filter', 'adjust', 'key', 'lut', 'blend', 'mask'],
+  audio: ['name', 'volume', 'muted', 'fadeIn', 'fadeOut', 'duck', 'audioFx'],
   text: ['name', 'text', 'style', 'transform', 'filter', 'adjust', 'blend'],
-  sticker: ['name', 'transform', 'emoji', 'filter', 'adjust', 'blend'],
+  sticker: ['name', 'transform', 'emoji', 'filter', 'adjust', 'blend', 'cutout'],
   region: ['name', 'transform', 'effect', 'shape', 'amount', 'width', 'height'],
 };
 
@@ -850,6 +992,17 @@ export function updateItem(project: Project, itemId: string, patch: ItemPatch): 
   const { item } = editable(project, itemId);
   const allowed = FIELDS_BY_KIND[item.kind];
   const target = item as Record<string, unknown>;
+  if (patch.cutout) {
+    const asset = project.assets[patch.cutout.assetId];
+    if (!asset || asset.kind !== 'image')
+      throw new EditError('not-found', `No image ${patch.cutout.assetId}`);
+  }
+  if (patch.audioFx && !AudioFxSchema.safeParse(patch.audioFx).success)
+    throw new EditError('invalid', 'Sound effect settings out of range');
+  if (patch.audioFx && !hasAudioFx(patch.audioFx, 1) && !patch.audioFx.keepPitch)
+    patch = { ...patch, audioFx: null };
+  if (patch.mask && !shapePreset(patch.mask.shape))
+    throw new EditError('invalid', `No mask shape ${patch.mask.shape}`);
   if (patch.lut) {
     const asset = project.assets[patch.lut.assetId];
     if (!asset || asset.kind !== 'lut')
@@ -870,6 +1023,7 @@ export function updateItem(project: Project, itemId: string, patch: ItemPatch): 
     item.key.spill = clamp01(item.key.spill);
   }
   if ('lut' in item && item.lut) item.lut.intensity = clamp01(item.lut.intensity);
+  if ('mask' in item && item.mask) item.mask.feather = clamp01(item.mask.feather);
   if (item.kind === 'region') {
     item.amount = clamp01(item.amount);
     const size = (v: number) =>
@@ -1180,4 +1334,302 @@ export function mergeCaptionWithNext(project: Project, itemId: string): void {
   item.duration = itemEnd(next) - item.start;
   if (words) item.words = words;
   track.items.splice(index + 1, 1);
+}
+
+// ── keyframes (v0.4) ──────────────────────────────────────────────────────
+
+type Keyed = Extract<Item, { transform: Transform }>;
+
+function keyed(project: Project, itemId: string): Keyed {
+  const { item } = editable(project, itemId);
+  if (!('transform' in item)) throw new EditError('invalid', 'Sound has no position to animate');
+  return item;
+}
+
+function checkProp(prop: string): asserts prop is KeyframeProp {
+  if (!(KEYFRAME_PROPS as readonly string[]).includes(prop))
+    throw new EditError('invalid', `${prop} can't take keyframes`);
+}
+
+/** Index of the keyframe within half a frame of `t`, or -1. */
+function keyAt(project: Project, list: readonly Keyframe[], t: Time): number {
+  const near = projectFrame(project) / 2;
+  return list.findIndex((k) => Math.abs(k.t - t) < near);
+}
+
+function tidyKeyframes(item: Keyed): void {
+  if (!item.keyframes) return;
+  for (const prop of KEYFRAME_PROPS)
+    if (item.keyframes[prop]?.length === 0) Reflect.deleteProperty(item.keyframes, prop);
+  if (!hasKeyframes(item.keyframes)) delete item.keyframes;
+  else if (item.keyframes.shift === 0) delete item.keyframes.shift;
+}
+
+/**
+ * Sets a keyframe of `prop` at `t` (flicks from the item's start, snapped to a frame and kept
+ * inside the item): replaces one there, else adds one. The first keyframe of a property makes
+ * it follow its keyframes instead of the transform.
+ */
+export function setKeyframe(
+  project: Project,
+  itemId: string,
+  prop: KeyframeProp,
+  t: Time,
+  value: number,
+  ease?: Ease | Bezier,
+): void {
+  checkProp(prop);
+  const item = keyed(project, itemId);
+  if (!Number.isFinite(value)) throw new EditError('invalid', 'A keyframe needs a number');
+  const at = Math.max(0, Math.min(item.duration, snap(project, t))) + (item.keyframes?.shift ?? 0);
+  const v = prop === 'opacity' ? clamp01(value) : prop === 'scale' ? Math.max(0.001, value) : value;
+  item.keyframes ??= {};
+  const list = (item.keyframes[prop] ??= []);
+  const i = keyAt(project, list, at);
+  if (i !== -1) {
+    list[i]!.v = v;
+    if (ease !== undefined) list[i]!.ease = copy(ease);
+    return;
+  }
+  const key: Keyframe = { t: at, v, ...(ease !== undefined ? { ease: copy(ease) } : {}) };
+  const after = list.findIndex((k) => k.t > at);
+  if (after === -1) list.push(key);
+  else list.splice(after, 0, key);
+}
+
+/** Removes the keyframe of `prop` at `t` (if there is one). */
+export function removeKeyframe(
+  project: Project,
+  itemId: string,
+  prop: KeyframeProp,
+  t: Time,
+): void {
+  checkProp(prop);
+  const item = keyed(project, itemId);
+  const list = item.keyframes?.[prop];
+  if (!list) return;
+  const i = keyAt(project, list, t + (item.keyframes!.shift ?? 0));
+  if (i === -1) return;
+  // The value the property had there stays as its plain value once the last keyframe goes.
+  if (list.length === 1) item.transform[prop] = list[0]!.v;
+  list.splice(i, 1);
+  tidyKeyframes(item);
+}
+
+/** Moves a keyframe of `prop` from `from` to `to` (and to `value`, when given). */
+export function moveKeyframe(
+  project: Project,
+  itemId: string,
+  prop: KeyframeProp,
+  from: Time,
+  to: Time,
+  value?: number,
+): void {
+  checkProp(prop);
+  const item = keyed(project, itemId);
+  const list = item.keyframes?.[prop];
+  const i = list ? keyAt(project, list, from + (item.keyframes!.shift ?? 0)) : -1;
+  if (!list || i === -1) throw new EditError('not-found', 'No keyframe there');
+  const [key] = list.splice(i, 1);
+  tidyKeyframes(item);
+  setKeyframe(project, itemId, prop, to, value ?? key!.v, key!.ease);
+}
+
+/** Sets the curve from the keyframe of `prop` at `t` to the next (`null`: the default). */
+export function setKeyframeEase(
+  project: Project,
+  itemId: string,
+  prop: KeyframeProp,
+  t: Time,
+  ease: Ease | Bezier | null,
+): void {
+  checkProp(prop);
+  const item = keyed(project, itemId);
+  const list = item.keyframes?.[prop];
+  const i = list ? keyAt(project, list, t + (item.keyframes!.shift ?? 0)) : -1;
+  if (!list || i === -1) throw new EditError('not-found', 'No keyframe there');
+  if (ease === null) delete list[i]!.ease;
+  else list[i]!.ease = copy(ease);
+}
+
+/**
+ * Removes every keyframe of `prop` (or of all properties): the property keeps the value it has
+ * at `bakeAt` (flicks from the item's start) as its plain value.
+ */
+export function clearKeyframes(
+  project: Project,
+  itemId: string,
+  prop?: KeyframeProp,
+  bakeAt: Time = 0,
+): void {
+  const item = keyed(project, itemId);
+  if (!item.keyframes) return;
+  for (const p of prop ? [prop] : KEYFRAME_PROPS) {
+    const list = item.keyframes[p];
+    if (!list?.length) continue;
+    item.transform[p] = sampleKeyframes(list, bakeAt + (item.keyframes.shift ?? 0));
+    Reflect.deleteProperty(item.keyframes, p);
+  }
+  tidyKeyframes(item);
+}
+
+/**
+ * Sets an item's transform as it should look at timeline time `at` (the playhead): keyframed
+ * properties get a keyframe there (added, or changed to the new value); the others change for the
+ * whole item, as without keyframes. What stage drags, sliders and align use.
+ */
+export function setTransformAt(
+  project: Project,
+  itemId: string,
+  transform: Readonly<Transform>,
+  at: Time,
+): void {
+  const item = keyed(project, itemId);
+  const local = at - item.start;
+  const next: Transform = { ...item.transform, flipX: transform.flipX, flipY: transform.flipY };
+  for (const prop of KEYFRAME_PROPS) {
+    const now = keyedValue(item.keyframes, prop, local);
+    if (now === null) next[prop] = transform[prop];
+    else if (Math.abs(now - transform[prop]) > 1e-9)
+      setKeyframe(project, itemId, prop, local, transform[prop]);
+  }
+  updateItem(project, itemId, { transform: next });
+}
+
+/** An item's transform at timeline time `at` (keyframes sampled; a new object). */
+export function transformAt(item: Item, at: Time): Transform | null {
+  if (!('transform' in item)) return null;
+  return keyedTransform(item.transform, item.keyframes, at - item.start, { ...item.transform });
+}
+
+// ── pro trims (v0.4): roll, slip, slide ───────────────────────────────────
+
+/** The source span (flicks) an item may still reach past its current end / before its start. */
+function sourceRoom(project: Project, item: Item): { before: Time; after: Time } {
+  if (!isMedia(item)) {
+    // Photos, freezes, text… can be any length.
+    return { before: Number.MAX_SAFE_INTEGER, after: Number.MAX_SAFE_INTEGER };
+  }
+  return {
+    before: floorToFrame(project, Math.floor(item.sourceIn / item.speed)),
+    after: Math.max(0, maxDuration(project, item) - item.duration),
+  };
+}
+
+/** Trims the start of an item by `delta` (flicks; > 0 shortens it) without moving its end. */
+function trimStartBy(item: Item, delta: Time): void {
+  if (isMedia(item)) item.sourceIn = Math.max(0, item.sourceIn + Math.round(delta * item.speed));
+  retimeItemKeyframes(item, delta);
+  item.start += delta;
+  item.duration -= delta;
+  clampWords(item, delta);
+  clampFades(item);
+}
+
+/**
+ * Roll edit: moves the cut between an item and the one right after it (touching, same track) by
+ * `delta` — one gets longer, the other shorter by the same amount, so nothing else moves.
+ * Clamped to the media both have and to one frame each. Returns the applied delta.
+ */
+export function rollEdit(project: Project, itemId: string, delta: Time): Time {
+  const { track, item: left, index } = editable(project, itemId);
+  const right = track.items[index + 1];
+  if (!right || right.start !== itemEnd(left))
+    throw new EditError('invalid', 'Pick a clip that touches the next one');
+  if (right.locked) throw new EditError('locked', 'The next clip is locked');
+  const frame = projectFrame(project);
+  let d = snapToFrame(delta, project.settings.frameRate);
+  const l = sourceRoom(project, left);
+  const r = sourceRoom(project, right);
+  d = Math.min(d, l.after, right.duration - frame);
+  d = Math.max(d, -(left.duration - frame), -r.before);
+  if (d === 0) return 0;
+  left.duration += d;
+  clampWords(left, 0);
+  clampFades(left);
+  trimStartBy(right, d);
+  if (track.kind === 'main') layoutMain(project);
+  else tidyLaneTransitions(project);
+  return d;
+}
+
+/**
+ * Slip: shows a different part of a video or sound in the same place — the clip keeps its spot
+ * and length, the media slides under it by `delta` (flicks of timeline time; > 0 shows later
+ * media). Returns the applied delta.
+ */
+export function slipItem(project: Project, itemId: string, delta: Time): Time {
+  const { item } = editable(project, itemId);
+  if (!isMedia(item)) throw new EditError('invalid', 'Only video and sound can slip');
+  const room = sourceRoom(project, item);
+  const d = Math.max(
+    -room.before,
+    Math.min(room.after, snapToFrame(delta, project.settings.frameRate)),
+  );
+  item.sourceIn = Math.max(0, item.sourceIn + Math.round(d * item.speed));
+  return d;
+}
+
+/**
+ * Slide: moves a main-video clip by `delta` between its neighbours — the one before gets longer
+ * (or shorter), the one after shorter (or longer); the clip itself and the video's length don't
+ * change. Returns the applied delta.
+ */
+export function slideItem(project: Project, itemId: string, delta: Time): Time {
+  const { track, index } = editable(project, itemId);
+  if (track.kind !== 'main') throw new EditError('invalid', 'Slide moves clips of the main video');
+  const prev = track.items[index - 1];
+  const next = track.items[index + 1];
+  if (!prev || !next) throw new EditError('invalid', 'Slide needs a clip before and after it');
+  if (prev.locked || next.locked) throw new EditError('locked', 'A neighbouring clip is locked');
+  const frame = projectFrame(project);
+  let d = snapToFrame(delta, project.settings.frameRate);
+  const p = sourceRoom(project, prev);
+  const n = sourceRoom(project, next);
+  d = Math.min(d, p.after, next.duration - frame);
+  d = Math.max(d, -(prev.duration - frame), -n.before);
+  if (d === 0) return 0;
+  prev.duration += d;
+  clampWords(prev, 0);
+  clampFades(prev);
+  trimStartBy(next, d);
+  layoutMain(project);
+  return d;
+}
+
+// ── markers (v0.4) ─────────────────────────────────────────────────────────
+
+/** Adds a marker at `time` (snapped to a frame, inside the video). Returns its id. */
+export function addMarker(project: Project, time: Time, ids: IdFactory, label?: string): string {
+  const at = Math.max(0, snap(project, time));
+  const marker: Marker = { id: ids(), time: at, ...(label ? { label: label.slice(0, 200) } : {}) };
+  const list = (project.markers ??= []);
+  const after = list.findIndex((m) => m.time > at);
+  if (after === -1) list.push(marker);
+  else list.splice(after, 0, marker);
+  return marker.id;
+}
+
+/** Changes a marker's time or label (an empty label removes it). */
+export function updateMarker(
+  project: Project,
+  markerId: string,
+  patch: { time?: Time; label?: string },
+): void {
+  const list = project.markers ?? [];
+  const marker = list.find((m) => m.id === markerId);
+  if (!marker) throw new EditError('not-found', 'No such marker');
+  if (patch.time !== undefined) marker.time = Math.max(0, snap(project, patch.time));
+  if (patch.label !== undefined) {
+    if (patch.label.trim()) marker.label = patch.label.slice(0, 200);
+    else delete marker.label;
+  }
+  list.sort((a, b) => a.time - b.time);
+}
+
+/** Removes a marker. */
+export function removeMarker(project: Project, markerId: string): void {
+  if (!project.markers) return;
+  project.markers = project.markers.filter((m) => m.id !== markerId);
+  if (project.markers.length === 0) delete project.markers;
 }

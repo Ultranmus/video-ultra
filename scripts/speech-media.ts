@@ -1,6 +1,6 @@
 /**
  * Speech test clips with known transcripts, for the captions work (v0.2 A0): English (two
- * accents), Hindi, and English over music. Uses macOS `say` and ffmpeg; writes
+ * accents), Hindi, and English over music. Uses macOS `say` (or `espeak-ng` elsewhere) and ffmpeg; writes
  * test-media/files/speech-*.m4a and speech.json (the reference text for word-error rates).
  * Synthetic voices are easier than real ones — real recordings are checked on devices.
  * Usage: node scripts/speech-media.ts
@@ -29,15 +29,17 @@ const HI =
   'वीडियो पसंद आए तो लाइक कीजिए और फिर मिलेंगे।';
 
 const clips = [
-  { name: 'speech-en-gb', voice: 'Daniel', text: EN, language: 'en' },
-  { name: 'speech-en-in', voice: 'Rishi', text: EN, language: 'en' },
-  { name: 'speech-hi', voice: 'Lekha', text: HI, language: 'hi' },
+  { name: 'speech-en-gb', voice: 'Daniel', espeak: 'en-gb', text: EN, language: 'en' },
+  { name: 'speech-en-in', voice: 'Rishi', espeak: 'en-us', text: EN, language: 'en' },
+  { name: 'speech-hi', voice: 'Lekha', espeak: 'hi', text: HI, language: 'hi' },
 ];
+const hasSay = process.platform === 'darwin';
 
 const manifest: Record<string, { text: string; language: string; seconds: number }> = {};
 for (const clip of clips) {
-  const aiff = join(tmp, `${clip.name}.aiff`);
-  execFileSync('say', ['-v', clip.voice, '-o', aiff, clip.text]);
+  const aiff = join(tmp, `${clip.name}.${hasSay ? 'aiff' : 'wav'}`);
+  if (hasSay) execFileSync('say', ['-v', clip.voice, '-o', aiff, clip.text]);
+  else execFileSync('espeak-ng', ['-v', clip.espeak, '-s', '150', '-w', aiff, clip.text]);
   const file = join(out, `${clip.name}.m4a`);
   execFileSync('ffmpeg', [
     '-y',

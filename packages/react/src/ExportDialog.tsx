@@ -48,8 +48,15 @@ function estimateMb(
   quality: ExportOptions['quality'],
   seconds: number,
   format: ExportOptions['format'],
+  codec: ExportOptions['videoCodec'] = 'auto',
 ) {
-  const video = exportBitrate(width, height, fps, quality, format === 'webm' ? 'vp9' : 'avc');
+  const video = exportBitrate(
+    width,
+    height,
+    fps,
+    quality,
+    codec === 'hevc' || codec === 'av1' ? codec : format === 'webm' ? 'vp9' : 'avc',
+  );
   return ((video + exportAudioBitrate(quality)) * seconds) / 8 / 1e6;
 }
 
@@ -467,6 +474,7 @@ export function ExportDialog(): ReactElement | null {
     options.quality,
     seconds,
     options.format,
+    options.videoCodec,
   );
   const aspect = width / height;
   const doneBlob = done ? (done.kind === 'image' ? done.image.blob : done.result.blob) : null;
@@ -826,6 +834,7 @@ export function ExportDialog(): ReactElement | null {
                                 q,
                                 seconds,
                                 options.format,
+                                options.videoCodec,
                               ),
                             )}
                             onPick={(quality) => setOptions({ ...options, quality })}
@@ -855,10 +864,38 @@ export function ExportDialog(): ReactElement | null {
                         ]}
                         onChange={(format) => {
                           setPreset(null);
-                          setOptions({ ...options, format });
+                          // HEVC is MP4-only: WebM falls back to its own default.
+                          setOptions({
+                            ...options,
+                            format,
+                            ...(format === 'webm' && options.videoCodec === 'hevc'
+                              ? { videoCodec: 'auto' as const }
+                              : {}),
+                          });
                         }}
                       />
                     </div>
+                    {limits &&
+                    (limits.hevc.includes(outHeight) || limits.av1.includes(outHeight)) ? (
+                      <Segmented
+                        label={l.videoCodec}
+                        value={options.videoCodec ?? 'auto'}
+                        options={[
+                          {
+                            value: 'auto' as const,
+                            label: options.format === 'mp4' ? 'H.264' : 'VP9',
+                            tip: l.codecStandardTip,
+                          },
+                          ...(options.format === 'mp4' && limits.hevc.includes(outHeight)
+                            ? [{ value: 'hevc' as const, label: 'HEVC', tip: l.codecHevcTip }]
+                            : []),
+                          ...(limits.av1.includes(outHeight)
+                            ? [{ value: 'av1' as const, label: 'AV1', tip: l.codecAv1Tip }]
+                            : []),
+                        ]}
+                        onChange={(videoCodec) => setOptions({ ...options, videoCodec })}
+                      />
+                    ) : null}
                   </>
                 ) : kind === 'audio' ? (
                   <>

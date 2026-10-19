@@ -15,7 +15,13 @@ export type PanelId =
   | 'layers'
   | 'captions'
   /** Blurred / pixelated areas (v0.2 C3). */
-  | 'blur';
+  | 'blur'
+  /** Templates (v0.3). */
+  | 'templates'
+  /** AI editing with the host's assistant (v0.4). */
+  | 'assistant'
+  /** A host's own panel (embedding API, v0.3). */
+  | `custom:${string}`;
 
 /** Tools whose controls open in the sheet (phone/tablet) or the inspector (desktop). */
 export type ToolId =
@@ -41,7 +47,32 @@ export type ToolId =
   // v0.2 C. Picture tools
   | 'key'
   | 'blend'
-  | 'region';
+  | 'region'
+  // v0.3 Shape masks
+  | 'mask'
+  // v0.3 Background removal
+  | 'cutout'
+  // v0.4 Keyframes
+  | 'keyframes'
+  // v0.4 Fine trims
+  | 'protrim'
+  // v0.4 Scene detection
+  | 'scenes'
+  // v0.4 Sound effects
+  | 'soundfx'
+  // v0.4 Text to speech
+  | 'readaloud';
+
+/** One exchange with the AI assistant (v0.4). */
+export interface AssistantTurn {
+  id: number;
+  instruction: string;
+  reply: string;
+  /** Changes applied (one undo step), 0 when none. */
+  applied: number;
+  /** Why the changes weren't applied (a bad action, a failed request). */
+  error: string | null;
+}
 
 export interface ImportRow {
   id: string;
@@ -84,6 +115,17 @@ export interface UiState {
     loaded?: number;
     total?: number;
   } | null;
+  /** Background removal running (v0.3): for which item, what it's doing, how far. */
+  cutoutJob: { itemId: string; stage: 'download' | 'work'; fraction: number } | null;
+  /** Scene detection running (v0.4): on which clip, how far. */
+  sceneJob: { itemId: string; fraction: number } | null;
+  /** AI editing (v0.4): this session's conversation, and whether a request is out. */
+  assistantTurns: AssistantTurn[];
+  assistantBusy: boolean;
+  /** Text to speech (v0.4) is generating. */
+  speechBusy: boolean;
+  /** Proxies being made (v0.4): asset id → 0…1. */
+  proxyJobs: Record<string, number>;
   /** A caption whose text box should take focus in the Captions panel. */
   captionEditing: string | null;
   /** Last screen-reader announcement (a polite live region reads it). */
@@ -124,6 +166,12 @@ export function createUiStore() {
     menu: null,
     announcement: '',
     captionJob: null,
+    cutoutJob: null,
+    sceneJob: null,
+    proxyJobs: {},
+    assistantTurns: [],
+    assistantBusy: false,
+    speechBusy: false,
     captionEditing: null,
     panel: 'media',
     tool: null,
@@ -165,6 +213,28 @@ export class Playhead {
   }
 
   subscribe(listener: (time: number) => void): () => void {
+    this.#listeners.add(listener);
+    return () => this.#listeners.delete(listener);
+  }
+}
+
+/**
+ * Sound levels while playing (v0.4 meters): the loudest sample per side just heard, 0…1.
+ * Updated per frame from the engine; components subscribe and draw through refs (no renders).
+ */
+export class Levels {
+  left = 0;
+  right = 0;
+  #listeners = new Set<(left: number, right: number) => void>();
+
+  set(left: number, right: number): void {
+    if (left === this.left && right === this.right) return;
+    this.left = left;
+    this.right = right;
+    for (const listener of this.#listeners) listener(left, right);
+  }
+
+  subscribe(listener: (left: number, right: number) => void): () => void {
     this.#listeners.add(listener);
     return () => this.#listeners.delete(listener);
   }

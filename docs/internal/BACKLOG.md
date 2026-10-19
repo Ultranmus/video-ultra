@@ -25,8 +25,14 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       silent part (the engine then refuses clearly).
 - [ ] WebKit logs "WebKitBlobResource error 1" console messages in editor-interact (not failures).
 
-- [ ] Copy / paste elements (⌘C / ⌘V, with a paste at the playhead) — image-ultra has it; not in
+- [x] (done 2026-10-19, #134) Copy / paste elements (⌘C / ⌘V, with a paste at the playhead) — image-ultra has it; not in
       v0.2's list.
+- [ ] Templates with media placeholders (a framed slot you drop a clip into) and animated
+      template previews (#139).
+- [ ] Export: MOV / MKV containers and transparent video (VP9 / HEVC with alpha) (#144).
+- [ ] Lottie stickers (.json / .lottie): need a Lottie runtime in the engine worker (#138).
+- [ ] Animated stickers in Safari without `ImageDecoder` show their first frame: decode GIF /
+      WebP frames ourselves (small WASM decoder) if the owner's iPhone lacks it (#138).
 - [ ] Layers panel: drag-reorder on touch uses the grip only; a long-press-anywhere lift like the
       timeline would feel more natural on phones.
 - [ ] Groups: resizing a group with rotated members scales positions around the box centre but
@@ -80,7 +86,11 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [x] Engine: blur background, text and sticker layers (Day 5), transitions (Day 5).
 - [ ] Engine: count project frames lost to display timing (60 Hz tick vs 30 fps) separately.
 - [ ] Speed changes shift pitch (plain resampling). Pitch-preserving time-stretch (Rust → WASM,
-      DECISIONS #13) for v0.2 speed curves.
+      DECISIONS #13) for v0.2 speed curves. _2026-10-19: "Keep the voice natural" (DECISIONS
+      #146) does it in TS for 0.5×–2×; beyond that range and for speed curves it's still open._
+- [ ] Sound effects (#146): owner to listen on real voices — if the pitch shifter warbles on a
+      voice, try a longer window (30 → 40 ms) or a WSOLA stretcher; compressor make-up gain may
+      want tuning by ear.
 - [ ] WebKit (Playwright) has late frames at cuts where a new video starts (2 s, 7 s in the demo):
       check on the iPhone; widen prefetch (1 s → 1.5 s) if real.
 - [ ] Next iPhone batch: audio plays, A/V offset, underruns on a real phone (engine lab page).
@@ -149,7 +159,7 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [ ] Blur transition uses a 13-tap disc on the full-size frame: at full strength rings can show
       on high-contrast edges. Use the backdrop's downscale path if it looks bad on real footage.
 - [x] (fixed 2026-10-19, #113) Transitions are not crossfaded in audio.
-- [ ] Image stickers that are animated GIFs show the first frame only.
+- [x] (fixed 2026-10-19, #138: ImageDecoder, frame per item) Image stickers that are animated GIFs show the first frame only.
 - [ ] WebKit (Playwright) logs `AudioEncoder encode failed: InternalAudioEncoderCocoa encoding failed` during `scripts/export-check.ts` (around the cancel step) — the check passes; make
       cancel close the encoder without an unhandled error.
 - [ ] Real-iPhone check of the second UI pass: keyboard lift (visualViewport) while editing text,
@@ -187,7 +197,8 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [ ] v0.3 references to build against (specs, not code): loudness to EBU R128 / ITU-R BS.1770
       (integrated + true peak; "normalize audio" and an export loudness target such as −14 LUFS);
       SRT / WebVTT import + export with frame-exact timing and burn-in (ties into v0.4 AI
-      captions); scopes — waveform, RGB parade, histogram, vectorscope.
+      captions); scopes — waveform, RGB parade, histogram, vectorscope (_scopes done 2026-10-19,
+      DECISIONS #147_).
 - [ ] Animation tiles: text previews use the item's own size — very long text can be tiny in the
       tile; consider fitting text to the tile in `itemPreview`.
 - [ ] Transition still (A | B) and flip-books are re-fetched when the panel reopens; cache per
@@ -199,3 +210,9 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       Opacity, Split… on text): add an edge fade or a "More" entry.
 - [x] (fixed 2026-10-19) The "browser may clear unsaved work" toast is large on phones and covers the stage.
 - [ ] Device frames bigger than the window scroll (zooming the frame breaks canvas pointer maths).
+- [ ] Proxies (#148): HDR clips get no copy (an HDR → SDR copy would need tone mapping that
+      matches the engine's); a "Make a lighter copy" button per clip and a Media panel badge
+      would make the automatic choice visible — wait for the owner's feedback first.
+- [ ] Text to speech on the device (#150): needs an MIT/Apache phonemizer (or a character-level
+      voice model small enough for phones with a permissive licence). Until then voices come
+      from the host's service.

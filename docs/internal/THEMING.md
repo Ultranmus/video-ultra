@@ -81,3 +81,16 @@ classes always win.
 
 Same keys as image-ultra (`accent`, `accentHover`, `accentContrast`, `accentText`, `bg`, `stage`,
 `surface1/2/3`, `text`, `textMuted`, `border`, `fontFamily`, `radius`) plus `timelineBg`.
+
+## Contrast and density (v0.3)
+
+- `contrast="high"` (or `"auto"`: high when the OS asks for more contrast, `prefers-contrast:
+more`) sets `data-vu-contrast` on `.vu-root`. High contrast redefines the colour tokens only:
+  pure black / white surfaces, text-muted near full strength, borders at 55–60 % (strong borders
+  solid), a brighter accent on dark (`#c879c8`, black text on it) and a deeper one on light
+  (`#3a0f3a`), and a thicker focus ring. Works with `theme` dark, light and auto. axe: 0
+  violations on every a11y-check page in both (2026-10-19).
+- `density="touch"` sets `data-vu-density`: thumb-sized controls everywhere (trim handles 20 px,
+  choices 36 px, touch targets 48 px, tracks 52 / 64 px, slider thumbs 24 px, layer rows 56 px),
+  also with a mouse. `density="compact"` keeps mouse sizes on touch screens. `auto` (default):
+  touch sizes when the primary pointer is coarse.

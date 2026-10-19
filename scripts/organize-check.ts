@@ -17,6 +17,7 @@ const arg = (name: string) =>
 const port = arg('port') ?? '3200';
 const shots = arg('shots');
 const only = arg('only');
+const mod = process.platform === 'darwin' ? 'Meta' : 'Control';
 const media = ['avc-1080p30.mp4', 'photo.jpg'].map((f) => resolve('test-media/files', f));
 
 let failures = 0;
@@ -128,7 +129,6 @@ if (only !== 'phone') {
   await load(page);
   const [a, b] = await addTexts(page);
   await page.waitForTimeout(400);
-  const mod = process.platform === 'darwin' ? 'Meta' : 'Control';
 
   // Multi-select: click A, Shift-click B.
   const pa = await stagePoint(page, a);
@@ -307,6 +307,96 @@ if (only !== 'phone') {
   const empty = await page.evaluate(() => (window as any).vuEditor.project.tracks[0].items.length);
   check('undo all the way back', empty === 0);
   check('no page errors (desktop)', errors.length === 0, errors.join(' | '));
+  await browser.close();
+}
+
+// ── desktop: selection box started on the main video ─────────────────────
+if (only !== 'phone') {
+  const browser = await chromium.launch({ channel: 'chrome' });
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await load(page);
+  const [a, b] = await addTexts(page);
+  await page.waitForTimeout(4000); // toasts gone
+  const frame = (await page.locator('.vu-stage-frame').boundingBox())!;
+  const at = (fx: number, fy: number) => ({
+    x: frame.x + frame.width * fx,
+    y: frame.y + frame.height * fy,
+  });
+  const box = async (from: { x: number; y: number }, to: { x: number; y: number }) => {
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(to.x, to.y, { steps: 12 });
+    await page.mouse.up();
+  };
+  const videoX = () =>
+    page.evaluate(() => (window as any).vuEditor.project.tracks[0].items[0].transform.x as number);
+  // Both drags start on the video (it fills the middle of the frame), not on empty stage.
+  await box(at(0.03, 0.5), at(0.9, 0.3));
+  check('box drawn from the video selects the text', (await selection(page)).join() === a);
+  check('…and leaves the video where it was', (await videoX()) === 0.5);
+  await page.keyboard.down('Shift');
+  await box(at(0.03, 0.55), at(0.9, 0.8));
+  await page.keyboard.up('Shift');
+  const both = await selection(page);
+  check('⇧ + a second box adds to the selection', both.length === 2 && both.includes(b));
+  await page.keyboard.press(`${mod}+g`);
+  const grouped = await page.evaluate(
+    ([x, y]) => {
+      const items = (window as any).vuEditor.project.tracks.flatMap((t: any) => t.items);
+      const g = (id: string) => items.find((i: any) => i.id === id).groupId;
+      return !!g(x) && g(x) === g(y);
+    },
+    [a, b],
+  );
+  check('boxed texts group with ⌘G', grouped);
+  // Copy the group, move the playhead, paste: two new texts there, still a group of their own.
+  await page.keyboard.press(`${mod}+c`);
+  await page.evaluate(() => (window as any).vuEditor.seek(4 * 705_600_000));
+  await page.keyboard.press(`${mod}+v`);
+  const pasted = await page.evaluate(() => {
+    const c = (window as any).vuEditor;
+    const ids: string[] = c.ui.getState().selectedIds;
+    const items = c.project.tracks.flatMap((t: any) => t.items);
+    const got = ids.map((id) => items.find((i: any) => i.id === id));
+    return {
+      n: got.length,
+      starts: got.map((i: any) => i.start / 705_600_000),
+      grouped: !!got[0]?.groupId && got.every((i: any) => i.groupId === got[0].groupId),
+      texts: items.filter((i: any) => i.kind === 'text').length,
+    };
+  });
+  check(
+    '⌘C then ⌘V pastes a copy at the playhead, as its own group',
+    pasted.n === 2 && pasted.texts === 4 && pasted.grouped && pasted.starts.every((t) => t >= 4),
+    JSON.stringify(pasted),
+  );
+  await page.keyboard.press(`${mod}+x`);
+  const afterCut = await page.evaluate(
+    () =>
+      (window as any).vuEditor.project.tracks
+        .flatMap((t: any) => t.items)
+        .filter((i: any) => i.kind === 'text').length,
+  );
+  await page.keyboard.press(`${mod}+v`);
+  const afterPaste = await page.evaluate(
+    () =>
+      (window as any).vuEditor.project.tracks
+        .flatMap((t: any) => t.items)
+        .filter((i: any) => i.kind === 'text').length,
+  );
+  check(
+    '⌘X removes, ⌘V brings it back',
+    afterCut === 2 && afterPaste === 4,
+    `${afterCut} → ${afterPaste}`,
+  );
+  await page.mouse.click(at(0.03, 0.5).x, at(0.03, 0.5).y);
+  const video = await page.evaluate(() => (window as any).vuEditor.project.tracks[0].items[0].id);
+  check('a click on the video still selects it', (await selection(page)).join() === video);
+  await box(at(0.5, 0.5), at(0.6, 0.5));
+  check('a selected video still drags', (await videoX()) > 0.55);
+  check('no page errors (selection box)', errors.length === 0, errors.join(' | '));
   await browser.close();
 }
 

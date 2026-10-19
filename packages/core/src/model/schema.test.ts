@@ -137,8 +137,8 @@ describe('project file back-compat', () => {
     return out;
   };
 
-  it('is file version 3 (1 → 2: text and stickers take a look; 2 → 3: lock, hide, group)', () => {
-    expect(PROJECT_VERSION).toBe(3);
+  it('is file version 4 (1 → 2: text and stickers take a look; 2 → 3: lock, hide, group; 3 → 4: shape masks)', () => {
+    expect(PROJECT_VERSION).toBe(4);
   });
 
   it('a version-3 project keeps locked, hidden and grouped items; main clips leave groups', () => {
@@ -150,7 +150,7 @@ describe('project file back-compat', () => {
     const result = parseProject(data);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.project).toEqual(data);
+    expect(result.project).toEqual({ ...data, version: PROJECT_VERSION });
     data.tracks[0].items[0].groupId = 'g1';
     const repaired = parseProject(data);
     expect(repaired.ok && repaired.project.tracks[0]!.items[0]!.groupId).toBeUndefined();
@@ -167,7 +167,7 @@ describe('project file back-compat', () => {
     const result = parseProject(data);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.project).toEqual(data);
+    expect(result.project).toEqual({ ...data, version: PROJECT_VERSION });
     expect(checkInvariants(result.project)).toEqual([]);
     sounding.duck = 0;
     const repaired = parseProject(data);
@@ -184,7 +184,10 @@ describe('project file back-compat', () => {
     expect(result.ok, result.ok ? '' : result.error).toBe(true);
     if (!result.ok) return;
     expect(result.warnings).toEqual([]);
-    expect(result.project).toEqual(upgraded(JSON.parse(V01_PROJECT)));
+    expect(result.project).toEqual({
+      ...upgraded(JSON.parse(V01_PROJECT)),
+      version: PROJECT_VERSION,
+    });
     const b = result.project.tracks[0]!.items[1]!;
     expect('transitionIn' in b && b.transitionIn).toEqual({
       type: 'slide-left',
@@ -209,7 +212,7 @@ describe('project file back-compat', () => {
     const result = parseProject(data);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.project).toEqual(upgraded(data));
+    expect(result.project).toEqual({ ...upgraded(data), version: PROJECT_VERSION });
   });
 
   it('a version-2 project keeps a text filter', () => {
@@ -222,7 +225,7 @@ describe('project file back-compat', () => {
     const result = parseProject(data);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.project).toEqual({ ...data, version: 3 });
+    expect(result.project).toEqual({ ...data, version: PROJECT_VERSION });
   });
 
   it('rejects bad transition options and animations', () => {
@@ -277,7 +280,7 @@ describe('project file back-compat', () => {
     expect(result.ok, result.ok ? '' : result.error).toBe(true);
     if (!result.ok) return;
     expect(result.warnings).toEqual([]);
-    expect(result.project).toEqual(data);
+    expect(result.project).toEqual({ ...data, version: PROJECT_VERSION });
   });
 
   it('drops a LUT look whose file is missing; rejects bad picture-tool values', () => {

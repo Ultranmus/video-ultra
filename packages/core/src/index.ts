@@ -31,6 +31,21 @@ export { checkInvariants } from './model/invariants';
 
 // Editing
 export * from './edit/ops';
+export {
+  KEYFRAME_PROPS,
+  sampleKeyframes,
+  keyedTransform,
+  keyedValue,
+  keyTime,
+  hasKeyframes,
+  retimeKeyframes,
+  curveAt,
+  bezierAt,
+  type KeyframeProp,
+  type Keyframe,
+  type Keyframes,
+  type Bezier,
+} from './model/keyframes';
 export { createEditor, replayLog } from './edit/history';
 export type {
   Editor,
@@ -85,6 +100,7 @@ export type {
   ExportResult,
   ExportHeight,
   ExportLimits,
+  ExportVideoCodec,
   ExportRange,
   ExportPreset,
   AudioExportFormat,
@@ -104,7 +120,50 @@ export type { GroupOptions, GroupedCaption } from './captions/group';
 export { captionWords, captionWordTimes, speechAt } from './captions/timing';
 export type { SpeechPosition } from './captions/timing';
 export { CAPTION_PRESETS, DEFAULT_CAPTION_PRESET, lookFromPreset } from './captions/presets';
+export {
+  TEMPLATE_PRESETS,
+  TEMPLATE_CATEGORIES,
+  TEMPLATE_THEMES,
+  templatePreset,
+  fillTemplateText,
+  applyTemplate,
+  type TemplatePreset,
+  type TemplateElement,
+  type TemplateVariable,
+  type TemplateCategory,
+} from './templates/templates';
+export {
+  SHAPE_PRESETS,
+  SHAPE_CATEGORIES,
+  ShapeFamily,
+  shapePreset,
+  shapeDistance,
+  shapeCoverage,
+  type ShapePreset,
+} from './effects/shapes';
+// AI editing (v0.4, optional): the action language a host's model answers in.
+export {
+  applyEditActions,
+  describeProject,
+  EditActionSchema,
+  EDIT_ACTIONS_GUIDE,
+  type EditAction,
+  type EditingAssistant,
+  type EditingRequest,
+  type EditingResponse,
+  type ProjectDescription,
+} from './ai/assistant';
+// Text to speech (v0.4, optional): the voice service interface.
+export type { SpeechGenerator, SpeechRequest, SpeechVoice } from './ai/speech';
+// Sound effects (v0.4): ready-made looks and the equaliser's band frequencies.
+export { AUDIO_FX_PRESETS, EQ_BANDS, pitchRatio } from './audio/fx';
 export type { CaptionPreset } from './captions/presets';
+// Background removal: the remover interface (a picture in, the same with no background out)
+export type {
+  BackgroundRemover,
+  BackgroundRemovalRequest,
+  BackgroundRemoverCheck,
+} from './ai/background';
 // Captions: the transcriber interface (audio in, timed words out)
 export { TRANSCRIBE_SAMPLE_RATE } from './captions/transcriber';
 export type {

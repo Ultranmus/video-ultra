@@ -2,7 +2,11 @@
 
 /**
  * The editor, full screen. `?theme=light|auto`, `?backend=webgl2`, `?autosave=0` for testing,
- * `?sounds=0` without the demo music & sounds library.
+ * `?sounds=0` without the demo music & sounds library. `?contrast=high|auto` for high contrast,
+ * `?density=touch|compact` for control sizes. `?embed=1` shows the embedding API (embed-demo.tsx).
+ * `?proxies=always|off` for the lighter editing copies (default auto). `?assistant=0` hides the
+ * AI Assistant (it uses `/api/assistant` when the server has a key, else an offline demo);
+ * `?speech=0` hides text to speech (`/api/speech`, else an offline demo voice).
  * `?device=phone|phone-small|tablet|tablet-portrait` shows it at that device's size (the editor
  * picks its layout from its own width), so phone and tablet layouts can be checked on a desktop
  * without deploying. A strip at the top switches devices; it hides itself on real phones.
@@ -11,9 +15,13 @@ import { VideoEditor } from '@video-ultra/react';
 import '@video-ultra/react/styles.css';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
+import { createBackgroundRemover } from '@video-ultra/ai';
+import { createPlaygroundAssistant } from './demo-assistant';
+import { createPlaygroundSpeech } from './demo-speech';
 import { createOnDeviceTranscriber } from '@video-ultra/captions';
 import { createDemoSounds } from './demo-sounds';
 import { createFakeTranscriber } from './fake-transcriber';
+import { embedDemo, logEvent } from './embed-demo';
 
 const DEVICES = {
   full: { label: 'Full window', width: 0, height: 0 },
@@ -29,6 +37,8 @@ function Editor() {
   const router = useRouter();
   const theme = (params.get('theme') ?? 'dark') as 'dark' | 'light' | 'auto';
   const backend = (params.get('backend') ?? 'auto') as 'auto' | 'webgpu' | 'webgl2';
+  const contrast = (params.get('contrast') ?? 'normal') as 'normal' | 'high' | 'auto';
+  const density = (params.get('density') ?? 'auto') as 'auto' | 'touch' | 'compact';
   const requested = params.get('device') as Device | null;
   const device: Device = requested && requested in DEVICES ? requested : 'full';
   // The switcher only makes sense on a big screen (on a phone the editor already is the phone).
@@ -37,6 +47,15 @@ function Editor() {
   const [transcriber] = useState(() =>
     params.get('transcriber') === 'fake' ? createFakeTranscriber() : createOnDeviceTranscriber(),
   );
+  // Background removal on this device (`?cutout=0`: none; `=people` / `=objects`: that model).
+  const [backgroundRemover] = useState(() => {
+    const model = params.get('cutout');
+    return createBackgroundRemover(model === 'people' || model === 'objects' ? { model } : {});
+  });
+  // AI editing: the server's model, or an offline demo (`?assistant=0`: none).
+  const [assistant] = useState(createPlaygroundAssistant);
+  // Text to speech: the server's voice service, or an offline demo voice (`?speech=0`: none).
+  const [speech] = useState(createPlaygroundSpeech);
   const [wide, setWide] = useState(false);
   const [room, setRoom] = useState(0);
   useEffect(() => {
@@ -81,10 +100,17 @@ function Editor() {
       // A new device size starts a fresh editor (the project comes back from autosave).
       key={device}
       theme={theme}
+      contrast={contrast}
+      density={density}
       backend={backend}
       autosave={params.get('autosave') !== '0'}
+      proxies={(params.get('proxies') ?? 'auto') as 'auto' | 'always' | 'off'}
       {...(params.get('sounds') !== '0' ? { audioLibrary: sounds } : {})}
       {...(params.get('transcriber') !== '0' ? { transcriber } : {})}
+      {...(params.get('cutout') !== '0' ? { backgroundRemover } : {})}
+      {...(params.get('assistant') !== '0' ? { assistant } : {})}
+      {...(params.get('speech') !== '0' ? { speech } : {})}
+      {...(params.get('embed') === '1' ? { customize: embedDemo, onEvent: logEvent } : {})}
       onReady={(controller) => {
         (window as unknown as { vuEditor: unknown }).vuEditor = controller;
       }}

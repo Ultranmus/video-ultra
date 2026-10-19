@@ -41,6 +41,7 @@ async function handle(msg: ToWorker): Promise<void> {
         msg.model.files,
         msg.model.device,
         (loaded, total) => post({ type: 'download', loaded, total }),
+        () => post({ type: 'building' }),
         msg.session ?? {},
       );
       post({ type: 'ready', device: msg.model.device });

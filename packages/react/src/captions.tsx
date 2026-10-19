@@ -187,6 +187,11 @@ function AutoCaptions({ has }: { has: boolean }): ReactElement | null {
               {minutes !== null ? ` · ${l.captionsAbout(minutes)}` : ''}
             </p>
           ) : null}
+          {check?.available && check.memoryRisk ? (
+            <p className="vu-hint" role="note">
+              {l.captionsMemoryRisk}
+            </p>
+          ) : null}
           {has ? <p className="vu-hint">{l.captionsReplaceNote}</p> : null}
         </>
       )}

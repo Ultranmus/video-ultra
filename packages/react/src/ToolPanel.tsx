@@ -12,6 +12,8 @@ import {
   setSpeed,
   trimItem,
   updateItem,
+  setTransformAt,
+  transformAt,
   type Adjust,
   type AudioItem,
   type Item,
@@ -28,6 +30,14 @@ import { DEFAULT_DUCK, isSounding, RATIOS, ratioOf } from './items';
 import { AnimatePanel, FilterStrip, TransitionGrid } from './looks';
 import type { ToolId } from './state';
 import { ArrangeControls, LockedNote } from './organize';
+import { BackgroundTool } from './cutout';
+import { KeyframesTool, usePlayheadFor } from './keyframes';
+import { ProTrimTool } from './protrim';
+import { ScenesTool } from './scenes';
+import { SoundFxTool } from './soundfx';
+import { ScopesView } from './scopes';
+import { ReadAloudTool } from './speech';
+import { MaskTool } from './mask';
 import { BlendTool, GreenScreenTool, RegionTool } from './picture';
 
 const seconds = (t: number) => t / FLICKS_PER_SECOND;
@@ -104,6 +114,20 @@ function ItemTool({ tool, item }: { tool: ToolId; item: Item }): ReactElement | 
       return <BlendTool item={item} />;
     case 'region':
       return <RegionTool item={item} />;
+    case 'mask':
+      return <MaskTool item={item} />;
+    case 'cutout':
+      return <BackgroundTool item={item} />;
+    case 'keyframes':
+      return <KeyframesTool item={item} />;
+    case 'protrim':
+      return <ProTrimTool item={item} />;
+    case 'readaloud':
+      return item.kind === 'text' ? <ReadAloudTool item={item} /> : null;
+    case 'soundfx':
+      return item.kind === 'video' || item.kind === 'audio' ? <SoundFxTool item={item} /> : null;
+    case 'scenes':
+      return item.kind === 'video' ? <ScenesTool item={item} /> : null;
     default:
       return null;
   }
@@ -115,6 +139,7 @@ function ItemTool({ tool, item }: { tool: ToolId; item: Item }): ReactElement | 
  * no duplicates — owner, 2026-10-19); this is the detail view.
  */
 export function InspectorSections({ item }: { item: Item }): ReactElement {
+  const ctl = useController();
   const l = useLabels();
   const index = useProject((p) => mainTrack(p).items.findIndex((i) => i.id === item.id));
   const onMain = index !== -1;
@@ -123,9 +148,25 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
       <Section title={l.adjust} collapsible defaultOpen={false}>
         <AdjustTool item={item} />
       </Section>
+      <Section title={l.scopes} collapsible defaultOpen={false}>
+        <ScopesView />
+      </Section>
       <Section title={l.cropRotate} collapsible defaultOpen={false}>
         <TransformTool item={item} />
         <CropTool item={item} />
+      </Section>
+      <Section title={l.fineTrim} collapsible defaultOpen={false}>
+        <ProTrimTool item={item} />
+      </Section>
+      <Section
+        title={l.keyframes}
+        collapsible
+        defaultOpen={'keyframes' in item && !!item.keyframes}
+      >
+        <KeyframesTool item={item} />
+      </Section>
+      <Section title={l.shape} collapsible defaultOpen={'mask' in item && !!item.mask}>
+        <MaskTool item={item} />
       </Section>
       <Section title={l.greenScreen} collapsible defaultOpen={'key' in item && !!item.key}>
         <GreenScreenTool item={item} />
@@ -150,6 +191,12 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
             <VolumeTool item={item} />
             <FadeTool item={item} />
           </Section>
+          <Section title={l.soundEffects} collapsible defaultOpen={!!item.audioFx}>
+            <SoundFxTool item={item} />
+          </Section>
+          <Section title={l.splitAtScenes} collapsible defaultOpen={false}>
+            <ScenesTool item={item} />
+          </Section>
           {picture}
         </>
       );
@@ -160,6 +207,11 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
           <Section title={l.timing}>
             <DurationTool item={item} />
           </Section>
+          {item.kind === 'image' && ctl.options.backgroundRemover ? (
+            <Section title={l.removeBackground}>
+              <BackgroundTool item={item} />
+            </Section>
+          ) : null}
           {picture}
         </>
       );
@@ -173,6 +225,9 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
           <Section title={l.speed}>
             <SpeedTool item={item} />
           </Section>
+          <Section title={l.soundEffects} collapsible defaultOpen={!!item.audioFx}>
+            <SoundFxTool item={item} />
+          </Section>
         </>
       );
     case 'text':
@@ -184,6 +239,11 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
           <Section title={l.style}>
             <TextStyleTool item={item} />
           </Section>
+          {ctl.options.speech ? (
+            <Section title={l.readAloud} collapsible defaultOpen={false}>
+              <ReadAloudTool item={item} />
+            </Section>
+          ) : null}
           <Section title={l.adjust} collapsible defaultOpen={false}>
             <AdjustTool item={item} />
           </Section>
@@ -192,11 +252,23 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
             <OpacityTool item={item} />
             <BlendTool item={item} />
           </Section>
+          <Section
+            title={l.keyframes}
+            collapsible
+            defaultOpen={'keyframes' in item && !!item.keyframes}
+          >
+            <KeyframesTool item={item} />
+          </Section>
         </>
       );
     case 'sticker':
       return (
         <>
+          {item.assetId && ctl.options.backgroundRemover ? (
+            <Section title={l.removeBackground}>
+              <BackgroundTool item={item} />
+            </Section>
+          ) : null}
           <Section title={l.adjust} collapsible defaultOpen={false}>
             <AdjustTool item={item} />
           </Section>
@@ -204,6 +276,13 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
             <TransformTool item={item} />
             <OpacityTool item={item} />
             <BlendTool item={item} />
+          </Section>
+          <Section
+            title={l.keyframes}
+            collapsible
+            defaultOpen={'keyframes' in item && !!item.keyframes}
+          >
+            <KeyframesTool item={item} />
           </Section>
         </>
       );
@@ -499,17 +578,15 @@ function CropTool({ item }: { item: Item }) {
   );
 }
 
-function transformOf(item: Item): Transform | null {
-  return 'transform' in item ? item.transform : null;
-}
-
 function TransformTool({ item }: { item: Item }) {
   const ctl = useController();
   const l = useLabels();
-  const tf = transformOf(item);
+  // Keyframed elements: the values at the playhead; edits key them there (setTransformAt).
+  const time = usePlayheadFor(item);
+  const tf = transformAt(item, time);
   if (!tf) return null;
   const set = (label: string, patch: Partial<Transform>) =>
-    ctl.run(label, (d) => updateItem(d, item.id, { transform: { ...tf, ...patch } }));
+    ctl.run(label, (d) => setTransformAt(d, item.id, { ...tf, ...patch }, time));
   const baseScale = item.kind === 'sticker' ? 0.3 : 1;
   const moved =
     tf.x !== 0.5 ||
@@ -570,7 +647,7 @@ function TransformTool({ item }: { item: Item }) {
         step={0.01}
         defaultValue={baseScale}
         format={percent}
-        recipe={(d, v) => updateItem(d, item.id, { transform: { ...tf, scale: v } })}
+        recipe={(d, v) => setTransformAt(d, item.id, { ...tf, scale: v }, time)}
         commitLabel={l.scale}
         coalesceKey={`scale:${item.id}`}
       />
@@ -583,7 +660,7 @@ function TransformTool({ item }: { item: Item }) {
         defaultValue={0}
         origin={0}
         format={(v) => `${Math.round(v)}°`}
-        recipe={(d, v) => updateItem(d, item.id, { transform: { ...tf, rotation: v } })}
+        recipe={(d, v) => setTransformAt(d, item.id, { ...tf, rotation: v }, time)}
         commitLabel={l.rotate}
         coalesceKey={`rotate:${item.id}`}
       />
@@ -593,7 +670,8 @@ function TransformTool({ item }: { item: Item }) {
 
 function OpacityTool({ item }: { item: Item }) {
   const l = useLabels();
-  const tf = transformOf(item);
+  const time = usePlayheadFor(item);
+  const tf = transformAt(item, time);
   if (!tf) return null;
   return (
     <EditSlider
@@ -604,7 +682,7 @@ function OpacityTool({ item }: { item: Item }) {
       step={0.01}
       defaultValue={1}
       format={percent}
-      recipe={(d, v) => updateItem(d, item.id, { transform: { ...tf, opacity: v } })}
+      recipe={(d, v) => setTransformAt(d, item.id, { ...tf, opacity: v }, time)}
       commitLabel={l.opacity}
       coalesceKey={`opacity:${item.id}`}
     />

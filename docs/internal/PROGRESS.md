@@ -290,3 +290,22 @@ merged and re-verified on main; A (captions) and E (layers) here.
 - The playground deploy failed at install: the lockfile held `onnxruntime-web`
   `1.31.0-dev.20260914`, outside `^1.30.0`. Pinned that exact version (#131); frozen install and
   the playground build (14 routes) pass.
+
+## 2026-10-19 night · v0.3 + v0.4 on `night/v0.3-v0.4` (owner asleep; checklist in TEST_CHECKLIST.md)
+
+- **Fixes:** Hindi (large) speech model: streamed download into Cache Storage, crash memory so a
+  phone that ran out of memory says so instead of crashing again, phone warning (#131–#133);
+  mouse marquee from the main video (organize-check +7); copy / cut / paste with groups.
+- **v0.3:** shape masks — 126 SDF shapes in WGSL and generated GLSL, golden-frame checked
+  (#134); high-contrast themes + touch density (#135); animated stickers (GIF / WebP / APNG via
+  ImageDecoder in the worker) + 611 animated emoji + SVG import (#136–#137); 192 templates
+  (32 layouts × 6 themes) with text variables (#138); `@video-ultra/ai` on-device background
+  removal (MODNet on phones, ormbg on computers) (#139–#140); embedding API (#141).
+- **v0.4:** keyframes on transform properties + graph editor, exact across split / trim
+  (`shift`) (#142); roll / slip / slide, Fine trim tool, markers (file version 4) (#143); HEVC
+  / AV1 export (#144); scene detection + Split at scenes (#145; real-footage test media with
+  known cuts + Sintel trailer); sound effects (EQ, Even out, pitch, keep pitch) + level meter
+  (#146); scopes (#147).
+- Checks added: shapes-, stickers-, templates-, cutout-, embed-, keyframes-, protrim-, codecs-,
+  scenes-, soundfx-, scopes-check; composite-check mask goldens; organize-check marquee + paste;
+  a11y-check --contrast. Core unit tests 493, react 18.

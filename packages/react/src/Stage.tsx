@@ -3,6 +3,8 @@ import {
   itemEnd,
   mainTrack,
   updateItem,
+  setTransformAt,
+  transformAt,
   type Item,
   type Project,
   type Transform,
@@ -75,7 +77,16 @@ type StageDrag =
   /** One finger on empty stage while zoomed in: pan the view. */
   | { type: 'pan'; id: number; x: number; y: number; start: View; moved: boolean }
   /** Mouse drag on empty stage: a selection rectangle (canvas px). */
-  | { type: 'marquee'; id: number; x: number; y: number; add: boolean; moved: boolean }
+  | {
+      type: 'marquee';
+      id: number;
+      x: number;
+      y: number;
+      add: boolean;
+      moved: boolean;
+      /** A click (no drag) selects this — the main video the box was started on. */
+      click: string | null;
+    }
   /**
    * A blurred area's side handle: changes its width or height, the opposite side stays put
    * (v0.2 C3). `w × h`: its box in canvas px when the drag started.
@@ -214,7 +225,7 @@ export function Stage(): ReactElement {
     const out: { item: Item; box: Box }[] = [];
     for (const item of items) {
       if (!('transform' in item) || item.hidden || t < item.start || t >= itemEnd(item)) continue;
-      const box = itemBox(item, project, pw, ph, measure);
+      const box = itemBox(item, project, pw, ph, measure, t);
       if (box) out.push({ item, box });
     }
     return out;
@@ -328,7 +339,8 @@ export function Stage(): ReactElement {
       .selectedItems()
       .filter((i): i is Extract<Item, { transform: Transform }> => 'transform' in i)
       .filter((i) => !ctl.isLocked(i.id))
-      .map((i) => ({ id: i.id, tf: { ...i.transform } }));
+      // Where each is now (keyframes sampled at the playhead): gestures start from there.
+      .map((i) => ({ id: i.id, tf: transformAt(i, ctl.playhead.time)! }));
 
   /** The box gestures turn around: the selection box on screen now. */
   const selectionBox = (): Box | null => {
@@ -372,7 +384,7 @@ export function Stage(): ReactElement {
     }
     latest.current = next;
     const project = ctl.preview((d) => {
-      for (const [id, tf] of next) updateItem(d, id, { transform: tf });
+      for (const [id, tf] of next) setTransformAt(d, id, tf, ctl.playhead.time);
     });
     if (project) {
       const items = ctl
@@ -527,11 +539,30 @@ export function Stage(): ReactElement {
     // Keep the current selection when pressing inside its box (it may be under another layer).
     const inside = box && boxContains(box, p.x, p.y);
     const additive = e.shiftKey || e.metaKey || e.ctrlKey;
-    if (additive && hit) {
+    // The main video fills the frame, so with a mouse a drag that starts on it (while it isn't
+    // selected) draws a selection rectangle; a click still selects it.
+    const onMain =
+      !touch &&
+      !inside &&
+      hit !== null &&
+      mainTrack(ctl.project).items.some((i) => i.id === hit.id);
+    if (additive && hit && !onMain) {
       ctl.select(hit.id, { add: true });
       return;
     }
     const target = inside && ctl.selectedItems().length ? ctl.selectedItem() : hit;
+    if (onMain) {
+      drag.current = {
+        type: 'marquee',
+        id: e.pointerId,
+        x: p.x,
+        y: p.y,
+        add: additive,
+        moved: false,
+        click: hit.id,
+      };
+      return;
+    }
     if (!target) {
       // Zoomed in, a drag on empty stage pans the view; with a mouse it draws a selection
       // rectangle. A plain tap clears the selection.
@@ -554,6 +585,7 @@ export function Stage(): ReactElement {
           y: p.y,
           add: additive,
           moved: false,
+          click: null,
         };
         return;
       }
@@ -760,7 +792,8 @@ export function Stage(): ReactElement {
       placeMarquee(null);
       if (cancelled) return;
       if (!d.moved) {
-        if (!d.add) ctl.select(null);
+        if (d.click) ctl.select(d.click, d.add ? { add: true } : undefined);
+        else if (!d.add) ctl.select(null);
         return;
       }
       const p = toCanvas(e);
@@ -812,7 +845,7 @@ export function Stage(): ReactElement {
       return;
     }
     ctl.run(label, (draft) => {
-      for (const [id, tf] of next) updateItem(draft, id, { transform: tf });
+      for (const [id, tf] of next) setTransformAt(draft, id, tf, ctl.playhead.time);
     });
   };
 
@@ -823,7 +856,7 @@ export function Stage(): ReactElement {
     const hits = visibleItemsAt(project, ctl.playhead.time)
       .filter((i) => !main.items.includes(i))
       .filter((i) => {
-        const box = itemBox(i, project, pw, ph, measure);
+        const box = itemBox(i, project, pw, ph, measure, ctl.playhead.time);
         if (!box) return false;
         const b = boundsOf(box);
         return (

@@ -2,6 +2,13 @@
 
 Where the last session stopped and what comes next. Update before ending every session.
 
+## 2026-10-19 (night branch merged to main)
+
+`night/v0.3-v0.4` merged into main (21 commits: v0.3 complete; v0.4 keyframes, trims + markers,
+HEVC / AV1, scenes, sound effects, scopes, proxies, AI editing endpoint, text to speech).
+Not pushed yet. Owner's list for tomorrow (below) still stands; test list for the new work is
+`docs/internal/TEST_CHECKLIST.md`.
+
 ## 2026-10-19 (end of day — owner's list for tomorrow)
 
 Pushed to origin (main d4ae1c8). Do these first, then continue the captions calibration:
@@ -28,6 +35,7 @@ Pushed to origin (main d4ae1c8). Do these first, then continue the captions cali
 8. Give the owner the full v0.2 test list (below) again.
 
 **v0.2 test list (what's new and how to try it):**
+
 - Layers & organising: History (clock icon), Layers (stack icon); Shift-click / ⌘A / drag a box
   to select several; ⌘G group, ⇧⌘G ungroup; ⇧⌘L lock, ⇧⌘H hide; ] [ ⌘] ⌘[ order; right-click
   or long-press for the menu; Arrange tool (phone) / Arrange section (desktop) for align.
@@ -42,6 +50,27 @@ Pushed to origin (main d4ae1c8). Do these first, then continue the captions cali
 - Capture & export: Media → Record with camera (front/back, mic) → Add to video / as a layer;
   Export → Video (Whole / Part with I/O keys, presets 9:16 / 16:9 / 1:1), Sound only
   (M4A / Ogg / WAV), Picture (PNG / JPEG of the frame at the playhead).
+
+## 2026-10-19 night (branch `night/v0.3-v0.4` — owner's overnight request; release after v0.4)
+
+Built on the branch **`night/v0.3-v0.4`**, now merged to main. The owner's test list is
+**`docs/internal/TEST_CHECKLIST.md`** — tick boxes there tomorrow.
+
+Done (each with its own browser check script in `scripts/` + unit tests; DECISIONS #131–#147):
+fixes (Hindi model crash memory on phones, mouse marquee starting on the main video, copy /
+paste); v0.3 (shape masks, high contrast + touch density, animated stickers + 611 animated
+emoji + SVG, 192 templates, on-device background removal `@video-ultra/ai`, embedding API);
+v0.4 (keyframes + graph editor, roll / slip / slide + markers, HEVC / AV1 export, scene detection
+
+- Split at scenes, sound effects + keep pitch + level meter, scopes).
+
+Not verifiable in the cloud sandbox (no GPU, no Safari, no phones): WebGPU golden frames, real
+iPhone memory for Hindi captions and background removal, how the sound effects sound to a human.
+Long main-thread tasks in the sandbox are the machine's (same on main — PERF "Cloud sandbox").
+
+Still open from v0.4 (PLAN): proxies for heavy 4K clips, text-to-speech voiceover, multiple
+sequences / compound clips, optional AI editing plugin — see the latest entry above this one if
+a later session continued.
 
 ## 2026-10-19 (made-up captions fixed — DECISIONS #130)
 

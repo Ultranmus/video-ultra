@@ -1,4 +1,7 @@
 import type { Input, InputVideoTrack, VideoSample } from 'mediabunny';
+import { shapePreset } from '../effects/shapes';
+import { keyedTransform } from '../model/keyframes';
+import { frameIndexAt, type AnimatedImage } from './animated';
 import {
   animationState,
   resetState,
@@ -94,10 +97,13 @@ export interface VideoMedia {
 
 /** The media every composer reads (shared; GPU copies are per renderer). */
 export interface MediaLibrary {
-  videos: Map<string, Promise<VideoMedia>>;
+  /** Loaded videos by asset id (preview composers may see a proxy here instead). */
+  videos: { get(assetId: string): Promise<VideoMedia> | undefined };
   images: Map<string, Promise<ImageBitmap>>;
   /** Parsed `.cube` LUT files by asset id. */
   luts: Map<string, Promise<CubeLut>>;
+  /** Animated images (GIF, animated WebP / PNG) by asset id; null = a still image. */
+  animations?: Map<string, Promise<AnimatedImage | null>>;
 }
 
 /** Result of one {@link Composer.render}. */
@@ -145,6 +151,10 @@ interface Slot {
   look: TransitionLook;
   anim: AnimationState;
   pic: PictureFx;
+  /** Keyframes (v0.4): the item it was made for, and a copy whose transform is resampled. */
+  keyedFor: Item | null;
+  keyed: Item | null;
+  keyedTf: Transform;
 }
 
 type Draft =
@@ -200,6 +210,8 @@ export class Composer {
 
   /** One frame source per timeline item (each needs its own decode position). */
   readonly sources = new Map<string, FrameSource>();
+  /** Animated images: the frame each item shows now (one bitmap per item). */
+  private readonly animFrames = new Map<string, { index: number; bitmap: ImageBitmap }>();
   /** Last frame drawn per item (reused when the next one isn't decoded in time). */
   readonly lastFrames = new Map<string, VideoSample>();
   readonly rasters: RasterCache;
@@ -284,6 +296,7 @@ export class Composer {
 
   /** Frees decoders and frames of items not in `alive`. */
   prune(alive: Set<string>): void {
+    for (const id of [...this.animFrames.keys()]) if (!alive.has(id)) this.dropAnimFrame(id);
     for (const [id, source] of this.sources) {
       if (alive.has(id)) continue;
       source.destroy();
@@ -311,8 +324,61 @@ export class Composer {
     for (const sample of this.lastFrames.values()) sample.close();
     this.lastFrames.clear();
     this.rasters.clear();
+    for (const id of [...this.animFrames.keys()]) this.dropAnimFrame(id);
     if (this.solid) this.renderer.release(this.solid);
     this.solid = null;
+  }
+
+  /**
+   * The picture of an image asset at an item's local time: its bitmap, or — for an animation —
+   * the frame showing then. Each item holds its own current frame (two items with one GIF can
+   * be at different frames in the same render); the old frame's GPU copy goes when it changes.
+   */
+  private async pictureAt(
+    itemId: string,
+    assetId: string,
+    localTime: Time,
+  ): Promise<ImageBitmap | null> {
+    const animation = await this.media.animations?.get(assetId);
+    if (!animation) return (await this.media.images.get(assetId)) ?? null;
+    const index = frameIndexAt(
+      animation.starts,
+      animation.total,
+      (localTime / FLICKS_PER_SECOND) * 1000,
+    );
+    const held = this.animFrames.get(itemId);
+    if (held?.index === index) return held.bitmap;
+    const bitmap = await animation.frame(index);
+    if (this.destroyed) {
+      bitmap.close();
+      return null;
+    }
+    this.dropAnimFrame(itemId);
+    this.animFrames.set(itemId, { index, bitmap });
+    return bitmap;
+  }
+
+  private dropAnimFrame(itemId: string): void {
+    const held = this.animFrames.get(itemId);
+    if (!held) return;
+    this.renderer.release(held.bitmap);
+    held.bitmap.close();
+    this.animFrames.delete(itemId);
+  }
+
+  /**
+   * The item as it is at `localTime`: itself, or — when it has keyframes — the slot's copy with
+   * the transform sampled there. The copy is made once per edit (when the item changes) and only
+   * its numbers are rewritten each frame.
+   */
+  private keyedItem<T extends Item>(item: T, localTime: Time, slot: Slot): T {
+    if (!('keyframes' in item) || !item.keyframes || !('transform' in item)) return item;
+    if (slot.keyedFor !== item) {
+      slot.keyedFor = item;
+      slot.keyed = { ...item, transform: slot.keyedTf } as Item;
+    }
+    keyedTransform(item.transform, item.keyframes, localTime, slot.keyedTf);
+    return slot.keyed as T;
   }
 
   private slot(index: number): Slot {
@@ -324,6 +390,9 @@ export class Composer {
       look: plainLook(),
       anim: restingState(),
       pic: noPictureFx(),
+      keyedFor: null,
+      keyed: null,
+      keyedTf: { ...BACKDROP_TRANSFORM },
     });
   }
 
@@ -446,6 +515,20 @@ export class Composer {
     // Lanes only: the main video is the bottom of the stack.
     if (layer.track.kind !== 'main' && 'blend' in item && item.blend)
       pic.blend = BLEND_IDS[item.blend] ?? 0;
+    if ('mask' in item && item.mask) {
+      const shape = shapePreset(item.mask.shape);
+      if (shape) {
+        pic.shape = shape.family;
+        pic.shapeA = shape.a;
+        pic.shapeB = shape.b;
+        pic.shapeC = shape.c;
+        pic.shapeRotation = shape.rotation;
+        pic.shapeStretch = shape.stretch;
+        pic.shapeInvert = !!item.mask.invert;
+        // Feather 0…1 → up to a quarter of the shape's radius.
+        pic.shapeFeather = item.mask.feather * 0.5;
+      }
+    }
   }
 
   /** Parsed `#rrggbb` colours (key colours), cached so frames don't parse strings. */
@@ -654,8 +737,8 @@ export class Composer {
     deadlineMs: number | null,
     result: ComposeResult,
   ): Promise<Draft | null> {
-    const item = layer.item;
     const slot = this.slot(index);
+    const item = this.keyedItem(layer.item, layer.localTime, slot);
     // A transition moves only the two clips of its own cut (main track, or two touching pictures
     // on one layer); other layers are never touched by it.
     const transition = layer.transition;
@@ -715,7 +798,11 @@ export class Composer {
 
     switch (item.kind) {
       case 'image': {
-        const bitmap = await this.media.images.get(item.assetId);
+        const bitmap = await this.pictureAt(
+          item.id,
+          item.cutout?.assetId ?? item.assetId,
+          layer.localTime,
+        );
         if (!bitmap) return null;
         const media: LayerMedia = {
           width: bitmap.width,
@@ -802,7 +889,11 @@ export class Composer {
           const emoji = item.emoji;
           source = this.rasters.get(item.id, `${px}|${emoji}`, () => rasterizeEmoji(emoji, px));
         } else if (item.assetId) {
-          const bitmap = await this.media.images.get(item.assetId);
+          const bitmap = await this.pictureAt(
+            item.id,
+            item.cutout?.assetId ?? item.assetId,
+            layer.localTime,
+          );
           if (!bitmap) return null;
           source = bitmap;
         } else {

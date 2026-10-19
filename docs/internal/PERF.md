@@ -405,6 +405,16 @@ speech; real recordings are checked on devices). Word error rate (WER) against t
 - **Audio for the transcriber:** pulled 10 s at a time from the export mixer at 16 kHz mono —
   flat memory for any length.
 - Phones still need measuring (owner's devices): expect 2–4× slower than the laptop.
+- **`small` memory, measured 2026-10-19** (Linux, 4 cores, Chrome 155, `captions-memory.ts wasm
+small speech-hi.m4a`, renderer = page + worker): 155 MB before → ~880 MB once both model files
+  are built (8 s) → **peak ~1.2–1.28 GB while hearing** (30 s windows) → back to ~190 MB after
+  the job. 28 s of Hindi took 57 s (0.5× real time on this CPU). Session settings: arenas off
+  1.28 GB (no saving); `graphOptimizationLevel: 'basic'` 1.18 GB but wrong text (20 words instead
+  of 84). Files: 4-bit encoder + 8-bit decoder 1.17 GB but no words; 4-bit both 1.82 GB. So the
+  8-bit pair stays. (espeak's Hindi voice is too robotic for a word-error rate — every setup
+  scored ~100 %; the Mac voice gave 43 % earlier — so these runs compare memory and speed only.)
+- **Download path** (DECISIONS #132): a model file is now held once (read back from Cache
+  Storage) instead of three times while downloading — by design, not measured on a phone.
 
 ### Made-up text guards (DECISIONS #130)
 
@@ -417,3 +427,78 @@ Per 30 s window (no-speech probability · average token log-probability):
 | iPhone, no speech (3 clips) | 0.18–0.72 · −0.75 to −1.77  | 0.10–0.56 · −1.03 to −2.27  | 0.08–0.75 · −0.82 to −2.98  |
 
 After the guards: no captions from any no-speech clip; speech clips unchanged.
+
+## Shape masks (v0.3, 2026-10-19)
+
+- No textures or buffers: a shape is ~20–60 ALU ops per covered pixel in the layer's own draw
+  (one uniform-driven branch; layers without a mask pay one compare). Uniform slot 496 → 528
+  bytes (WebGPU slot 512 → 768 bytes, ×16 layers = 12 KB).
+- Picker tiles: 126 × 40×40 alpha images, drawn in ≤ 6 ms slices per frame and cached for the page.
+  shapes-check: opening the picker adds no main-thread task over 50 ms (Chrome, 4-core Linux).
+
+## Animated stickers (v0.3, 2026-10-19)
+
+- Memory: one decoded frame per animated item (a 512 px WebP frame = 1 MB RGBA) + the decoder's
+  own state; never the whole animation. Opening times every frame once in the worker (each frame
+  closed at once): 20-frame test GIF a few ms.
+- stickers-check: GIF sticker frames 0.5 s apart differ (0.87 mean / 255 over the frame; the old
+  build 0.00); the same time twice is identical (exact export).
+
+## Background removal (v0.3, 2026-10-19, Linux 4 cores, Chrome 155, `scripts/cutout-check.ts`)
+
+A 1024×683 portrait on a 16:9 project, first run (includes the model download):
+
+| Model                 | Download | Time   | Renderer (page + workers) peak | After |
+| --------------------- | -------- | ------ | ------------------------------ | ----- |
+| people (MODNet 8-bit) | 6.6 MB   | 5.1 s  | 362 → 621 MB (+260)            | 368   |
+| objects (ormbg 8-bit) | 44 MB    | 15.1 s | 361 → 1077 MB (+716)           | 297   |
+
+Both: background fully removed (exported left fifth luma 113 → 0), the person unchanged (116 →
+116). objects has cleaner edges (people left a faint smudge by the backpack). Phones: `people`
+(DECISIONS #140) — not measured on a phone yet.
+
+## Scene detection (v0.4, 2026-10-19, Linux 4 cores, Chrome 155, `scripts/scenes-check.ts`)
+
+| Clip                                   | Time  | Cuts found                                  |
+| -------------------------------------- | ----- | ------------------------------------------- |
+| scenes-cuts.mp4 (720p30, 10 s, 3 cuts) | 1.6 s | 3, 6, 8 s — exact                           |
+| Sintel trailer (480p24, 52 s)          | 3.5 s | the 6 hard cuts ffmpeg's scene filter finds |
+| bbb-1080p60 (10 s, one shot), "high"   | —     | none                                        |
+
+No main-thread long task while it runs; 0 frames left open. Hardware decode will be faster on
+the owner's devices; budget phones decode slower but the job is cancellable and yields to
+thumbnails.
+
+## Sound effects (v0.4, 2026-10-19, `fx.test.ts`, `scripts/soundfx-check.ts`)
+
+- All effects on (EQ 3 bands + compressor + pitch), one minute of 48 kHz stereo: under 1.5 s in
+  Node on the cloud machine (the unit test's bound) — ≈ 2 % of real time; each off stage costs 0.
+- Exported WAV measurements: Pitch +12 on 440 Hz → 880 Hz; 2× speed → 880 Hz, Keep the voice
+  natural → 440 Hz; More bass (+8 dB shelf) lifts 60 Hz by 7.5 dB; Even out (1.0) narrows a
+  24.1 dB loud / quiet gap to 4.4 dB. Meter: reads the tone's level (−13 dB → 0.72 of the bar),
+  0 when paused; no React renders (refs).
+
+## Scopes (v0.4, 2026-10-19, `scripts/scopes-check.ts`)
+
+≤ 4 measurements a second while playing (11–12 in 3 s), none while the section is closed, no
+main-thread long task while playing with scopes open; each measurement = one 256-px render +
+one 256×144 readback in the worker, ~0.6 MB of counts transferred (not copied).
+
+## Proxies (v0.4, 2026-10-19, Linux 4 cores, software decode, `scripts/proxies-check.ts`)
+
+| 3 s of playback, avc-4k30 (4K H.264) | shown | late | skipped |
+| ------------------------------------ | ----- | ---- | ------- |
+| from the 4K original                 | 17    | 12   | 14      |
+| from the 540p copy                   | 70    | 2    | 3       |
+
+The copy of 2.4 s of 4K took 7.6 s to make here (software codecs); 20 MB → 0.4 MB. Phones and
+Macs encode / decode in hardware — measure there.
+
+## Cloud sandbox note (2026-10-19)
+
+The night's checks ran on a Linux container without a GPU (Chrome 155, 4 cores; WebGL2 in
+software). editor-interact logs main-thread tasks of 50–420 ms there — **the same on `main`**
+(measured side by side, production builds, two runs each: main 10–20 long tasks, night branch
+11), so they come from the machine (software rendering, slow cores), not from the v0.3 / v0.4
+work. Long-task budgets are judged on the owner's devices; per-feature checks (shapes-check)
+count only the tasks a feature adds.

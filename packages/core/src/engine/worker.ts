@@ -9,6 +9,7 @@ import { createWebGL2Renderer } from '../render/webgl2';
 import { createWebGPURenderer } from '../render/webgpu';
 import { Mixer, type AudioTrackSource } from '../audio/mixer';
 import { AudioOutput } from './audio-output';
+import { openAnimatedImage } from './animated';
 import { Composer, type MediaLibrary, type VideoMedia } from './compose';
 import {
   cleanStaleExports,
@@ -23,6 +24,7 @@ import { QualityGovernor } from './quality';
 import type { EngineMessage, EngineRequest, EngineResponseData, EngineStats } from './protocol';
 import { upcomingVideo } from './timeline';
 import { parseCubeLut } from '../effects/lut';
+import { computeScopes, SCOPE_MAX_SIDE } from '../effects/scopes';
 
 /**
  * The engine worker: owns the project, the media, the decoders and the GPU. The main thread only
@@ -63,7 +65,20 @@ let pool = new DecoderPool(DECODER_BUDGET.mid);
 let project: Project | null = null;
 let viewW = 1280;
 let viewH = 720;
-const media: MediaLibrary = { videos: new Map(), images: new Map(), luts: new Map() };
+const videos = new Map<string, Promise<VideoMedia>>();
+/** Lighter copies of heavy videos (v0.4 proxies): preview only, never exports or saved frames. */
+const proxies = new Map<string, Promise<VideoMedia>>();
+const media: MediaLibrary = {
+  videos,
+  images: new Map(),
+  luts: new Map(),
+  animations: new Map(),
+};
+/** What the preview (and the small looks renders) read: a video's proxy when it has one. */
+const previewMedia: MediaLibrary = {
+  ...media,
+  videos: { get: (assetId) => proxies.get(assetId) ?? videos.get(assetId) },
+};
 /** Audio tracks by asset (videos with sound and audio files), once loaded. */
 const audioTracks = new Map<string, AudioTrackSource>();
 const audioLoads = new Map<string, Promise<void>>();
@@ -122,7 +137,13 @@ function reportError(error: unknown): void {
 }
 
 function emitTime(time: Time): void {
-  post({ id: -1, event: { type: 'time', time, playing } });
+  // While sound plays, the level of what's audible now rides along (level meters).
+  if (playing && audioOut)
+    post({
+      id: -1,
+      event: { type: 'time', time, playing, levels: [audioOut.peakL, audioOut.peakR] },
+    });
+  else post({ id: -1, event: { type: 'time', time, playing } });
 }
 
 // ── media ────────────────────────────────────────────────────────────────
@@ -145,7 +166,39 @@ function loadVideo(assetId: string, blob: Blob): void {
     return { input, track, media: layerMedia, hdr };
   })();
   loading.catch(reportError);
-  media.videos.set(assetId, loading);
+  videos.set(assetId, loading);
+}
+
+/** Uses `blob` (a lighter copy of the asset's video) for previews; null goes back to the original. */
+function loadProxy(assetId: string, blob: Blob | null): void {
+  if (!blob) proxies.delete(assetId);
+  else {
+    const loading = (async (): Promise<VideoMedia> => {
+      const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(blob) });
+      const track = await input.getPrimaryVideoTrack();
+      if (!track) throw new Error(`Proxy of ${assetId} has no video`);
+      return {
+        input,
+        track,
+        media: {
+          width: await track.getSquarePixelWidth(),
+          height: await track.getSquarePixelHeight(),
+          rotation: await track.getRotation(),
+          flip: await track.getFlip(),
+        },
+        hdr: false,
+      };
+    })();
+    // A copy that can't be read: quietly keep using the original.
+    loading.catch(() => {
+      if (proxies.get(assetId) === loading) proxies.delete(assetId);
+    });
+    proxies.set(assetId, loading);
+  }
+  // Items showing this asset start again on the other file.
+  composer?.prune(new Set());
+  looks?.composer.prune(new Set());
+  pruneSources();
 }
 
 /** The asset's chosen audio track (the probe's pick, e.g. AAC rather than iPhone spatial audio). */
@@ -164,11 +217,16 @@ function loadAudio(assetId: string, blob: Blob): void {
   audioLoads.set(assetId, loading.catch(reportError));
 }
 
-function loadImage(assetId: string, blob: Blob): void {
+function loadImage(assetId: string, blob: Blob, mimeType: string): void {
   // Straight alpha: the renderer contract (render/types.ts, DECISIONS #39).
   const loading = createImageBitmap(blob, { premultiplyAlpha: 'none' });
   loading.catch(reportError);
   media.images.set(assetId, loading);
+  // GIF / animated WebP / APNG: frames by time (a still image resolves to null).
+  if (/^image\/(gif|webp|png|apng)$/.test(mimeType)) {
+    const animation = openAnimatedImage(blob, mimeType).catch(() => null);
+    media.animations!.set(assetId, animation);
+  }
 }
 
 function loadLut(assetId: string, blob: Blob): void {
@@ -414,10 +472,14 @@ async function makeRenderer(canvas: OffscreenCanvas, backend: RenderBackend): Pr
 async function mediaReady(p: Project): Promise<void> {
   const waits: Promise<unknown>[] = [];
   for (const id of Object.keys(p.assets)) {
-    const v = media.videos.get(id);
+    const v = videos.get(id);
     if (v) waits.push(v.catch(() => undefined));
+    const proxy = proxies.get(id);
+    if (proxy) waits.push(proxy.catch(() => undefined));
     const i = media.images.get(id);
     if (i) waits.push(i.catch(() => undefined));
+    const anim = media.animations?.get(id);
+    if (anim) waits.push(anim);
     const a = audioLoads.get(id);
     if (a) waits.push(a.catch(() => undefined));
     const l = media.luts.get(id);
@@ -618,7 +680,7 @@ async function filterPreviews(
     looks = {
       canvas,
       renderer: r,
-      composer: new Composer(r, new DecoderPool(1), media, true, 4 << 20, false),
+      composer: new Composer(r, new DecoderPool(1), previewMedia, true, 4 << 20, false),
       size,
     };
   }
@@ -692,7 +754,7 @@ async function looksRenderer(width: number, height: number) {
     looks = {
       canvas,
       renderer: r,
-      composer: new Composer(r, new DecoderPool(2), media, true, 4 << 20, false),
+      composer: new Composer(r, new DecoderPool(2), previewMedia, true, 4 << 20, false),
       size: key,
     };
   }
@@ -789,6 +851,42 @@ async function itemPreview(
  * animation, nothing above it) at `time`, at most 480 px, and the average colour of the 5 × 5
  * pixels around the canvas point `x, y`. Null when the point is outside the canvas.
  */
+/** Scopes of the whole video at `time`, from a small render (≤ SCOPE_MAX_SIDE px). */
+async function scopes(
+  request: Extract<EngineRequest, { type: 'scopes' }>,
+): Promise<{ data: EngineResponseData; transfer: Transferable[] }> {
+  if (!project) throw new Error('No project');
+  const p = project;
+  const { width: pw, height: ph } = p.settings;
+  const k = SCOPE_MAX_SIDE / Math.max(pw, ph);
+  const width = Math.max(8, Math.round(pw * k));
+  const height = Math.max(8, Math.round(ph * k));
+  const l = await looksRenderer(width, height);
+  await mediaReady(p);
+  const time = Math.min(Math.max(0, request.time), Math.max(0, projectDuration(p) - 1));
+  await l.composer.render(p, time, width, height, null);
+  const bitmap = l.canvas.transferToImageBitmap();
+  if (!scopeCanvas || scopeCanvas.width !== width || scopeCanvas.height !== height) {
+    scopeCanvas = new OffscreenCanvas(width, height);
+    scopeContext = scopeCanvas.getContext('2d', { willReadFrequently: true })!;
+  }
+  scopeContext!.drawImage(bitmap, 0, 0);
+  bitmap.close();
+  looksDone();
+  const result = computeScopes(scopeContext!.getImageData(0, 0, width, height).data, width, height);
+  return {
+    data: { type: 'scopes', scopes: result },
+    transfer: [
+      result.histogram.buffer,
+      result.waveform.buffer,
+      result.parade.buffer,
+      result.vector.buffer,
+    ],
+  };
+}
+let scopeCanvas: OffscreenCanvas | null = null;
+let scopeContext: OffscreenCanvasRenderingContext2D | null = null;
+
 async function pickColour(
   request: Extract<EngineRequest, { type: 'pick-colour' }>,
 ): Promise<EngineResponseData> {
@@ -879,7 +977,7 @@ async function transitionPreview(
     looks = {
       canvas,
       renderer: r,
-      composer: new Composer(r, new DecoderPool(2), media, true, 4 << 20, false),
+      composer: new Composer(r, new DecoderPool(2), previewMedia, true, 4 << 20, false),
       size: key,
     };
   }
@@ -991,7 +1089,7 @@ async function handle(
         }
       }
       renderer ??= createWebGL2Renderer(canvas);
-      composer = new Composer(renderer, pool, media, false, RASTER_BUDGET[tier]);
+      composer = new Composer(renderer, pool, previewMedia, false, RASTER_BUDGET[tier]);
       // Old export files left by closed pages: tidy once, after startup work is done.
       setTimeout(() => void cleanStaleExports(), 5000);
       composer.cheapEffects = tier === 'low';
@@ -1004,13 +1102,17 @@ async function handle(
       return { type: 'ok' };
     case 'media': {
       const asset = project?.assets[request.assetId];
-      if (asset?.kind === 'image') loadImage(request.assetId, request.blob);
+      if (asset?.kind === 'image') loadImage(request.assetId, request.blob, asset.mimeType);
       else if (asset?.kind === 'audio') loadAudio(request.assetId, request.blob);
       else if (asset?.kind === 'lut') loadLut(request.assetId, request.blob);
       else loadVideo(request.assetId, request.blob);
       if (!playing) void showAt(playheadAt);
       return { type: 'ok' };
     }
+    case 'proxy':
+      loadProxy(request.assetId, request.blob);
+      if (!playing) void showAt(playheadAt);
+      return { type: 'ok' };
     case 'view':
       viewW = request.viewWidth;
       viewH = request.viewHeight;
@@ -1121,6 +1223,8 @@ async function handle(
     }
     case 'pick-colour':
       return inLooksQueue(() => pickColour(request));
+    case 'scopes':
+      return inLooksQueue(() => scopes(request));
   }
 }
 

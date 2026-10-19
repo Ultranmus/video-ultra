@@ -35,6 +35,9 @@ class VideoUltraPlayer extends AudioWorkletProcessor {
   private played = 0;
   private underruns = 0;
   private quanta = 0;
+  /** Loudest sample per side since the last report (level meters). */
+  private peakL = 0;
+  private peakR = 0;
 
   constructor() {
     super();
@@ -89,6 +92,16 @@ class VideoUltraPlayer extends AudioWorkletProcessor {
       }
       if (written < frames) this.underruns++;
     }
+    let peakL = this.peakL;
+    let peakR = this.peakR;
+    for (let i = 0; i < written; i++) {
+      const l = Math.abs(outL[i]!);
+      const r = Math.abs(outR[i]!);
+      if (l > peakL) peakL = l;
+      if (r > peakR) peakR = r;
+    }
+    this.peakL = peakL;
+    this.peakR = peakR;
     if (written < frames) {
       outL.fill(0, written);
       if (outR !== outL) outR.fill(0, written);
@@ -102,7 +115,11 @@ class VideoUltraPlayer extends AudioWorkletProcessor {
         buffered: this.buffered,
         underruns: this.underruns,
         sampleRate,
+        peakL: this.peakL,
+        peakR: this.peakR,
       });
+      this.peakL = 0;
+      this.peakR = 0;
     }
     return true;
   }

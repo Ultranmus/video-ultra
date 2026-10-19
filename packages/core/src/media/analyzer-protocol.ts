@@ -1,5 +1,6 @@
 import type { DeviceTier } from '../capabilities';
 import type { ProbeResult } from './probe';
+import type { SceneSensitivity } from './scenes';
 
 /** Messages between the main thread (media analyzer client) and the analyzer worker. Not public API. */
 
@@ -30,6 +31,8 @@ export interface AnalyzerStats {
   cacheBudget: number;
   /** Waveforms computed. */
   waveforms: number;
+  /** Scene-detection runs finished. */
+  sceneRuns: number;
   /** Stalled decodes the watchdog gave up on. */
   watchdogResets: number;
   /** Media files currently open (Mediabunny inputs). */
@@ -50,6 +53,15 @@ export type AnalyzerRequest =
   | { type: 'remove'; assetId: string }
   | { type: 'thumb'; id: number; assetId: string; seconds: number; height: number }
   | { type: 'wave'; id: number; assetId: string }
+  | {
+      type: 'scenes';
+      id: number;
+      assetId: string;
+      /** Media seconds to look at. */
+      from: number;
+      to: number;
+      sensitivity: SceneSensitivity;
+    }
   | { type: 'cancel'; id: number }
   | { type: 'stats'; id: number };
 
@@ -62,5 +74,7 @@ export type AnalyzerResponse =
       type: 'wave';
       waveform: { peaksPerSecond: number; peaks: Float32Array; duration: number } | null;
     }
+  | { id: number; type: 'scenes-progress'; done: number }
+  | { id: number; type: 'scenes'; cuts: number[] | null }
   | { id: number; type: 'stats'; stats: AnalyzerStats }
   | { id: number; type: 'error'; message: string };

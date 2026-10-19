@@ -2,7 +2,7 @@ import type { EditContext, Project } from '@video-ultra/core';
 import { useEffect, useId, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import { useController } from './context';
 import { ColorPicker } from './ColorPicker';
-import { Icon, type IconName } from './icons';
+import { Icon, type IconName, type IconSpec } from './icons';
 
 /**
  * Shared controls. Every control has a visible label or a tooltip; a control that can't act right
@@ -22,7 +22,7 @@ function tooltipFor(
 }
 
 export interface ButtonProps {
-  icon?: IconName;
+  icon?: IconSpec;
   label: string;
   onClick: () => void;
   /** `ghost` (default) · `primary` (one per screen) · `secondary` · `danger`. */
