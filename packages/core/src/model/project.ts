@@ -173,6 +173,8 @@ export function sourceSpan(item: Extract<Item, { speed: number }>): Time {
 export function assetKindsFor(kind: ItemKind): readonly Asset['kind'][] {
   switch (kind) {
     case 'video':
+      // A combined clip plays like a video (file version 5+).
+      return ['video', 'compound'];
     case 'freeze':
       return ['video'];
     case 'image':

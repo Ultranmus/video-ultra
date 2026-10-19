@@ -3,6 +3,8 @@ import type { Editor } from '../edit/history';
 import {
   EditError,
   addCaptions,
+  combineItems,
+  separateItem,
   addToLane,
   arrangeItem,
   mergeCaptionWithNext,
@@ -66,6 +68,8 @@ export type Op =
   | { op: 'flags'; pick: number; locked: boolean; hidden: boolean }
   | { op: 'group'; pick: number; other: number }
   | { op: 'ungroup'; pick: number }
+  | { op: 'combine'; pick: number; other: number }
+  | { op: 'separate'; pick: number }
   | { op: 'shift'; pick: number; other: number; delta: number }
   | { op: 'arrange'; pick: number; to: 'forward' | 'backward' | 'front' | 'back'; at: number }
   | { op: 'duck'; pick: number; amount: number }
@@ -124,6 +128,8 @@ export const opArb: fc.Arbitrary<Op> = fc.oneof(
   }),
   fc.record({ op: fc.constant('group' as const), pick: fc.nat(), other: fc.nat() }),
   fc.record({ op: fc.constant('ungroup' as const), pick: fc.nat() }),
+  fc.record({ op: fc.constant('combine' as const), pick: fc.nat(), other: fc.nat() }),
+  fc.record({ op: fc.constant('separate' as const), pick: fc.nat() }),
   fc.record({
     op: fc.constant('shift' as const),
     pick: fc.nat(),
@@ -268,6 +274,14 @@ export function run(editor: Editor, step: Op, newId: () => string): void {
       }
       case 'ungroup':
         if (item.groupId) editor.apply('Ungroup', (d) => ungroupItems(d, item.groupId!));
+        break;
+      case 'combine': {
+        const other = pickItem(step.other)!;
+        editor.apply('Combine', (d, ctx) => combineItems(d, [item.id, other.id], ctx.ids));
+        break;
+      }
+      case 'separate':
+        editor.apply('Separate', (d, ctx) => separateItem(d, item.id, ctx.ids));
         break;
       case 'shift': {
         const other = pickItem(step.other)!;

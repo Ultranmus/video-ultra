@@ -137,8 +137,20 @@ describe('project file back-compat', () => {
     return out;
   };
 
-  it('is file version 4 (1 → 2: text and stickers take a look; 2 → 3: lock, hide, group; 3 → 4: shape masks)', () => {
-    expect(PROJECT_VERSION).toBe(4);
+  it('is file version 5 (1 → 2: text and stickers take a look; 2 → 3: lock, hide, group; 3 → 4: shape masks; 4 → 5: combined clips)', () => {
+    expect(PROJECT_VERSION).toBe(5);
+  });
+
+  it('a version-4 project opens as version 5, unchanged otherwise', () => {
+    const data = upgraded(JSON.parse(V01_PROJECT));
+    data.version = 4;
+    const result = parseProject(JSON.stringify(data));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.project.version).toBe(5);
+    expect(result.project.tracks.map((t) => t.items.length)).toEqual(
+      data.tracks.map((t: { items: unknown[] }) => t.items.length),
+    );
   });
 
   it('a version-3 project keeps locked, hidden and grouped items; main clips leave groups', () => {
