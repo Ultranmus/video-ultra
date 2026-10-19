@@ -24,6 +24,7 @@ import { QualityGovernor } from './quality';
 import type { EngineMessage, EngineRequest, EngineResponseData, EngineStats } from './protocol';
 import { upcomingVideo } from './timeline';
 import { parseCubeLut } from '../effects/lut';
+import { computeScopes, SCOPE_MAX_SIDE } from '../effects/scopes';
 
 /**
  * The engine worker: owns the project, the media, the decoders and the GPU. The main thread only
@@ -808,6 +809,42 @@ async function itemPreview(
  * animation, nothing above it) at `time`, at most 480 px, and the average colour of the 5 × 5
  * pixels around the canvas point `x, y`. Null when the point is outside the canvas.
  */
+/** Scopes of the whole video at `time`, from a small render (≤ SCOPE_MAX_SIDE px). */
+async function scopes(
+  request: Extract<EngineRequest, { type: 'scopes' }>,
+): Promise<{ data: EngineResponseData; transfer: Transferable[] }> {
+  if (!project) throw new Error('No project');
+  const p = project;
+  const { width: pw, height: ph } = p.settings;
+  const k = SCOPE_MAX_SIDE / Math.max(pw, ph);
+  const width = Math.max(8, Math.round(pw * k));
+  const height = Math.max(8, Math.round(ph * k));
+  const l = await looksRenderer(width, height);
+  await mediaReady(p);
+  const time = Math.min(Math.max(0, request.time), Math.max(0, projectDuration(p) - 1));
+  await l.composer.render(p, time, width, height, null);
+  const bitmap = l.canvas.transferToImageBitmap();
+  if (!scopeCanvas || scopeCanvas.width !== width || scopeCanvas.height !== height) {
+    scopeCanvas = new OffscreenCanvas(width, height);
+    scopeContext = scopeCanvas.getContext('2d', { willReadFrequently: true })!;
+  }
+  scopeContext!.drawImage(bitmap, 0, 0);
+  bitmap.close();
+  looksDone();
+  const result = computeScopes(scopeContext!.getImageData(0, 0, width, height).data, width, height);
+  return {
+    data: { type: 'scopes', scopes: result },
+    transfer: [
+      result.histogram.buffer,
+      result.waveform.buffer,
+      result.parade.buffer,
+      result.vector.buffer,
+    ],
+  };
+}
+let scopeCanvas: OffscreenCanvas | null = null;
+let scopeContext: OffscreenCanvasRenderingContext2D | null = null;
+
 async function pickColour(
   request: Extract<EngineRequest, { type: 'pick-colour' }>,
 ): Promise<EngineResponseData> {
@@ -1140,6 +1177,8 @@ async function handle(
     }
     case 'pick-colour':
       return inLooksQueue(() => pickColour(request));
+    case 'scopes':
+      return inLooksQueue(() => scopes(request));
   }
 }
 

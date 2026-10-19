@@ -844,3 +844,13 @@ reason; when one changes, edit the entry and note the date.
       event, `ctl.levels` → a two-bar meter in the desktop timeline bar drawn through refs (no
       React renders; −48…0 dB, amber over −6 dB, red at full scale). Phones: no meter (space;
       InShot-simple), effects in the toolbar.
+147.  **Video scopes** (v0.4). Waveform, RGB parade, histogram ("Levels") and vectorscope
+      ("Colour", with 75 % targets and the skin-tone line) of the **whole picture** under the
+      playhead. The engine worker renders the project at ≤ 256 px on the long side with the
+      warm looks renderer (no new GPU context), reads it back once and counts (`computeScopes`,
+      pure, unit-tested); the counts are transferred, the UI draws them into one small canvas
+      (one view at a time — the inspector is narrow). Lives as a collapsed **Scopes** section in
+      the desktop inspector (video settings, and every picture item next to Adjust — where colour
+      gets fixed). Measures only while open: one request at a time, ≤ 4 per second while playing,
+      60 ms after a seek or edit while paused. Phones: none (pro tool, progressive disclosure).
+      Scope colours are tokens read once (`--vu-scope-*`).

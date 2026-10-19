@@ -1,3 +1,4 @@
+import type { ScopeData } from '../effects/scopes';
 import type { DeviceTier } from '../capabilities';
 import type { BackendChoice } from '../lab/protocol';
 import type { ItemAnimation, Project, Transition } from '../model/schema';
@@ -130,6 +131,11 @@ export interface Engine {
    * `x, y` (fractions) at timeline `time`; null outside the picture. For "pick from video".
    */
   pickColour(itemId: string, time: Time, x: number, y: number): Promise<string | null>;
+  /**
+   * Video scopes (histogram, waveform, parade, vectorscope) of the whole picture at `time`,
+   * measured on a small render in the worker. For the Scopes view; ask at most a few per second.
+   */
+  scopes(time: Time): Promise<ScopeData>;
   /**
    * Silences (or restores) the engine's sound output without touching playback timing — e.g.
    * while recording a voiceover without headphones.
@@ -506,6 +512,11 @@ export async function createEngine(
       const data = await send({ type: 'lut-check', blob });
       if (data.type !== 'lut-check') throw new Error('Unexpected engine response');
       return { size: data.size, title: data.title };
+    },
+    async scopes(time: Time) {
+      const data = await send({ type: 'scopes', time });
+      if (data.type !== 'scopes') throw new Error('Unexpected engine response');
+      return data.scopes;
     },
     async pickColour(itemId: string, time: Time, x: number, y: number) {
       const data = await send({ type: 'pick-colour', itemId, time, x, y });

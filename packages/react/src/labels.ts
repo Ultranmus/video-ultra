@@ -841,6 +841,21 @@ export const DEFAULT_LABELS = {
   tipKeepPitch: 'Sped up or slowed down, the voice keeps its own pitch (0.5×–2×)',
   soundFxHint: 'Even out brings quiet words up and loud parts down.',
   off: 'Off',
+  // v0.4 Scopes
+  scopes: 'Scopes',
+  scopeView: 'Scope',
+  scopeWaveform: 'Wave',
+  scopeParade: 'RGB',
+  scopeHistogram: 'Levels',
+  scopeVector: 'Colour',
+  tipScopeWaveform:
+    'Waveform: brightness across the picture, left to right — top is white, bottom black',
+  tipScopeParade:
+    'RGB parade: the waveform for red, green and blue side by side — level them to fix a colour cast',
+  tipScopeHistogram: 'Histogram: how many pixels at each brightness, per colour',
+  tipScopeVector:
+    'Vectorscope: hue around the circle, saturation from the centre; skin sits on the line',
+  scopeAria: (view: string) => `${view} scope of the picture under the playhead`,
   // v0.4 Scene detection
   splitAtScenes: 'Split at scenes',
   tipSplitAtScenes: 'Find where the shot changes and cut the clip there',

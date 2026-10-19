@@ -1,3 +1,4 @@
+import type { ScopeData } from '../effects/scopes';
 import type { DeviceTier } from '../capabilities';
 import type { ItemAnimation, Project, Transition } from '../model/schema';
 import type { BackendChoice } from '../lab/protocol';
@@ -150,6 +151,8 @@ export type EngineRequest =
    * (fractions) at timeline `time` — the green screen's "pick from video".
    */
   | { type: 'pick-colour'; itemId: string; time: number; x: number; y: number }
+  /** Video scopes of the whole picture at `time` (v0.4). */
+  | { type: 'scopes'; time: number }
   /** Audio output: the port to the AudioWorklet, its sample rate and output latency (s). */
   | { type: 'audio'; port: MessagePort; sampleRate: number; latency: number };
 
@@ -170,7 +173,8 @@ export type EngineResponseData =
   | { type: 'transition-preview'; bitmaps: ImageBitmap[] }
   | { type: 'item-preview'; bitmaps: ImageBitmap[] }
   | { type: 'lut-check'; size: number; title: string | null }
-  | { type: 'pick-colour'; color: string | null };
+  | { type: 'pick-colour'; color: string | null }
+  | { type: 'scopes'; scopes: ScopeData };
 
 /** Unsolicited events from the worker. */
 export type EngineEvent =

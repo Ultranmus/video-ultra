@@ -197,7 +197,8 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [ ] v0.3 references to build against (specs, not code): loudness to EBU R128 / ITU-R BS.1770
       (integrated + true peak; "normalize audio" and an export loudness target such as −14 LUFS);
       SRT / WebVTT import + export with frame-exact timing and burn-in (ties into v0.4 AI
-      captions); scopes — waveform, RGB parade, histogram, vectorscope.
+      captions); scopes — waveform, RGB parade, histogram, vectorscope (_scopes done 2026-10-19,
+      DECISIONS #147_).
 - [ ] Animation tiles: text previews use the item's own size — very long text can be tiny in the
       tile; consider fitting text to the tile in `itemPreview`.
 - [ ] Transition still (A | B) and flip-books are re-fetched when the panel reopens; cache per

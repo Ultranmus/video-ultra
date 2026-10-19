@@ -207,7 +207,7 @@ _D. Capture & export_
 - [ ] Proxies for heavy 4K clips (also helps budget phones) (M)
 - [x] More codecs and containers: H.265 / AV1, MOV / MKV, transparent video (S–M each, where the
       device can encode) — HEVC + AV1 export (#144); MOV / MKV / alpha → BACKLOG
-- [ ] Audio EQ, compressor, pitch shift, meters (M); scopes (M); scene detection + auto-split (M)
-      — scene detection + auto-split (#145), EQ / compressor / pitch / meters (#146) done; scopes open
+- [x] Audio EQ, compressor, pitch shift, meters (M); scopes (M); scene detection + auto-split (M)
+      — scene detection + auto-split (#145), EQ / compressor / pitch / meters (#146), scopes (#147) done
 - [ ] Text-to-speech voiceover (L); multiple sequences / compound clips (L)
 - [ ] Optional AI editing plugin (bring-your-own endpoint) driving the op-based Project (M)

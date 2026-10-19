@@ -478,6 +478,12 @@ thumbnails.
   24.1 dB loud / quiet gap to 4.4 dB. Meter: reads the tone's level (−13 dB → 0.72 of the bar),
   0 when paused; no React renders (refs).
 
+## Scopes (v0.4, 2026-10-19, `scripts/scopes-check.ts`)
+
+≤ 4 measurements a second while playing (11–12 in 3 s), none while the section is closed, no
+main-thread long task while playing with scopes open; each measurement = one 256-px render +
+one 256×144 readback in the worker, ~0.6 MB of counts transferred (not copied).
+
 ## Cloud sandbox note (2026-10-19)
 
 The night's checks ran on a Linux container without a GPU (Chrome 155, 4 cores; WebGL2 in

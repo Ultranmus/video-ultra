@@ -28,6 +28,7 @@ import { TimelineView } from './timeline/view';
 import { CanvasTool, InspectorSections, ToolPanel } from './ToolPanel';
 import { toolsFor } from './tools';
 import { LevelMeter } from './meter';
+import { ScopesView } from './scopes';
 import {
   ArrangeControls,
   CommandButton,
@@ -315,6 +316,11 @@ export function Inspector(): ReactElement {
           <Section>
             <CanvasTool />
           </Section>
+          {clips > 0 ? (
+            <Section title={l.scopes} collapsible defaultOpen={false}>
+              <ScopesView />
+            </Section>
+          ) : null}
           {clips < 3 ? (
             <Section title={l.howTo}>
               <ol className="vu-steps">

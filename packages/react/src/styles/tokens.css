@@ -227,6 +227,14 @@
     --vu-meter-fill: var(--vu-success);
     --vu-meter-hot: var(--vu-warning);
     --vu-meter-clip: var(--vu-danger);
+    /* v0.4 Scopes (drawn in a canvas; read once) */
+    --vu-scope-bg: #0b0b0e;
+    --vu-scope-trace: #8fe3a8;
+    --vu-scope-red: #ff4d4d;
+    --vu-scope-green: #4dff7a;
+    --vu-scope-blue: #4d8dff;
+    --vu-scope-grid: rgba(255, 255, 255, 0.18);
+    --vu-size-scope-vector: 200px;
     /* v0.3 Templates */
     --vu-size-template: 72px;
     --vu-size-template-max: 180px;

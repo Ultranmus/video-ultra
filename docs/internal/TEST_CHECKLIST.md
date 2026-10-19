@@ -102,3 +102,9 @@ Open the branch's Vercel preview (or `pnpm --filter playground dev`), then **`/e
 - [ ] **Level meter (desktop).** Play a video: two thin bars next to the time move with the
       sound, amber near the top, red if it's too loud; they rest when paused. _Checked here:_
       soundfx-check (reads the tone's level, rests at 0).
+- [ ] **Scopes (desktop).** Click empty space (video settings) → open **Scopes** → switch
+      Wave / RGB / Levels / Colour while you scrub and play: they follow the picture, playback
+      stays smooth. Select a clip → Adjust → drag Brightness / Warmth: the scopes move with it.
+      Skin tones should sit near the line on Colour. _Checked here:_ scopes-check (colour-bar
+      counts, every view draws, follows an edit, ≤ 4 updates/s while playing, axe, no long
+      tasks) + 3 unit tests.

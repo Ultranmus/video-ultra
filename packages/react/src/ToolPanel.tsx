@@ -35,6 +35,7 @@ import { KeyframesTool, usePlayheadFor } from './keyframes';
 import { ProTrimTool } from './protrim';
 import { ScenesTool } from './scenes';
 import { SoundFxTool } from './soundfx';
+import { ScopesView } from './scopes';
 import { MaskTool } from './mask';
 import { BlendTool, GreenScreenTool, RegionTool } from './picture';
 
@@ -143,6 +144,9 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
     <>
       <Section title={l.adjust} collapsible defaultOpen={false}>
         <AdjustTool item={item} />
+      </Section>
+      <Section title={l.scopes} collapsible defaultOpen={false}>
+        <ScopesView />
       </Section>
       <Section title={l.cropRotate} collapsible defaultOpen={false}>
         <TransformTool item={item} />

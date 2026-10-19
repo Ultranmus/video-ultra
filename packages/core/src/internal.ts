@@ -90,6 +90,14 @@ export type { DuckTuning } from './audio/duck';
 
 // Media analysis (import probing, thumbnails, waveforms) — runs in its own worker.
 export { ClipFx, hasAudioFx } from './audio/fx';
+export {
+  computeScopes,
+  vectorPoint,
+  SCOPE_MAX_SIDE,
+  SCOPE_ROWS,
+  VECTOR_SIZE,
+  type ScopeData,
+} from './effects/scopes';
 export { createMediaAnalyzer } from './media/analyzer';
 export type {
   MediaAnalyzer,
