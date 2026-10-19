@@ -807,3 +807,11 @@ reason; when one changes, edit the entry and note the date.
       `project.markers` (file version 4); M adds one at the playhead (M on a marker removes it),
       `,` / `.` jump to the previous / next; flags on the ruler; scrubbing, trims and moves snap
       to them. Track lock already existed (v0.2 E).
+144.  **More export codecs** (v0.4). `ExportOptions.videoCodec`: `auto` (as before: H.264 in MP4,
+      VP9 / VP8 in WebM), `hevc` (MP4) and `av1` (MP4 or WebM), offered in the export dialog only
+      at sizes this device's encoder accepts (`ExportLimits.hevc / av1`, probed with
+      `isConfigSupported`); bitrates 60 % (HEVC) and 50 % (AV1) of H.264's for the same look.
+      Measured (codecs-check, Chrome on Linux): AV1 140 KB vs H.264 293 KB for the same 2 s at
+      480p, every frame decodes in ffmpeg; HEVC isn't offered there (no encoder) and asking for it
+      says so — Macs and iPhones have hardware HEVC. MOV / MKV containers and transparent video:
+      not in this round (BACKLOG).

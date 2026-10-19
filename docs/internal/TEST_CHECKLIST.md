@@ -79,3 +79,8 @@ Open the branch's Vercel preview (or `pnpm --filter playground dev`), then **`/e
 - [ ] **Markers.** Press **M** to drop a marker (a flag on the ruler); M again on it removes it;
       **,** and **.** jump between markers; dragging the playhead or clips snaps to them.
       _Checked here:_ protrim-check.
+- [ ] **Smaller files: HEVC / AV1 export.** Export → Video → a **Codec** row appears where your
+      device can encode them: on the Mac / iPhone pick **HEVC** (about 40 % smaller) or **AV1** —
+      the file plays in Photos / QuickTime? (HEVC should; AV1 needs a new device.) _Checked
+      here:_ codecs-check (AV1 in MP4 and WebM, every frame decodes, half the size; HEVC absent
+      on Linux with a clear message).

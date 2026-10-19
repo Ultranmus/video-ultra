@@ -19,12 +19,21 @@ export interface ExportOptions {
   fps: 24 | 30 | 60;
   quality: 'low' | 'medium' | 'high';
   /**
+   * The video codec (v0.4): `auto` (default — H.264 for MP4, VP9 / VP8 for WebM), or a newer one
+   * for a smaller file where this device can encode it ({@link ExportLimits}): `hevc` (H.265,
+   * MP4) or `av1` (MP4 or WebM); `h264` / `vp9` ask for the default one by name.
+   */
+  videoCodec?: ExportVideoCodec;
+  /**
    * Export only this part of the timeline (flicks, `start` inclusive, `end` exclusive). Omitted:
    * the whole video. Clamped to the video's length; transitions, animations and sound at the
    * edges are exactly what plays at those times.
    */
   range?: ExportRange;
 }
+
+/** Video codecs an export can ask for (see {@link ExportOptions.videoCodec}). */
+export type ExportVideoCodec = 'auto' | 'h264' | 'hevc' | 'av1' | 'vp9';
 
 /** A part of the timeline, in flicks: from `start` up to (not including) `end`. */
 export interface ExportRange {
@@ -206,8 +215,11 @@ export function exportSize(
 
 /** Bits per pixel per frame for each quality (H.264 at typical settings). */
 const BITS_PER_PIXEL = { low: 0.05, medium: 0.09, high: 0.16 } as const;
-/** VP9 needs fewer bits for the same look than H.264; VP8 a few more. */
-const CODEC_FACTOR = { avc: 1, vp9: 0.8, vp8: 1.2 } as const;
+/**
+ * Bits for the same look, relative to H.264: VP9 needs fewer, VP8 a few more; HEVC and AV1 about
+ * 60 % and 50 % (the point of choosing them: a smaller file).
+ */
+const CODEC_FACTOR = { avc: 1, vp9: 0.8, vp8: 1.2, hevc: 0.6, av1: 0.5 } as const;
 
 /**
  * The video bitrate (bits/s) an export uses: set from the picture size, frame rate and quality,
@@ -262,6 +274,9 @@ export interface ExportLimits {
   aacFallback: boolean;
   /** Opus (WebM sound) can be encoded. Without it a WebM export has no sound. */
   opus: boolean;
+  /** Heights HEVC (H.265, in MP4) and AV1 (MP4 / WebM) can be encoded at, if any (v0.4). */
+  hevc: ExportHeight[];
+  av1: ExportHeight[];
 }
 
 function avcCodec(width: number, height: number, fps: number): string {
@@ -271,6 +286,20 @@ function avcCodec(width: number, height: number, fps: number): string {
   if (rate <= 1920 * 1088 * 60) return 'avc1.64002a'; // 4.2
   if (rate <= 4096 * 2304 * 30) return 'avc1.640033'; // 5.1
   return 'avc1.640034'; // 5.2
+}
+
+/** HEVC Main profile, level by size (3.1 · 4.1 · 5.1). */
+function hevcCodec(shortSide: number): string {
+  return shortSide <= 720
+    ? 'hvc1.1.6.L93.B0'
+    : shortSide <= 1080
+      ? 'hvc1.1.6.L123.B0'
+      : 'hvc1.1.6.L153.B0';
+}
+
+/** AV1 Main profile, 8-bit, level by size (3.1 · 4.0 · 5.1). */
+function av1Codec(shortSide: number): string {
+  return shortSide <= 720 ? 'av01.0.05M.08' : shortSide <= 1080 ? 'av01.0.08M.08' : 'av01.0.13M.08';
 }
 
 async function encoderAccepts(codec: string, width: number, height: number, fps: number) {
@@ -309,7 +338,14 @@ async function audioAccepts(codec: string): Promise<boolean> {
  */
 export async function exportLimits(tier: DeviceTier): Promise<ExportLimits> {
   const max = maxExportHeight(tier);
-  const limits: ExportLimits = { mp4: [], webm: [], aacFallback: false, opus: false };
+  const limits: ExportLimits = {
+    mp4: [],
+    webm: [],
+    aacFallback: false,
+    opus: false,
+    hevc: [],
+    av1: [],
+  };
   if (typeof VideoEncoder === 'undefined') return limits;
   for (const h of EXPORT_HEIGHTS) {
     if (h > max) break;
@@ -318,6 +354,8 @@ export async function exportLimits(tier: DeviceTier): Promise<ExportLimits> {
     const vp9 = h > 1080 ? 'vp09.00.50.08' : 'vp09.00.40.08';
     if ((await encoderAccepts(vp9, w, h, 30)) || (await encoderAccepts('vp8', w, h, 30)))
       limits.webm.push(h);
+    if (await encoderAccepts(hevcCodec(h), w, h, 30)) limits.hevc.push(h);
+    if (await encoderAccepts(av1Codec(h), w, h, 30)) limits.av1.push(h);
   }
   if (typeof AudioEncoder !== 'undefined') {
     limits.aacFallback = !(await audioAccepts('mp4a.40.2'));

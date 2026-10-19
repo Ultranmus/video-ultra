@@ -100,6 +100,7 @@ export type {
   ExportResult,
   ExportHeight,
   ExportLimits,
+  ExportVideoCodec,
   ExportRange,
   ExportPreset,
   AudioExportFormat,

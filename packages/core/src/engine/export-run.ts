@@ -429,8 +429,17 @@ export async function runExport(
   // time (0.70× at 720p) — VP8 there is 3.7× faster (2.6×) for a somewhat larger file
   // (DECISIONS #111). Measured with scripts/export-check.ts.
   const firefox = /firefox/i.test(globalThis.navigator?.userAgent ?? '');
+  const asked = options.videoCodec ?? 'auto';
   const candidates: VideoCodec[] =
-    format === 'mp4' ? ['avc'] : firefox ? ['vp8', 'vp9'] : ['vp9', 'vp8'];
+    asked === 'hevc' && format === 'mp4'
+      ? ['hevc']
+      : asked === 'av1'
+        ? ['av1']
+        : format === 'mp4'
+          ? ['avc']
+          : firefox
+            ? ['vp8', 'vp9']
+            : ['vp9', 'vp8'];
   let videoCodec: VideoCodec | null = null;
   for (const codec of candidates) {
     if (await canEncodeVideo(codec, { width, height, frameRate: fps, quality })) {
@@ -439,8 +448,16 @@ export async function runExport(
     }
   }
   if (!videoCodec) {
+    const name =
+      asked === 'hevc'
+        ? 'HEVC'
+        : asked === 'av1'
+          ? 'AV1'
+          : format === 'mp4'
+            ? 'MP4 (H.264)'
+            : 'WebM';
     throw new Error(
-      `This browser can't encode ${format === 'mp4' ? 'MP4 (H.264)' : 'WebM'} video at ${width}×${height}. Try a lower resolution${format === 'mp4' ? ' or WebM' : ' or MP4'}.`,
+      `This browser can't encode ${name} video at ${width}×${height}. Try a lower resolution${asked === 'hevc' || asked === 'av1' ? ' or H.264' : format === 'mp4' ? ' or WebM' : ' or MP4'}.`,
     );
   }
   let audioCodec: 'aac' | 'opus' | null = null;
@@ -486,7 +503,9 @@ export async function runExport(
       height,
       fps,
       options.quality,
-      videoCodec === 'vp9' ? 'vp9' : videoCodec === 'vp8' ? 'vp8' : 'avc',
+      videoCodec === 'vp9' || videoCodec === 'vp8' || videoCodec === 'hevc' || videoCodec === 'av1'
+        ? videoCodec
+        : 'avc',
     ),
     keyFrameInterval: 2,
     latencyMode: 'quality',

@@ -456,3 +456,12 @@ A 1024×683 portrait on a 16:9 project, first run (includes the model download):
 Both: background fully removed (exported left fifth luma 113 → 0), the person unchanged (116 →
 116). objects has cleaner edges (people left a faint smudge by the backpack). Phones: `people`
 (DECISIONS #140) — not measured on a phone yet.
+
+## Cloud sandbox note (2026-10-19)
+
+The night's checks ran on a Linux container without a GPU (Chrome 155, 4 cores; WebGL2 in
+software). editor-interact logs main-thread tasks of 50–420 ms there — **the same on `main`**
+(measured side by side, production builds, two runs each: main 10–20 long tasks, night branch
+11), so they come from the machine (software rendering, slow cores), not from the v0.3 / v0.4
+work. Long-task budgets are judged on the owner's devices; per-feature checks (shapes-check)
+count only the tasks a feature adds.

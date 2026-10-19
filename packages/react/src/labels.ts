@@ -807,6 +807,11 @@ export const DEFAULT_LABELS = {
     `Runs on this device, nothing is uploaded · one-time ${Math.round(mb)} MB download`,
   backgroundUnavailable: 'Background removal isn’t available here.',
   photoOnly: 'Works on photos and image stickers.',
+  // v0.4 Export codecs
+  videoCodec: 'Codec',
+  codecStandardTip: 'Plays everywhere',
+  codecHevcTip: 'About 40 % smaller; plays on most phones and Macs, not every PC browser',
+  codecAv1Tip: 'About half the size; plays in new browsers and phones',
   // v0.4 Pro trims and markers
   rollCut: 'Move cut',
   fineTrim: 'Fine trim',

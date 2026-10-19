@@ -205,8 +205,8 @@ _D. Capture & export_
 - [x] Keyframes on any property, then a curve editor (M, then L) — transform properties + graph editor (#142)
 - [x] Ripple / roll / slip / slide trims, markers, track lock (M) — main video is ripple by design; #143
 - [ ] Proxies for heavy 4K clips (also helps budget phones) (M)
-- [ ] More codecs and containers: H.265 / AV1, MOV / MKV, transparent video (S–M each, where the
-      device can encode)
+- [x] More codecs and containers: H.265 / AV1, MOV / MKV, transparent video (S–M each, where the
+      device can encode) — HEVC + AV1 export (#144); MOV / MKV / alpha → BACKLOG
 - [ ] Audio EQ, compressor, pitch shift, meters (M); scopes (M); scene detection + auto-split (M)
 - [ ] Text-to-speech voiceover (L); multiple sequences / compound clips (L)
 - [ ] Optional AI editing plugin (bring-your-own endpoint) driving the op-based Project (M)
