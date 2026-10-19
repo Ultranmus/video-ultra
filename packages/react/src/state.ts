@@ -18,6 +18,8 @@ export type PanelId =
   | 'blur'
   /** Templates (v0.3). */
   | 'templates'
+  /** AI editing with the host's assistant (v0.4). */
+  | 'assistant'
   /** A host's own panel (embedding API, v0.3). */
   | `custom:${string}`;
 
@@ -58,6 +60,17 @@ export type ToolId =
   | 'scenes'
   // v0.4 Sound effects
   | 'soundfx';
+
+/** One exchange with the AI assistant (v0.4). */
+export interface AssistantTurn {
+  id: number;
+  instruction: string;
+  reply: string;
+  /** Changes applied (one undo step), 0 when none. */
+  applied: number;
+  /** Why the changes weren't applied (a bad action, a failed request). */
+  error: string | null;
+}
 
 export interface ImportRow {
   id: string;
@@ -104,6 +117,9 @@ export interface UiState {
   cutoutJob: { itemId: string; stage: 'download' | 'work'; fraction: number } | null;
   /** Scene detection running (v0.4): on which clip, how far. */
   sceneJob: { itemId: string; fraction: number } | null;
+  /** AI editing (v0.4): this session's conversation, and whether a request is out. */
+  assistantTurns: AssistantTurn[];
+  assistantBusy: boolean;
   /** Proxies being made (v0.4): asset id → 0…1. */
   proxyJobs: Record<string, number>;
   /** A caption whose text box should take focus in the Captions panel. */
@@ -149,6 +165,8 @@ export function createUiStore() {
     cutoutJob: null,
     sceneJob: null,
     proxyJobs: {},
+    assistantTurns: [],
+    assistantBusy: false,
     captionEditing: null,
     panel: 'media',
     tool: null,

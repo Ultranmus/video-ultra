@@ -841,6 +841,25 @@ export const DEFAULT_LABELS = {
   tipKeepPitch: 'Sped up or slowed down, the voice keeps its own pitch (0.5×–2×)',
   soundFxHint: 'Even out brings quiet words up and loud parts down.',
   off: 'Off',
+  // v0.4 AI editing
+  assistant: 'Assistant',
+  tipAssistant: 'Say what you want changed — the assistant edits for you (one Undo takes it back)',
+  assistantPlaceholder: 'e.g. “Add a title ‘Day one’ at the start” or “make it warmer”',
+  assistantSend: 'Send',
+  assistantThinking: 'Working on it…',
+  assistantEdit: 'Assistant edit',
+  assistantApplied: (n: number) => (n === 1 ? 'Made 1 change' : `Made ${n} changes`),
+  assistantNothing: 'No changes',
+  assistantFailed: (why: string) => `The assistant couldn’t answer: ${why}`,
+  assistantNotApplied: 'Nothing was changed',
+  assistantPrivacy:
+    'A description of your project (names, texts, timings — no video or sound) goes to the assistant.',
+  assistantExamples: [
+    'Add a title “My trip” at the start',
+    'Make the whole video warmer',
+    'Add a fade between every clip',
+    'Make it square for Instagram',
+  ],
   // v0.4 Proxies
   makingProxy: (name: string) =>
     `Making a lighter copy of "${name}" for smooth editing — your export still uses the original`,

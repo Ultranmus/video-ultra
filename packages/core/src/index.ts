@@ -141,6 +141,18 @@ export {
   shapeCoverage,
   type ShapePreset,
 } from './effects/shapes';
+// AI editing (v0.4, optional): the action language a host's model answers in.
+export {
+  applyEditActions,
+  describeProject,
+  EditActionSchema,
+  EDIT_ACTIONS_GUIDE,
+  type EditAction,
+  type EditingAssistant,
+  type EditingRequest,
+  type EditingResponse,
+  type ProjectDescription,
+} from './ai/assistant';
 // Sound effects (v0.4): ready-made looks and the equaliser's band frequencies.
 export { AUDIO_FX_PRESETS, EQ_BANDS, pitchRatio } from './audio/fx';
 export type { CaptionPreset } from './captions/presets';

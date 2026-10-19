@@ -1,5 +1,8 @@
 import type { EditorCustomization, EditorEvent } from './embed';
 import {
+  applyEditActions,
+  describeProject,
+  type EditingAssistant,
   addAsset,
   addToLane,
   arrangeItem,
@@ -110,6 +113,7 @@ import {
   createUiStore,
   Levels,
   Playhead,
+  type AssistantTurn,
   type LayoutMode,
   type PanelId,
   type ToolId,
@@ -156,6 +160,8 @@ export interface ControllerOptions {
   customize?: EditorCustomization;
   /** Removes photo backgrounds (`createBackgroundRemover()` from `@video-ultra/ai`, or yours). */
   backgroundRemover?: BackgroundRemover;
+  /** AI editing with the host's model (`createChatAssistant()` from `@video-ultra/ai`, or yours). */
+  assistant?: EditingAssistant;
 }
 
 /**
@@ -1945,6 +1951,83 @@ export class EditorController {
   /** Shows the photo's own background again. */
   restoreBackground(itemId: string): void {
     this.run(this.labels.restoreBackground, (d) => updateItem(d, itemId, { cutout: null }));
+  }
+
+  // ── AI editing (v0.4) ───────────────────────────────────────────────────
+
+  #assistantAbort: AbortController | null = null;
+  #assistantTurn = 0;
+
+  /**
+   * Sends `instruction` to the host's assistant with a description of the project, then applies
+   * the edits it answers with as one undo step — all of them or, if one is invalid, none (the
+   * reason shows in the conversation). Returns the turn.
+   */
+  async askAssistant(instruction: string): Promise<AssistantTurn | null> {
+    const assistant = this.options.assistant;
+    const text = instruction.trim();
+    if (!assistant || !text) return null;
+    this.#assistantAbort?.abort();
+    const abort = new AbortController();
+    this.#assistantAbort = abort;
+    this.ui.setState({ assistantBusy: true });
+    const l = this.labels;
+    const state = this.ui.getState();
+    let turn: AssistantTurn = {
+      id: ++this.#assistantTurn,
+      instruction: text,
+      reply: '',
+      applied: 0,
+      error: null,
+    };
+    try {
+      const answer = await assistant.edit({
+        instruction: text,
+        project: describeProject(this.project),
+        selection: [...state.selectedIds],
+        playhead: this.playhead.time / FLICKS_PER_SECOND,
+        history: state.assistantTurns
+          .slice(-6)
+          .map((t) => ({ instruction: t.instruction, reply: t.reply })),
+        signal: abort.signal,
+      });
+      if (abort.signal.aborted) return null;
+      turn = { ...turn, reply: answer.reply };
+      if (answer.actions.length > 0) {
+        try {
+          this.editor.apply(l.assistantEdit, (d, ctx) =>
+            applyEditActions(d, answer.actions, ctx.ids),
+          );
+          turn = { ...turn, applied: answer.actions.length };
+          this.toast(l.assistantApplied(answer.actions.length), 'success', {
+            label: l.undo,
+            run: () => this.undo(),
+          });
+        } catch (error) {
+          turn = { ...turn, error: error instanceof EditError ? error.message : String(error) };
+        }
+      }
+    } catch (error) {
+      if (abort.signal.aborted) return null;
+      turn = {
+        ...turn,
+        error: l.assistantFailed(error instanceof Error ? error.message : String(error)),
+      };
+    } finally {
+      if (this.#assistantAbort === abort) {
+        this.#assistantAbort = null;
+        this.ui.setState({ assistantBusy: false });
+      }
+    }
+    this.ui.setState((s) => ({ assistantTurns: [...s.assistantTurns, turn] }));
+    return turn;
+  }
+
+  /** Stops a request to the assistant. */
+  cancelAssistant(): void {
+    this.#assistantAbort?.abort();
+    this.#assistantAbort = null;
+    this.ui.setState({ assistantBusy: false });
   }
 
   // ── scene detection (v0.4) ──────────────────────────────────────────────

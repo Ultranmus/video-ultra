@@ -210,4 +210,4 @@ _D. Capture & export_
 - [x] Audio EQ, compressor, pitch shift, meters (M); scopes (M); scene detection + auto-split (M)
       — scene detection + auto-split (#145), EQ / compressor / pitch / meters (#146), scopes (#147) done
 - [ ] Text-to-speech voiceover (L); multiple sequences / compound clips (L)
-- [ ] Optional AI editing plugin (bring-your-own endpoint) driving the op-based Project (M)
+- [x] Optional AI editing plugin (bring-your-own endpoint) driving the op-based Project (M) — #149

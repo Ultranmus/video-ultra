@@ -868,3 +868,18 @@ reason; when one changes, edit the entry and note the date.
       saved frames always read the original** (checked by giving a clip a deliberately different
       copy). HDR clips get no copy (it would lose the HDR look). One info toast says a copy is
       being made and that exports use the original; `ui.proxyJobs` has the progress.
+149.  **AI editing, bring-your-own endpoint** (v0.4, optional). The model never edits the project
+      JSON: it answers in an **edit-action language** (`EditActionSchema`, 14 actions in seconds
+      and ids — split, trim, delete, move, speed, sound (incl. sound looks), filter, adjust,
+      transition, addText, editText, animate, canvas, marker) that `applyEditActions` validates
+      and maps onto the existing ops; the whole plan is one edit (one undo) or, if any action is
+      invalid, nothing changes and the conversation says which action and why. The model reads
+      `describeProject` (ids, kinds, times, names, texts, catalogue ids — no media; < 8 KB).
+      Interface `EditingAssistant` in core (like BackgroundRemover); `createChatAssistant({
+endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with JSON
+      output so keys stay on the host's server. UI: an **Assistant** panel (last in the rail /
+      phone tools, only when the host passes `assistant`): example chips, conversation, Enter
+      to send, Cancel, a privacy line. Playground: `/api/assistant` forwards to any
+      OpenAI-compatible model when `ASSISTANT_API_KEY` (+ `ASSISTANT_URL`, `ASSISTANT_MODEL`) is
+      set; otherwise an offline demo understands a few phrases (warmer, title "…", fades,
+      square…), so the panel can be tried with no account.

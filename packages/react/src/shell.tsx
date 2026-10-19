@@ -183,7 +183,8 @@ const RAIL: {
     | 'filters'
     | 'transitions'
     | 'blurAreas'
-    | 'captions';
+    | 'captions'
+    | 'assistant';
   tip:
     | 'tipAddMedia'
     | 'tipText'
@@ -193,7 +194,8 @@ const RAIL: {
     | 'tipTransitions'
     | 'tipBlurAreas'
     | 'tipCaptions'
-    | 'tipTemplates';
+    | 'tipTemplates'
+    | 'tipAssistant';
 }[] = [
   { id: 'media', icon: 'media', key: 'media', tip: 'tipAddMedia' },
   { id: 'templates', icon: 'template', key: 'templates', tip: 'tipTemplates' },
@@ -204,6 +206,8 @@ const RAIL: {
   { id: 'filters', icon: 'filter', key: 'filters', tip: 'tipFilter' },
   { id: 'transitions', icon: 'transition', key: 'transitions', tip: 'tipTransitions' },
   { id: 'blur', icon: 'blurArea', key: 'blurAreas', tip: 'tipBlurAreas' },
+  // Only when the host gives the editor an assistant (railEntries).
+  { id: 'assistant', icon: 'sparkle', key: 'assistant', tip: 'tipAssistant' },
 ];
 
 /** The left menu: built-in panels the host didn't hide, the host's own panels, in its order. */
@@ -213,7 +217,9 @@ export function railEntries(
 ): { id: PanelId; icon: IconSpec; label: string; tip: string }[] {
   const customize = ctl.options.customize;
   const entries = [
-    ...RAIL.filter((r) => !isHidden(customize, r.id)).map((r) => ({
+    ...RAIL.filter(
+      (r) => !isHidden(customize, r.id) && (r.id !== 'assistant' || !!ctl.options.assistant),
+    ).map((r) => ({
       id: r.id as PanelId,
       icon: r.icon as IconSpec,
       label: l[r.key],

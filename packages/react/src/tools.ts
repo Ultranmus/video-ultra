@@ -158,6 +158,17 @@ function singleTools(
       { key: 'blur', icon: 'blurArea', label: l.blurAreas, tip: l.tipBlurAreas, panel: 'blur' },
       { key: 'canvas', icon: 'canvas', label: l.canvas, tip: l.tipCanvas, tool: 'canvas' },
       split,
+      ...(ctl.options.assistant
+        ? [
+            {
+              key: 'assistant',
+              icon: 'sparkle',
+              label: l.assistant,
+              tip: l.tipAssistant,
+              panel: 'assistant',
+            } as ToolEntry,
+          ]
+        : []),
     ];
   }
   const duplicate: ToolEntry = {

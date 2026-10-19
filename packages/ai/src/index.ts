@@ -6,7 +6,8 @@ import type {
 import type { FromWorker, ModelSpec, ToWorker } from './background/protocol';
 
 /**
- * @video-ultra/ai — optional on-device AI for video-ultra (v0.3). Background removal: a
+ * @video-ultra/ai — optional AI for video-ultra. AI editing (v0.4): `createChatAssistant` connects
+ * the editor to your own model endpoint. Background removal (v0.3): a
  * segmentation model runs in a worker on the device (single-threaded WebAssembly, no
  * cross-origin isolation needed); nothing is uploaded. The model downloads once, the first time
  * someone removes a background, and the browser keeps it.
@@ -16,6 +17,8 @@ import type { FromWorker, ModelSpec, ToWorker } from './background/protocol';
  * <VideoEditor backgroundRemover={createBackgroundRemover()} />
  * ```
  */
+
+export { createChatAssistant, parseAnswer, type ChatAssistantOptions } from './assistant';
 
 /** Which model: `people` (small, fast, best on people) or `objects` (anything; bigger). */
 export type BackgroundModel = 'people' | 'objects';

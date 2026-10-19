@@ -115,3 +115,12 @@ Open the branch's Vercel preview (or `pnpm --filter playground dev`), then **`/e
       `/editor?proxies=always`. _Checked here:_ proxies-check (copy made, 540p, keyframe each
       second, every frame decodes, playback 17 → 70 frames shown in 3 s, export reads the
       original, reused after reopening).
+- [ ] **AI Assistant.** Left menu (phone: last tool) → **Assistant** → tap an example or type
+      "Make the whole video warmer", "Add a title “Day one” at the start", "Add a fade between
+      every clip", "Make it square" → it edits; **Undo** takes the whole answer back. With no
+      server key this is an offline demo (a few phrases only). To try a real model: on Vercel set
+      `ASSISTANT_API_KEY` (and `ASSISTANT_MODEL`, e.g. a small fast model; `ASSISTANT_URL` for a
+      non-OpenAI OpenAI-compatible endpoint), redeploy, then ask anything ("cut the first 2
+      seconds", "make the title yellow and bigger"). _Checked here:_ assistant-check (mocked
+      model end to end, one undo, bad plan changes nothing, offline demo, axe, phone) + 6 unit
+      tests.

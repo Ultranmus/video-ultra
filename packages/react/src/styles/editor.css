@@ -2827,6 +2827,69 @@
     background: var(--vu-meter-clip);
   }
 
+  /* v0.4 AI editing */
+  .vu-assistant {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-3);
+  }
+
+  .vu-assistant-turns {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .vu-assistant-turn {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-1);
+  }
+
+  .vu-assistant-turn p {
+    margin: 0;
+  }
+
+  .vu-assistant-you {
+    align-self: flex-end;
+    max-inline-size: 90%;
+    padding: var(--vu-space-2) var(--vu-space-3);
+    border-radius: var(--vu-radius-md);
+    background: var(--vu-accent-soft);
+  }
+
+  .vu-assistant-reply {
+    padding: var(--vu-space-2) var(--vu-space-3);
+    border-radius: var(--vu-radius-md);
+    background: var(--vu-surface-2);
+  }
+
+  .vu-assistant-result {
+    color: var(--vu-text-muted);
+    font-size: var(--vu-text-sm);
+  }
+
+  .vu-assistant-result[data-state='done'] {
+    color: var(--vu-success);
+  }
+
+  .vu-assistant-result[data-state='error'] {
+    color: var(--vu-danger);
+  }
+
+  .vu-assistant-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-2);
+  }
+
+  .vu-assistant-input {
+    font-size: var(--vu-text-md);
+  }
+
   /* v0.4 Scopes */
   .vu-scopes {
     display: flex;

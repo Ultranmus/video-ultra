@@ -5,6 +5,7 @@ import {
   type Project,
   type Transcriber,
   type BackgroundRemover,
+  type EditingAssistant,
   type ExportResult,
   type AudioExportResult,
   type FrameImage,
@@ -99,6 +100,14 @@ export interface VideoEditorProps {
    */
   backgroundRemover?: BackgroundRemover;
   /**
+   * AI editing (v0.4): an Assistant panel where people type what they want ("make it warmer",
+   * "add a title at the start") and your model's answer is applied as one undo step. Use
+   * `createChatAssistant({ endpoint })` from `@video-ultra/ai` with your own server, or implement
+   * `EditingAssistant`. A description of the project (no media) is sent to it. Without it the
+   * panel isn't shown.
+   */
+  assistant?: EditingAssistant;
+  /**
    * Embedding API: hide or reorder built-in tools, add your own panels, top-bar buttons and
    * media sources (see {@link EditorCustomization}).
    */
@@ -166,6 +175,7 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
         ...(props.audioLibrary ? { audioLibrary: props.audioLibrary } : {}),
         ...(props.transcriber ? { transcriber: props.transcriber } : {}),
         ...(props.backgroundRemover ? { backgroundRemover: props.backgroundRemover } : {}),
+        ...(props.assistant ? { assistant: props.assistant } : {}),
         ...(props.customize ? { customize: props.customize } : {}),
       },
       parsed?.project ?? undefined,

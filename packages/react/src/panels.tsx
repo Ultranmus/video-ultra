@@ -20,6 +20,7 @@ import { FilterStrip, TransitionGrid } from './looks';
 import { CanvasTool } from './ToolPanel';
 import { BlurPanel } from './picture';
 import { TemplatesPanel } from './templates';
+import { AssistantPanel } from './assistant';
 import { MediaSources } from './library/MediaSources';
 
 /** The browse panel for an add-content category (desktop panel, phone sheet). */
@@ -47,6 +48,8 @@ export function AddPanel({ panel }: { panel: PanelId }): ReactElement {
       return <BlurPanel />;
     case 'templates':
       return <TemplatesPanel />;
+    case 'assistant':
+      return <AssistantPanel />;
     default:
       return <CustomPanelBody id={panel.slice('custom:'.length)} />;
   }
