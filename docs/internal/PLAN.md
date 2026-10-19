@@ -73,7 +73,7 @@ Deferred to v0.2+: speed curves, reverse, text animations, templates, keyframes,
 - [x] 2.3 HDR → SDR correction (measured calibrations, both backends, error ~5 / 255 vs Apple); rotation ✅; golden-frame CI test → BACKLOG
 - [x] 2.4 Audio engine: worker mixer → AudioWorklet, audio-driven clock, A/V sync (p95 ≤ 1.5 ms Chrome), fades, volume, resampling (`scripts/audio-check.ts`)
 - [x] 2.5 Device tiers in action: preview caps + decoder budgets per tier, adaptive preview quality (`engine/quality.ts`), held-frame counter
-- [ ] 2.6 Soak: `scripts/soak.ts` + OS memory; 6.8-min run plateaus (PERF.md); full 30-min run + the 1-late-frame-per-pass item → next session
+- [x] 2.6 Soak: 30-minute run flat (RSS −3.6 %, 0 underruns); the late-frame-per-pass item fixed (prefetch) — PERF.md (2026-10-20)
 - [ ] **Checkpoint (iPhone + Android):** multi-clip playback on phones
 
 ### Day 4 — Editor UI shell (Phase 3a)

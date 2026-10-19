@@ -74,7 +74,8 @@ Video-specific sizes: `--vu-size-topbar` 48px, `--vu-size-rail` 72px, `--vu-size
 `--vu-size-region-swatch` 64px, `--vu-size-key-preset` 28px. Capture & export (v0.2 D):
 `--vu-size-record`, `-record-mark`, `-record-stop`, `-record-ring`, `--vu-size-camera-dot`,
 `--vu-size-range-track`, `--vu-size-range-thumb`, `--vu-camera-bg`, `--vu-record`. Captions
-(v0.2 A): `--vu-size-caption-preset` 64px, `--vu-size-caption-time` 52px. Element resets in editor.css use `:where()` (zero specificity) so component
+(v0.2 A): `--vu-size-caption-preset` 64px, `--vu-size-caption-time` 52px. Combined clips (v0.4, #155):
+`--vu-size-inside-bar` 44px (the bar over the timeline while one is open). Element resets in editor.css use `:where()` (zero specificity) so component
 classes always win.
 
 ## `ThemeOverrides` (public, typed)

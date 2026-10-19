@@ -311,16 +311,25 @@ function releaseIdle(t: Time): void {
 }
 
 /** Warm up decoders for clips that appear soon — transitions included (first frame at the cut). */
+/** Clips being warmed up by {@link prefetch} (one request each at a time). */
+const warming = new Set<string>();
+
 function prefetch(t: Time): void {
   if (!project || !composer) return;
   const c = composer;
   for (const upcoming of upcomingVideo(project, t, fromSeconds(PREFETCH_S))) {
     const item = upcoming.item;
-    if (upcoming.visibleFrom <= t || c.sources.has(item.id)) continue;
-    void c.sourceFor(item.id, item.assetId).then(async (found) => {
-      const sample = await found?.source.frameAt(upcoming.firstSourceTime / FLICKS_PER_SECOND);
-      if (sample) c.keep(item.id, sample);
-    });
+    // Warm = it still holds a decoded frame. A source whose decoder releaseIdle gave back is
+    // cold again: skipping it made the next pass's first frame at that clip late (soak).
+    if (upcoming.visibleFrom <= t || c.lastFrames.has(item.id) || warming.has(item.id)) continue;
+    warming.add(item.id);
+    void c
+      .sourceFor(item.id, item.assetId)
+      .then(async (found) => {
+        const sample = await found?.source.frameAt(upcoming.firstSourceTime / FLICKS_PER_SECOND);
+        if (sample) c.keep(item.id, sample);
+      })
+      .finally(() => warming.delete(item.id));
   }
 }
 

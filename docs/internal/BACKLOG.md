@@ -122,8 +122,8 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [ ] WebKit (Playwright) has late frames at cuts where a new video starts (2 s, 7 s in the demo):
       check on the iPhone; widen prefetch (1 s → 1.5 s) if real.
 - [ ] Next iPhone batch: audio plays, A/V offset, underruns on a real phone (engine lab page).
-- [ ] Soak: ~1 late frame per pass in looped playback (0 in single runs) — find where (`lateAt`
-      in stats); run the full 30-minute soak; confirm RSS stays at the ~1675 MB plateau.
+- [x] Soak: late frames in looped playback — prefetch skipped clips whose decoder had been
+      released (PERF "Soak, 30 minutes"); 30-minute soak flat (−3.6 %), 0 underruns.
 - [ ] **Real Safari (iPhone batch):** storage worker with `createSyncAccessHandle` on iOS 17/18/26,
       `persist()` answer, recovery after the tab is killed by iOS; analyzer thumbnails of iPhone HEVC
       on the phone. Playwright's WebKit has no OPFS, so storage-check only covers memory there.

@@ -328,3 +328,19 @@ merged and re-verified on main; A (captions) and E (layers) here.
   empties dist).
 - Checks added: stage-text, multiedit, videos, compound, combine-ui. Golden frames unchanged on
   both backends and browsers.
+
+## 2026-10-20 (later) · Audio, release prep (branch `feat/audio-and-release`)
+
+- **Clean up noise** (#156): spectral noise gate, first in the effect chain; Clean voice preset;
+  Extract audio keeps fades, effects and lower-under-voice. denoise-check on real speech + fan
+  noise: −8 dB (50 %) / −10.5 dB (100 %) in pauses, speech within 0.2 dB.
+- **PLAN 5.2:** pack-check (publint, attw, gzip budgets, fresh install from the tarballs, typical
+  app type-check, Node import + server render); READMEs and licences per package; styles.css
+  types; `^` ranges on core; CI on push / PR with pack-check; release workflow (changesets,
+  provenance; needs `NPM_TOKEN`); first-release changeset (0.1.0).
+- **PLAN 5.1:** docs site in the playground (`/docs`, 12 pages, docs-check: axe clean, phones),
+  TypeDoc API reference (`pnpm docs:api`, built before the playground on Vercel); public types for
+  every prop; optional props accept `undefined`; Next.js example (server component + server
+  action, checked in a browser); Vite example shows the editor.
+- Fixes on the way: stray screenshots out of the repo root; per-package Vitest cache (a shared one
+  raced — the session's first unexplained test failure).
