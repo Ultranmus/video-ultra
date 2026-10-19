@@ -860,6 +860,18 @@ export const DEFAULT_LABELS = {
     'Add a fade between every clip',
     'Make it square for Instagram',
   ],
+  // v0.4 Text to speech
+  textToSpeech: 'Text to speech',
+  speechPlaceholder: 'Type what the voice should say',
+  speechVoice: 'Voice',
+  speechSpeed: 'Speed',
+  speechMake: 'Add voice',
+  speechMaking: 'Making the voice…',
+  readAloud: 'Read aloud',
+  tipReadAloud: 'A voice reads this text — added as a sound clip where the text starts',
+  voiceFile: 'Voice',
+  speechFailed: (why: string) => `Couldn't make the voice: ${why}`,
+  speechHint: 'The text goes to the voice service; the voice is added at the playhead.',
   // v0.4 Proxies
   makingProxy: (name: string) =>
     `Making a lighter copy of "${name}" for smooth editing — your export still uses the original`,

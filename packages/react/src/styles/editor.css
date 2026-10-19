@@ -2890,6 +2890,13 @@
     font-size: var(--vu-text-md);
   }
 
+  /* v0.4 Text to speech */
+  .vu-tts {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-2);
+  }
+
   /* v0.4 Scopes */
   .vu-scopes {
     display: flex;

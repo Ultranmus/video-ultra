@@ -153,6 +153,8 @@ export {
   type EditingResponse,
   type ProjectDescription,
 } from './ai/assistant';
+// Text to speech (v0.4, optional): the voice service interface.
+export type { SpeechGenerator, SpeechRequest, SpeechVoice } from './ai/speech';
 // Sound effects (v0.4): ready-made looks and the equaliser's band frequencies.
 export { AUDIO_FX_PRESETS, EQ_BANDS, pitchRatio } from './audio/fx';
 export type { CaptionPreset } from './captions/presets';

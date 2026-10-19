@@ -41,3 +41,26 @@ describe('chat assistant', () => {
     expect(JSON.parse(messages[3]!.content).instruction).toBe('add a title');
   });
 });
+
+describe('speech endpoint', () => {
+  it('posts text, voice and speed and returns typed audio', async () => {
+    const { createSpeechEndpoint } = await import('./speech');
+    let body: Record<string, unknown> = {};
+    const speech = createSpeechEndpoint({
+      endpoint: '/api/speech',
+      fetch: (async (_url: string, init: RequestInit) => {
+        body = JSON.parse(init.body as string);
+        return new Response(new Uint8Array([1, 2, 3]));
+      }) as typeof fetch,
+    });
+    const audio = await speech.speak({
+      text: 'Hello',
+      voice: 'nova',
+      speed: 3,
+      signal: new AbortController().signal,
+    });
+    expect(body).toMatchObject({ input: 'Hello', voice: 'nova', speed: 2, response_format: 'mp3' });
+    expect(audio.type).toBe('audio/mpeg');
+    expect((await speech.voices()).length).toBe(6);
+  });
+});

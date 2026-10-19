@@ -6,6 +6,7 @@ import {
   type Transcriber,
   type BackgroundRemover,
   type EditingAssistant,
+  type SpeechGenerator,
   type ExportResult,
   type AudioExportResult,
   type FrameImage,
@@ -108,6 +109,12 @@ export interface VideoEditorProps {
    */
   assistant?: EditingAssistant;
   /**
+   * Text to speech (v0.4): "Text to speech" in the Audio panel and "Read aloud" on texts add a
+   * spoken sound clip. Use `createSpeechEndpoint({ endpoint })` from `@video-ultra/ai` with
+   * your own server, or implement `SpeechGenerator`. Without it these aren't shown.
+   */
+  speech?: SpeechGenerator;
+  /**
    * Embedding API: hide or reorder built-in tools, add your own panels, top-bar buttons and
    * media sources (see {@link EditorCustomization}).
    */
@@ -176,6 +183,7 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
         ...(props.transcriber ? { transcriber: props.transcriber } : {}),
         ...(props.backgroundRemover ? { backgroundRemover: props.backgroundRemover } : {}),
         ...(props.assistant ? { assistant: props.assistant } : {}),
+        ...(props.speech ? { speech: props.speech } : {}),
         ...(props.customize ? { customize: props.customize } : {}),
       },
       parsed?.project ?? undefined,

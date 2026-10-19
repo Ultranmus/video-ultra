@@ -883,3 +883,15 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       OpenAI-compatible model when `ASSISTANT_API_KEY` (+ `ASSISTANT_URL`, `ASSISTANT_MODEL`) is
       set; otherwise an offline demo understands a few phrases (warmer, title "…", fades,
       square…), so the panel can be tried with no account.
+150.  **Text to speech through the host's voice service** (v0.4). On-device voices were weighed and
+      left out: the good small open models need an espeak-based phonemizer (GPL — can't ship in
+      an MIT package) or carry non-commercial licences, and the big character-level ones are
+      hundreds of MB. So, like captions and AI editing: an interface (`SpeechGenerator`: voices +
+      speak → audio Blob) and `createSpeechEndpoint` in `@video-ultra/ai` for OpenAI-compatible
+      `/audio/speech` endpoints (hosted services, or a self-hosted open voice model behind the
+      host's server). The answer is imported like a recording (stored, a sound clip, one undo).
+      UI: **Text to speech** in the Audio panel (text, voice chips, speed, Add voice → at the
+      playhead) and **Read aloud** on texts (the text's words, where it starts; phone tool +
+      inspector section). Playground: `/api/speech` forwards when `SPEECH_API_KEY` (or the
+      assistant's key) is set; otherwise an offline demo "voice" (tones per syllable) so the flow
+      can be tried. BACKLOG: revisit on-device voices when an MIT-compatible phonemizer exists.

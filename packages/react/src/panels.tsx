@@ -21,6 +21,7 @@ import { CanvasTool } from './ToolPanel';
 import { BlurPanel } from './picture';
 import { TemplatesPanel } from './templates';
 import { AssistantPanel } from './assistant';
+import { TextToSpeech } from './speech';
 import { MediaSources } from './library/MediaSources';
 
 /** The browse panel for an add-content category (desktop panel, phone sheet). */
@@ -320,6 +321,7 @@ function AudioPanel() {
         }}
       />
       <Voiceover />
+      <TextToSpeech />
       <ImportRows />
       {assets.length && library ? <h3 className="vu-audiolib-title">{l.yourAudio}</h3> : null}
       {assets.length ? (

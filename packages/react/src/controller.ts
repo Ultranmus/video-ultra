@@ -3,6 +3,7 @@ import {
   applyEditActions,
   describeProject,
   type EditingAssistant,
+  type SpeechGenerator,
   addAsset,
   addToLane,
   arrangeItem,
@@ -162,6 +163,8 @@ export interface ControllerOptions {
   backgroundRemover?: BackgroundRemover;
   /** AI editing with the host's model (`createChatAssistant()` from `@video-ultra/ai`, or yours). */
   assistant?: EditingAssistant;
+  /** Text to speech (`createSpeechEndpoint()` from `@video-ultra/ai`, or yours). */
+  speech?: SpeechGenerator;
 }
 
 /**
@@ -1951,6 +1954,69 @@ export class EditorController {
   /** Shows the photo's own background again. */
   restoreBackground(itemId: string): void {
     this.run(this.labels.restoreBackground, (d) => updateItem(d, itemId, { cutout: null }));
+  }
+
+  // ── text to speech (v0.4) ──────────────────────────────────────────────
+
+  #speechAbort: AbortController | null = null;
+
+  /**
+   * Speaks `text` with the host's voice service and adds it as a sound clip at `at` (default:
+   * the playhead). Progress: `ui.speechBusy`. Returns false when it failed or was stopped.
+   */
+  async speak(
+    text: string,
+    options: { voice?: string; speed?: number; at?: number } = {},
+  ): Promise<boolean> {
+    const speech = this.options.speech;
+    const words = text.trim();
+    if (!speech || !words) return false;
+    const l = this.labels;
+    this.#speechAbort?.abort();
+    const abort = new AbortController();
+    this.#speechAbort = abort;
+    this.ui.setState({ speechBusy: true });
+    try {
+      const voice = options.voice ?? (await speech.voices())[0]?.id ?? 'default';
+      const audio = await speech.speak({
+        text: words,
+        voice,
+        speed: options.speed ?? 1,
+        signal: abort.signal,
+      });
+      if (abort.signal.aborted) return false;
+      const extension = /wav/.test(audio.type)
+        ? 'wav'
+        : /ogg|opus/.test(audio.type)
+          ? 'ogg'
+          : /aac|mp4/.test(audio.type)
+            ? 'm4a'
+            : 'mp3';
+      const short =
+        words.length > 32 ? `${words.slice(0, 32).trimEnd()}…` : words.replace(/[.!?\s]+$/, '');
+      const name = `${l.voiceFile} · ${short}.${extension}`;
+      if (options.at !== undefined) this.seek(options.at);
+      await this.importFiles([new File([audio], name, { type: audio.type })], {
+        selectSound: true,
+      });
+      return true;
+    } catch (error) {
+      if (!abort.signal.aborted)
+        this.toast(l.speechFailed(error instanceof Error ? error.message : String(error)), 'error');
+      return false;
+    } finally {
+      if (this.#speechAbort === abort) {
+        this.#speechAbort = null;
+        this.ui.setState({ speechBusy: false });
+      }
+    }
+  }
+
+  /** Stops a running {@link speak}. */
+  cancelSpeech(): void {
+    this.#speechAbort?.abort();
+    this.#speechAbort = null;
+    this.ui.setState({ speechBusy: false });
   }
 
   // ── AI editing (v0.4) ───────────────────────────────────────────────────

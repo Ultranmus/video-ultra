@@ -36,6 +36,7 @@ import { ProTrimTool } from './protrim';
 import { ScenesTool } from './scenes';
 import { SoundFxTool } from './soundfx';
 import { ScopesView } from './scopes';
+import { ReadAloudTool } from './speech';
 import { MaskTool } from './mask';
 import { BlendTool, GreenScreenTool, RegionTool } from './picture';
 
@@ -121,6 +122,8 @@ function ItemTool({ tool, item }: { tool: ToolId; item: Item }): ReactElement | 
       return <KeyframesTool item={item} />;
     case 'protrim':
       return <ProTrimTool item={item} />;
+    case 'readaloud':
+      return item.kind === 'text' ? <ReadAloudTool item={item} /> : null;
     case 'soundfx':
       return item.kind === 'video' || item.kind === 'audio' ? <SoundFxTool item={item} /> : null;
     case 'scenes':
@@ -236,6 +239,11 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
           <Section title={l.style}>
             <TextStyleTool item={item} />
           </Section>
+          {ctl.options.speech ? (
+            <Section title={l.readAloud} collapsible defaultOpen={false}>
+              <ReadAloudTool item={item} />
+            </Section>
+          ) : null}
           <Section title={l.adjust} collapsible defaultOpen={false}>
             <AdjustTool item={item} />
           </Section>

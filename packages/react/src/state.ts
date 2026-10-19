@@ -59,7 +59,9 @@ export type ToolId =
   // v0.4 Scene detection
   | 'scenes'
   // v0.4 Sound effects
-  | 'soundfx';
+  | 'soundfx'
+  // v0.4 Text to speech
+  | 'readaloud';
 
 /** One exchange with the AI assistant (v0.4). */
 export interface AssistantTurn {
@@ -120,6 +122,8 @@ export interface UiState {
   /** AI editing (v0.4): this session's conversation, and whether a request is out. */
   assistantTurns: AssistantTurn[];
   assistantBusy: boolean;
+  /** Text to speech (v0.4) is generating. */
+  speechBusy: boolean;
   /** Proxies being made (v0.4): asset id → 0…1. */
   proxyJobs: Record<string, number>;
   /** A caption whose text box should take focus in the Captions panel. */
@@ -167,6 +171,7 @@ export function createUiStore() {
     proxyJobs: {},
     assistantTurns: [],
     assistantBusy: false,
+    speechBusy: false,
     captionEditing: null,
     panel: 'media',
     tool: null,

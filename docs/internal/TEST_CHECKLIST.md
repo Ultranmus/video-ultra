@@ -124,3 +124,9 @@ Open the branch's Vercel preview (or `pnpm --filter playground dev`), then **`/e
       seconds", "make the title yellow and bigger"). _Checked here:_ assistant-check (mocked
       model end to end, one undo, bad plan changes nothing, offline demo, axe, phone) + 6 unit
       tests.
+- [ ] **Text to speech.** Audio panel → **Text to speech** → type a sentence, pick a voice →
+      **Add voice** → a sound clip at the playhead. Select a title → **Read aloud** → its words
+      are spoken where it starts. Without a server key you hear the demo "voice" (soft tones per
+      syllable) — set `SPEECH_API_KEY` (or the assistant's key) on Vercel for a real voice.
+      _Checked here:_ speech-check (mocked service with a real recording, placement, failure
+      message, demo voice, axe) + 1 unit test.

@@ -377,6 +377,17 @@ function singleTools(
       return [
         { key: 'text-edit', icon: 'edit', label: l.edit, tool: 'text-edit' },
         { key: 'text-style', icon: 'style', label: l.style, tool: 'text-style' },
+        ...(ctl.options.speech
+          ? [
+              {
+                key: 'readaloud',
+                icon: 'audio',
+                label: l.readAloud,
+                tip: l.tipReadAloud,
+                tool: 'readaloud',
+              } as ToolEntry,
+            ]
+          : []),
         ...animate,
         look[0]!,
         look[1]!,

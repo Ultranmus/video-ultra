@@ -752,7 +752,8 @@ type TitleKey =
   | 'keyframes'
   | 'fineTrim'
   | 'splitAtScenes'
-  | 'soundEffects';
+  | 'soundEffects'
+  | 'readAloud';
 
 const TOOL_TITLE: Record<ToolId, TitleKey> = {
   speed: 'speed',
@@ -783,6 +784,7 @@ const TOOL_TITLE: Record<ToolId, TitleKey> = {
   protrim: 'fineTrim',
   scenes: 'splitAtScenes',
   soundfx: 'soundEffects',
+  readaloud: 'readAloud',
 };
 
 /**

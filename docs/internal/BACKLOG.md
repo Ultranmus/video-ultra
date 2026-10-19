@@ -213,3 +213,6 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [ ] Proxies (#148): HDR clips get no copy (an HDR → SDR copy would need tone mapping that
       matches the engine's); a "Make a lighter copy" button per clip and a Media panel badge
       would make the automatic choice visible — wait for the owner's feedback first.
+- [ ] Text to speech on the device (#150): needs an MIT/Apache phonemizer (or a character-level
+      voice model small enough for phones with a permissive licence). Until then voices come
+      from the host's service.
