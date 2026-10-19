@@ -131,6 +131,7 @@ export {
   type TemplateElement,
   type TemplateVariable,
   type TemplateCategory,
+  type Theme as TemplateTheme,
 } from './templates/templates';
 export {
   SHAPE_PRESETS,

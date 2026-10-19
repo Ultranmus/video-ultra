@@ -9,7 +9,18 @@ export type { ControllerOptions } from './controller';
 export { useController, useUi, useProject, useHistory, useLabels } from './context';
 export { DEFAULT_LABELS } from './labels';
 export type { Labels } from './labels';
-export type { UiState, LayoutMode, PanelId, ToolId } from './state';
+export type {
+  UiState,
+  LayoutMode,
+  PanelId,
+  ToolId,
+  AssistantTurn,
+  ImportRow,
+  Toast,
+} from './state';
+export { Playhead, Levels } from './state';
+export type { LookItem, Targets } from './targets';
+export type { AlignEdge } from './stage/arrange';
 export { createStarterSounds } from './library/starter-sounds';
 export type { StarterSoundLabels } from './library/starter-sounds';
 export type {
@@ -32,10 +43,18 @@ export { themeOverridesToStyle } from './theme';
 export type { ThemeMode, ThemeOverrides } from './theme';
 export { VERSION, detectCapabilities } from '@video-ultra/core';
 export type {
+  Asset,
+  AudioExportResult,
+  BackgroundRemover,
   Capabilities,
   DeviceTier,
-  Project,
+  EditingAssistant,
   ExportOptions,
   ExportProgress,
+  ExportLimits,
   ExportResult,
+  FrameImage,
+  Project,
+  SpeechGenerator,
+  Transcriber,
 } from '@video-ultra/core';

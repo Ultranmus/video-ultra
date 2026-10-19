@@ -68,7 +68,8 @@ export const TEMPLATE_CATEGORIES = [
 ] as const;
 export type TemplateCategory = (typeof TEMPLATE_CATEGORIES)[number];
 
-interface Theme {
+/** A template theme: the colours and fonts a template is drawn with. */
+export interface Theme {
   id: string;
   name: string;
   title: string; // font preset id

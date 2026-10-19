@@ -116,8 +116,8 @@ Deferred to v0.2+: speed curves, reverse, text animations, templates, keyframes,
 
 ### Day 7 — Release v0.1 (on hold)
 
-- [ ] 5.1 Docs site + API reference + examples (Next.js, Vite)
-- [ ] 5.2 Package checks (publint, attw, size limits), fresh install from npm tarball; turn CI back on for push / PR + add the release workflow
+- [x] 5.1 Docs site + API reference + examples (Next.js, Vite) — playground `/docs` (12 pages, docs-check), TypeDoc at `/api`, `apps/examples/nextjs` + `vite` (2026-10-20)
+- [x] 5.2 Package checks (publint, attw, size limits), fresh install from npm tarball; turn CI back on for push / PR + add the release workflow — `scripts/pack-check.ts`, CI on push / PR, `release.yml` (changesets, provenance) (2026-10-20)
 - [ ] 5.3 Fix Day 6 findings
 - [ ] 5.4 **Owner publishes** (`changeset publish`) + deploys the demo site
 

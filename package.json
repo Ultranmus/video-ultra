@@ -20,7 +20,8 @@
     "e2e": "turbo run e2e",
     "media": "node scripts/test-media.ts",
     "verify": "pnpm shaders --check && pnpm lint && pnpm format:check && pnpm build && pnpm typecheck && pnpm test",
-    "shaders": "node scripts/shaders.ts"
+    "shaders": "node scripts/shaders.ts",
+    "docs:api": "typedoc"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
@@ -36,6 +37,7 @@
     "prettier": "^3.9.10",
     "publint": "^0.3.25",
     "turbo": "^2.11.9",
+    "typedoc": "^0.28.20",
     "typescript": "6.0.3",
     "typescript-eslint": "^8.71.2"
   }

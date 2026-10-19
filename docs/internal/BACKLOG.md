@@ -4,6 +4,11 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 
 ## Open
 
+- [ ] mediabunny's dependency `@types/dom-webcodecs` clashes with TypeScript 6's built-in
+      WebCodecs types when an app type-checks with `skipLibCheck: false` (Next.js and Vite default
+      to true). Upstream; pack-check uses `skipLibCheck: true`.
+- [ ] Docs site: no search yet; the phone page list is long (a picker would be shorter).
+
 - [ ] Combined clips (#155): Separate re-makes lanes at the end of their kind (a title can come
       back above a sticker it was under); keep their old row order.
 - [ ] Combined clips: no waveform on the timeline for a combined clip with sound (mix its inside
@@ -85,9 +90,8 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [x] Truncated files: probe finds the playable length and warns "incomplete" (2026-10-17).
 - [x] Firefox + HEVC: probe returns `unsupported-video-codec` with a plain message (2026-10-17);
       the import UI (Day 4) must show it.
-- [ ] Vite consumers should set `worker: { format: 'es' }`; without it Vite inlines the AAC
-      fallback into the worker (1.57 MB instead of a lazy chunk). Document, or ship a pre-bundled
-      worker (Day 7 packaging).
+- [x] Vite consumers should set `worker: { format: 'es' }` — documented (docs /vite, the
+      react README) and set in `apps/examples/vite` (2026-10-20).
 - [ ] Turbopack also copies `lab.worker.js` as an unused static asset — harmless, check again
       with the real engine worker.
 - [x] HDR (HLG) washed out — fixed: correction shader + measured calibrations (Chrome WebGPU 5.5,
