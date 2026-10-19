@@ -16,6 +16,9 @@ import {
   type ReactNode,
 } from 'react';
 import { useStore } from 'zustand';
+import { AdjustTool, FadeTool, OpacityTool, SpeedTool, VolumeTool } from './ToolPanel';
+import { AllSelected, useSharedReps } from './multiedit';
+import { BlendTool } from './picture';
 import { ALIGN_COMMANDS, getCommand, menuSections, type Command, type CommandId } from './commands';
 import { useController, useLabels, useUi } from './context';
 import { Button, IconButton, Section } from './controls';
@@ -796,6 +799,7 @@ export function SelectionInspector(): ReactElement {
         <Section title={l.arrange}>
           <ArrangeControls />
         </Section>
+        <SharedSections />
         <Section>
           <div className="vu-arrange-row vu-arrange-toggles">
             <CommandButton id="duplicate" variant="secondary" />
@@ -804,6 +808,45 @@ export function SelectionInspector(): ReactElement {
         </Section>
       </div>
     </aside>
+  );
+}
+
+/**
+ * Several selected: the settings they share, each change made to all of them (DECISIONS #153).
+ * Filters and entrance / exit are in the left menu, which also acts on all of them.
+ */
+function SharedSections(): ReactElement | null {
+  const l = useLabels();
+  const shared = useSharedReps();
+  if (!shared) return null;
+  const { ids, reps } = shared;
+  if (!reps.speed && !reps.sound && !reps.look && !reps.layer) return null;
+  return (
+    <AllSelected ids={ids}>
+      <p className="vu-hint vu-shared-note">{l.appliesToAll(ids.length)}</p>
+      {reps.speed ? (
+        <Section title={l.speed}>
+          <SpeedTool item={reps.speed} />
+        </Section>
+      ) : null}
+      {reps.sound ? (
+        <Section title={l.sound}>
+          <VolumeTool item={reps.sound} />
+          <FadeTool item={reps.sound} />
+        </Section>
+      ) : null}
+      {reps.look ? (
+        <Section title={l.adjust} collapsible defaultOpen={false}>
+          <AdjustTool item={reps.look} />
+        </Section>
+      ) : null}
+      {reps.layer ? (
+        <Section title={l.opacityBlend}>
+          <OpacityTool item={reps.layer} />
+          <BlendTool item={reps.layer} />
+        </Section>
+      ) : null}
+    </AllSelected>
   );
 }
 

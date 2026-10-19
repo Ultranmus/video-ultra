@@ -209,5 +209,9 @@ _D. Capture & export_
       device can encode) — HEVC + AV1 export (#144); MOV / MKV / alpha → BACKLOG
 - [x] Audio EQ, compressor, pitch shift, meters (M); scopes (M); scene detection + auto-split (M)
       — scene detection + auto-split (#145), EQ / compressor / pitch / meters (#146), scopes (#147) done
-- [ ] Text-to-speech voiceover (L); multiple sequences / compound clips (L) — TTS done (#150)
+- [x] Text-to-speech voiceover (L) — #150
+- [x] Edit several at once (M) — #153 (owner's choice over multiple sequences)
+- [ ] Duplicate project, sharing media (S) — #153
+- [ ] Combine into one clip (compound clip; context menu only) (L) — #153; multiple timelines →
+      BACKLOG
 - [x] Optional AI editing plugin (bring-your-own endpoint) driving the op-based Project (M) — #149

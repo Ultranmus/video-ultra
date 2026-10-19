@@ -9,6 +9,12 @@ import type { UiState } from './state';
 /** The editor's controller, for components inside `<VideoEditor />`. */
 export const ControllerContext = createContext<EditorController | null>(null);
 
+/**
+ * The item panel-level tools (filters, animation) act on, instead of the selection's primary
+ * one — set while several are selected (multiedit.tsx). `undefined`: the selection decides.
+ */
+export const SubjectContext = createContext<string | null | undefined>(undefined);
+
 /** The controller of the surrounding `<VideoEditor />`. */
 export function useController(): EditorController {
   const ctl = useContext(ControllerContext);

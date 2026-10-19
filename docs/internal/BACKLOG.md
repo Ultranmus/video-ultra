@@ -4,6 +4,9 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 
 ## Open
 
+- [ ] Multiple timelines in one project (tabs; one dropped into another as a combined clip) —
+      left out of v0.4 for edit-several + duplicate project (#153).
+
 - [ ] Owner's "frame lane flickers when changing the selection in Layers" (2026-10-19) didn't
       reproduce (2026-10-20): Chrome and WebKit, 1× and 2× pixels, clips and video layers — no new
       thumbnail requests, Layers pictures kept, the timeline canvas changes once per click (the

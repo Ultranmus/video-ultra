@@ -1015,6 +1015,7 @@ export const DEFAULT_LABELS = {
   captionsTranscribing: (percent: number) => `Listening · ${percent}%`,
   captionsCancel: 'Stop',
   captionsNoSpeech: 'No speech was heard in this video.',
+  appliesToAll: (n: number) => `Changes here apply to all ${n} selected.`,
   captionsNeedSecure:
     "Captions can't hear the video on this connection: browsers only let pages read sound on secure (https) pages.",
   captionsSoundUnreadable:

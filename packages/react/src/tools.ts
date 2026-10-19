@@ -4,6 +4,7 @@ import type { EditorController } from './controller';
 import type { IconSpec } from './icons';
 import { inHostOrder, isHidden } from './embed';
 import type { Labels } from './labels';
+import { sharedReps } from './multiedit';
 import type { PanelId, ToolId } from './state';
 import { hasCutInto, type Targets } from './targets';
 
@@ -85,9 +86,47 @@ function builtInTools(
     tool: 'arrange',
   };
   if (count > 1) {
+    // The settings they share, each acting on all of them (DECISIONS #153).
+    const reps = sharedReps(project, ctl.selectedItems());
+    const shared: ToolEntry[] = [
+      ...(reps.speed
+        ? [{ key: 'speed', icon: 'speed', label: l.speed, tip: l.tipSpeed, tool: 'speed' } as const]
+        : []),
+      ...(reps.sound
+        ? ([
+            { key: 'volume', icon: 'volume', label: l.volume, tip: l.tipVolume, tool: 'volume' },
+            { key: 'fade', icon: 'fade', label: l.fade, tip: l.tipFade, tool: 'fade' },
+          ] as const)
+        : []),
+      ...(reps.look
+        ? ([
+            { key: 'filter', icon: 'filter', label: l.filter, tip: l.tipFilter, tool: 'filter' },
+            { key: 'adjust', icon: 'adjust', label: l.adjust, tip: l.tipAdjust, tool: 'adjust' },
+          ] as const)
+        : []),
+      ...(reps.layer
+        ? ([
+            {
+              key: 'animate',
+              icon: 'sparkle',
+              label: l.animate,
+              tip: l.tipAnimate,
+              tool: 'animate',
+            },
+            {
+              key: 'opacity',
+              icon: 'opacity',
+              label: l.opacity,
+              tip: l.tipOpacity,
+              tool: 'opacity',
+            },
+          ] as const)
+        : []),
+    ];
     return [
       command(ctl.selectedGroup() ? 'ungroup' : 'group', 'group'),
       arrange,
+      ...shared,
       command('lock'),
       command('hide'),
       command('duplicate'),

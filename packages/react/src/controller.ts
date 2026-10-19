@@ -122,6 +122,7 @@ import {
 import { alignOffsets, distributeOffsets, type AlignEdge } from './stage/arrange';
 import { itemBox, visibleItemsAt, type Box } from './stage/geometry';
 import { measureText } from './stage/measure';
+import { spread } from './fanout';
 
 /** Options the `<VideoEditor />` passes to its controller. */
 export interface ControllerOptions {
@@ -596,6 +597,23 @@ export class EditorController {
     this.seek(Math.round(this.playhead.time / frame + frames) * frame);
   }
 
+  // ── editing several at once (DECISIONS #153) ─────────────────────────
+
+  /** While set (a call through `fanOutController`), edits also reach these selected items. */
+  fanOut: readonly string[] | null = null;
+
+  /** `recipe`, spreading what it changes to the fan-out items when a fan-out is on. */
+  #fanned<F extends ((draft: Project, ctx: EditContext) => unknown) | null>(recipe: F): F {
+    const ids = this.fanOut;
+    if (!recipe || !ids) return recipe;
+    const base = this.project;
+    return ((draft: Project, ctx: EditContext) => {
+      const result = recipe(draft, ctx);
+      spread(base, draft, ids, ctx);
+      return result;
+    }) as F;
+  }
+
   // ── transient previews (drags) ─────────────────────────────────────────
 
   /**
@@ -603,6 +621,7 @@ export class EditorController {
    * release). Nothing is written to the store or the undo history. Coalesced per frame.
    */
   preview(recipe: ((draft: Project, ctx: EditContext) => void) | null): Project | null {
+    recipe = this.#fanned(recipe);
     if (!recipe) {
       if (this.#previewProject) void this.engine?.setProject(this.project).catch(() => {});
       this.#previewProject = null;
@@ -632,6 +651,7 @@ export class EditorController {
     recipe: (draft: Project, ctx: EditContext) => R,
     options?: { coalesceKey?: string },
   ): R | undefined {
+    recipe = this.#fanned(recipe);
     this.#previewProject = null;
     try {
       return this.editor.apply(label, recipe, options);

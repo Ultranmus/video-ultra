@@ -214,8 +214,10 @@ function FilterSection({
           className="vu-filter-tile"
           onClick={() => {
             ctl.applyFilter(item, id);
-            // Picking a look for a clip makes that clip the selection, so it's clear what changed.
-            ctl.select(item.id, { keepPanel: true });
+            // Picking a look for a clip makes that clip the selection, so it's clear what changed
+            // (several selected: they all changed, the selection stays).
+            if (!ctl.ui.getState().selectedIds.includes(item.id))
+              ctl.select(item.id, { keepPanel: true });
           }}
         >
           <TileImage bitmap={tiles?.[i] ?? null} />

@@ -22,6 +22,7 @@ import { BlurPanel } from './picture';
 import { TemplatesPanel } from './templates';
 import { AssistantPanel } from './assistant';
 import { TextToSpeech } from './speech';
+import { SelectionScope } from './multiedit';
 import { MediaSources } from './library/MediaSources';
 
 /** The browse panel for an add-content category (desktop panel, phone sheet). */
@@ -38,9 +39,17 @@ export function AddPanel({ panel }: { panel: PanelId }): ReactElement {
     case 'canvas':
       return <CanvasTool />;
     case 'filters':
-      return <FilterStrip />;
+      return (
+        <SelectionScope kind="look">
+          <FilterStrip />
+        </SelectionScope>
+      );
     case 'transitions':
-      return <TransitionGrid />;
+      return (
+        <SelectionScope kind="motion">
+          <TransitionGrid />
+        </SelectionScope>
+      );
     case 'layers':
       return <LayersPanel />;
     case 'captions':

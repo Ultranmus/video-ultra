@@ -921,3 +921,21 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       plainly instead of "No speech was heard" (`listen` fails with `SoundUnreadable`). Safari
       on http keeps an undefined `audioWorklet`: playback sound now says "needs a secure
       (https) page" from `isSecureContext` first. Results in PERF.md "Captions".
+
+153.  **Finishing v0.4: edit several at once, duplicate project, combine into one clip — no
+      multiple timelines** (owner, 2026-10-20, after weighing compound clips vs. multiple
+      sequences for what people prefer). Everyday editors change several clips at once ("apply
+      to all / selected") far more often than they reach for a nested clip, and expect
+      "Duplicate project" for another version, not timeline tabs. So: (1) **Edit several at
+      once** — with several selected, the inspector's Speed, Sound (volume, mute, fades),
+      Adjust and Opacity & blend, the left menu's Filters and Transitions / entrance-exit, and
+      the phone's multi-selection tools (Speed, Volume, Fade, Filter, Adjust, Animate, Opacity)
+      act on all of them, one undo step. Built once, not per tool: the tools show a
+      representative item, and run through a controller whose edits (direct, or inside a
+      controller method) are spread to every other selected item that has that setting —
+      speed through `setSpeed` (later clips move up), the rest field by field through
+      `updateItem` / `setAnimation` / `setTransition`, so an item without that setting keeps
+      its own; place, size, timing and text are never copied. (2) **Duplicate project** sharing
+      the media files. (3) **Combine into one clip** (compound) only in the context menu (pro,
+      progressive disclosure): Combine / Open / Separate. Multiple timelines in one project →
+      BACKLOG (1 + 2 cover what people use them for).

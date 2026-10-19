@@ -8,9 +8,9 @@ import {
   type Time,
 } from '@video-ultra/core';
 import { itemIndexAt } from '@video-ultra/core/internal';
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { useStore } from 'zustand';
-import { useController } from './context';
+import { SubjectContext, useController } from './context';
 import type { Labels } from './labels';
 
 /**
@@ -203,7 +203,9 @@ function key(t: Targets): string {
 export function useTargets(): Targets {
   const ctl = useController();
   const project = useStore(ctl.editor.store, (s) => s.project);
-  const selectedId = useStore(ctl.ui, (s) => s.selectedId);
+  const primary = useStore(ctl.ui, (s) => s.selectedId);
+  const subject = useContext(SubjectContext);
+  const selectedId = subject !== undefined ? subject : primary;
   const [targets, setTargets] = useState(() =>
     computeTargets(project, selectedId, ctl.playhead.time, ctl.labels),
   );

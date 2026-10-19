@@ -468,6 +468,12 @@
     border-bottom: 1px solid var(--vu-border);
   }
 
+  /* Several selected: says the settings below change all of them (DECISIONS #153). */
+  .vu-inspector .vu-shared-note {
+    margin: 0;
+    padding: var(--vu-space-3) var(--vu-space-4) 0;
+  }
+
   .vu-section:last-child {
     border-bottom: 0;
   }

@@ -141,6 +141,10 @@ the stage and everything drawn on it don't mirror. Text items in RTL scripts ren
   "⋯" in Layers, Shift+F10): the selection's commands in groups; Align as a submenu. On desktop the
   submenu opens beside the menu (flipped left near the right edge); on phones, inline under its
   item.
+- **Several selected** (#153): the desktop inspector shows "Changes here apply to all N
+  selected" and the settings they share (Speed, Sound, Adjust, Opacity & blend); the left
+  menu's Filters and Transitions act on all of them; the phone's multi-selection tools add
+  Speed, Volume, Fade, Filter, Adjust, Animate, Opacity.
 - **Typing on the stage** (#151): double-click a text (mouse) or tap a selected text (touch) →
   a field over it, styled like the text, dashed accent outline; click away or ⌘/Ctrl+Enter keeps
   it, Esc puts the old text back.
