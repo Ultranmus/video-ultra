@@ -17,7 +17,6 @@ const arg = (name: string) =>
 const port = arg('port') ?? '3200';
 const shots = arg('shots');
 const browserName = arg('browser') ?? 'chrome';
-const F = 705_600_000;
 
 let failures = 0;
 const results: string[] = [];
