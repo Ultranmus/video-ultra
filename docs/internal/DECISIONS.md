@@ -895,3 +895,29 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       inspector section). Playground: `/api/speech` forwards when `SPEECH_API_KEY` (or the
       assistant's key) is set; otherwise an offline demo "voice" (tones per syllable) so the flow
       can be tried. BACKLOG: revisit on-device voices when an MIT-compatible phonemizer exists.
+
+151.  **Typing on the stage** (owner's list, 2026-10-19: "text isn't editable on the canvas").
+      Double-click a text (mouse; it selects all), or tap a text that's already selected (touch;
+      the caret goes to the end), and a field opens right over it, styled like the text — font,
+      size, colour, spacing, alignment, turn, outline, shadow, background. The engine hides that
+      item meanwhile (a preview, not an edit), so only the field shows. Typing stays in the field
+      — no store write per key — and lands as one edit (one undo step) when the field closes
+      (click away, ⌘/Ctrl+Enter); Esc puts the old text back. The field is always in the page and
+      focused inside the tap: iOS only raises the keyboard for focus given in a user gesture.
+      Its own line breaks can differ by a line from the engine's balanced wrap while typing; the
+      engine's layout returns as soon as it closes. Captions keep their own editing (list).
+
+152.  **Captions on real speech under background sound** (owner's iPhone, Hindi: "No speech was
+      heard"). Measured on real Hindi (LibriVox) mixed 15 / 8 dB over background: the model
+      reports a high no-speech probability (0.4–0.7) on windows full of words it wrote with
+      confidence (≥ −0.5), and #130's "no-speech > 0.5" dropped them. Made-up text (#130's
+      clips, every model, English and Hindi) is always sparse or unsure (≤ −0.75), so that rule
+      now drops a window only when it is also sparse (fewer than 0.3 words per second) or unsure
+      (< −0.6); every other #130 guard stands. Also: when the model's word timing collapses
+      (every word stamped within 0.5 s at the window's end — seen on real Hindi), the words are
+      spread over the parts of the window with sound instead of being dropped, so captions come
+      with rough timing the user can nudge. And when the video has sound the browser can't
+      decode here (no AudioDecoder on an http page, or a missing codec), captions say that
+      plainly instead of "No speech was heard" (`listen` fails with `SoundUnreadable`). Safari
+      on http keeps an undefined `audioWorklet`: playback sound now says "needs a secure
+      (https) page" from `isSecureContext` first. Results in PERF.md "Captions".

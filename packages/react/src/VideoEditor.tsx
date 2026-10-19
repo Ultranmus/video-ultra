@@ -406,7 +406,7 @@ function Shell({
         onChange={(e) => {
           const files = [...(e.currentTarget.files ?? [])];
           e.currentTarget.value = '';
-          void ctl.importFiles(files);
+          void ctl.importFiles(files, { atStart: ctl.takePickPlace() === 'start' });
         }}
       />
       {dropping ? (

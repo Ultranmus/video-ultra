@@ -8,6 +8,7 @@ import {
 } from '@video-ultra/core';
 import {
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -510,8 +511,14 @@ function MenuPanel({ x, y }: { x: number; y: number }): ReactElement {
   const ctl = useController();
   const l = useLabels();
   const ref = useRef<HTMLDivElement>(null);
+  const phone = useUi((s) => s.layout === 'phone');
+  const subId = useId();
   const [submenu, setSubmenu] = useState(false);
   const [pos, setPos] = useState({ x, y });
+  // Desktop: the submenu sits beside the list (outside it, so the list's scrolling can't clip
+  // it), lined up with its item and flipped to the left when there's no room on the right.
+  const [sub, setSub] = useState({ top: 0, flip: false });
+  const lastPointer = useRef('');
   const returnFocus = useRef<HTMLElement | null>(
     typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null,
   );
@@ -531,6 +538,15 @@ function MenuPanel({ x, y }: { x: number; y: number }): ReactElement {
     const nx = Math.max(8, Math.min(x, root.clientWidth - el.offsetWidth - 8));
     const ny = Math.max(8, Math.min(y, root.clientHeight - el.offsetHeight - 8));
     setPos((p) => (p.x === nx && p.y === ny ? p : { x: nx, y: ny }));
+    const panel = el.querySelector<HTMLElement>(':scope > .vu-submenu');
+    const trigger = el.querySelector<HTMLElement>('[data-submenu]');
+    if (panel && trigger) {
+      const top = trigger.getBoundingClientRect().top - el.getBoundingClientRect().top;
+      const maxTop = root.clientHeight - ny - panel.offsetHeight - 8;
+      const flip = nx + el.offsetWidth + panel.offsetWidth + 8 > root.clientWidth;
+      const next = { top: Math.max(-ny + 8, Math.min(top, maxTop)), flip };
+      setSub((p) => (p.top === next.top && p.flip === next.flip ? p : next));
+    }
     if (!focused.current) {
       focused.current = true;
       el.querySelector<HTMLElement>('[role="menuitem"]:not([aria-disabled="true"])')?.focus();
@@ -555,7 +571,7 @@ function MenuPanel({ x, y }: { x: number; y: number }): ReactElement {
       ...(ref.current?.querySelectorAll<HTMLElement>(
         submenu
           ? '.vu-submenu [role="menuitem"]'
-          : ':scope > [role="menuitem"], :scope > .vu-menu-group > [role="menuitem"]',
+          : ':scope > .vu-menu-main > .vu-menu-group > [role="menuitem"], :scope > .vu-menu-main > .vu-menu-group > .vu-menu-sub > [role="menuitem"]',
       ) ?? []),
     ];
     const i = items.indexOf(document.activeElement as HTMLElement);
@@ -608,62 +624,88 @@ function MenuPanel({ x, y }: { x: number; y: number }): ReactElement {
     </div>
   );
 
+  const subPanel = (
+    <div
+      id={subId}
+      className="vu-submenu vu-menu"
+      role="menu"
+      aria-label={l.align}
+      data-flip={!phone && sub.flip ? '' : undefined}
+      style={phone ? undefined : { top: sub.top }}
+    >
+      {ALIGN_COMMANDS.map((a) => item(getCommand(ctl, a)))}
+    </div>
+  );
+
   return (
     <div
       ref={ref}
-      className="vu-menu"
-      role="menu"
-      aria-label={heading ?? l.moreActions}
+      className="vu-menu-wrap"
       style={{ left: pos.x, top: pos.y }}
       onKeyDown={onKey}
       onContextMenu={(e) => e.preventDefault()}
     >
-      {heading ? <div className="vu-menu-heading">{heading}</div> : null}
-      {sections.map((section, si) => (
-        <div key={si} className="vu-menu-group" role="none">
-          {section.map((id) =>
-            id === 'align' ? (
-              <div key="align" className="vu-menu-sub" role="none">
-                <div
-                  role="menuitem"
-                  tabIndex={-1}
-                  aria-haspopup="menu"
-                  aria-expanded={submenu}
-                  data-submenu=""
-                  className="vu-menu-item"
-                  onClick={() => setSubmenu(!submenu)}
-                  onPointerEnter={(e) => e.pointerType === 'mouse' && setSubmenu(true)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'ArrowRight' || e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setSubmenu(true);
-                      requestAnimationFrame(() =>
-                        ref.current
-                          ?.querySelector<HTMLElement>(
-                            '.vu-submenu [role="menuitem"]:not([aria-disabled="true"])',
-                          )
-                          ?.focus(),
-                      );
-                    }
-                  }}
-                >
-                  <Icon name="alignToCenter" size={16} />
-                  <span className="vu-menu-label">{l.align}</span>
-                  <Icon name="arrowRight" size={14} />
-                </div>
-                {submenu ? (
-                  <div className="vu-submenu vu-menu" role="menu" aria-label={l.align}>
-                    {ALIGN_COMMANDS.map((a) => item(getCommand(ctl, a)))}
+      <div
+        className="vu-menu vu-menu-main"
+        role="menu"
+        aria-label={heading ?? l.moreActions}
+        onScroll={() => !phone && setSubmenu(false)}
+        onPointerOver={(e) => {
+          // A mouse moving onto another item closes the desktop submenu.
+          const t = e.target as HTMLElement;
+          if (!phone && e.pointerType === 'mouse' && !t.closest('.vu-menu-sub')) {
+            if (t.closest('[role="menuitem"]')) setSubmenu(false);
+          }
+        }}
+      >
+        {heading ? <div className="vu-menu-heading">{heading}</div> : null}
+        {sections.map((section, si) => (
+          <div key={si} className="vu-menu-group" role="none">
+            {section.map((id) =>
+              id === 'align' ? (
+                <div key="align" className="vu-menu-sub" role="none">
+                  <div
+                    role="menuitem"
+                    tabIndex={-1}
+                    aria-haspopup="menu"
+                    aria-expanded={submenu}
+                    aria-controls={submenu ? subId : undefined}
+                    data-submenu=""
+                    className="vu-menu-item"
+                    onPointerDown={(e) => (lastPointer.current = e.pointerType)}
+                    // A mouse opens it on hover, so a click only ever opens it (a toggle would
+                    // close what the hover just opened); touch and keys toggle.
+                    onClick={() => setSubmenu((v) => lastPointer.current === 'mouse' || !v)}
+                    onPointerEnter={(e) => e.pointerType === 'mouse' && setSubmenu(true)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'ArrowRight' || e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setSubmenu(true);
+                        requestAnimationFrame(() =>
+                          ref.current
+                            ?.querySelector<HTMLElement>(
+                              '.vu-submenu [role="menuitem"]:not([aria-disabled="true"])',
+                            )
+                            ?.focus(),
+                        );
+                      }
+                    }}
+                  >
+                    <Icon name="alignToCenter" size={16} />
+                    <span className="vu-menu-label">{l.align}</span>
+                    <Icon name="arrowRight" size={14} />
                   </div>
-                ) : null}
-              </div>
-            ) : (
-              item(getCommand(ctl, id))
-            ),
-          )}
-        </div>
-      ))}
+                  {submenu && phone ? subPanel : null}
+                </div>
+              ) : (
+                item(getCommand(ctl, id))
+              ),
+            )}
+          </div>
+        ))}
+      </div>
+      {submenu && !phone ? subPanel : null}
     </div>
   );
 }

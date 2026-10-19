@@ -10,6 +10,7 @@ import {
   activeFrames,
   activeShare,
   keepWords,
+  spreadCollapsed,
   windowsOf,
   wordsWithSound,
   WINDOW_SECONDS,
@@ -413,7 +414,7 @@ export function createOnDeviceTranscriber(options: OnDeviceTranscriberOptions = 
               markBuilding(null);
             }
           }
-          const spoken = wordsWithSound(heard.words, active);
+          const spoken = wordsWithSound(spreadCollapsed(heard.words, active), active);
           for (const word of keepWords(spoken, w.index, w.isLast, length)) words.push(word);
           request.onProgress?.({
             stage: 'transcribe',

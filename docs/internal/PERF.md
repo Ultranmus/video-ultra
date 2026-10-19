@@ -428,6 +428,26 @@ Per 30 s window (no-speech probability · average token log-probability):
 
 After the guards: no captions from any no-speech clip; speech clips unchanged.
 
+**Real speech under background sound (DECISIONS #152, 2026-10-20, `small`, WebGPU, Chrome on the
+Mac):** words heard on two real Hindi recordings (LibriVox, 60 s), clean and mixed 15 / 8 dB over
+background. Window numbers (no-speech · confidence): speech under sound 0.17–0.68 · −0.43 to
+−0.5 with 14–74 words; made-up text 1–3 words at ≥ 0.58 or ≤ −0.75.
+
+| Clip              | before (#130) | after (#152)                                         |
+| ----------------- | ------------- | ---------------------------------------------------- |
+| Hindi 1, clean    | 84            | 84                                                   |
+| Hindi 1, 15 dB    | 68            | 97                                                   |
+| Hindi 1, 8 dB     | 0             | 0                                                    |
+| Hindi 2, clean    | 0             | 8                                                    |
+| Hindi 2, 15 dB    | 0             | 14                                                   |
+| Hindi 2, 8 dB     | 0             | 49                                                   |
+| speech-hi         | 72            | 72                                                   |
+| iPhone, no speech | 0             | 0 (5 clips × tiny / base / small, English and Hindi) |
+
+Hindi 2 stays low: the model writes a few words and ends the window (no seek past an early end
+yet — BACKLOG). The `real/*-phone.m4a` re-recordings give 1–3 words with or without guards — the
+speech is buried under the room sound; English re-recorded the same way gives "Thank you.".
+
 ## Shape masks (v0.3, 2026-10-19)
 
 - No textures or buffers: a shape is ~20–60 ALU ops per covered pixel in the layer's own draw

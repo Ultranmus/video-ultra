@@ -67,7 +67,9 @@ export interface Engine {
   /**
    * A project's sound (`from`…`to`) as mono PCM at `sampleRate`, in pieces of `pieceSeconds`,
    * mixed by the same mixer as export. Pulled one piece at a time, so memory stays flat. Used to
-   * hand speech to a transcriber (pass a project without the music to help it).
+   * hand speech to a transcriber (pass a project without the music to help it). Fails with an
+   * error named `SoundUnreadable` when the project has sound but none of it can be decoded here
+   * (an http page has no audio decoder), rather than handing over silence.
    */
   listen(
     project: Project,
@@ -229,7 +231,12 @@ export async function createEngine(
     if (message.ok) entry.resolve(message.data);
     else if (message.name === 'AbortError')
       entry.reject(new DOMException(message.error, 'AbortError'));
-    else entry.reject(new Error(message.error));
+    else {
+      // Keep the worker's error name (e.g. `SoundUnreadable` from listen) for callers to tell apart.
+      const error = new Error(message.error);
+      if (message.name && message.name !== 'Error') error.name = message.name;
+      entry.reject(error);
+    }
   };
   let fatal = false;
   const die = (message: string) => {
@@ -286,8 +293,9 @@ export async function createEngine(
     if (destroyed || audio || options.audio === false || typeof AudioContext === 'undefined')
       return;
     // Browsers only offer AudioWorklet on secure pages (https, localhost). On http over a LAN
-    // address (a phone testing a dev server) there is no sound — say so plainly, once.
-    if (!('audioWorklet' in AudioContext.prototype)) {
+    // address (a phone testing a dev server) there is no sound — say so plainly, once. Safari
+    // keeps the property there but leaves it undefined, so check the page itself first.
+    if (globalThis.isSecureContext === false || !('audioWorklet' in AudioContext.prototype)) {
       audio = { context: null, ready: Promise.resolve() };
       handlers.onAudioUnavailable?.(
         globalThis.isSecureContext === false ? 'insecure' : 'failed',

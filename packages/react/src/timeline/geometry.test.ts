@@ -102,6 +102,18 @@ describe('timeline geometry', () => {
     expect(hitTest(rows, m, scale, 200, rows[0]!.top + 28, null, false).type).toBe('transition');
   });
 
+  it('phones: a "+" before the first clip adds at the start', () => {
+    const p = project();
+    const rows = layoutRows(p, m);
+    // The playhead mid-screen at 0 s: time 0 sits 200 px in.
+    const scale = { pps: 100, x0: 200 };
+    const y = rows[0]!.top + m.mainTrack / 2;
+    const hit = hitTest(rows, m, scale, 200 - 8 - 20, y, null, true, true);
+    expect(hit.type === 'add' && hit.atStart).toBe(true);
+    // Not on desktop, and nothing there to the left without the flag.
+    expect(hitTest(rows, m, scale, 200 - 8 - 20, y, null, true, false).type).not.toBe('add');
+  });
+
   it('groups rows: main video, picture layers, text, then sound', () => {
     const p = project();
     const lane = (id: string, kind: 'overlay' | 'text' | 'audio') =>

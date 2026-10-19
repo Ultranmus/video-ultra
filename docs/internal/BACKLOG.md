@@ -4,6 +4,15 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 
 ## Open
 
+- [ ] Owner's "frame lane flickers when changing the selection in Layers" (2026-10-19) didn't
+      reproduce (2026-10-20): Chrome and WebKit, 1× and 2× pixels, clips and video layers — no new
+      thumbnail requests, Layers pictures kept, the timeline canvas changes once per click (the
+      selection outline). Needs a screen recording of it.
+- [ ] Captions: when the model ends a window early (a few words, then end of text), hear the
+      rest of the window again from the last word (like a seek), so long speech isn't cut (#152).
+- [ ] Captions: speech far under room sound (a phone re-recording) gives nothing — the model
+      itself hears 1–3 words; consider a speech-band filter / noise reduction before the model.
+
 - [ ] (v0.2 A) Captions: right-to-left captions show without the word highlight; Chinese /
       Japanese / Thai need character-based words (not offered yet); one caption row (no
       multi-language rows); "Detect" uses the default model (Hindi needs Hindi chosen); the

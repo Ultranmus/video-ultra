@@ -225,6 +225,7 @@ export class EditorController {
   engine: Engine | null = null;
   caps: Capabilities | null = null;
   #filePicker: (() => void) | null = null;
+  #pickPlace: 'playhead' | 'start' = 'playhead';
   /** Bytes of every asset, for the engine and analyzer (Files/Blobs: no copies in memory). */
   readonly media = new Map<string, Blob>();
   #disposers: (() => void)[] = [];
@@ -297,8 +298,17 @@ export class EditorController {
   }
 
   /** Opens the file picker (the shell registers it). */
-  pickFiles(): void {
+  /** Opens the file picker; `start`: what's picked goes before the first clip. */
+  pickFiles(place: 'playhead' | 'start' = 'playhead'): void {
+    this.#pickPlace = place;
     this.#filePicker?.();
+  }
+
+  /** Where the files from the last `pickFiles` go (read once by the picker's change handler). */
+  takePickPlace(): 'playhead' | 'start' {
+    const place = this.#pickPlace;
+    this.#pickPlace = 'playhead';
+    return place;
   }
 
   /** Registers the shell's file picker; returns an unregister function. */
@@ -1422,9 +1432,12 @@ export class EditorController {
       name?: string;
       /** Select the added sound clip (library sounds: its settings show next). */
       selectSound?: boolean;
+      /** Videos and photos go before the first clip (in the order given), not at the playhead. */
+      atStart?: boolean;
     } = {},
   ): Promise<void> {
     const addToTimeline = options.addToTimeline ?? true;
+    let startIndex = 0;
     for (const original of files) {
       const rowId = randomId();
       // SVG: drawn once into a PNG here (the engine worker can't decode SVG).
@@ -1482,7 +1495,12 @@ export class EditorController {
           } else {
             const main = mainTrack(d).items;
             const under = itemIndexAt(main, this.playhead.time);
-            insertMain(d, visualItem(asset, ctx.ids()), under === -1 ? main.length : under + 1);
+            const at = options.atStart
+              ? Math.min(startIndex++, main.length)
+              : under === -1
+                ? main.length
+                : under + 1;
+            insertMain(d, visualItem(asset, ctx.ids()), at);
           }
         });
         this.#registerMedia(asset, file);
@@ -2226,6 +2244,14 @@ export class EditorController {
     } catch (error) {
       if (abort.signal.aborted || (error instanceof DOMException && error.name === 'AbortError'))
         return;
+      // The video has sound but this browser can't read it here — not "nobody spoke".
+      if (error instanceof Error && error.name === 'SoundUnreadable') {
+        this.toast(
+          globalThis.isSecureContext === false ? l.captionsNeedSecure : l.captionsSoundUnreadable,
+          'info',
+        );
+        return;
+      }
       this.toast(l.captionsFailed(error instanceof Error ? error.message : String(error)), 'error');
     } finally {
       if (this.#captionAbort === abort) {

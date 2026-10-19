@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { keepWords, ownedSpan, windowsOf } from './windows';
+import { keepWords, ownedSpan, spreadCollapsed, windowsOf } from './windows';
 
 async function* pieces(total: number, size: number, rate: number) {
   let left = total;
@@ -76,5 +76,27 @@ describe('sound check', () => {
       ).map((w) => (w as { text: string }).text),
     ).toEqual(['real']);
     expect(activeShare(activeFrames(new Float32Array(32_000)))).toBe(0);
+  });
+
+  it('spreads words whose timing collapsed over the sound, in order', () => {
+    // 30 s window: sound from 2 s to 20 s (20 ms frames).
+    const active = new Uint8Array(1500);
+    active.fill(1, 100, 1000);
+    const collapsed = ['one', 'two', 'three', 'four'].map((text) => ({
+      text,
+      start: 29.9,
+      end: 30,
+    }));
+    const out = spreadCollapsed(collapsed, active);
+    expect(out[0]!.start).toBeCloseTo(2, 1);
+    expect(out.at(-1)!.end).toBeLessThanOrEqual(20.1);
+    for (let i = 1; i < out.length; i++) expect(out[i]!.start).toBeGreaterThan(out[i - 1]!.start);
+    // Believable timing is left alone.
+    const fine = [
+      { text: 'a', start: 1, end: 1.2 },
+      { text: 'b', start: 3, end: 3.2 },
+      { text: 'c', start: 6, end: 6.4 },
+    ];
+    expect(spreadCollapsed(fine, active)).toEqual(fine);
   });
 });

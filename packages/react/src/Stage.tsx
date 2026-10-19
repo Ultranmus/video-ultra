@@ -24,6 +24,7 @@ import {
   type Box,
 } from './stage/geometry';
 import { measureText as measure } from './stage/measure';
+import { placeTextField } from './stage/text-edit';
 
 /**
  * The preview. The canvas belongs to the engine worker (transferred); this component only sizes
@@ -311,9 +312,76 @@ export function Stage(): ReactElement {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ctl, selected, lockedKey, pw, ph, scale, previewMode]);
 
+  // ── typing on the stage ──────────────────────────────────────────────
+  // Double-click a text (mouse) or tap a selected one (touch): a field opens over it, styled like
+  // the text, and the engine hides the item meanwhile. The typing stays local (no store writes
+  // per key) and commits as one edit when the field closes; Esc puts the old text back. The
+  // field is always mounted so focus happens inside the tap — iOS only shows the keyboard then.
+
+  const fieldRef = useRef<HTMLTextAreaElement>(null);
+  const editing = useRef<{ id: string; original: string } | null>(null);
+  const boxShown = useRef(false);
+
+  const layoutField = () => {
+    const field = fieldRef.current;
+    const ed = editing.current;
+    const item = ed ? findItem(ctl.project, ed.id)?.item : null;
+    if (!field || !ed || item?.kind !== 'text') return;
+    const typed = { ...item, text: field.value || ' ' };
+    const box = itemBox(typed, ctl.project, pw, ph, measure, ctl.playhead.time);
+    if (box) placeTextField(field, typed, box, pw, ph, scale, ctl.playhead.time);
+  };
+
+  /** `selectAll`: a mouse replaces the text; a finger types on at the end (keyboard up). */
+  const startTyping = (id: string, selectAll: boolean) => {
+    const field = fieldRef.current;
+    const item = findItem(ctl.project, id)?.item;
+    const caption = ctl.project.tracks.find((t) => t.kind === 'caption');
+    if (!field || item?.kind !== 'text' || isLockedIn(ctl.project, id)) return;
+    if (caption?.items.some((i) => i.id === id)) return;
+    if (ctl.ui.getState().playing) ctl.pause();
+    editing.current = { id, original: item.text };
+    field.value = item.text;
+    field.hidden = false;
+    layoutField();
+    field.focus({ preventScroll: true });
+    const end = field.value.length;
+    field.setSelectionRange(selectAll ? 0 : end, end);
+    if (boxRef.current) {
+      boxShown.current = !boxRef.current.hidden;
+      boxRef.current.hidden = true;
+    }
+    ctl.preview((d) => {
+      const found = findItem(d, id);
+      if (found) found.item.hidden = true;
+    });
+  };
+
+  const stopTyping = (keep: boolean) => {
+    const field = fieldRef.current;
+    const ed = editing.current;
+    if (!field || !ed) return;
+    editing.current = null;
+    field.hidden = true;
+    ctl.preview(null);
+    if (boxRef.current && boxShown.current) boxRef.current.hidden = false;
+    const text = field.value;
+    if (keep && text !== ed.original && findItem(ctl.project, ed.id)) {
+      ctl.run(l.edit, (d) => updateItem(d, ed.id, { text }));
+    }
+  };
+
+  // The stage resized (phone keyboard, panels): keep the field over its text.
+  useLayoutEffect(() => {
+    if (editing.current) layoutField();
+    // layoutField reads refs and the current scale only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scale, pw, ph]);
+
   // ── gestures ─────────────────────────────────────────────────────────
 
   const drag = useRef<StageDrag | null>(null);
+  const tapToType = useRef<string | null>(null);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const longPress = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number } | null>(
     null,
@@ -538,6 +606,8 @@ export function Stage(): ReactElement {
     );
     // Keep the current selection when pressing inside its box (it may be under another layer).
     const inside = box && boxContains(box, p.x, p.y);
+    // Touch: a tap on the one selected text types into it (checked when the finger lifts).
+    tapToType.current = touch && inside && only?.kind === 'text' ? only.id : null;
     const additive = e.shiftKey || e.metaKey || e.ctrlKey;
     // The main video fills the frame, so with a mouse a drag that starts on it (while it isn't
     // selected) draws a selection rectangle; a click still selects it.
@@ -825,8 +895,12 @@ export function Stage(): ReactElement {
     showGuides(false, false);
     const next = latest.current;
     latest.current = null;
+    const typeInto = tapToType.current;
+    tapToType.current = null;
     if (cancelled || !next) {
       ctl.preview(null);
+      if (!cancelled && !next && d.type === 'move' && !d.moved && typeInto)
+        startTyping(typeInto, false);
       return;
     }
     const label =
@@ -918,11 +992,13 @@ export function Stage(): ReactElement {
         if (pointers.current.has(e.pointerId)) finish(e, true);
       }}
       onDoubleClick={(e) => {
-        // Double-click a group member to pick just that one.
-        if (scale === 0 || ctl.ui.getState().selectedIds.length < 2) return;
+        if (scale === 0 || editing.current || ctl.ui.getState().previewMode) return;
         const p = toCanvas(e);
         const hit = hitStage(ctl.project, ctl.playhead.time, pw, ph, p.x, p.y, measure, 4 / scale);
-        if (hit) ctl.select(hit.id, { only: true });
+        if (!hit) return;
+        // Double-click a group member to pick just that one; a text then types.
+        if (ctl.ui.getState().selectedIds.length >= 2) ctl.select(hit.id, { only: true });
+        if (hit.kind === 'text') startTyping(hit.id, true);
       }}
       onContextMenu={(e) => {
         e.preventDefault();
@@ -975,6 +1051,31 @@ export function Stage(): ReactElement {
           <span className="vu-rotate-stem" aria-hidden="true" />
           <span className="vu-handle vu-handle-rotate" data-handle="rotate" />
         </div>
+        <textarea
+          ref={fieldRef}
+          className="vu-stage-text"
+          aria-label={l.text}
+          hidden
+          rows={1}
+          spellCheck
+          onPointerDown={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
+          onContextMenu={(e) => e.stopPropagation()}
+          onInput={layoutField}
+          onBlur={() => stopTyping(true)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              e.stopPropagation();
+              const field = e.currentTarget;
+              if (editing.current) field.value = editing.current.original;
+              stopTyping(false);
+            } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              e.currentTarget.blur();
+            }
+          }}
+        />
       </div>
       {picking ? (
         <div className="vu-stage-pick" role="status" onPointerDown={(e) => e.stopPropagation()}>

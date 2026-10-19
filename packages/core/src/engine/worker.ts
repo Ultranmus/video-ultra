@@ -1052,6 +1052,27 @@ async function listen(
   if (!session) {
     if (!request.project) throw new Error('Listening session has ended');
     await mediaReady(request.project);
+    // Sound that's there but can't be decoded here (no AudioDecoder on an http page, or a codec
+    // this browser lacks) would mix as silence and read as "nobody spoke": say so instead.
+    let expected = 0;
+    let readable = 0;
+    for (const track of request.project.tracks)
+      for (const item of track.items) {
+        if (!('muted' in item) || item.muted || track.muted || !('assetId' in item)) continue;
+        const asset = item.assetId ? request.project.assets[item.assetId] : undefined;
+        if (!asset || !(asset.kind === 'audio' || asset.hasAudio)) continue;
+        expected++;
+        if (audioTracks.has(asset.id)) readable++;
+      }
+    if (expected > 0 && readable === 0) {
+      const error = new Error(
+        typeof AudioDecoder === 'undefined'
+          ? 'This browser has no audio decoder here'
+          : "This browser can't decode this sound",
+      );
+      error.name = 'SoundUnreadable';
+      throw error;
+    }
     session = {
       mixer: new Mixer(request.sampleRate, (assetId) => audioTracks.get(assetId) ?? null),
       project: request.project,

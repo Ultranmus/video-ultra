@@ -27,6 +27,7 @@ import { formatClock, formatDurationShort } from '../format';
 import { itemTitle } from '../items';
 import {
   addButtonRect,
+  addStartRect,
   clampPps,
   contentHeight,
   GROUP_ORDER,
@@ -174,8 +175,8 @@ const FLASH_MS = 700;
 const WHEEL_GESTURE_MS = 220;
 
 export interface TimelineHooks {
-  /** The "+" at the end of the main track. */
-  onAddMedia(): void;
+  /** The "+" at the end of the main track (`atStart`: the phone's "+" before the first clip). */
+  onAddMedia(atStart: boolean): void;
 }
 
 export class TimelineView {
@@ -426,7 +427,16 @@ export class TimelineView {
   }
 
   #hit(x: number, y: number): Hit {
-    return hitTest(this.#rows(), this.#m, this.#scale(), x, y, this.#trimTarget(), this.#touch);
+    return hitTest(
+      this.#rows(),
+      this.#m,
+      this.#scale(),
+      x,
+      y,
+      this.#trimTarget(),
+      this.#touch,
+      this.#phone,
+    );
   }
 
   /** The clip with trim handles: the one selected clip, unless it's locked. */
@@ -498,7 +508,7 @@ export class TimelineView {
         // A file picker may only open from a real activation: for touch that's the finger
         // lifting (pointerup), not pressing — on phones the "+" opens on release.
         if (!this.#touch) {
-          this.#hooks.onAddMedia();
+          this.#hooks.onAddMedia(!!hit.atStart);
           return;
         }
         break;
@@ -866,7 +876,7 @@ export class TimelineView {
         if (drag.timer) clearTimeout(drag.timer);
         if (drag.hit.type === 'row' || drag.hit.type === 'empty') this.#ctl.select(null);
         if (drag.hit.type === 'ruler' && this.#phone) this.#ctl.seek(drag.hit.time);
-        if (drag.hit.type === 'add') this.#hooks.onAddMedia();
+        if (drag.hit.type === 'add') this.#hooks.onAddMedia(!!drag.hit.atStart);
         break;
       case 'pan':
         if (this.#phone && drag.axis === 'x') this.#fling(drag.samples);
@@ -1442,23 +1452,13 @@ export class TimelineView {
     const last = items[items.length - 1];
     const end = last ? itemEnd(last) : 0;
     const add = addButtonRect(row, scale, end);
-    ctx.fillStyle = c.surface;
-    ctx.strokeStyle = c.border;
-    ctx.lineWidth = 1;
-    this.#roundRect(add.x + 0.5, add.y + 0.5, add.size - 1, add.size - 1, 10);
-    ctx.fill();
-    ctx.stroke();
-    ctx.strokeStyle = c.label;
-    ctx.lineWidth = 1.75;
-    ctx.lineCap = 'round';
-    const cx = add.x + add.size / 2;
+    this.#drawAdd(add);
+    // Phones: a "+" before the first clip too, so the start isn't half an empty screen.
+    if (this.#phone && items.length > 0) {
+      const first = addStartRect(row, scale);
+      if (first.x + first.size > 0) this.#drawAdd(first);
+    }
     const cy = add.y + add.size / 2;
-    ctx.beginPath();
-    ctx.moveTo(cx - 7, cy);
-    ctx.lineTo(cx + 7, cy);
-    ctx.moveTo(cx, cy - 7);
-    ctx.lineTo(cx, cy + 7);
-    ctx.stroke();
     if (items.length === 0) {
       ctx.fillStyle = c.muted;
       ctx.font = `13px ${c.font}`;
@@ -1687,6 +1687,29 @@ export class TimelineView {
     ctx.fillStyle = this.#c.grip;
     ctx.textBaseline = 'middle';
     ctx.fillText(text, lx + 7, ly + 9.5);
+  }
+
+  /** A "+" add-media button (canvas px). */
+  #drawAdd(add: { x: number; y: number; size: number }): void {
+    const ctx = this.#ctx;
+    const c = this.#c;
+    ctx.fillStyle = c.surface;
+    ctx.strokeStyle = c.border;
+    ctx.lineWidth = 1;
+    this.#roundRect(add.x + 0.5, add.y + 0.5, add.size - 1, add.size - 1, 10);
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = c.label;
+    ctx.lineWidth = 1.75;
+    ctx.lineCap = 'round';
+    const cx = add.x + add.size / 2;
+    const cy = add.y + add.size / 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - 7, cy);
+    ctx.lineTo(cx + 7, cy);
+    ctx.moveTo(cx, cy - 7);
+    ctx.lineTo(cx, cy + 7);
+    ctx.stroke();
   }
 
   #roundRect(x: number, y: number, w: number, h: number, r: number): void {

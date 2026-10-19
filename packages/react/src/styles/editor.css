@@ -551,10 +551,12 @@
     gap: var(--vu-space-2);
   }
 
-  /* Side-by-side actions share the width equally and never stack unevenly. */
+  /* Side-by-side actions share the width equally; when their labels don't fit side by side,
+     each takes a full line instead of cutting its label. */
   .vu-row > .vu-btn {
     flex: 1 1 0;
-    min-width: 0;
+    min-width: fit-content;
+    max-width: 100%;
   }
 
   .vu-row > .vu-btn .vu-btn-label {
@@ -820,7 +822,8 @@
 
   .vu-segment {
     display: inline-flex;
-    flex: 1;
+    /* Sized by its label, so a longer label (Animated) gets the room a short one (3D) doesn't use. */
+    flex: 1 1 auto;
     align-items: center;
     justify-content: center;
     gap: var(--vu-space-1);
@@ -2191,11 +2194,17 @@
     box-shadow: var(--vu-focus-ring);
   }
 
+  /* Two lines before it's cut, so names like "Cross process" show whole. */
   .vu-filter-name {
+    display: -webkit-box;
     max-width: 100%;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-height: 1.2;
+    text-align: center;
+    overflow-wrap: anywhere;
   }
 
   .vu-transition-grid {
@@ -2590,6 +2599,31 @@
 
   .vu-screen p {
     max-width: 48ch;
+  }
+
+  /* Typing on the stage: a field over the text, styled inline like the text itself (stage/
+     text-edit.ts); a dashed accent outline says it's being typed into. */
+  .vu-stage-text {
+    position: absolute;
+    z-index: 2;
+    top: 0;
+    left: 0;
+    box-sizing: border-box;
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    border: 0;
+    outline: calc(1.5px / var(--vu-stage-zoom, 1)) dashed var(--vu-selection);
+    outline-offset: calc(4px / var(--vu-stage-zoom, 1));
+    caret-color: var(--vu-selection);
+    paint-order: stroke fill;
+    transform-origin: center;
+    resize: none;
+    overflow-wrap: break-word;
+  }
+
+  .vu-stage-text[hidden] {
+    display: none;
   }
 
   /* Selection on the video: a thin accent outline, small square handles, a rotate grip. */
@@ -4069,6 +4103,17 @@
   }
 
   /* Context menu */
+  /* The context menu: a positioned wrapper holding the (scrolling) list and, on desktop, the
+     Align submenu beside it — outside the list so the list's scrolling can't clip it. */
+  .vu-menu-wrap {
+    position: absolute;
+    z-index: calc(var(--vu-z-toast) + 1);
+  }
+
+  .vu-menu-wrap > .vu-menu-main {
+    position: relative;
+  }
+
   .vu-menu {
     position: absolute;
     z-index: calc(var(--vu-z-toast) + 1);
@@ -4147,8 +4192,12 @@
   }
 
   .vu-submenu {
-    top: calc(-1 * var(--vu-space-1));
     left: calc(100% + var(--vu-space-1));
+  }
+
+  .vu-submenu[data-flip] {
+    right: calc(100% + var(--vu-space-1));
+    left: auto;
   }
 
   /* Phones: no room on the side — the submenu opens inline, under its item. */
@@ -4414,9 +4463,11 @@
 
   .vu-audiolib-name,
   .vu-audiolib-meta {
+    display: -webkit-box;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
   }
 
   .vu-audiolib-meta {

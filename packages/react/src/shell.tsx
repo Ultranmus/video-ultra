@@ -264,6 +264,13 @@ export function Panel(): ReactElement | null {
   const ctl = useController();
   const l = useLabels();
   const panel = useUi((s) => s.panel);
+  // Each panel keeps its own scroll place (a fresh box per panel, so one panel's place never
+  // carries over to the next); a panel opened for the first time starts at the top.
+  const places = useRef(new Map<string, number>());
+  const scroller = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (panel && scroller.current) scroller.current.scrollTop = places.current.get(panel) ?? 0;
+  }, [panel]);
   if (!panel) return null;
   const entry = RAIL.find((r) => r.id === panel);
   const custom = ctl.options.customize?.panels?.find((p) => `custom:${p.id}` === panel);
@@ -280,7 +287,12 @@ export function Panel(): ReactElement | null {
         <h2 className="vu-panel-title">{title}</h2>
         <IconButton icon="close" label={l.closePanel} onClick={() => ctl.openPanel(null)} />
       </div>
-      <div className="vu-panel-scroll">
+      <div
+        className="vu-panel-scroll"
+        key={panel}
+        ref={scroller}
+        onScroll={(e) => places.current.set(panel, e.currentTarget.scrollTop)}
+      >
         <AddPanel panel={panel} />
       </div>
     </aside>
@@ -517,7 +529,7 @@ export function Timeline({
   const viewRef = useRef<TimelineView | null>(null);
   useEffect(() => {
     const view = new TimelineView(rootRef.current!, canvasRef.current!, ctl, {
-      onAddMedia: () => ctl.pickFiles(),
+      onAddMedia: (atStart) => ctl.pickFiles(atStart ? 'start' : 'playhead'),
     });
     viewRef.current = view;
     const offZoom = ctl.setZoomHandler((factor) => view.zoomBy(factor));
