@@ -1,12 +1,11 @@
-# The same checks as `pnpm verify`. Manual-only until v0.1 (owner, 2026-10-17): run it from the
-# Actions tab ("Run workflow"). Before v0.1, restore the push/pull_request triggers:
-#   on:
-#     push:
-#       branches: [main]
-#     pull_request:
+# The same checks as `pnpm verify`, plus the packages as npm will see them (pack-check).
+# Browser checks (scripts/*-check.ts) need real GPUs, Safari and test media: they run locally.
 name: CI
 
 on:
+  push:
+    branches: [main]
+  pull_request:
   workflow_dispatch:
 
 concurrency:
@@ -26,6 +25,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
+      - name: Shaders up to date
+        run: pnpm shaders --check
       - name: Lint and formatting
         run: pnpm lint && pnpm format:check
       - name: Build
@@ -34,3 +35,5 @@ jobs:
         run: pnpm typecheck
       - name: Unit tests
         run: pnpm test
+      - name: Packages (publint, types, sizes, fresh install, SSR)
+        run: node scripts/pack-check.ts
