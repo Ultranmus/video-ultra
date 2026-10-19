@@ -2,6 +2,26 @@
 
 Where the last session stopped and what comes next. Update before ending every session.
 
+## 2026-10-19 night (branch `night/v0.3-v0.4` — owner's overnight request; release after v0.4)
+
+Everything is on the branch **`night/v0.3-v0.4`** (not merged to main). The owner's test list is
+**`docs/internal/TEST_CHECKLIST.md`** — tick boxes there tomorrow.
+
+Done (each with its own browser check script in `scripts/` + unit tests; DECISIONS #131–#147):
+fixes (Hindi model crash memory on phones, mouse marquee starting on the main video, copy /
+paste); v0.3 (shape masks, high contrast + touch density, animated stickers + 611 animated
+emoji + SVG, 192 templates, on-device background removal `@video-ultra/ai`, embedding API);
+v0.4 (keyframes + graph editor, roll / slip / slide + markers, HEVC / AV1 export, scene detection
++ Split at scenes, sound effects + keep pitch + level meter, scopes).
+
+Not verifiable in the cloud sandbox (no GPU, no Safari, no phones): WebGPU golden frames, real
+iPhone memory for Hindi captions and background removal, how the sound effects sound to a human.
+Long main-thread tasks in the sandbox are the machine's (same on main — PERF "Cloud sandbox").
+
+Still open from v0.4 (PLAN): proxies for heavy 4K clips, text-to-speech voiceover, multiple
+sequences / compound clips, optional AI editing plugin — see the latest entry above this one if
+a later session continued.
+
 ## 2026-10-19 (made-up captions fixed — DECISIONS #130)
 
 Auto captions no longer invent sentences when nobody is speaking; default model is `base` (more
