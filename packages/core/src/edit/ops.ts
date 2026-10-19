@@ -1322,7 +1322,7 @@ function keyAt(project: Project, list: readonly Keyframe[], t: Time): number {
 function tidyKeyframes(item: Keyed): void {
   if (!item.keyframes) return;
   for (const prop of KEYFRAME_PROPS)
-    if (item.keyframes[prop]?.length === 0) delete item.keyframes[prop];
+    if (item.keyframes[prop]?.length === 0) Reflect.deleteProperty(item.keyframes, prop);
   if (!hasKeyframes(item.keyframes)) delete item.keyframes;
   else if (item.keyframes.shift === 0) delete item.keyframes.shift;
 }
@@ -1430,7 +1430,7 @@ export function clearKeyframes(
     const list = item.keyframes[p];
     if (!list?.length) continue;
     item.transform[p] = sampleKeyframes(list, bakeAt + (item.keyframes.shift ?? 0));
-    delete item.keyframes[p];
+    Reflect.deleteProperty(item.keyframes, p);
   }
   tidyKeyframes(item);
 }

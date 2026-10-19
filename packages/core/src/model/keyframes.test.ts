@@ -15,7 +15,7 @@ import {
   trimItem,
 } from '../edit/ops';
 import { checkInvariants } from './invariants';
-import { ProjectSchema } from './schema';
+import { ProjectSchema, type ImageItem, type TextItem } from './schema';
 import {
   bezierAt,
   keyedTransform,
@@ -70,24 +70,24 @@ describe('keyframes', () => {
     setKeyframe(project, 't', 'x', s(1) + 3, 0.1);
     setKeyframe(project, 't', 'x', s(3), 0.9);
     setKeyframe(project, 't', 'x', s(1), 0.2); // same frame: replaces
-    let item = findItem(project, 't')!.item as any;
-    expect(item.keyframes.x.map((k: Keyframe) => [k.t / s(1), k.v])).toEqual([
+    let item = findItem(project, 't')!.item as TextItem;
+    expect(item.keyframes!.x!.map((k: Keyframe) => [k.t / s(1), k.v])).toEqual([
       [1, 0.2],
       [3, 0.9],
     ]);
     setKeyframeEase(project, 't', 'x', s(1), [0.1, 0.7, 0.9, 0.3]);
-    expect(item.keyframes.x[0].ease).toEqual([0.1, 0.7, 0.9, 0.3]);
+    expect(item.keyframes!.x![0]!.ease).toEqual([0.1, 0.7, 0.9, 0.3]);
     moveKeyframe(project, 't', 'x', s(3), s(2), 0.7);
-    expect(item.keyframes.x.map((k: Keyframe) => k.t / s(1))).toEqual([1, 2]);
+    expect(item.keyframes!.x!.map((k: Keyframe) => k.t / s(1))).toEqual([1, 2]);
     removeKeyframe(project, 't', 'x', s(1));
     removeKeyframe(project, 't', 'x', s(2));
-    item = findItem(project, 't')!.item;
+    item = findItem(project, 't')!.item as TextItem;
     expect(item.keyframes).toBeUndefined();
     expect(item.transform.x).toBe(0.7);
     setKeyframe(project, 't', 'scale', 0, -5);
-    expect((findItem(project, 't')!.item as any).keyframes.scale[0].v).toBeGreaterThan(0);
+    expect((findItem(project, 't')!.item as TextItem).keyframes!.scale![0]!.v).toBeGreaterThan(0);
     clearKeyframes(project, 't');
-    expect((findItem(project, 't')!.item as any).keyframes).toBeUndefined();
+    expect((findItem(project, 't')!.item as TextItem).keyframes).toBeUndefined();
     expect(() => setKeyframe(project, 't', 'volume' as never, 0, 1)).toThrow(EditError);
     expect(() => setKeyframe(project, 't', 'x', 0, Number.NaN)).toThrow(EditError);
     expect(ProjectSchema.safeParse(project).success).toBe(true);
@@ -116,7 +116,7 @@ describe('keyframes', () => {
     expect(valueAt(0)).toBeCloseTo(at1!, 9);
     // New keyframes land where the part is now, in its own time.
     setKeyframe(project, 'a', 'x', s(1), 9);
-    expect(keyedValue((findItem(project, 'a')!.item as any).keyframes, 'x', s(1))).toBe(9);
+    expect(keyedValue((findItem(project, 'a')!.item as ImageItem).keyframes, 'x', s(1))).toBe(9);
     expect(checkInvariants(project)).toEqual([]);
     expect(ProjectSchema.safeParse(project).success).toBe(true);
   });
@@ -136,17 +136,17 @@ describe('editing keyed transforms', () => {
     addToLane(project, textItem('t', 2, 4), ids);
     setKeyframe(project, 't', 'x', 0, 0.2);
     setKeyframe(project, 't', 'x', s(4), 0.8);
-    const item = () => findItem(project, 't')!.item as any;
+    const item = () => findItem(project, 't')!.item as TextItem;
     // At 3 s on the timeline = 1 s into the item: x keyed, rotation not.
     const tf = { ...transformAt(item(), s(3))!, x: 0.1, rotation: 30 };
     setTransformAt(project, 't', tf, s(3));
-    expect(item().keyframes.x.map((k: Keyframe) => [k.t / s(1), k.v])).toEqual([
+    expect(item().keyframes!.x!.map((k: Keyframe) => [k.t / s(1), k.v])).toEqual([
       [0, 0.2],
       [1, 0.1],
       [4, 0.8],
     ]);
     expect(item().transform.rotation).toBe(30);
-    expect(item().keyframes.rotation).toBeUndefined();
+    expect(item().keyframes!.rotation).toBeUndefined();
     expect(transformAt(item(), s(3))!.x).toBeCloseTo(0.1);
   });
 });
