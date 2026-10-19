@@ -980,3 +980,16 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       inspector, history and saving all work unchanged inside. A bar over the timeline names
       where you are with Back; Captions and the canvas size say they're the whole video's;
       Export and undoing past the Combine leave the clip. Multiple timelines stay out (#153).
+
+156.  **Clean up noise, and Extract audio keeps what was done to the sound** (owner, 2026-10-20).
+      A sound effect (`audioFx.denoise`, 0…1; optional, so file version 5 holds it): a spectral
+      noise gate in TypeScript (no WASM — measured at under 1 % of real time), first in each
+      clip's effect chain so Even out can't bring the noise back. 1024-sample Hann frames a
+      quarter apart through one complex FFT for both channels; the noise floor per band is the
+      minimum of the last ~1.4 s (minimum statistics) × 3; gains over-subtract (1 + 3 × amount),
+      never below −24 dB × amount, rise at once and fall gently, averaged with neighbours (no
+      "musical noise"). One frame of latency (~21 ms at 48 kHz), not compensated — like the
+      pitch shifter. For steady noise (hiss, hum, fans, rumble); not for music or crowds behind a
+      voice. New preset "Clean voice" (clean 60 %, voice EQ, Even out 40 %). Extract audio now
+      copies the video's fades, effects and lower-under-voice to the sound clip, not only the
+      volume.

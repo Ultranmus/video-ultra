@@ -1,0 +1,11 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "name": "video-ultra API",
+  "entryPointStrategy": "packages",
+  "entryPoints": ["packages/react", "packages/core", "packages/captions", "packages/ai"],
+  "out": "apps/playground/public/api",
+  "readme": "none",
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "navigationLinks": { "Docs": "/docs", "Demo": "/editor" }
+}

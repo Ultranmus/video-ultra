@@ -1,4 +1,5 @@
 import type { AudioFx } from '../model/schema';
+import { Denoiser } from './denoise';
 
 /**
  * A clip's sound effects (v0.4): pitch shift (or keeping the pitch when the speed changes), a
@@ -13,6 +14,7 @@ export function hasAudioFx(fx: AudioFx | undefined, speed: number): boolean {
   return (
     (!!fx.eq && (fx.eq.low !== 0 || fx.eq.mid !== 0 || fx.eq.high !== 0)) ||
     (fx.compress ?? 0) > 0 ||
+    (fx.denoise ?? 0) > 0 ||
     pitchRatio(fx, speed) !== 1
   );
 }
@@ -289,6 +291,7 @@ export class ClipFx {
   private readonly high = new Biquad();
   private readonly compressor = new Compressor();
   private shifter: PitchShifter | null = null;
+  private denoiser: Denoiser | null = null;
 
   constructor(private readonly rate: number) {}
 
@@ -299,6 +302,7 @@ export class ClipFx {
     this.high.reset();
     this.compressor.reset();
     this.shifter?.reset();
+    this.denoiser?.reset();
   }
 
   /** Applies `fx` in place to `count` stereo samples of a clip playing at `speed`. */
@@ -309,6 +313,9 @@ export class ClipFx {
     right: Float32Array,
     count: number,
   ): void {
+    // Noise first: the compressor after it would bring the noise back up.
+    const clean = fx.denoise ?? 0;
+    if (clean > 0) (this.denoiser ??= new Denoiser()).process(left, right, count, clean);
     const ratio = pitchRatio(fx, speed);
     if (ratio !== 1)
       (this.shifter ??= new PitchShifter(this.rate)).process(left, right, count, ratio);
@@ -336,6 +343,7 @@ export class ClipFx {
 export const AUDIO_FX_PRESETS: readonly { id: string; fx: AudioFx }[] = [
   { id: 'none', fx: {} },
   { id: 'voice', fx: { eq: { low: -4, mid: 2, high: 3 }, compress: 0.5 } },
+  { id: 'clean', fx: { denoise: 0.6, eq: { low: -3, mid: 2, high: 2 }, compress: 0.4 } },
   { id: 'podcast', fx: { eq: { low: 2, mid: 1, high: 2 }, compress: 0.75 } },
   { id: 'bass', fx: { eq: { low: 8, mid: 0, high: 0 } } },
   { id: 'bright', fx: { eq: { low: 0, mid: 0, high: 6 } } },

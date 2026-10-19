@@ -44,41 +44,41 @@ import { themeOverridesToStyle, type ThemeMode, type ThemeOverrides } from './th
 /** Props of {@link VideoEditor}. */
 export interface VideoEditorProps {
   /** Project to open (object or JSON string). Without it the last autosaved project reopens, or a new one starts. */
-  initialProject?: Project | string;
+  initialProject?: Project | string | undefined;
   /** Called about a second after each edit with the current project. This is the durable save — store it. */
-  onSave?: (project: Project) => void | Promise<void>;
+  onSave?: ((project: Project) => void | Promise<void>) | undefined;
   /** Called when an export finishes, with the video file. */
-  onExport?: (result: ExportResult) => void;
+  onExport?: ((result: ExportResult) => void) | undefined;
   /** Called when a sound-only export finishes, with the sound file. */
-  onExportAudio?: (result: AudioExportResult) => void;
+  onExportAudio?: ((result: AudioExportResult) => void) | undefined;
   /** Called when a frame is saved as a picture, with the image file. */
-  onSaveFrame?: (image: FrameImage) => void;
+  onSaveFrame?: ((image: FrameImage) => void) | undefined;
   /** Shows a close button that calls this. */
-  onClose?: () => void;
+  onClose?: (() => void) | undefined;
   /** Called when the device can't run the editor (instead of, or as well as, the built-in message). */
-  onUnsupported?: (capabilities: Capabilities) => void;
+  onUnsupported?: ((capabilities: Capabilities) => void) | undefined;
   /** Gets bytes for media the host stores itself (assets with `url` sources). */
-  resolveMedia?: (asset: Asset) => Promise<Blob | null>;
+  resolveMedia?: ((asset: Asset) => Promise<Blob | null>) | undefined;
   /** Keep a local autosave and crash-recovery copy in the browser (default true). */
-  autosave?: boolean;
+  autosave?: boolean | undefined;
   /**
    * Where the 3D sticker images come from: a base URL (self-host the MIT-licensed set), or `false`
    * to offer only emoji, shapes and uploads. Default: a pinned public CDN. Placed stickers are
    * stored in the project, so exports never depend on it.
    */
-  stickerLibrary?: string | false;
+  stickerLibrary?: string | false | undefined;
   /**
    * Where animated emoji stickers come from (Noto Emoji Animation, CC BY 4.0): a base URL whose
    * `<code>/512.webp` files are the animations, or `false` to hide the Animated tab. Default:
    * Google's public copy. Placed stickers are stored in the project.
    */
-  animatedStickerLibrary?: string | false;
+  animatedStickerLibrary?: string | false | undefined;
   /**
    * Lighter copies of heavy videos for smooth editing, kept on this device: `auto` (default)
    * for videos this device would struggle with (4K; 1080p on budget phones), `always` for every
    * video over 540p, `off` never. Previews use the copy; exports always use the original.
    */
-  proxies?: 'auto' | 'always' | 'off';
+  proxies?: 'auto' | 'always' | 'off' | undefined;
   /**
    * A music & sound-effects source for the Audio panel: search, categories, a ▶ preview and the
    * licence line per sound, and Add (at the playhead). The picked file is stored in the project
@@ -87,19 +87,19 @@ export interface VideoEditorProps {
    * editor ships no catalogue. `createStarterSounds()` is a small built-in set of synthesised,
    * CC0 sound effects. Read once, like `initialProject`.
    */
-  audioLibrary?: AudioLibrary;
+  audioLibrary?: AudioLibrary | undefined;
   /**
    * Turns speech into timed words for Auto captions: `createOnDeviceTranscriber()` from the
    * optional `@video-ultra/captions` package (runs on the device, nothing uploaded), or your own
    * service. Without it, captions can still be imported (.srt / .vtt) or typed.
    */
-  transcriber?: Transcriber;
+  transcriber?: Transcriber | undefined;
   /**
    * Removes photo backgrounds: `createBackgroundRemover()` from the optional `@video-ultra/ai`
    * package (runs on the device, nothing uploaded), or your own service. Without it the option
    * isn't shown.
    */
-  backgroundRemover?: BackgroundRemover;
+  backgroundRemover?: BackgroundRemover | undefined;
   /**
    * AI editing (v0.4): an Assistant panel where people type what they want ("make it warmer",
    * "add a title at the start") and your model's answer is applied as one undo step. Use
@@ -107,44 +107,44 @@ export interface VideoEditorProps {
    * `EditingAssistant`. A description of the project (no media) is sent to it. Without it the
    * panel isn't shown.
    */
-  assistant?: EditingAssistant;
+  assistant?: EditingAssistant | undefined;
   /**
    * Text to speech (v0.4): "Text to speech" in the Audio panel and "Read aloud" on texts add a
    * spoken sound clip. Use `createSpeechEndpoint({ endpoint })` from `@video-ultra/ai` with
    * your own server, or implement `SpeechGenerator`. Without it these aren't shown.
    */
-  speech?: SpeechGenerator;
+  speech?: SpeechGenerator | undefined;
   /**
    * Embedding API: hide or reorder built-in tools, add your own panels, top-bar buttons and
    * media sources (see {@link EditorCustomization}).
    */
-  customize?: EditorCustomization;
+  customize?: EditorCustomization | undefined;
   /** Everything that happens in the editor (edits, selection, playback, commands, export…). */
-  onEvent?: (event: EditorEvent) => void;
+  onEvent?: ((event: EditorEvent) => void) | undefined;
   /** `dark` (default), `light` or `auto` (follow the OS). */
-  theme?: ThemeMode;
+  theme?: ThemeMode | undefined;
   /** Typed overrides for the common theme tokens. */
-  themeOverrides?: ThemeOverrides;
+  themeOverrides?: ThemeOverrides | undefined;
   /**
    * `normal` (default), `high` (stronger text, borders and focus rings — for low vision or bright
    * sunlight), or `auto` (high when the OS asks for more contrast).
    */
-  contrast?: 'normal' | 'high' | 'auto';
+  contrast?: 'normal' | 'high' | 'auto' | undefined;
   /**
    * Control sizes: `auto` (default — thumb-sized on touch screens), `touch` (thumb-sized
    * everywhere) or `compact` (mouse sizes, also on touch screens).
    */
-  density?: 'auto' | 'touch' | 'compact';
+  density?: 'auto' | 'touch' | 'compact' | undefined;
   /** Replace any of the editor's text (translation). */
-  labels?: Partial<Labels>;
+  labels?: Partial<Labels> | undefined;
   /** Text direction of the editor chrome. The timeline always runs left to right. */
-  dir?: 'ltr' | 'rtl';
+  dir?: 'ltr' | 'rtl' | undefined;
   /** Called once the editor is ready, with its controller (programmatic control: play, seek, edits). */
-  onReady?: (controller: EditorController) => void;
+  onReady?: ((controller: EditorController) => void) | undefined;
   /** Force a renderer (testing). Default: WebGPU when available, else WebGL2. */
-  backend?: 'auto' | 'webgpu' | 'webgl2';
-  className?: string;
-  style?: CSSProperties;
+  backend?: 'auto' | 'webgpu' | 'webgl2' | undefined;
+  className?: string | undefined;
+  style?: CSSProperties | undefined;
 }
 
 const ACCEPT = 'video/*,audio/*,image/*,.mov,.mkv,.heic,.heif,.m4a,.mp3,.wav,.svg';

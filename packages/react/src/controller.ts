@@ -1507,6 +1507,11 @@ export class EditorController {
       audio.speed = item.speed;
       audio.duration = item.duration;
       audio.volume = item.volume;
+      // The sound keeps what was done to it on the video: fades, effects, lowering under voice.
+      audio.fadeIn = item.fadeIn;
+      audio.fadeOut = item.fadeOut;
+      if (item.audioFx) audio.audioFx = structuredClone(item.audioFx);
+      if (item.duck) audio.duck = item.duck;
       addToLane(d, audio, ctx.ids);
       updateItem(d, item.id, { muted: true });
     });

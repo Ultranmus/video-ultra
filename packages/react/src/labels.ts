@@ -842,9 +842,12 @@ export const DEFAULT_LABELS = {
   soundEffects: 'Sound effects',
   tipSoundEffects: 'Voice clarity, bass, even out, pitch',
   soundLook: 'Sound',
+  cleanNoise: 'Clean up noise',
+  tipCleanNoise: 'Turns down steady background noise — hiss, hum, fans, wind rumble',
   soundPresets: {
     none: 'Original',
     voice: 'Clear voice',
+    clean: 'Clean voice',
     podcast: 'Podcast',
     bass: 'More bass',
     bright: 'Brighter',

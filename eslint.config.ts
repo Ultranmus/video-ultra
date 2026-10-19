@@ -13,6 +13,8 @@ export default tseslint.config(
       '**/.snippets/**',
       '**/next-env.d.ts',
       '**/node_modules/**',
+      // Generated API reference (pnpm docs:api).
+      'apps/playground/public/api/**',
     ],
   },
   js.configs.recommended,

@@ -20,3 +20,9 @@ apps/playground/public/media
 apps/examples/vite/public/media
 # Agent worktrees
 .claude/worktrees
+
+# Check screenshots written to the repo root by mistake
+/*.png
+
+# Generated API reference (pnpm docs:api)
+apps/playground/public/api

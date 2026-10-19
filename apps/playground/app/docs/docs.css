@@ -1,0 +1,251 @@
+/* The docs site (playground only; the editor package has its own tokens). */
+.docs {
+  --d-bg: #0b0b0d;
+  --d-surface: #141418;
+  --d-border: rgba(255, 255, 255, 0.1);
+  --d-text: #ececef;
+  --d-muted: #a1a1aa;
+  --d-accent: #c47ac4;
+  --d-code: #1a1a1f;
+  min-height: 100dvh;
+  background: var(--d-bg);
+  color: var(--d-text);
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+/* The page behind the docs (overscroll, wide content) matches them. */
+html:has(.docs),
+body:has(.docs) {
+  background: var(--d-page, #0b0b0d);
+}
+
+@media (prefers-color-scheme: light) {
+  html:has(.docs),
+  body:has(.docs) {
+    --d-page: #ffffff;
+  }
+
+  .docs {
+    --d-bg: #ffffff;
+    --d-surface: #f6f6f8;
+    --d-border: rgba(0, 0, 0, 0.1);
+    --d-text: #18181b;
+    --d-muted: #52525b;
+    --d-accent: #7a2f7a;
+    --d-code: #f4f4f6;
+    color-scheme: light;
+  }
+}
+
+.docs a {
+  color: var(--d-accent);
+}
+
+.docs-top {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--d-border);
+  background: var(--d-bg);
+}
+
+.docs-brand {
+  color: var(--d-text) !important;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.docs-top-links {
+  display: flex;
+  gap: 20px;
+  font-size: 14px;
+}
+
+.docs-top-links a {
+  color: var(--d-muted);
+  text-decoration: none;
+}
+
+.docs-top-links a:hover {
+  color: var(--d-text);
+}
+
+.docs-body {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.docs-nav ul {
+  position: sticky;
+  top: 64px;
+  margin: 0;
+  padding: 24px 16px;
+  list-style: none;
+}
+
+.docs-nav a {
+  display: block;
+  padding: 6px 12px;
+  border-radius: 8px;
+  color: var(--d-muted);
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.docs-nav a:hover {
+  color: var(--d-text);
+}
+
+.docs-nav a[aria-current='page'] {
+  background: var(--d-surface);
+  color: var(--d-text);
+  font-weight: 600;
+}
+
+.docs-main {
+  min-width: 0;
+  padding: 32px 40px 80px;
+}
+
+.docs-main h1 {
+  margin: 0 0 8px;
+  font-size: 34px;
+  line-height: 1.2;
+}
+
+.docs-main h2 {
+  margin: 40px 0 8px;
+  font-size: 22px;
+}
+
+.docs-main h3 {
+  margin: 28px 0 4px;
+  font-size: 17px;
+}
+
+.docs-main p,
+.docs-main li {
+  max-width: 72ch;
+}
+
+.docs-lead {
+  color: var(--d-muted);
+  font-size: 18px;
+}
+
+.docs-main code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--d-code);
+  font-size: 0.88em;
+}
+
+.docs-code {
+  overflow-x: auto;
+  margin: 16px 0;
+  padding: 16px;
+  border: 1px solid var(--d-border);
+  border-radius: 10px;
+  background: var(--d-code);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.docs-code code {
+  padding: 0;
+  background: none;
+}
+
+.docs-note {
+  margin: 16px 0;
+  padding: 12px 16px;
+  border-left: 3px solid var(--d-accent);
+  border-radius: 6px;
+  background: var(--d-surface);
+}
+
+.docs-main table {
+  /* Wide tables scroll in their own box (never the page) — the table is focusable for that. */
+  display: block;
+  overflow-x: auto;
+  width: 100%;
+  margin: 16px 0;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.docs-main th,
+.docs-main td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--d-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.docs-main th {
+  color: var(--d-muted);
+  font-weight: 600;
+}
+
+.docs-pagenav {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 56px;
+  padding-top: 20px;
+  border-top: 1px solid var(--d-border);
+}
+
+@media (max-width: 760px) {
+  /* Phones: each option is a small card (name, type, what it does) instead of a wide row. */
+  .docs-props thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .docs-props tr {
+    display: block;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--d-border);
+  }
+
+  .docs-props td {
+    display: block;
+    padding: 2px 0;
+    border: 0;
+  }
+
+  .docs-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .docs-nav ul {
+    position: static;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 12px 16px 0;
+  }
+
+  .docs-main {
+    padding: 20px 16px 64px;
+  }
+
+  .docs-top {
+    padding: 10px 16px;
+  }
+
+  .docs-top-links {
+    gap: 12px;
+  }
+}

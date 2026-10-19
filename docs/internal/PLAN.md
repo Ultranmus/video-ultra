@@ -73,7 +73,7 @@ Deferred to v0.2+: speed curves, reverse, text animations, templates, keyframes,
 - [x] 2.3 HDR → SDR correction (measured calibrations, both backends, error ~5 / 255 vs Apple); rotation ✅; golden-frame CI test → BACKLOG
 - [x] 2.4 Audio engine: worker mixer → AudioWorklet, audio-driven clock, A/V sync (p95 ≤ 1.5 ms Chrome), fades, volume, resampling (`scripts/audio-check.ts`)
 - [x] 2.5 Device tiers in action: preview caps + decoder budgets per tier, adaptive preview quality (`engine/quality.ts`), held-frame counter
-- [ ] 2.6 Soak: `scripts/soak.ts` + OS memory; 6.8-min run plateaus (PERF.md); full 30-min run + the 1-late-frame-per-pass item → next session
+- [x] 2.6 Soak: 30-minute run flat (RSS −3.6 %, 0 underruns); the late-frame-per-pass item fixed (prefetch) — PERF.md (2026-10-20)
 - [ ] **Checkpoint (iPhone + Android):** multi-clip playback on phones
 
 ### Day 4 — Editor UI shell (Phase 3a)
@@ -116,8 +116,8 @@ Deferred to v0.2+: speed curves, reverse, text animations, templates, keyframes,
 
 ### Day 7 — Release v0.1 (on hold)
 
-- [ ] 5.1 Docs site + API reference + examples (Next.js, Vite)
-- [ ] 5.2 Package checks (publint, attw, size limits), fresh install from npm tarball; turn CI back on for push / PR + add the release workflow
+- [x] 5.1 Docs site + API reference + examples (Next.js, Vite) — playground `/docs` (12 pages, docs-check), TypeDoc at `/api`, `apps/examples/nextjs` + `vite` (2026-10-20)
+- [x] 5.2 Package checks (publint, attw, size limits), fresh install from npm tarball; turn CI back on for push / PR + add the release workflow — `scripts/pack-check.ts`, CI on push / PR, `release.yml` (changesets, provenance) (2026-10-20)
 - [ ] 5.3 Fix Day 6 findings
 - [ ] 5.4 **Owner publishes** (`changeset publish`) + deploys the demo site
 

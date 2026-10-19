@@ -37,6 +37,7 @@ function presetOf(fx: AudioFx | undefined): string | null {
     (a.eq?.mid ?? 0) === (b.eq?.mid ?? 0) &&
     (a.eq?.high ?? 0) === (b.eq?.high ?? 0) &&
     (a.compress ?? 0) === (b.compress ?? 0) &&
+    (a.denoise ?? 0) === (b.denoise ?? 0) &&
     (a.pitch ?? 0) === (b.pitch ?? 0);
   return AUDIO_FX_PRESETS.find((p) => same(p.fx, fx ?? {}))?.id ?? null;
 }
@@ -83,6 +84,18 @@ export function SoundFxTool({ item }: { item: VideoItem | AudioItem }): ReactEle
             })),
           );
         }}
+      />
+      <EditSlider
+        label={l.cleanNoise}
+        value={fx?.denoise ?? 0}
+        min={0}
+        max={1}
+        step={0.05}
+        defaultValue={0}
+        format={(v) => (v === 0 ? l.off : `${Math.round(v * 100)} %`)}
+        recipe={(d, v) => patchFx(d, item.id, (f) => ({ ...f, denoise: v }))}
+        commitLabel={l.cleanNoise}
+        coalesceKey={`denoise:${item.id}`}
       />
       {band('low', l.bass)}
       {band('mid', l.middle)}

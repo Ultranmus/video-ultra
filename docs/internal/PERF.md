@@ -537,3 +537,26 @@ count only the tasks a feature adds.
   the original; sound correlation 1.0000; export 13.03 s with picture and sound, clean decode.
 - Not measured on a phone yet: a combined clip over the main video is two decodes plus one extra
   pass — the budget phone pass should include one.
+
+## Clean up noise (2026-10-20, DECISIONS #156)
+
+- Cost: 25 ms of work per 4 s of stereo at 48 kHz in Node (≈ 0.6 % of real time), no allocation
+  per block.
+- Unit tests (synthetic): steady white noise −17 to −19 dB at full strength; a tone above the
+  noise kept within 0.01 dB.
+- denoise-check (real speech through the engine's mixer: LibriVox Hindi + fan-like pink noise,
+  16 kHz): noise in the pauses −46.2 → −54.4 dB at 50 %, → −56.7 dB at 100 %; speech level
+  −23.8 → −23.9 / −24.0 dB.
+
+## Soak, 30 minutes (2026-10-20, Chrome on the Mac, `scripts/soak.ts --minutes 30`)
+
+- 117 passes of the engine lab's demo (every third from a seek): RSS first third 1080 MB → last
+  third 1042 MB (−3.6 %, flat); 0 underruns; at most 1 held frame; decoders back to 1 after each
+  pass; A/V p95 1.4–1.8 ms.
+- Late frames: 32 in 30 minutes, all at 6.60 s (the light-leak transition's incoming clip) and only
+  from about the 10th pass on. Cause: `prefetch` skipped clips that still had a frame source, but
+  `releaseIdle` had given that source's decoder back — the next pass found it cold. Fixed (warm =
+  holds a decoded frame; one warm-up per clip at a time): 30 passes, 0 late, 0 skipped.
+- Confirmation (10 minutes, after the fix): 0 late frames, 0 underruns. RSS moves in the same
+  850–1170 MB band as the 30-minute run (Chrome gives memory back every few minutes: a sawtooth,
+  not a climb) — the 10-minute window's +7.6 % sits inside it.

@@ -2,6 +2,19 @@
 
 Where the last session stopped and what comes next. Update before ending every session.
 
+## 2026-10-20 (later — audio, release prep, soak; merged to main, not pushed)
+
+- Clean up noise + Clean voice preset; Extract audio keeps fades / effects (#156).
+- PLAN 5.1 and 5.2 done: docs site `/docs` + TypeDoc `/api` (`pnpm docs:api`), Next.js and Vite
+  examples, `scripts/pack-check.ts`, CI on push / PR, release workflow (changesets + provenance;
+  needs the `NPM_TOKEN` secret and the `@video-ultra` npm organisation — owner), first-release
+  changeset (0.1.0).
+- PLAN 2.6 done: 30-minute soak flat; the looped-playback late frame fixed (prefetch).
+- **Owner (5.4):** create the `@video-ultra` npm organisation, add `NPM_TOKEN` to the repo
+  secrets; then the "Version packages" pull request that the release workflow opens publishes
+  0.1.0 when merged. Deploy the playground (it now has the docs).
+- Next for me: the device pass when phones are available (BrowserStack or plugged in).
+
 ## 2026-10-20 (your list fixed, v0.4 finished — merged to main, not pushed)
 
 Branch `feat/v0.4-finish`, merged into main locally. **Not pushed** (waits for the owner's word),
