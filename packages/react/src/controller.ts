@@ -94,6 +94,7 @@ import {
   type Engine,
   type MediaAnalyzer,
   type ProjectStorage,
+  type StoredProjectInfo,
 } from '@video-ultra/core/internal';
 import { produce } from 'immer';
 import {
@@ -453,6 +454,105 @@ export class EditorController {
     if (latest) this.editor.load(latest.project);
     this.#startAutosave();
     this.toast(this.labels.tookOver, 'success');
+  }
+
+  // ── your videos (DECISIONS #154) ──────────────────────────────────────
+
+  /** The videos saved on this device, newest first (empty when the editor doesn't save here). */
+  async listVideos(): Promise<StoredProjectInfo[]> {
+    if (!this.storage || this.options.autosave === false) return [];
+    return this.storage.listProjects().catch(() => []);
+  }
+
+  /**
+   * Makes a copy of this video and opens it: the same media files (nothing is copied but the
+   * project), a new name, its own history. The original stays as it was saved.
+   */
+  async duplicateVideo(): Promise<void> {
+    const storage = this.storage;
+    if (!storage || this.ui.getState().readOnly) return;
+    await this.#autosave?.flush();
+    const original = this.project;
+    const copy: Project = {
+      ...structuredClone(original),
+      id: randomId(),
+      name: this.labels.copyOf(original.name),
+      updatedAt: new Date().toISOString(),
+    };
+    try {
+      await storage.openWriter(copy);
+    } catch (error) {
+      this.toast(error instanceof Error ? error.message : String(error), 'error');
+      return;
+    }
+    await this.#switchTo(copy);
+    this.toast(this.labels.copyMade(copy.name), 'success', {
+      label: this.labels.backToOriginal,
+      run: () => void this.openVideo(original.id),
+    });
+  }
+
+  /** Opens another saved video (the current one is saved first). */
+  async openVideo(id: string): Promise<void> {
+    const storage = this.storage;
+    if (!storage || id === this.project.id) return;
+    await this.#autosave?.flush();
+    const loaded = await storage.loadProject(id).catch((error: unknown) => {
+      this.toast(error instanceof Error ? error.message : String(error), 'error');
+      return null;
+    });
+    if (!loaded) return;
+    await this.#switchTo(loaded.project);
+    for (const warning of loaded.warnings) this.toast(warning, 'info');
+  }
+
+  /** Starts a new, empty video (the current one is saved first and stays in the list). */
+  async newVideo(): Promise<void> {
+    if (!this.storage) return;
+    await this.#autosave?.flush();
+    const fresh = createProject({ name: this.labels.untitledVideo });
+    await this.#switchTo(fresh);
+  }
+
+  /** Deletes a saved video other than the open one, and media only it used. */
+  async deleteVideo(id: string): Promise<void> {
+    if (!this.storage || id === this.project.id) return;
+    await this.storage.deleteProject(id).catch((error: unknown) => {
+      this.toast(error instanceof Error ? error.message : String(error), 'error');
+    });
+  }
+
+  /** Puts `project` in the editor: its own lock, history and saving; its media registered. */
+  async #switchTo(project: Project): Promise<void> {
+    const generation = this.#generation;
+    this.pause();
+    this.#autosave?.detach();
+    this.#autosave = null;
+    this.#lock?.release();
+    this.#lock = null;
+    this.ui.setState({
+      selectedId: null,
+      selectedIds: [],
+      menu: null,
+      historyOpen: false,
+      save: 'idle',
+    });
+    this.editor.load(project);
+    this.seek(0);
+    if (await this.#claim(false, generation)) this.#startAutosave();
+    if (generation !== this.#generation) return;
+    await Promise.all(
+      Object.values(project.assets)
+        .filter((asset) => !this.media.has(asset.id))
+        .map(async (asset) => {
+          const blob =
+            (await this.options.resolveMedia?.(asset).catch(() => null)) ??
+            (await this.storage!.getMedia(asset).catch(() => null));
+          if (generation !== this.#generation) return;
+          if (blob) this.#registerMedia(asset, blob);
+          else this.toast(this.labels.mediaMissing(asset.name), 'error');
+        }),
+    );
   }
 
   /** Hands the preview canvas to a new engine worker. Returns a disposer. */

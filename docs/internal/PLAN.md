@@ -211,7 +211,7 @@ _D. Capture & export_
       — scene detection + auto-split (#145), EQ / compressor / pitch / meters (#146), scopes (#147) done
 - [x] Text-to-speech voiceover (L) — #150
 - [x] Edit several at once (M) — #153 (owner's choice over multiple sequences)
-- [ ] Duplicate project, sharing media (S) — #153
+- [x] Duplicate project, sharing media (S) — #153, #154 ("Your videos")
 - [ ] Combine into one clip (compound clip; context menu only) (L) — #153; multiple timelines →
       BACKLOG
 - [x] Optional AI editing plugin (bring-your-own endpoint) driving the op-based Project (M) — #149

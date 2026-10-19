@@ -939,3 +939,14 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       the media files. (3) **Combine into one clip** (compound) only in the context menu (pro,
       progressive disclosure): Combine / Open / Separate. Multiple timelines in one project →
       BACKLOG (1 + 2 cover what people use them for).
+
+154.  **Your videos: make a copy, new video, open, delete** (#153 part 2). A copy shares the
+      media files (the media folder is already shared by every project, and deleting a project
+      removes only media no other project uses), so it costs one project file. It needs a way
+      back, so a small **Your videos** popover from the top bar's start (all layouts; phones
+      don't show the name there): Make a copy (opens the copy; a toast offers "Back to
+      original"), New video, the other saved videos (open; delete asks first). Switching saves
+      the open video first, then moves the editor's lock, history and saving to the other one
+      and registers only the media not already loaded. Shown only when the editor saves
+      locally (`autosave` on) and not hidden (`customize.hide: ['videos']`) — hosts with their
+      own project list keep theirs. Checked by videos-check (desktop + phone).

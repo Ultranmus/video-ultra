@@ -141,6 +141,9 @@ the stage and everything drawn on it don't mirror. Text items in RTL scripts ren
   "⋯" in Layers, Shift+F10): the selection's commands in groups; Align as a submenu. On desktop the
   submenu opens beside the menu (flipped left near the right edge); on phones, inline under its
   item.
+- **Your videos** (#154): a button at the top bar's start (every layout) opens a popover —
+  Make a copy, New video, and the other saved videos (tap to open; a bin asks before
+  deleting). Not shown when the host keeps its own project list.
 - **Several selected** (#153): the desktop inspector shows "Changes here apply to all N
   selected" and the settings they share (Speed, Sound, Adjust, Opacity & blend); the left
   menu's Filters and Transitions act on all of them; the phone's multi-selection tools add

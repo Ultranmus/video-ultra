@@ -11,6 +11,7 @@ import {
   trimItem,
   type Item,
 } from '@video-ultra/core';
+import { VideosPopover } from './videos';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactElement } from 'react';
 import { useController, useHistory, useLabels, useProject, useUi } from './context';
 import { Button, IconButton, Ruler, Section, ToolButton } from './controls';
@@ -52,12 +53,27 @@ export function TopBar({ onClose }: { onClose?: (() => void) | undefined }): Rea
   const readOnly = useUi((s) => s.readOnly);
   const layout = useUi((s) => s.layout);
   const historyOpen = useUi((s) => s.historyOpen);
+  const videosOpen = useUi((s) => s.videosOpen);
   const layersOpen = useUi((s) => s.panel === 'layers' && (s.layout !== 'phone' || s.sheetPanel));
   const ratio = ratioOf(width, height);
   return (
     <header className="vu-topbar">
       <div className="vu-topbar-start">
         {onClose ? <IconButton icon="close" label={l.close} onClick={onClose} /> : null}
+        {ctl.options.autosave !== false && !isHidden(ctl.options.customize, 'videos') ? (
+          <span className="vu-popover-anchor vu-videos-anchor" data-videos-toggle="">
+            <IconButton
+              icon="videos"
+              label={l.yourVideos}
+              tip={l.tipYourVideos}
+              pressed={videosOpen}
+              onClick={() =>
+                ctl.ui.setState({ videosOpen: !videosOpen, historyOpen: false, menu: null })
+              }
+            />
+            <VideosPopover />
+          </span>
+        ) : null}
         {layout !== 'phone' ? (
           <input
             className="vu-project-name"

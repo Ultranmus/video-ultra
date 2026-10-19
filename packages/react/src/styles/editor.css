@@ -3833,6 +3833,79 @@
     font-weight: var(--vu-weight-semibold);
   }
 
+  /* Your videos (#154): opens from the top bar's start, so it hangs from the left. */
+  .vu-videos-anchor .vu-popover {
+    left: 0;
+    transform: none;
+  }
+
+  .vu-videos-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-1);
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    list-style: none;
+  }
+
+  .vu-videos-row {
+    display: flex;
+    align-items: center;
+    gap: var(--vu-space-1);
+  }
+
+  .vu-videos-open {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: flex-start;
+    min-width: 0;
+    min-height: var(--vu-size-touch);
+    padding: var(--vu-space-2) var(--vu-space-3);
+    border: 0;
+    border-radius: var(--vu-radius-md);
+    background: transparent;
+    color: var(--vu-text);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .vu-videos-open:hover {
+    background: var(--vu-surface-2);
+  }
+
+  .vu-videos-open:focus-visible {
+    outline: none;
+    box-shadow: var(--vu-focus-ring);
+  }
+
+  .vu-videos-name {
+    max-width: 100%;
+    overflow: hidden;
+    font-weight: var(--vu-weight-medium);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .vu-videos-when {
+    color: var(--vu-text-muted);
+    font-size: var(--vu-text-xs);
+  }
+
+  .vu-videos-confirm {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: var(--vu-space-2);
+    padding: var(--vu-space-2) var(--vu-space-3);
+    border-radius: var(--vu-radius-md);
+    background: var(--vu-surface-2);
+    font-size: var(--vu-text-sm);
+  }
+
   .vu-history-list {
     display: flex;
     flex-direction: column;

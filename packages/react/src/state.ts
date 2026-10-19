@@ -103,6 +103,8 @@ export interface UiState {
    */
   selectedIds: readonly string[];
   /** The History popover is open. */
+  /** "Your videos" popover (top bar). */
+  videosOpen: boolean;
   historyOpen: boolean;
   /** Layers panel: tapping rows adds to the selection (phones have no Shift key). */
   layersSelecting: boolean;
@@ -162,6 +164,7 @@ export function createUiStore() {
     selectedId: null,
     selectedIds: [],
     historyOpen: false,
+    videosOpen: false,
     layersSelecting: false,
     menu: null,
     announcement: '',
