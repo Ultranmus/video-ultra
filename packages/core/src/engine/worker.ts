@@ -65,11 +65,19 @@ let pool = new DecoderPool(DECODER_BUDGET.mid);
 let project: Project | null = null;
 let viewW = 1280;
 let viewH = 720;
+const videos = new Map<string, Promise<VideoMedia>>();
+/** Lighter copies of heavy videos (v0.4 proxies): preview only, never exports or saved frames. */
+const proxies = new Map<string, Promise<VideoMedia>>();
 const media: MediaLibrary = {
-  videos: new Map(),
+  videos,
   images: new Map(),
   luts: new Map(),
   animations: new Map(),
+};
+/** What the preview (and the small looks renders) read: a video's proxy when it has one. */
+const previewMedia: MediaLibrary = {
+  ...media,
+  videos: { get: (assetId) => proxies.get(assetId) ?? videos.get(assetId) },
 };
 /** Audio tracks by asset (videos with sound and audio files), once loaded. */
 const audioTracks = new Map<string, AudioTrackSource>();
@@ -158,7 +166,39 @@ function loadVideo(assetId: string, blob: Blob): void {
     return { input, track, media: layerMedia, hdr };
   })();
   loading.catch(reportError);
-  media.videos.set(assetId, loading);
+  videos.set(assetId, loading);
+}
+
+/** Uses `blob` (a lighter copy of the asset's video) for previews; null goes back to the original. */
+function loadProxy(assetId: string, blob: Blob | null): void {
+  if (!blob) proxies.delete(assetId);
+  else {
+    const loading = (async (): Promise<VideoMedia> => {
+      const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(blob) });
+      const track = await input.getPrimaryVideoTrack();
+      if (!track) throw new Error(`Proxy of ${assetId} has no video`);
+      return {
+        input,
+        track,
+        media: {
+          width: await track.getSquarePixelWidth(),
+          height: await track.getSquarePixelHeight(),
+          rotation: await track.getRotation(),
+          flip: await track.getFlip(),
+        },
+        hdr: false,
+      };
+    })();
+    // A copy that can't be read: quietly keep using the original.
+    loading.catch(() => {
+      if (proxies.get(assetId) === loading) proxies.delete(assetId);
+    });
+    proxies.set(assetId, loading);
+  }
+  // Items showing this asset start again on the other file.
+  composer?.prune(new Set());
+  looks?.composer.prune(new Set());
+  pruneSources();
 }
 
 /** The asset's chosen audio track (the probe's pick, e.g. AAC rather than iPhone spatial audio). */
@@ -432,8 +472,10 @@ async function makeRenderer(canvas: OffscreenCanvas, backend: RenderBackend): Pr
 async function mediaReady(p: Project): Promise<void> {
   const waits: Promise<unknown>[] = [];
   for (const id of Object.keys(p.assets)) {
-    const v = media.videos.get(id);
+    const v = videos.get(id);
     if (v) waits.push(v.catch(() => undefined));
+    const proxy = proxies.get(id);
+    if (proxy) waits.push(proxy.catch(() => undefined));
     const i = media.images.get(id);
     if (i) waits.push(i.catch(() => undefined));
     const anim = media.animations?.get(id);
@@ -638,7 +680,7 @@ async function filterPreviews(
     looks = {
       canvas,
       renderer: r,
-      composer: new Composer(r, new DecoderPool(1), media, true, 4 << 20, false),
+      composer: new Composer(r, new DecoderPool(1), previewMedia, true, 4 << 20, false),
       size,
     };
   }
@@ -712,7 +754,7 @@ async function looksRenderer(width: number, height: number) {
     looks = {
       canvas,
       renderer: r,
-      composer: new Composer(r, new DecoderPool(2), media, true, 4 << 20, false),
+      composer: new Composer(r, new DecoderPool(2), previewMedia, true, 4 << 20, false),
       size: key,
     };
   }
@@ -935,7 +977,7 @@ async function transitionPreview(
     looks = {
       canvas,
       renderer: r,
-      composer: new Composer(r, new DecoderPool(2), media, true, 4 << 20, false),
+      composer: new Composer(r, new DecoderPool(2), previewMedia, true, 4 << 20, false),
       size: key,
     };
   }
@@ -1047,7 +1089,7 @@ async function handle(
         }
       }
       renderer ??= createWebGL2Renderer(canvas);
-      composer = new Composer(renderer, pool, media, false, RASTER_BUDGET[tier]);
+      composer = new Composer(renderer, pool, previewMedia, false, RASTER_BUDGET[tier]);
       // Old export files left by closed pages: tidy once, after startup work is done.
       setTimeout(() => void cleanStaleExports(), 5000);
       composer.cheapEffects = tier === 'low';
@@ -1067,6 +1109,10 @@ async function handle(
       if (!playing) void showAt(playheadAt);
       return { type: 'ok' };
     }
+    case 'proxy':
+      loadProxy(request.assetId, request.blob);
+      if (!playing) void showAt(playheadAt);
+      return { type: 'ok' };
     case 'view':
       viewW = request.viewWidth;
       viewH = request.viewHeight;

@@ -104,6 +104,8 @@ export interface UiState {
   cutoutJob: { itemId: string; stage: 'download' | 'work'; fraction: number } | null;
   /** Scene detection running (v0.4): on which clip, how far. */
   sceneJob: { itemId: string; fraction: number } | null;
+  /** Proxies being made (v0.4): asset id → 0…1. */
+  proxyJobs: Record<string, number>;
   /** A caption whose text box should take focus in the Captions panel. */
   captionEditing: string | null;
   /** Last screen-reader announcement (a polite live region reads it). */
@@ -146,6 +148,7 @@ export function createUiStore() {
     captionJob: null,
     cutoutJob: null,
     sceneJob: null,
+    proxyJobs: {},
     captionEditing: null,
     panel: 'media',
     tool: null,

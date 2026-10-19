@@ -854,3 +854,17 @@ reason; when one changes, edit the entry and note the date.
       gets fixed). Measures only while open: one request at a time, ≤ 4 per second while playing,
       60 ms after a seek or edit while paused. Phones: none (pro tool, progressive disclosure).
       Scope colours are tokens read once (`--vu-scope-*`).
+148.  **Proxies** (v0.4). A lighter copy of a heavy video is made automatically when this device
+      would struggle (`proxyHeightFor`: low tier > 720p → 540p, mid > 1080p → 720p, high > 4K →
+      1080p; `proxies: 'always'` = anything over 540p, `'off'`). Made in its **own worker**
+      (`proxy.worker.js`; one at a time, so the analyzer's thumbnails aren't blocked) with
+      Mediabunny's Conversion: H.264, a keyframe every second (quick seeks), no sound (sound
+      comes from the original), rotation metadata kept (shows exactly like the original). Written
+      straight to OPFS with a sync access handle (never in memory) under
+      `video-ultra-proxies/`, marked finished with a `.ok` file; a byte budget per tier (1 / 2 /
+      4 GB) deletes the oldest; skipped when free space < 2× the estimate + 200 MB. Device-local:
+      not in the project file; a reopened project finds its copies. The engine keeps two video
+      maps: previews and the small looks renders (scopes, pickers) read the copy, **exports and
+      saved frames always read the original** (checked by giving a clip a deliberately different
+      copy). HDR clips get no copy (it would lose the HDR look). One info toast says a copy is
+      being made and that exports use the original; `ui.proxyJobs` has the progress.

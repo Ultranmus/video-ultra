@@ -12,7 +12,8 @@ fixes (Hindi model crash memory on phones, mouse marquee starting on the main vi
 paste); v0.3 (shape masks, high contrast + touch density, animated stickers + 611 animated
 emoji + SVG, 192 templates, on-device background removal `@video-ultra/ai`, embedding API);
 v0.4 (keyframes + graph editor, roll / slip / slide + markers, HEVC / AV1 export, scene detection
-+ Split at scenes, sound effects + keep pitch + level meter, scopes).
+
+- Split at scenes, sound effects + keep pitch + level meter, scopes).
 
 Not verifiable in the cloud sandbox (no GPU, no Safari, no phones): WebGPU golden frames, real
 iPhone memory for Hindi captions and background removal, how the sound effects sound to a human.

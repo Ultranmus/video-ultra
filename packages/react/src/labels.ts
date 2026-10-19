@@ -841,6 +841,9 @@ export const DEFAULT_LABELS = {
   tipKeepPitch: 'Sped up or slowed down, the voice keeps its own pitch (0.5×–2×)',
   soundFxHint: 'Even out brings quiet words up and loud parts down.',
   off: 'Off',
+  // v0.4 Proxies
+  makingProxy: (name: string) =>
+    `Making a lighter copy of "${name}" for smooth editing — your export still uses the original`,
   // v0.4 Scopes
   scopes: 'Scopes',
   scopeView: 'Scope',

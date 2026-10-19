@@ -484,6 +484,16 @@ thumbnails.
 main-thread long task while playing with scopes open; each measurement = one 256-px render +
 one 256×144 readback in the worker, ~0.6 MB of counts transferred (not copied).
 
+## Proxies (v0.4, 2026-10-19, Linux 4 cores, software decode, `scripts/proxies-check.ts`)
+
+| 3 s of playback, avc-4k30 (4K H.264) | shown | late | skipped |
+| ------------------------------------ | ----- | ---- | ------- |
+| from the 4K original                 | 17    | 12   | 14      |
+| from the 540p copy                   | 70    | 2    | 3       |
+
+The copy of 2.4 s of 4K took 7.6 s to make here (software codecs); 20 MB → 0.4 MB. Phones and
+Macs encode / decode in hardware — measure there.
+
 ## Cloud sandbox note (2026-10-19)
 
 The night's checks ran on a Linux container without a GPU (Chrome 155, 4 cores; WebGL2 in

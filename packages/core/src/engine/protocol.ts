@@ -80,6 +80,8 @@ export type EngineRequest =
     }
   | { type: 'project'; project: Project }
   | { type: 'media'; assetId: string; blob: Blob }
+  /** A lighter copy of a video for previews (v0.4 proxies); null = back to the original. */
+  | { type: 'proxy'; assetId: string; blob: Blob | null }
   | { type: 'view'; viewWidth: number; viewHeight: number }
   | { type: 'seek'; time: number }
   | { type: 'play' }

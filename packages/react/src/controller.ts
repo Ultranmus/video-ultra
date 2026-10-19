@@ -80,7 +80,10 @@ import {
   createEngine,
   createMediaAnalyzer,
   createProjectStorage,
+  createProxyMaker,
   itemIndexAt,
+  proxyHeightFor,
+  type ProxyMaker,
   sceneCutTimes,
   type SceneSensitivity,
   StorageFullError,
@@ -139,6 +142,12 @@ export interface ControllerOptions {
    * Google's public copy. Placed stickers are stored in the project.
    */
   animatedStickerLibrary?: string | false;
+  /**
+   * Lighter copies of heavy videos for smooth editing (v0.4): `auto` (default) makes them for
+   * videos this device would struggle with (4K; 1080p on budget phones), `always` for every
+   * video over 540p, `off` never. Previews use the copy; exports always use the original.
+   */
+  proxies?: 'auto' | 'always' | 'off';
   /** The host's music & sound-effects source for the Audio panel. */
   audioLibrary?: AudioLibrary;
   /** Turns speech into timed words for auto captions (on-device or the host's service). */
@@ -469,6 +478,7 @@ export class EditorController {
     };
     await engine.setProject(this.project);
     for (const [assetId, blob] of this.media) await engine.addMedia(assetId, blob);
+    for (const [assetId, proxy] of this.proxies) await engine.setProxy(assetId, proxy);
     await engine.seek(this.playhead.time);
     return () => {
       if (this.engine === engine) this.engine = null;
@@ -490,6 +500,10 @@ export class EditorController {
     this.engine?.destroy();
     this.engine = null;
     this.analyzer?.destroy();
+    this.#proxyAbort.abort();
+    this.#proxyAbort = new AbortController();
+    this.#proxyMaker?.destroy();
+    this.#proxyMaker = null;
     this.analyzer = null;
     // Close after the autosave flush above has been handed its writes.
     const storage = this.storage;
@@ -1330,6 +1344,57 @@ export class EditorController {
         asset.audioTrack !== undefined ? { audioTrack: asset.audioTrack } : {},
       );
     void this.engine?.addMedia(asset.id, blob).catch(() => {});
+    if (asset.kind === 'video') void this.#ensureProxy(asset, blob);
+  }
+
+  // ── proxies (v0.4) ─────────────────────────────────────────────────────
+
+  /** Lighter copies in use for previews, by asset id (device-local, not in the project). */
+  readonly proxies = new Map<string, File>();
+  #proxyMaker: ProxyMaker | null = null;
+  #proxyAbort = new AbortController();
+
+  /** Finds or makes the proxy a heavy video needs on this device, then previews from it. */
+  async #ensureProxy(asset: Asset, blob: Blob): Promise<void> {
+    const mode = this.options.proxies ?? 'auto';
+    if (mode === 'off' || asset.kind !== 'video' || asset.hdr || this.proxies.has(asset.id)) return;
+    if (!asset.width || !asset.height || typeof Worker === 'undefined') return;
+    const turned = asset.rotation === 90 || asset.rotation === 270;
+    const w = turned ? asset.height : asset.width;
+    const h = turned ? asset.width : asset.height;
+    const height =
+      mode === 'always'
+        ? Math.min(w, h) > 540
+          ? 540
+          : null
+        : proxyHeightFor(w, h, this.caps?.tier ?? 'mid');
+    if (!height) return;
+    const maker = (this.#proxyMaker ??= createProxyMaker(this.caps?.tier ?? 'mid'));
+    const signal = this.#proxyAbort.signal;
+    let file = await maker.find(asset.id, height);
+    if (!file) {
+      if (signal.aborted) return;
+      this.ui.setState((s) => ({ proxyJobs: { ...s.proxyJobs, [asset.id]: 0 } }));
+      this.toast(this.labels.makingProxy(asset.name), 'info');
+      try {
+        file = await maker.make(asset.id, blob, height, {
+          signal,
+          onProgress: (done) =>
+            this.ui.setState((s) =>
+              asset.id in s.proxyJobs ? { proxyJobs: { ...s.proxyJobs, [asset.id]: done } } : {},
+            ),
+        });
+      } finally {
+        this.ui.setState((s) => {
+          const rest = { ...s.proxyJobs };
+          Reflect.deleteProperty(rest, asset.id);
+          return { proxyJobs: rest };
+        });
+      }
+    }
+    if (!file || signal.aborted || !this.media.has(asset.id)) return;
+    this.proxies.set(asset.id, file);
+    await this.engine?.setProxy(asset.id, file).catch(() => {});
   }
 
   /**

@@ -32,6 +32,11 @@ export interface Engine {
   setProject(project: Project): Promise<void>;
   /** Gives the engine the bytes of an asset (a `File` from an input, or a Blob). */
   addMedia(assetId: string, blob: Blob): Promise<void>;
+  /**
+   * Previews `assetId` from `proxy` (a lighter copy, same timing); exports and saved frames keep
+   * reading the original. `null` goes back to the original.
+   */
+  setProxy(assetId: string, proxy: Blob | null): Promise<void>;
   /** The size of the element showing the preview changed (device pixels). */
   setViewSize(width: number, height: number): Promise<void>;
   seek(time: Time): Promise<void>;
@@ -385,6 +390,9 @@ export async function createEngine(
     backend: init.backend,
     async setProject(project: Project) {
       await send({ type: 'project', project });
+    },
+    async setProxy(assetId: string, proxy: Blob | null) {
+      await send({ type: 'proxy', assetId, blob: proxy });
     },
     async addMedia(assetId: string, blob: Blob) {
       await send({ type: 'media', assetId, blob });

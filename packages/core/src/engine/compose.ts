@@ -97,7 +97,8 @@ export interface VideoMedia {
 
 /** The media every composer reads (shared; GPU copies are per renderer). */
 export interface MediaLibrary {
-  videos: Map<string, Promise<VideoMedia>>;
+  /** Loaded videos by asset id (preview composers may see a proxy here instead). */
+  videos: { get(assetId: string): Promise<VideoMedia> | undefined };
   images: Map<string, Promise<ImageBitmap>>;
   /** Parsed `.cube` LUT files by asset id. */
   luts: Map<string, Promise<CubeLut>>;

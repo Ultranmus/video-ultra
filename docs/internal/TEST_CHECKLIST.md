@@ -108,3 +108,10 @@ Open the branch's Vercel preview (or `pnpm --filter playground dev`), then **`/e
       Skin tones should sit near the line on Colour. _Checked here:_ scopes-check (colour-bar
       counts, every view draws, follows an edit, ≤ 4 updates/s while playing, axe, no long
       tasks) + 3 unit tests.
+- [ ] **Proxies (heavy 4K clips).** On a budget Android phone (or the iPhone with a 4K
+      recording): add a long 4K video → a note says a lighter copy is being made → after it's
+      done, play and scrub: smoother than before? Export → the file is full quality (4K export
+      looks sharp). Reopen the project → no new copy is made. To force it on the Mac:
+      `/editor?proxies=always`. _Checked here:_ proxies-check (copy made, 540p, keyframe each
+      second, every frame decodes, playback 17 → 70 frames shown in 3 s, export reads the
+      original, reused after reopening).

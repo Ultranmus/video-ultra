@@ -72,6 +72,12 @@ export interface VideoEditorProps {
    */
   animatedStickerLibrary?: string | false;
   /**
+   * Lighter copies of heavy videos for smooth editing, kept on this device: `auto` (default)
+   * for videos this device would struggle with (4K; 1080p on budget phones), `always` for every
+   * video over 540p, `off` never. Previews use the copy; exports always use the original.
+   */
+  proxies?: 'auto' | 'always' | 'off';
+  /**
    * A music & sound-effects source for the Audio panel: search, categories, a ▶ preview and the
    * licence line per sound, and Add (at the playhead). The picked file is stored in the project
    * like an import (its licence line on the asset as `credit`), so exports never depend on the
@@ -156,6 +162,7 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
         ...(props.animatedStickerLibrary !== undefined
           ? { animatedStickerLibrary: props.animatedStickerLibrary }
           : {}),
+        ...(props.proxies ? { proxies: props.proxies } : {}),
         ...(props.audioLibrary ? { audioLibrary: props.audioLibrary } : {}),
         ...(props.transcriber ? { transcriber: props.transcriber } : {}),
         ...(props.backgroundRemover ? { backgroundRemover: props.backgroundRemover } : {}),

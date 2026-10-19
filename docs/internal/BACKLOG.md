@@ -210,3 +210,6 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       Opacity, Split… on text): add an edge fade or a "More" entry.
 - [x] (fixed 2026-10-19) The "browser may clear unsaved work" toast is large on phones and covers the stage.
 - [ ] Device frames bigger than the window scroll (zooming the frame breaks canvas pointer maths).
+- [ ] Proxies (#148): HDR clips get no copy (an HDR → SDR copy would need tone mapping that
+      matches the engine's); a "Make a lighter copy" button per clip and a Media panel badge
+      would make the automatic choice visible — wait for the owner's feedback first.

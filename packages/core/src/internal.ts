@@ -99,6 +99,7 @@ export {
   type ScopeData,
 } from './effects/scopes';
 export { createMediaAnalyzer } from './media/analyzer';
+export { createProxyMaker, proxyHeightFor, PROXY_BUDGET, type ProxyMaker } from './media/proxy';
 export type {
   MediaAnalyzer,
   MediaAnalyzerOptions,

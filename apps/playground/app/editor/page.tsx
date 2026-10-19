@@ -4,6 +4,7 @@
  * The editor, full screen. `?theme=light|auto`, `?backend=webgl2`, `?autosave=0` for testing,
  * `?sounds=0` without the demo music & sounds library. `?contrast=high|auto` for high contrast,
  * `?density=touch|compact` for control sizes. `?embed=1` shows the embedding API (embed-demo.tsx).
+ * `?proxies=always|off` for the lighter editing copies (default auto).
  * `?device=phone|phone-small|tablet|tablet-portrait` shows it at that device's size (the editor
  * picks its layout from its own width), so phone and tablet layouts can be checked on a desktop
  * without deploying. A strip at the top switches devices; it hides itself on real phones.
@@ -95,6 +96,7 @@ function Editor() {
       density={density}
       backend={backend}
       autosave={params.get('autosave') !== '0'}
+      proxies={(params.get('proxies') ?? 'auto') as 'auto' | 'always' | 'off'}
       {...(params.get('sounds') !== '0' ? { audioLibrary: sounds } : {})}
       {...(params.get('transcriber') !== '0' ? { transcriber } : {})}
       {...(params.get('cutout') !== '0' ? { backgroundRemover } : {})}
