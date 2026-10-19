@@ -84,3 +84,10 @@ Open the branch's Vercel preview (or `pnpm --filter playground dev`), then **`/e
       the file plays in Photos / QuickTime? (HEVC should; AV1 needs a new device.) _Checked
       here:_ codecs-check (AV1 in MP4 and WebM, every frame decodes, half the size; HEVC absent
       on Linux with a clear message).
+- [ ] **Split at scenes.** Add a video with several shots (any trailer, or a phone video you cut
+      together) → select it → **Split at scenes** (inspector section; phone: toolbar) → each shot
+      becomes its own clip; Undo puts it back in one step. Try **Big changes** / **Small changes
+      too**. Time it on the iPhone and Android for a 1-minute video, and does Cancel stop it?
+      Slow cross-fades stay in one clip (by design for now). _Checked here:_ scenes-check (exact
+      cuts at 3 / 6 / 8 s in real footage, at 2× speed too, Sintel trailer, no false cut, Cancel,
+      no long tasks, phone toolbar) + 6 unit tests.

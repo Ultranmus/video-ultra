@@ -19,6 +19,7 @@ import type {
 } from './analyzer-protocol';
 import { accumulatePeaks, peaksPerSecondFor } from './peaks';
 import { probeMedia } from './probe';
+import { SCENE_FRAME_HEIGHT, SCENE_FRAME_WIDTH, SceneDetector } from './scenes';
 
 /**
  * The media-analysis worker: probing at import, timeline thumbnails and waveforms. Everything that
@@ -33,6 +34,8 @@ import { probeMedia } from './probe';
  *   keyframes again).
  * - **Waveforms** stream-decode audio into fixed buckets (never the whole PCM). On a full decode
  *   budget they pause every few seconds of audio to let waiting thumbnails through.
+ * - **Scene detection** decodes the asked range frame by frame and reads each frame at 64×36
+ *   ({@link SceneDetector}). Like waveforms, it steps aside for waiting thumbnails and resumes.
  * - **Every VideoSample is closed** right after it's drawn (`openFrames` counts them).
  * - **Watchdog:** a decode step that doesn't answer in time ends its job; its requests get `null`.
  */
@@ -59,6 +62,8 @@ const MAX_QUEUE = 512;
 const WATCHDOG_MS = 4000;
 /** A waveform job checks for waiting thumbnails after every this many seconds of audio. */
 const WAVE_SLICE_S = 8;
+/** A scene job checks for waiting thumbnails after every this many seconds of video. */
+const SCENE_SLICE_S = 2;
 
 let tier: DeviceTier = 'mid';
 let mode: ThumbnailMode = 'keyframe';
@@ -106,9 +111,20 @@ interface WaveJob {
   state: { peaks: Float32Array; peaksPerSecond: number; duration: number } | null;
 }
 
+interface SceneJob {
+  id: number;
+  assetId: string;
+  from: number;
+  to: number;
+  /** Frames before this media time were read already (resume point). */
+  resumeAt: number;
+  detector: SceneDetector;
+}
+
 const media = new Map<string, MediaEntry>();
 let thumbQueue: ThumbRequest[] = [];
 const waveQueue: WaveJob[] = [];
+const sceneQueue: SceneJob[] = [];
 /** Ids of requests inside a running job that were cancelled. */
 const cancelled = new Set<number>();
 /** Ids of requests inside a running job (so a cancel knows to mark them). */
@@ -130,6 +146,7 @@ const stats: AnalyzerStats = {
   cacheBytes: 0,
   cacheBudget: CACHE_BUDGET.mid,
   waveforms: 0,
+  sceneRuns: 0,
   watchdogResets: 0,
   openInputs: 0,
 };
@@ -272,7 +289,7 @@ const live = (id: number) => !cancelled.has(id);
 
 function pump(): void {
   while (active < budget) {
-    const job = nextThumbJob() ?? nextWaveJob();
+    const job = nextThumbJob() ?? nextWaveJob() ?? nextSceneJob();
     if (!job) return;
     active++;
     stats.activeJobs = active;
@@ -316,6 +333,17 @@ function nextWaveJob(): (() => Promise<void>) | null {
     return () => Promise.resolve();
   }
   return () => runWaveJob(entry, job);
+}
+
+function nextSceneJob(): (() => Promise<void>) | null {
+  const job = sceneQueue.shift();
+  if (!job) return null;
+  const entry = media.get(job.assetId);
+  if (!entry || entry.kind !== 'video') {
+    answerScenes(job.id, null);
+    return () => Promise.resolve();
+  }
+  return () => runSceneJob(entry, job);
 }
 
 class WatchdogError extends Error {}
@@ -605,6 +633,85 @@ async function runWaveJob(entry: MediaEntry, job: WaveJob): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Scene detection
+
+let sceneCanvas: OffscreenCanvas | null = null;
+let sceneContext: OffscreenCanvasRenderingContext2D | null = null;
+
+function answerScenes(id: number, cuts: number[] | null): void {
+  running.delete(id);
+  if (cancelled.delete(id)) return;
+  if (cuts) stats.sceneRuns++;
+  reply({ id, type: 'scenes', cuts });
+}
+
+async function runSceneJob(entry: MediaEntry, job: SceneJob): Promise<void> {
+  entry.users++;
+  let iterator: AsyncIterator<VideoSample> | null = null;
+  try {
+    const info = await videoInfo(entry);
+    if (!info) {
+      answerScenes(job.id, null);
+      return;
+    }
+    if (!sceneCanvas || !sceneContext) {
+      sceneCanvas = new OffscreenCanvas(SCENE_FRAME_WIDTH, SCENE_FRAME_HEIGHT);
+      sceneContext = sceneCanvas.getContext('2d', { alpha: false, willReadFrequently: true })!;
+    }
+    const ctx = sceneContext;
+    const to = Math.min(job.to, info.duration);
+    iterator = info.sink.samples(job.resumeAt, to)[Symbol.asyncIterator]();
+    let sliceEnd = job.resumeAt + SCENE_SLICE_S;
+    let reported = job.resumeAt;
+    for (;;) {
+      if (!live(job.id)) {
+        answerScenes(job.id, null);
+        return;
+      }
+      const result = await nextWithWatchdog(iterator);
+      if (result.done) break;
+      const sample = result.value;
+      const time = sample.timestamp;
+      stats.framesDecoded++;
+      stats.openFrames++;
+      try {
+        // A resumed decode starts at the frame showing at resumeAt: read already.
+        if (time < job.resumeAt - 1e-4 && job.resumeAt > job.from) continue;
+        sample.drawWithFit(ctx, { fit: 'fill' });
+      } finally {
+        sample.close();
+        stats.openFrames--;
+      }
+      job.detector.push(ctx.getImageData(0, 0, SCENE_FRAME_WIDTH, SCENE_FRAME_HEIGHT).data, time);
+      job.resumeAt = time + 1e-3;
+      if (time - reported >= 0.5) {
+        reported = time;
+        reply({
+          id: job.id,
+          type: 'scenes-progress',
+          done: Math.min(1, (time - job.from) / Math.max(1e-3, to - job.from)),
+        });
+      }
+      if (time >= sliceEnd) {
+        sliceEnd = time + SCENE_SLICE_S;
+        if (thumbQueue.length > 0 && active >= budget) {
+          sceneQueue.unshift(job);
+          return;
+        }
+      }
+    }
+    answerScenes(job.id, job.detector.cuts);
+  } catch (error) {
+    if (error instanceof WatchdogError) stats.watchdogResets++;
+    answerScenes(job.id, null);
+  } finally {
+    void iterator?.return?.(undefined).catch(() => undefined);
+    entry.users--;
+    if (entry.removed && entry.users === 0) closeInput(entry);
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
 // Messages
 
 self.onmessage = (event: MessageEvent<AnalyzerRequest>) => {
@@ -669,6 +776,18 @@ self.onmessage = (event: MessageEvent<AnalyzerRequest>) => {
       running.add(message.id);
       pump();
       return;
+    case 'scenes':
+      sceneQueue.push({
+        id: message.id,
+        assetId: message.assetId,
+        from: Math.max(0, message.from),
+        to: message.to,
+        resumeAt: Math.max(0, message.from),
+        detector: new SceneDetector({ sensitivity: message.sensitivity }),
+      });
+      running.add(message.id);
+      pump();
+      return;
     case 'cancel': {
       const queued = thumbQueue.findIndex((r) => r.id === message.id);
       if (queued >= 0) {
@@ -679,6 +798,12 @@ self.onmessage = (event: MessageEvent<AnalyzerRequest>) => {
       const wave = waveQueue.findIndex((j) => j.id === message.id);
       if (wave >= 0) {
         waveQueue.splice(wave, 1);
+        running.delete(message.id);
+        return;
+      }
+      const scene = sceneQueue.findIndex((j) => j.id === message.id);
+      if (scene >= 0) {
+        sceneQueue.splice(scene, 1);
         running.delete(message.id);
         return;
       }
@@ -706,6 +831,12 @@ function removeMedia(entry: MediaEntry): void {
     if (job.assetId !== entry.assetId) continue;
     waveQueue.splice(i, 1);
     answerWave(job.id, null);
+  }
+  for (let i = sceneQueue.length - 1; i >= 0; i--) {
+    const job = sceneQueue[i]!;
+    if (job.assetId !== entry.assetId) continue;
+    sceneQueue.splice(i, 1);
+    answerScenes(job.id, null);
   }
   // Jobs in flight finish and answer on their own; the input closes after the last one.
   if (entry.users === 0) closeInput(entry);

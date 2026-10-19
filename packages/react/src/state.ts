@@ -53,7 +53,9 @@ export type ToolId =
   // v0.4 Keyframes
   | 'keyframes'
   // v0.4 Fine trims
-  | 'protrim';
+  | 'protrim'
+  // v0.4 Scene detection
+  | 'scenes';
 
 export interface ImportRow {
   id: string;
@@ -98,6 +100,8 @@ export interface UiState {
   } | null;
   /** Background removal running (v0.3): for which item, what it's doing, how far. */
   cutoutJob: { itemId: string; stage: 'download' | 'work'; fraction: number } | null;
+  /** Scene detection running (v0.4): on which clip, how far. */
+  sceneJob: { itemId: string; fraction: number } | null;
   /** A caption whose text box should take focus in the Captions panel. */
   captionEditing: string | null;
   /** Last screen-reader announcement (a polite live region reads it). */
@@ -139,6 +143,7 @@ export function createUiStore() {
     announcement: '',
     captionJob: null,
     cutoutJob: null,
+    sceneJob: null,
     captionEditing: null,
     panel: 'media',
     tool: null,

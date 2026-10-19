@@ -736,7 +736,8 @@ type TitleKey =
   | 'shape'
   | 'removeBackground'
   | 'keyframes'
-  | 'fineTrim';
+  | 'fineTrim'
+  | 'splitAtScenes';
 
 const TOOL_TITLE: Record<ToolId, TitleKey> = {
   speed: 'speed',
@@ -765,6 +766,7 @@ const TOOL_TITLE: Record<ToolId, TitleKey> = {
   cutout: 'removeBackground',
   keyframes: 'keyframes',
   protrim: 'fineTrim',
+  scenes: 'splitAtScenes',
 };
 
 /**

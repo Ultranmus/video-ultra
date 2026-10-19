@@ -25,6 +25,7 @@ import {
   setTrackFlags,
   setTransition,
   splitItem,
+  splitItemAt,
   trimItem,
   updateItem,
   moveMainToLane,
@@ -74,6 +75,19 @@ describe('main track', () => {
     expect(starts(project).slice(0, 2)).toEqual([
       ['a', 0, 2],
       [second, 2, 3],
+    ]);
+    expect(checkInvariants(project)).toEqual([]);
+  });
+
+  it('splits at many times in one edit (scene cuts), skipping edges and repeats', () => {
+    const { project, ids } = setup();
+    const parts = splitItemAt(project, 'a', [s(3), s(1), 0, s(1) + 2, s(5), s(9)], ids);
+    expect(parts).toHaveLength(3);
+    expect(starts(project).slice(0, 4)).toEqual([
+      ['a', 0, 1],
+      [parts[1], 1, 2],
+      [parts[2], 3, 2],
+      ['b', 5, 3],
     ]);
     expect(checkInvariants(project)).toEqual([]);
   });

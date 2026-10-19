@@ -208,5 +208,6 @@ _D. Capture & export_
 - [x] More codecs and containers: H.265 / AV1, MOV / MKV, transparent video (S–M each, where the
       device can encode) — HEVC + AV1 export (#144); MOV / MKV / alpha → BACKLOG
 - [ ] Audio EQ, compressor, pitch shift, meters (M); scopes (M); scene detection + auto-split (M)
+      — scene detection + auto-split done (#145)
 - [ ] Text-to-speech voiceover (L); multiple sequences / compound clips (L)
 - [ ] Optional AI editing plugin (bring-your-own endpoint) driving the op-based Project (M)

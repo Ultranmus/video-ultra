@@ -815,3 +815,15 @@ reason; when one changes, edit the entry and note the date.
       480p, every frame decodes in ffmpeg; HEVC isn't offered there (no encoder) and asking for it
       says so — Macs and iPhones have hardware HEVC. MOV / MKV containers and transparent video:
       not in this round (BACKLOG).
+145.  **Scene detection + auto-split** (v0.4). In the media analyzer worker (no new worker, no
+      model): the clip's range is decoded frame by frame, each frame drawn at 64×36 and scored
+      against the previous one (half colour-histogram change, half brightness change per pixel).
+      A cut = score over the sensitivity's threshold **and** 2–3× the last 12 frames' average
+      (fast motion lifts every score; a cut is a spike) **and** ≥ 0.4 s after the previous cut (a
+      flash isn't two scenes). Lowest priority in the analyzer: it steps aside every 2 s of video
+      for waiting thumbnails. Buffers are reused (no per-frame allocation except the 9 KB
+      `getImageData`). Cuts map onto the clip as it is now (speed, trims), then one
+      `splitItemAt` edit = one undo. Slow cross-fades are not cuts (a trailer's dissolves stay in
+      one clip) — a deliberate limit for now. UI: a "Split at scenes" section / tool on video
+      clips with Big changes / Normal / Small changes too, progress and Cancel. Test media:
+      `scenes-cuts.mp4` (real footage cut at known times) and the Sintel trailer (CC BY).

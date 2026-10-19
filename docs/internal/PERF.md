@@ -457,6 +457,18 @@ Both: background fully removed (exported left fifth luma 113 → 0), the person 
 116). objects has cleaner edges (people left a faint smudge by the backpack). Phones: `people`
 (DECISIONS #140) — not measured on a phone yet.
 
+## Scene detection (v0.4, 2026-10-19, Linux 4 cores, Chrome 155, `scripts/scenes-check.ts`)
+
+| Clip                                   | Time  | Cuts found                                  |
+| -------------------------------------- | ----- | ------------------------------------------- |
+| scenes-cuts.mp4 (720p30, 10 s, 3 cuts) | 1.6 s | 3, 6, 8 s — exact                           |
+| Sintel trailer (480p24, 52 s)          | 3.5 s | the 6 hard cuts ffmpeg's scene filter finds |
+| bbb-1080p60 (10 s, one shot), "high"   | —     | none                                        |
+
+No main-thread long task while it runs; 0 frames left open. Hardware decode will be faster on
+the owner's devices; budget phones decode slower but the job is cancellable and yields to
+thumbnails.
+
 ## Cloud sandbox note (2026-10-19)
 
 The night's checks ran on a Linux container without a GPU (Chrome 155, 4 cores; WebGL2 in

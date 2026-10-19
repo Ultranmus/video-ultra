@@ -685,6 +685,34 @@ export function splitItem(project: Project, itemId: string, at: Time, ids: IdFac
   return second.id;
 }
 
+/**
+ * Splits an item at every time in `times` (timeline flicks; e.g. scene cuts) in one edit. Times
+ * outside the item or within a frame of its ends or of each other are skipped. Returns the ids
+ * of the item's parts in order (the first is `itemId`).
+ */
+export function splitItemAt(
+  project: Project,
+  itemId: string,
+  times: readonly Time[],
+  ids: IdFactory,
+): string[] {
+  const { item } = editable(project, itemId);
+  const frame = projectFrame(project);
+  const cuts: Time[] = [];
+  for (const t of [...times].map((x) => snap(project, x)).sort((a, b) => a - b)) {
+    if (t < item.start + frame || t > itemEnd(item) - frame) continue;
+    if (cuts.length && t - cuts[cuts.length - 1]! < frame) continue;
+    cuts.push(t);
+  }
+  const parts = [itemId];
+  let current = itemId;
+  for (const t of cuts) {
+    current = splitItem(project, current, t, ids);
+    parts.push(current);
+  }
+  return parts;
+}
+
 /** Keyframes for a part of the item that starts `offset` later in its old timing (keyframes.ts). */
 function retimeItemKeyframes(item: Item, offset: Time): void {
   if ('keyframes' in item && item.keyframes)

@@ -33,6 +33,7 @@ import { ArrangeControls, LockedNote } from './organize';
 import { BackgroundTool } from './cutout';
 import { KeyframesTool, usePlayheadFor } from './keyframes';
 import { ProTrimTool } from './protrim';
+import { ScenesTool } from './scenes';
 import { MaskTool } from './mask';
 import { BlendTool, GreenScreenTool, RegionTool } from './picture';
 
@@ -118,6 +119,8 @@ function ItemTool({ tool, item }: { tool: ToolId; item: Item }): ReactElement | 
       return <KeyframesTool item={item} />;
     case 'protrim':
       return <ProTrimTool item={item} />;
+    case 'scenes':
+      return item.kind === 'video' ? <ScenesTool item={item} /> : null;
     default:
       return null;
   }
@@ -177,6 +180,9 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
           <Section title={l.sound}>
             <VolumeTool item={item} />
             <FadeTool item={item} />
+          </Section>
+          <Section title={l.splitAtScenes} collapsible defaultOpen={false}>
+            <ScenesTool item={item} />
           </Section>
           {picture}
         </>

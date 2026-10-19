@@ -268,6 +268,13 @@ function singleTools(
         ...transition,
         { key: 'fade', icon: 'fade', label: l.fade, tip: l.tipFade, tool: 'fade' },
         ...protrim,
+        {
+          key: 'scenes',
+          icon: 'scenes',
+          label: l.splitAtScenes,
+          tip: l.tipSplitAtScenes,
+          tool: 'scenes',
+        },
         ...(onMain
           ? [
               {

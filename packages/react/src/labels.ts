@@ -812,6 +812,18 @@ export const DEFAULT_LABELS = {
   codecStandardTip: 'Plays everywhere',
   codecHevcTip: 'About 40 % smaller; plays on most phones and Macs, not every PC browser',
   codecAv1Tip: 'About half the size; plays in new browsers and phones',
+  // v0.4 Scene detection
+  splitAtScenes: 'Split at scenes',
+  tipSplitAtScenes: 'Find where the shot changes and cut the clip there',
+  findingScenes: 'Finding the scene changes…',
+  sceneSensitivity: 'Find',
+  sceneFewer: 'Big changes',
+  sceneNormal: 'Normal',
+  sceneMore: 'Small changes too',
+  scenesHint: 'Looks at every frame on this device. Each scene becomes its own clip.',
+  noScenesFound: 'No scene changes found in this clip',
+  scenesSplit: (parts: number) => `Split into ${parts} scenes`,
+  scenesFailed: 'Couldn’t read this video to find its scenes',
   // v0.4 Pro trims and markers
   rollCut: 'Move cut',
   fineTrim: 'Fine trim',

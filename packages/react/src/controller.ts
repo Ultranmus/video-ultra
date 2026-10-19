@@ -35,6 +35,7 @@ import {
   setTransition,
   LAYER_SCALE,
   splitItem,
+  splitItemAt,
   ungroupItems,
   updateItem,
   type ArrangeTo,
@@ -80,6 +81,8 @@ import {
   createMediaAnalyzer,
   createProjectStorage,
   itemIndexAt,
+  sceneCutTimes,
+  type SceneSensitivity,
   StorageFullError,
   type Engine,
   type MediaAnalyzer,
@@ -1867,6 +1870,69 @@ export class EditorController {
   /** Shows the photo's own background again. */
   restoreBackground(itemId: string): void {
     this.run(this.labels.restoreBackground, (d) => updateItem(d, itemId, { cutout: null }));
+  }
+
+  // ── scene detection (v0.4) ──────────────────────────────────────────────
+
+  #sceneAbort: AbortController | null = null;
+
+  /**
+   * Finds where the scenes change in a video clip (in the analyzer worker, frame by frame) and
+   * splits the clip there — one undo step. Progress is in `ui.sceneJob`. Returns the number of
+   * parts (1 = no scene changes), or `null` when stopped or the video couldn't be read.
+   */
+  async splitAtScenes(
+    itemId: string,
+    sensitivity: SceneSensitivity = 'normal',
+  ): Promise<number | null> {
+    const l = this.labels;
+    const item = findItem(this.project, itemId)?.item;
+    if (!item || item.kind !== 'video' || !this.analyzer) return null;
+    this.#sceneAbort?.abort();
+    const abort = new AbortController();
+    this.#sceneAbort = abort;
+    this.ui.setState({ sceneJob: { itemId, fraction: 0 } });
+    try {
+      const from = item.sourceIn / FLICKS_PER_SECOND;
+      const cuts = await this.analyzer.scenes(item.assetId, {
+        from,
+        to: from + (item.duration * item.speed) / FLICKS_PER_SECOND,
+        sensitivity,
+        signal: abort.signal,
+        onProgress: (fraction) => {
+          if (!abort.signal.aborted) this.ui.setState({ sceneJob: { itemId, fraction } });
+        },
+      });
+      if (abort.signal.aborted) return null;
+      if (!cuts) {
+        this.toast(l.scenesFailed, 'error');
+        return null;
+      }
+      // The clip may have changed while the worker looked: map onto it as it is now.
+      const now = findItem(this.project, itemId)?.item;
+      if (!now || now.kind !== 'video') return null;
+      const times = sceneCutTimes(cuts, now, FLICKS_PER_SECOND, projectFrame(this.project));
+      if (times.length === 0) {
+        this.toast(l.noScenesFound, 'info');
+        return 1;
+      }
+      const parts = this.run(l.splitAtScenes, (d, ctx) => splitItemAt(d, itemId, times, ctx.ids));
+      if (!parts) return null;
+      this.toast(l.scenesSplit(parts.length), 'success', { label: l.undo, run: () => this.undo() });
+      return parts.length;
+    } finally {
+      if (this.#sceneAbort === abort) {
+        this.#sceneAbort = null;
+        this.ui.setState({ sceneJob: null });
+      }
+    }
+  }
+
+  /** Stops a running {@link splitAtScenes}. */
+  cancelSceneDetection(): void {
+    this.#sceneAbort?.abort();
+    this.#sceneAbort = null;
+    this.ui.setState({ sceneJob: null });
   }
 
   // ── captions (v0.2 A) ──────────────────────────────────────────────────
