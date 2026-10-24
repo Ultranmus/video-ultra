@@ -329,19 +329,25 @@ export function EditSlider({
 
 type Choice<T extends string> = { value: T; label: string; icon?: IconName; tip?: string };
 
-/** A small set of exclusive choices in one pill (2–5 short options). */
+/**
+ * A small set of exclusive choices in one pill (2–5 short options). `iconOnly`: each option shows
+ * its icon, its name goes to the tooltip and screen readers (for options an icon says plainly,
+ * like arrows).
+ */
 export function Segmented<T extends string>({
   label,
   value,
   options,
   onChange,
   hideLabel,
+  iconOnly,
 }: {
   label: string;
   value: T | null;
   options: readonly Choice<T>[];
   onChange: (value: T) => void;
   hideLabel?: boolean;
+  iconOnly?: boolean;
 }): ReactElement {
   return (
     <div className="vu-field">
@@ -354,11 +360,12 @@ export function Segmented<T extends string>({
             role="radio"
             aria-checked={o.value === value}
             className="vu-segment"
-            data-tooltip={o.tip}
+            aria-label={iconOnly && o.icon ? o.label : undefined}
+            data-tooltip={o.tip ?? (iconOnly && o.icon ? o.label : undefined)}
             onClick={() => onChange(o.value)}
           >
             {o.icon ? <Icon name={o.icon} size={16} /> : null}
-            <span>{o.label}</span>
+            {iconOnly && o.icon ? null : <span>{o.label}</span>}
           </button>
         ))}
       </div>

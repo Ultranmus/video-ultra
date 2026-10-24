@@ -344,3 +344,72 @@ merged and re-verified on main; A (captions) and E (layers) here.
   action, checked in a browser); Vite example shows the editor.
 - Fixes on the way: stray screenshots out of the repo root; per-package Vitest cache (a shared one
   raced — the session's first unexplained test failure).
+
+## 2026-10-24 · Owner-reported UI fixes (inspector)
+
+- Blurred area: the stage's selection box follows Width / Height (and any side-panel slider)
+  while dragging — new `ctl.onPreview()` subscription; it used to catch up only on release.
+- Pressed buttons keep their accent on hover (flip H / V looked unchanged after a click), and
+  buttons in an icon row get a visible hover (the row was already the hover colour).
+- Align buttons: each has its own tooltip (left / centre / right / top / middle / bottom, to the
+  video or to each other) instead of one shared line.
+- Locked note in the desktop inspector lines up with the sections (it touched the panel edges).
+- Blurred area: Flip mirrors it as it sits on the video (a tilted box tilts the other way); off with a reason when upright, where it would look the same.
+- Rotate 90° turns from the current angle (45° → 135°) instead of snapping first.
+- **Owner-tested:** Blur tab fully tested on the laptop ✓ (phones still to do).
+- Filters → Apply to all clips: copies this clip's look (filter at its strength, plus its LUT look) to every video and photo, layers too, skipping locked ones; the toast says how many. It used to keep each clip's old strength and skip layers.
+- **Owner-tested:** Filters tested on desktop ✓ (phones still to do).
+- Sound effects: room between the look chips and the sliders (the list had no spacing).
+- **Owner-tested:** Templates tab works on desktop ✓ (phones still to do).
+- Text on the stage: one click on the selected text types (desktop; no double-click needed); a phone tap that wobbles a few pixels types instead of counting as a drag (touch drags start after 10 px); the typing field shows its dashed outline instead of the dark focus ring. stage-text-check covers all three.
+- Typing on the stage: the field is the drawn text's exact width (no extra caret room that made it wider), and the selection frame stays while typing (handles hidden) and grows with the text, instead of a separate dashed outline.
+- Typing into a template title (text with a wrap width): the field hugs the drawn lines like the selection frame, instead of spreading to the whole wrap width.
+- Read aloud: the speed control is the editor's own slider (it was the browser's default range input).
+- Template titles keep their lines when made bigger: the wrap width grows with the text's scale (DECISIONS #157); captions keep a fixed wrap. The typing field follows, since it uses the same measure. Core test + stage-text-check (scaled wrapping title).
+- Checked text adjustments by rendering each at −1 / +1 on a yellow title: all nine apply. Brightness, contrast, saturation and highlights show clearly; warmth, tint, shadows, sharpen and vignette barely change a flat, bright colour.
+- Stage: the selection frame hides while playing (animated / keyframed items moved away from it) and follows a keyframed item while scrubbing.
+- Playground: Text to speech / Read aloud only show when the server has a voice service key (page.tsx reads it on the server; editor-client.tsx is the old page). The buzzing offline demo voice is gone. `?speech=1` forces it on for speech-check, which now also checks it's hidden without a key.
+- .gitignore: .env*.local and .env (the owner's playground key file wasn't ignored). Playground key confirmed reaching OpenAI; the account has no credits (429 insufficient_quota).
+- Playground speech: Google's Gemini speech model as a second service (auto when the key isn't an OpenAI one, or SPEECH_PROVIDER=gemini): its voices in the editor, PCM wrapped as WAV, pace asked for in words (no speed setting there). Checked end to end with the owner's key: Add voice puts a real 2.8 s spoken clip on the timeline.
+- **Owner-tested:** Text tab works on desktop ✓, Read aloud included (Gemini voice); phones still to do.
+- Stickers → Animated: tiles show a still of the placed art (Noto `emoji.svg`, ~3 KB, lazy) instead of the device's emoji font, which looked different (Apple vs Google art); the font emoji stays as a fallback. 3D and Emoji tabs already matched (checked by screenshots).
+- Stickers → Animated: a mouse over a tile plays its animation (the 512.webp loads only then; back to the still on leave); one hint line says they move when the video plays.
+- **Owner-confirmed (desktop):** Animated sticker tiles match the placed art; hover preview plays.
+- **Owner-tested:** Stickers tab works on desktop ✓.
+- Remove background on stickers only when there's a background to remove: hidden for animated images (a cut-out is one still — it would stop the animation) and for images already see-through at their edges (library 3D / animated / shapes, cut-out logos). Checked once per sticker (4 KB header + a 48 px decode). Photos unchanged. Browser-checked: animated, 3D, shape, PNG logo, GIF → hidden; JPEG photo sticker → shown.
+- Transitions → Direction: arrows only, the name in the tooltip (the labels were cut to "L…", "Ri…"). New `iconOnly` option on the segmented control.
+- Transitions panel (desktop): the list comes first; the chosen transition's settings sit in a bar pinned to the panel's bottom — Direction on one line (arrows), Feel closed to one row (opens as a sideways strip of curves), Duration, Preview + Apply to all side by side. Phones keep settings above the list (the sheet is too short to pin them).
+- Transitions panel: the chosen transition's settings open inside the list, right under its tile's row (a full-width card; dense grid packing keeps the tiles in order) — owner picked this over the pinned bar. Scrolls into view when picked low in the list. Direction one line with arrows, Feel one collapsible row (sideways strip), Preview + Apply to all side by side. Same on phones. axe clean.
+- Transitions panel: back to the original order at the owner's word (settings above the list), keeping the tidy-ups: Direction on one line with arrows, Feel one collapsible row, Preview + Apply to all side by side. (Tried a pinned bottom bar and settings inside the list; neither kept.)
+- Transitions: the Cut tile is gone — a "Remove transition" button (tip: back to a straight cut) shows in the settings when one is set. Feel is always open (no toggle): its name and the chosen curve's name, then the sideways strip of curves.
+- Transitions → Feel: no name on the right (the highlighted curve says it); the strip opens scrolled to the chosen curve.
+- Transitions: switching between two cuts with the panel open now shows each cut's choice — the panel starts fresh per cut (its chosen tile scrolled into view if it isn't; the Feel strip follows the chosen curve).
+- Transitions: the settings start with the cut's transition name ("Transition — Slide & fade"); its tile is usually far down the list, so which one a cut had (and why Direction shows or not) wasn't visible. Owner's report of Direction missing on a video→photo cut: that cut had a transition without directions (directions are per transition, not per clip type).
+- Transitions panel: the cut's chosen transition comes first — its tile playing, with its name — then its settings (Direction, Feel, Duration, Preview / Apply to all, Remove), then "Change transition" and the list. Owner: settings must read as belonging to a transition.
+- Transitions panel opens at the top (the chosen one is shown there), also when switching cuts — no more jumping down the list to its tile.
+- Transitions: the "Change transition" line runs edge to edge like the chip bar's, so heading + chips read as one header.
+- Transitions: "Change transition" is a section title (white, like the inspector's), so it reads above the list's grey group names (Basic, Slide…).
+- **Owner-tested:** Transitions tab works on desktop ✓.
+- Tooltips draw above popovers (Your videos, History): new `--vu-z-tooltip` (40), on top of everything; they shared the toast layer, one below popovers. THEMING.md updated.
+- Your videos button: clearer tooltip (saved in this browser; start a new one, copy this one, or switch).
+- Timeline: a cut's transition button on the selected clip's edge works — a tap / click opens the transition, a drag from it trims (the trim handle used to win, so taps there started a trim). Transitions now open on release, so a scroll that starts on a button no longer opens it (phones). Unit test updated; browser-checked with mouse and real touch events (tap → transition, drag → trim).
+- Timeline: where a transition button sits on the selected clip's trim handle, the button is centred on the handle and the handle's arrows sit above and below it (they were hidden behind it, the button half off the handle). Hit area follows (`cutButtonX`).
+- Timeline cut buttons, owner's rule: nothing selected → the cut's transition button (click opens it); a clip selected → its edges show only its trim handles, no button; a tap / click on a handle that sits on a cut opens that cut's transition, a drag trims (tooltip says both). The selected clip's handles are drawn after the row's clips, so the right one isn't covered by the next clip. Browser-checked with mouse and real touch on both edges.
+- Media panel: thumbnails show on a fresh load. The project opens before its files are read back from storage; tiles asked for a thumbnail too early, got nothing and never asked again (switching tabs remounted them). New `ctl.whenMedia(assetId, signal)`; tiles wait for it. Browser-checked: 3 reloads, all tiles drawn.
+- Media panel and Layers panel thumbnails are lazy (decode only when scrolled near the view) and wait for their file on a fresh load. Checked: 40 photos → 9 of 40 thumbnails decoded at the top of the panel; 3 reloads → all visible tiles drawn. PERF.md rule 9 written down (lazy previews everywhere).
+- Layers lazy thumbnails, browser-checked: 41 layers (40 photo stickers + the video) → 7 decoded at the top, 15 after jumping to the end (the middle never decoded); after a reload the visible 7 draw.
+- **Owner-tested on desktop:** Media tab ✓, Your videos popup (new video / make a copy) ✓.
+- Assistant panel: standard panel padding (its content ran edge to edge — it lacked `vu-panel-body`); the example chips get a "Try one of these" label; the greyed Send's tooltip says "Type what you'd like to change first" (it repeated the placeholder).
+- Assistant: an Undo button beside "Made N changes", shown only while that turn's changes are the latest step (the turn keeps the project it produced; `undoAssistantTurn`); after it, the turn says "Undone". Browser-checked: warmer → Undo → warmth back to 0; another edit hides it.
+- Assistant panel redesigned as a chat: greeting centred while empty; the box pinned to the bottom (text on top, a small send button in its corner); suggestions as short icon pills under it; replies with a sparkle avatar and "✓ Made N changes · Undo" inside the reply; one-line privacy note.
+- Playground assistant route: OpenAI-compatible key if set, else Gemini (the voice key, `gemini-3.8-flash` via Google's OpenAI-compatible endpoint), and Claude (`ANTHROPIC_API_KEY`, `claude-opus-5-5` through `@anthropic-ai/sdk`, server-side refusal fallbacks on) when the first fails or none is set. Checked: Gemini answered "make it warmer" and the 2 changes applied.
+- Assistant: what you sent shows at once as your message, with a reply bubble of three pulsing dots, "Editing your video…" and Cancel while it works (the empty greeting and a bare spinner line showed before). Reduced motion: still dots.
+- Assistant: while it works, the send button turns into a stop button (■) — the Cancel left the reply bubble.
+- Assistant Stop: your words go back in the box; the playground route passes the cancel on to Gemini / Claude (request.signal), so they stop too.
+- Busy model: a 429/503/529 shows "The AI is busy right now — try again in a moment" (the error carries its status from `createChatAssistant`). Playground route: `gemini-3.8-flash` with a 12 s limit, then `gemini-flash-lite-latest` (measured today: flash 503 after 11 s or hanging past 60 s; lite 6 s), then Claude if set. Real request "add a title Hello at the start and make it warmer" → 2 changes applied.
+- Filters panel: previews re-render when you switch to another clip. They were keyed only on the clip's picture settings, so two clips with the same settings (e.g. two untouched clips) kept the first one's previews. Browser-checked switching video ↔ photo.
+- Assistant scrolling: the conversation scrolls on its own above a box that never moves (the whole panel scrolled before). Sending brings your message to the top of the chat (a spacer under the newest exchange makes room and shrinks as the answer fills it); the answer never moves the chat. Checked with 5 long mocked replies: your message at the top each time, the reply's start in view, panel never scrolls.
+- Desktop: the side panel, settings panel and timeline are resizable by their inner edges (DECISIONS #158): today's sizes are the minimum, ceilings 400 / 400 / 420 px (timeline ≤ 45 % of the height); kept per browser; keyboard and double-click reset. Browser-checked: every limit holds, sizes come back after a reload.
+- Assistant instructions: "this / it / the selected one" = the selection; change only what was asked for.
+- Timeline can shrink below its default too: 160 px minimum (owner).
+- Timeline floor: exactly the ruler + the whole main video row (92 px at normal density; read from the timeline's sizes), owner's ask; the lanes below scroll.

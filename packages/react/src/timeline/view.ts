@@ -33,7 +33,7 @@ import {
   contentHeight,
   GROUP_ORDER,
   hitTest,
-  isCut,
+  cutButtonShown,
   isLayerTrack,
   layoutRows,
   majorTickSeconds,
@@ -567,6 +567,11 @@ export class TimelineView {
         else this.#ctl.openTool('transition');
         return;
       case 'trim': {
+        // A handle on a cut: a tap opens the transition there, a drag trims (#move, #up).
+        if (hit.transition) {
+          this.#drag = { type: 'pending', id: e.pointerId, x: p.x, y: p.y, hit, timer: null };
+          return;
+        }
         // Alt: roll the cut — the clip that touches this edge gives or takes the time.
         let roll: Item | null = null;
         if (e.altKey && !this.#touch) {
@@ -811,6 +816,20 @@ export class TimelineView {
         const slop = this.#touch ? TOUCH_SLOP : DRAG_SLOP;
         if (Math.hypot(dx, dy) < slop) return;
         if (drag.timer) clearTimeout(drag.timer);
+        if (drag.hit.type === 'trim') {
+          this.#drag = {
+            type: 'trim',
+            id: drag.id,
+            x: drag.x,
+            item: drag.hit.item,
+            edge: drag.hit.edge,
+            delta: 0,
+            roll: null,
+          };
+          this.invalidate();
+          this.#move(e);
+          return;
+        }
         if (!this.#touch && drag.hit.type === 'item') {
           this.#startItemDrag(drag, drag.x, drag.y);
           this.#move(e);
@@ -926,6 +945,11 @@ export class TimelineView {
         if (drag.hit.type === 'row' || drag.hit.type === 'empty') this.#ctl.select(null);
         if (drag.hit.type === 'ruler' && this.#phone) this.#ctl.seek(drag.hit.time);
         if (drag.hit.type === 'add') this.#hooks.onAddMedia(!!drag.hit.atStart);
+        if (drag.hit.type === 'trim' && drag.hit.transition) {
+          this.#ctl.select(drag.hit.transition.id);
+          if (this.#ctl.ui.getState().layout === 'desktop') this.#ctl.openPanel('transitions');
+          else this.#ctl.openTool('transition');
+        }
         break;
       case 'pan':
         if (this.#phone && drag.axis === 'x') this.#fling(drag.samples);
@@ -1172,7 +1196,13 @@ export class TimelineView {
       switch (hit.type) {
         case 'trim':
           cursor = 'ew-resize';
-          tip = hit.edge === 'start' ? l.tipTrimStart : l.tipTrimEnd;
+          tip = hit.transition
+            ? hit.edge === 'start'
+              ? l.tipTrimStartOrTransition
+              : l.tipTrimEndOrTransition
+            : hit.edge === 'start'
+              ? l.tipTrimStart
+              : l.tipTrimEnd;
           break;
         case 'item':
           cursor = 'grab';
@@ -1474,17 +1504,24 @@ export class TimelineView {
         selectedIds.includes(item.id) && !lifted,
         alpha,
         false,
-        item.id === trimId,
       );
     }
+    // The selected clip's trim handles go on top: the clip after it would cover its end handle.
+    const trimmed = trimId ? items.findIndex((i) => i.id === trimId) : -1;
+    if (trimmed >= 0 && !lifted && !row.track.hidden && !items[trimmed]!.hidden) {
+      const item = items[trimmed]!;
+      const box = this.#itemBox(row, timeToX(scale, item.start), timeToX(scale, itemEnd(item)));
+      this.#drawTrimHandles(box.bx, box.bw, box.top, box.height);
+    }
     if (row.track.kind !== 'main' && row.track.kind !== 'overlay') return;
-    // Transition markers on cuts (main track; touching pictures on a layer).
+    // Transition markers on cuts (main track; touching pictures on a layer). The selected clip's
+    // edges show its trim handles instead (a tap on one opens the transition).
     for (let i = 1; i < items.length; i++) {
-      if (!isCut(items, i)) continue;
+      if (!cutButtonShown(items, i, scale)) continue;
+      if (trimmed >= 0 && (i === trimmed || i === trimmed + 1)) continue;
       const item = items[i]!;
       const x = timeToX(scale, item.start);
       if (x < left - 12 || x > this.#width + 12) continue;
-      if ((item.duration / FLICKS_PER_SECOND) * scale.pps <= 30) continue;
       const has = 'transitionIn' in item && item.transitionIn !== null;
       const s = 18;
       const y = row.top + row.height / 2;
@@ -1784,16 +1821,10 @@ export class TimelineView {
     selected: boolean,
     alpha: number,
     lifted = false,
-    handles = false,
   ): void {
     const ctx = this.#ctx;
     const c = this.#c;
-    const inset = 3;
-    const top = row.top + inset;
-    const height = row.height - inset * 2;
-    const cutGap = row.track.kind === 'main' ? 1.5 : 1;
-    const bx = x1 + cutGap;
-    const bw = Math.max(2, x2 - x1 - cutGap * 2);
+    const { bx, bw, top, height } = this.#itemBox(row, x1, x2);
     const hovered = this.#hoverId === item.id && !selected;
     const picture = item.kind === 'video' || item.kind === 'image' || item.kind === 'freeze';
     const accent =
@@ -1967,7 +1998,6 @@ export class TimelineView {
       ctx.restore();
       if ('keyframes' in item && item.keyframes)
         this.#drawKeyframes(item.keyframes, item.duration, bx, bw, top + height);
-      if (alpha > 0.9 && handles) this.#drawTrimHandles(bx, bw, top, height);
     } else if (lifted) {
       ctx.strokeStyle = c.selection;
       ctx.lineWidth = 2;
@@ -2016,6 +2046,18 @@ export class TimelineView {
       }
     }
     ctx.restore();
+  }
+
+  /** A clip's drawn box in its row (inset, with a hairline gap at cuts). */
+  #itemBox(row: Row, x1: number, x2: number) {
+    const inset = 3;
+    const cutGap = row.track.kind === 'main' ? 1.5 : 1;
+    return {
+      bx: x1 + cutGap,
+      bw: Math.max(2, x2 - x1 - cutGap * 2),
+      top: row.top + inset,
+      height: row.height - inset * 2,
+    };
   }
 
   #drawTrimHandles(bx: number, bw: number, top: number, height: number): void {

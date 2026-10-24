@@ -1,7 +1,7 @@
 import type { SpeechVoice, TextItem } from '@video-ultra/core';
-import { useEffect, useState, type ReactElement } from 'react';
+import { useEffect, useId, useState, type ReactElement } from 'react';
 import { useController, useLabels, useUi } from './context';
-import { Button, Chips } from './controls';
+import { Button, Chips, Ruler } from './controls';
 
 /**
  * Text to speech (v0.4): "Text to speech" in the Audio panel (type, pick a voice, add it at the
@@ -37,6 +37,7 @@ function VoiceControls({
 }): ReactElement {
   const l = useLabels();
   const voices = useVoices();
+  const speedId = useId();
   return (
     <>
       {voices.length > 1 ? (
@@ -48,19 +49,21 @@ function VoiceControls({
         />
       ) : null}
       <div className="vu-field">
-        <label className="vu-field-row">
-          <span>{l.speechSpeed}</span>
-          <output>{`${speed.toFixed(2)}×`}</output>
-        </label>
-        <input
-          className="vu-range"
-          type="range"
+        <div className="vu-field-row">
+          <span id={speedId}>{l.speechSpeed}</span>
+          <output className="vu-field-value" data-changed={speed !== 1 || undefined}>
+            {`${speed.toFixed(2)}×`}
+          </output>
+        </div>
+        <Ruler
+          labelledBy={speedId}
+          value={speed}
           min={0.5}
           max={2}
           step={0.05}
-          value={speed}
-          aria-label={l.speechSpeed}
-          onChange={(e) => setSpeed(Number(e.currentTarget.value))}
+          defaultValue={1}
+          format={(v) => `${v.toFixed(2)}×`}
+          onChange={(v) => setSpeed(v)}
         />
       </div>
     </>

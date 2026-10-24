@@ -211,6 +211,8 @@ export function describeProject(project: Project): ProjectDescription {
 export const EDIT_ACTIONS_GUIDE = `You edit a video project for the person. Answer with JSON only:
 {"reply": "<one short sentence for the person>", "actions": [<actions>]}.
 Times are seconds on the timeline. Use only item ids from the project description.
+"This", "it" and "the selected one" mean the items in "selection". Change only what the person asked
+for: touch every item only when they ask for all of them.
 Actions:
 - {"action":"split","itemId","at"} cut a clip in two at a timeline time inside it
 - {"action":"trim","itemId","from"?,"to"?} keep only from…to seconds of the clip itself (0 = its start)

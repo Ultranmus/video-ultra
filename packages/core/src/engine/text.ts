@@ -106,6 +106,15 @@ function layoutBlock(
 }
 
 /**
+ * A text's wrap width in canvas px (null: no wrapping). A title's grows with its size, so making
+ * it bigger keeps its lines (DECISIONS #157); captions keep theirs, so they stay inside the frame.
+ */
+export function textWrapPx(item: TextItem, canvasW: number, caption = false): number | null {
+  if (!item.maxWidth) return null;
+  return item.maxWidth * canvasW * (caption ? 1 : item.transform.scale);
+}
+
+/**
  * The on-canvas size (px, before rotation) of a text item's box on a `canvasW × canvasH` canvas:
  * the text block plus background padding. Pass a 2D context's measureText as `measure`.
  */
@@ -114,13 +123,15 @@ export function measureTextBox(
   canvasW: number,
   canvasH: number,
   measure: MeasureText,
+  /** On the caption track (its wrap width doesn't grow with its size). */
+  caption = false,
 ): { width: number; height: number } {
   const block = layoutBlock(
     item.text,
     item.style,
     textFontPx(item, canvasH),
     measure,
-    item.maxWidth ? item.maxWidth * canvasW : null,
+    textWrapPx(item, canvasW, caption),
   );
   return { width: block.width, height: block.height };
 }
@@ -310,6 +321,8 @@ export function rasterizeText(
   highlight: TextHighlight | null = null,
   /** Output canvas width (px), for the wrap width. */
   canvasW = 0,
+  /** On the caption track (its wrap width doesn't grow with its size). */
+  caption = false,
 ): TextRaster {
   const style = item.style;
   const probe = new OffscreenCanvas(1, 1).getContext('2d')!;
@@ -322,7 +335,7 @@ export function rasterizeText(
     style,
     fontPx,
     measure,
-    item.maxWidth && canvasW ? (item.maxWidth * canvasW) / displayScale : null,
+    item.maxWidth && canvasW ? textWrapPx(item, canvasW, caption)! / displayScale : null,
   );
   const outline = style.outline ? style.outline.width * fontPx : 0;
   const shadowUnit = canvasH / 1080 / displayScale;

@@ -932,7 +932,16 @@ export class Composer {
           : '';
         const key = `${rasterPx}|${width}x${height}|${item.maxWidth ?? ''}|${withLayout ? 'L' : ''}|${item.text}|${styleKey(item.style)}${marked}`;
         const canvas = this.rasters.get(item.id, key, () => {
-          const raster = rasterizeText(item, rasterPx, height, k, withLayout, highlight, width);
+          const raster = rasterizeText(
+            item,
+            rasterPx,
+            height,
+            k,
+            withLayout,
+            highlight,
+            width,
+            layer.track.kind === 'caption',
+          );
           if (raster.layout) this.textLayouts.set(raster.canvas, raster.layout);
           return raster.canvas;
         });

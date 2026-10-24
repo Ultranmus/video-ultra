@@ -214,6 +214,17 @@ export function StickersPanel(): ReactElement {
               aria-label={l.animatedSticker(name)}
               data-tooltip={l.animatedSticker(name)}
               aria-busy={busy === emoji || undefined}
+              onPointerEnter={(e) => {
+                const img = e.currentTarget.querySelector('img');
+                if (e.pointerType !== 'mouse' || !img || img.hidden) return;
+                const code = animated.codes.get(plainEmoji(emoji));
+                img.dataset.still = img.src;
+                img.src = `${animatedLibrary}${code}/512.webp`;
+              }}
+              onPointerLeave={(e) => {
+                const img = e.currentTarget.querySelector('img');
+                if (img?.dataset.still) img.src = img.dataset.still;
+              }}
               onClick={() => {
                 const code = animated.codes.get(plainEmoji(emoji));
                 if (!code) return;
@@ -230,7 +241,20 @@ export function StickersPanel(): ReactElement {
                 );
               }}
             >
-              {emoji}
+              {/* The art that gets placed (a still of it), not this device's emoji font; a host
+                  library without stills falls back to the font. A mouse over it plays the
+                  animation (loaded only then). */}
+              <img
+                alt=""
+                src={`${animatedLibrary}${animated.codes.get(plainEmoji(emoji))}/emoji.svg`}
+                loading="lazy"
+                decoding="async"
+                draggable={false}
+                onError={(e) => {
+                  e.currentTarget.hidden = true;
+                }}
+              />
+              <span aria-hidden="true">{emoji}</span>
             </button>
           ) : tab === '3d' && library ? (
             <button
@@ -299,6 +323,7 @@ export function StickersPanel(): ReactElement {
         tip={l.uploadStickerTip}
         onClick={() => uploadRef.current?.click()}
       />
+      {tab === 'animated' ? <p className="vu-hint">{l.animatedStickersHint}</p> : null}
       {tab !== 'shapes' ? (
         <>
           <label className="vu-search">

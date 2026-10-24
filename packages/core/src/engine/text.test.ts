@@ -32,6 +32,20 @@ describe('text box', () => {
     expect(measureTextBox(item, 1000, 1000, measure).height).toBeCloseTo(50);
   });
 
+  it('a bigger title keeps its lines; a bigger caption wraps inside the frame (#157)', () => {
+    const item = textItem('t', 0);
+    item.style = { ...item.style, size: 0.05, lineHeight: 1 };
+    item.text = 'aaaa bbbb cccc dddd eeee';
+    item.maxWidth = 0.5;
+    item.transform.scale = 2; // 100 px font, 50 px a character
+    const title = measureTextBox(item, 1000, 1000, measure);
+    expect(title.height).toBeCloseTo(2 * 100); // the same two lines as at scale 1
+    expect(title.width).toBeCloseTo(14 * 50);
+    // Caption: still 500 px wide at most → 10 characters a line.
+    const caption = measureTextBox(item, 1000, 1000, measure, true);
+    expect(caption.height).toBeCloseTo(3 * 100);
+  });
+
   it('sizes the block from the font size (size × canvas height × scale)', () => {
     const item = textItem('t', 0);
     item.text = 'Hello';

@@ -43,6 +43,10 @@ Starting targets (2026-10-17), to be confirmed or adjusted with Phase 0 measurem
 6. Drags commit one operation on release.
 7. Backpressure + cancellation + watchdog.
 8. Degrade preview resolution before smoothness; drop video before audio.
+9. Previews in lists are lazy: a tile decodes / renders only when scrolled near the view
+   (`useNearView`), waits for its file (`whenMedia`), frees its bitmap once drawn, and cancels
+   when it leaves (AbortSignal). Hover-only previews (transitions, animations, animated
+   stickers) load on hover.
 
 ## Measurements
 

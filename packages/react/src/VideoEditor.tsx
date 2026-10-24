@@ -1,3 +1,4 @@
+import { Splitter, useSavedLayout } from './splitters';
 import {
   detectCapabilities,
   type Asset,
@@ -69,7 +70,8 @@ export interface VideoEditorProps {
   stickerLibrary?: string | false | undefined;
   /**
    * Where animated emoji stickers come from (Noto Emoji Animation, CC BY 4.0): a base URL whose
-   * `<code>/512.webp` files are the animations, or `false` to hide the Animated tab. Default:
+   * `<code>/512.webp` files are the animations (and `<code>/emoji.svg` stills for the panel's
+   * tiles, optional), or `false` to hide the Animated tab. Default:
    * Google's public copy. Placed stickers are stored in the project.
    */
   animatedStickerLibrary?: string | false | undefined;
@@ -260,6 +262,9 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
     };
   }, []);
 
+  // Desktop panel sizes the person dragged, kept in this browser.
+  useSavedLayout(rootRef);
+
   // Layout from the editor's own width.
   useEffect(() => {
     const root = rootRef.current!;
@@ -318,6 +323,7 @@ function Shell({
   useEffect(() => ctl.setFilePicker(() => inputRef.current?.click()), [ctl]);
 
   useKeyboard(rootRef);
+  const panelOpen = useUi((s) => s.panel !== null);
 
   if (status === 'unsupported') {
     return (
@@ -385,6 +391,10 @@ function Shell({
         {status === 'loading' ? <div className="vu-loading">{l.loading}</div> : <Stage />}
       </div>
       {desktop && !previewMode ? <Inspector /> : null}
+      {/* Desktop: drag an inner edge to resize the side panel, the settings, the timeline. */}
+      {desktop && !previewMode && panelOpen ? <Splitter edge="panel" /> : null}
+      {desktop && !previewMode ? <Splitter edge="inspector" /> : null}
+      {desktop && !previewMode ? <Splitter edge="timeline" /> : null}
       {previewMode ? (
         <PreviewBar />
       ) : (

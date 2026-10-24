@@ -709,6 +709,7 @@ export function Toolbar(): ReactElement {
   const item = useProject((p) => (selectedId ? (findItem(p, selectedId)?.item ?? null) : null));
   const count = useUi((s) => s.selectedIds.length);
   useProject((p) => p); // lock / group state shows on the tools
+  useUi((s) => s.stickerChecks); // a sticker's background check finished: Remove background may show
   const entries = toolsFor(item, ctl.project, ctl, l, targets, count);
   // Fades at the edges show there are more tools to scroll to (phones show ~6 at a time).
   const barRef = useRef<HTMLDivElement>(null);

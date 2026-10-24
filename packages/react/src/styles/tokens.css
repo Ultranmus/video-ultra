@@ -251,6 +251,8 @@
     --vu-z-overlay: 10;
     --vu-z-popover: 20;
     --vu-z-toast: 30;
+    /* Tooltips: above everything, popovers and dialogs included (they explain what's in them). */
+    --vu-z-tooltip: 40;
 
     --vu-focus-ring: 0 0 0 2px var(--vu-bg), 0 0 0 4px var(--vu-accent);
     color-scheme: dark;

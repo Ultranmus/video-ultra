@@ -20,7 +20,7 @@ import {
   type Item,
   type Transition,
 } from '@video-ultra/core';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useController, useLabels, useProject, useUi } from './context';
 import { Button, EditSlider, EmptyState, Segmented } from './controls';
 import type { IconName } from './icons';
@@ -80,8 +80,11 @@ function FilterGrid({ item, note }: { item: LookItem; note: string | null }) {
   const ctl = useController();
   const l = useLabels();
   const current = item.filter?.id ?? null;
-  // Previews are re-rendered when the clip's picture inputs change, not on every edit.
+  // Previews are re-rendered for another clip, or when this one's picture inputs change — not on
+  // every edit.
   const inputs = JSON.stringify([
+    item.id,
+    'assetId' in item ? item.assetId : null,
     'adjust' in item ? item.adjust : null,
     'crop' in item ? item.crop : null,
     item.kind === 'video' ? item.sourceIn : 0,
@@ -133,8 +136,11 @@ function FilterGrid({ item, note }: { item: LookItem; note: string | null }) {
           variant="secondary"
           tip={l.applyFilterAllTip}
           onClick={() => {
-            ctl.applyFilterToAll(current);
-            ctl.toast(l.filterAppliedAll, 'success', { label: l.undo, run: () => ctl.undo() });
+            const count = ctl.applyFilterToAll(item);
+            ctl.toast(l.filterAppliedAll(count), 'success', {
+              label: l.undo,
+              run: () => ctl.undo(),
+            });
           }}
         />
       </div>
@@ -279,15 +285,30 @@ function easePath(ease: Ease): string {
 }
 
 /** How the transition moves: every timing curve as a tile showing its shape. */
+/**
+ * The timing curve: every curve to pick from, the chosen one highlighted (a sideways strip in
+ * settings, kept scrolled to the chosen one).
+ */
 function EasePicker({ value, onChange }: { value: Ease; onChange: (ease: Ease) => void }) {
   const l = useLabels();
+  const id = useId();
+  const stripRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const strip = stripRef.current;
+    const chosen = strip?.querySelector<HTMLElement>('[aria-checked="true"]');
+    if (!strip || !chosen) return;
+    // Only the strip scrolls (not the panel): bring the chosen curve into its view.
+    const left = chosen.offsetLeft - strip.offsetLeft;
+    if (left < strip.scrollLeft || left + chosen.offsetWidth > strip.scrollLeft + strip.clientWidth)
+      strip.scrollLeft = left - (strip.clientWidth - chosen.offsetWidth) / 2;
+    // Only when out of view, so a pick made in view stays where it is.
+  }, [value]);
   return (
     <div className="vu-field">
-      <span className="vu-field-row" id="vu-feel-label">
+      <span className="vu-field-row" id={id}>
         {l.feel}
-        <span className="vu-field-value">{l.easeName(value)}</span>
       </span>
-      <div className="vu-ease-grid" role="radiogroup" aria-labelledby="vu-feel-label">
+      <div ref={stripRef} className="vu-ease-grid" role="radiogroup" aria-labelledby={id}>
         {EASES.map((e) => (
           <button
             key={e}
@@ -449,7 +470,8 @@ function FlipCanvas({
   }, [rest, playing, draw]);
 
   useEffect(() => {
-    const tile = canvasRef.current?.closest<HTMLElement>('[role="radio"]');
+    // A picker tile, or a block showing the chosen one (`data-flip-host`, always playing).
+    const tile = canvasRef.current?.closest<HTMLElement>('[role="radio"], [data-flip-host]');
     if (!tile || !loadKey) return;
     let frame = 0;
     let active = false;
@@ -480,7 +502,8 @@ function FlipCanvas({
         frame = requestAnimationFrame(loop);
       });
     };
-    const chosen = tile.getAttribute('aria-checked') === 'true';
+    const chosen =
+      tile.getAttribute('aria-checked') === 'true' || tile.hasAttribute('data-flip-host');
     const leave = () => {
       if (!chosen) stop();
     };
@@ -574,7 +597,8 @@ export function TransitionGrid(): ReactElement {
       />
     );
   }
-  return <TransitionChoices item={transition} note={transitionNote} />;
+  // Per cut: switching to another clip's transition starts fresh (its group, its curve in view).
+  return <TransitionChoices key={transition.id} item={transition} note={transitionNote} />;
 }
 
 function TransitionChoices({
@@ -589,6 +613,16 @@ function TransitionChoices({
   const current = item.transitionIn;
   const preset = current ? findTransitionPreset(current.type) : undefined;
   const flipbook = useFlipbooks(item);
+  // Opened for a cut (or switched to another one): from the top, where its transition and
+  // settings are (after the panel restored its scroll).
+  const rootRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      const scroller = rootRef.current?.closest<HTMLElement>('.vu-panel-scroll, .vu-dock-body');
+      if (scroller) scroller.scrollTop = 0;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   const preview = (duration: number) => {
     const half = Math.round(duration / 2);
@@ -613,17 +647,32 @@ function TransitionChoices({
     if (type) preview(duration);
   };
 
-  return (
-    <div className="vu-looks">
-      <p className="vu-target" data-active="">
-        {l.transitionsFor(itemTitle(item, ctl.project.assets))}
-      </p>
-      {note ? <p className="vu-hint">{note}</p> : null}
-      {current && preset ? (
-        <>
-          {preset.directions?.length ? (
+  // The chosen transition's settings, above the list.
+  const settings =
+    current && preset ? (
+      <div
+        className="vu-transition-settings"
+        role="group"
+        aria-label={l.transitionSettings(preset.label)}
+      >
+        {/* The cut's transition first (playing), then its settings; the list to change it is
+            below. */}
+        <div className="vu-transition-current">
+          <span className="vu-transition-current-tile" data-flip-host="">
+            <TransitionTile family={preset.category} flipbook={flipbook} transition={current} />
+          </span>
+          <span className="vu-transition-current-name">
+            <span>{l.transition}</span>
+            <strong>{preset.label}</strong>
+          </span>
+        </div>
+        {preset.directions?.length ? (
+          <div className="vu-transition-row">
+            <span aria-hidden="true">{l.direction}</span>
             <Segmented
               label={l.direction}
+              hideLabel
+              iconOnly
               value={current.direction ?? preset.directions[0]!}
               options={preset.directions.map((d) => ({
                 value: d,
@@ -632,62 +681,64 @@ function TransitionChoices({
               }))}
               onChange={(direction) => choose(preset.id, { direction })}
             />
-          ) : null}
-          <EasePicker
-            value={current.ease ?? preset.ease}
-            onChange={(ease) => choose(preset.id, { ease })}
-          />
-          <EditSlider
-            label={l.duration}
-            value={current.duration / FLICKS}
-            min={0.1}
-            max={2.5}
-            step={0.1}
-            defaultValue={preset.defaultDuration ?? 0.6}
-            format={(v) => `${v.toFixed(1)} s`}
-            recipe={(d, v) => setTransition(d, item.id, { ...current, duration: fromSeconds(v) })}
-            commitLabel={l.transition}
-            coalesceKey={`transition:${item.id}`}
-          />
-          <div className="vu-row">
-            <Button
-              icon="play"
-              label={l.playPreview}
-              variant="secondary"
-              onClick={() => preview(current.duration)}
-            />
-            <Button
-              icon="transition"
-              label={l.applyToAll}
-              variant="secondary"
-              onClick={() => {
-                ctl.applyTransitionToAll(current.type, current.duration);
-                ctl.toast(l.appliedToAll(preset.label), 'success', {
-                  label: l.undo,
-                  run: () => ctl.undo(),
-                });
-              }}
-            />
           </div>
-        </>
-      ) : null}
-      <div className="vu-transition-grid" role="radiogroup" aria-label={l.transition}>
-        <button
-          type="button"
-          role="radio"
-          aria-checked={current === null}
-          className="vu-transition-tile"
+        ) : null}
+        <EasePicker
+          value={current.ease ?? preset.ease}
+          onChange={(ease) => choose(preset.id, { ease })}
+        />
+        <EditSlider
+          label={l.duration}
+          value={current.duration / FLICKS}
+          min={0.1}
+          max={2.5}
+          step={0.1}
+          defaultValue={preset.defaultDuration ?? 0.6}
+          format={(v) => `${v.toFixed(1)} s`}
+          recipe={(d, v) => setTransition(d, item.id, { ...current, duration: fromSeconds(v) })}
+          commitLabel={l.transition}
+          coalesceKey={`transition:${item.id}`}
+        />
+        <div className="vu-row">
+          <Button
+            icon="play"
+            label={l.previewShort}
+            tip={l.playPreview}
+            variant="secondary"
+            onClick={() => preview(current.duration)}
+          />
+          <Button
+            icon="transition"
+            label={l.applyToAllShort}
+            tip={l.applyToAll}
+            variant="secondary"
+            onClick={() => {
+              ctl.applyTransitionToAll(current.type, current.duration);
+              ctl.toast(l.appliedToAll(preset.label), 'success', {
+                label: l.undo,
+                run: () => ctl.undo(),
+              });
+            }}
+          />
+        </div>
+        <Button
+          icon="delete"
+          label={l.removeTransition}
+          tip={l.removeTransitionTip}
           onClick={() => choose(null)}
-        >
-          <TransitionTile family="cut" flipbook={flipbook} />
-          <span>{l.cut}</span>
-        </button>
+        />
       </div>
-      <CategoryBrowser
-        label={l.category}
-        categories={TRANSITION_CATEGORIES}
-        initial={preset?.category ?? null}
-      >
+    ) : null;
+
+  return (
+    <div ref={rootRef} className="vu-looks">
+      <p className="vu-target" data-active="">
+        {l.transitionsFor(itemTitle(item, ctl.project.assets))}
+      </p>
+      {note ? <p className="vu-hint">{note}</p> : null}
+      {settings}
+      {settings ? <p className="vu-transition-list-head">{l.changeTransition}</p> : null}
+      <CategoryBrowser label={l.category} categories={TRANSITION_CATEGORIES}>
         {(c) => (
           <div className="vu-transition-grid" role="radiogroup" aria-label={c.label}>
             {TRANSITION_PRESETS.filter((p) => p.category === c.id).map((p) => (

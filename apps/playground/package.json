@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.2.0",
     "@video-ultra/ai": "workspace:*",
     "@video-ultra/captions": "workspace:*",
     "@video-ultra/core": "workspace:*",

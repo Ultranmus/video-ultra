@@ -97,8 +97,10 @@ describe('timeline geometry', () => {
     expect(hitTest(rows, m, scale, 50, 10, null, false).type).toBe('ruler');
     const body = hitTest(rows, m, scale, 50, y, null, false);
     expect(body.type === 'item' && body.item.id).toBe('c1');
+    // The selected clip's end handle sits on a cut: it stands in for the transition button.
     const trim = hitTest(rows, m, scale, 205, y, 'c1', false);
     expect(trim.type === 'trim' && trim.edge).toBe('end');
+    expect(trim.type === 'trim' && trim.transition?.id).toBe('c2');
     expect(hitTest(rows, m, scale, 200, rows[0]!.top + 28, null, false).type).toBe('transition');
   });
 

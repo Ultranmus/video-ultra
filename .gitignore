@@ -26,3 +26,7 @@ apps/examples/vite/public/media
 
 # Generated API reference (pnpm docs:api)
 apps/playground/public/api
+
+# Local secrets (API keys) — never committed
+.env*.local
+.env

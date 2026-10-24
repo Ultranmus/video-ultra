@@ -993,3 +993,20 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       voice. New preset "Clean voice" (clean 60 %, voice EQ, Even out 40 %). Extract audio now
       copies the video's fades, effects and lower-under-voice to the sound clip, not only the
       volume.
+157.  **A title's wrap width grows with its size; captions' doesn't** (owner, 2026-10-24).
+      `maxWidth` is the wrap width as a fraction of the canvas width _at scale 1_: the engine
+      wraps at `maxWidth × canvas width × scale`, so making a template title bigger keeps its
+      lines (before, the font grew but the wrap stayed, and the title broke onto more lines).
+      In raster pixels the wrap no longer depends on the scale, so resizing never re-wraps.
+      Captions (caption track) keep a fixed wrap, so bigger captions still fit the frame. No
+      migration: a saved title that was scaled re-wraps to the lines it had at scale 1.
+158.  **Desktop panels can be resized** (owner, 2026-10-25); the side panels' default sizes are
+      their floor; the timeline can also shrink, down to its ruler and the whole main video row
+      (measured from the timeline's own sizes, so density is respected).
+      Desktop only (≥ 1024 px; tablets keep the fixed layout, their sheet sits over the
+      timeline): a thin handle on the side panel's right edge, the settings panel's left edge and
+      the timeline's top edge. Side and settings panels 280–400 px, timeline (ruler + main video row)–420 px and at
+      most 45 % of the editor's height; the video keeps ≥ 320 × 200 px. Dragging only changes a
+      CSS variable on the root (no render per move); release keeps the size in this browser
+      (`localStorage`, a per-viewer convenience). Arrow keys / Home / End on a focused handle,
+      double-click or Enter resets. `splitters.tsx`.

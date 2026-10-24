@@ -35,7 +35,10 @@ export function itemBox(
     rotation: tf.rotation,
   });
   if (item.kind === 'text') {
-    const size = measureTextBox(item, canvasW, canvasH, measure);
+    const caption = project.tracks.some(
+      (t) => t.kind === 'caption' && t.items.some((i) => i.id === item.id),
+    );
+    const size = measureTextBox(item, canvasW, canvasH, measure, caption);
     return box(size.width, size.height);
   }
   if (item.kind === 'sticker' && item.emoji !== null) {

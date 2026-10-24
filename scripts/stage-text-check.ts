@@ -146,6 +146,31 @@ if (only !== 'phone') {
   );
   await page.keyboard.press(`${mod}+Shift+z`);
 
+  // A single click on the already selected text types too (a double-click isn't needed).
+  await page.mouse.click(p.x, p.y);
+  await page.waitForTimeout(600);
+  check('a first click only selects', !(await field(page).isVisible()));
+  await page.mouse.click(p.x, p.y);
+  await page.waitForTimeout(200);
+  check('a click on the selected text opens the field', await field(page).isVisible());
+  const look = await page.evaluate(() => {
+    const f = document.querySelector('.vu-stage-text') as HTMLElement;
+    const b = document.querySelector('.vu-selection-box') as HTMLElement;
+    const cs = getComputedStyle(f);
+    return {
+      bare: cs.outlineStyle === 'none' && cs.boxShadow === 'none',
+      frame: !b.hidden && b.hasAttribute('data-typing'),
+      // The frame is the field plus 6 px of air each side.
+      fit: Math.abs(b.offsetWidth - 12 - f.offsetWidth) <= 1,
+      widths: `${f.offsetWidth} / ${b.offsetWidth}`,
+    };
+  });
+  check('the field draws no border or focus ring of its own', look.bare);
+  check('the selection frame stays while typing', look.frame);
+  check('the frame fits the field', look.fit, look.widths);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
+
   // Esc cancels.
   await page.mouse.dblclick(p.x, p.y);
   await page.keyboard.type('nope');
@@ -161,6 +186,34 @@ if (only !== 'phone') {
   await page.keyboard.press(`${mod}+Enter`);
   await page.waitForTimeout(200);
   check('⌘/Ctrl+Enter commits', (await textOf(page, id)) === 'Hi');
+
+  // A wrapping text (templates give their titles a wrap width): the field hugs the drawn lines,
+  // like the selection frame does, not the whole wrap width.
+  await page.evaluate((itemId) => {
+    const c = (window as any).vuEditor;
+    c.run('Wrap', (d: any) => {
+      for (const t of d.tracks)
+        for (const i of t.items)
+          if (i.id === itemId) {
+            i.text = 'Summer in Lisbon, a long weekend by the sea';
+            i.maxWidth = 0.5;
+            // Bigger than at scale 1: the lines stay as they were (DECISIONS #157).
+            i.transform.scale = 1.6;
+          }
+    });
+    c.select(itemId);
+  }, id);
+  await page.waitForTimeout(300);
+  const selectedWidth = await page.locator('.vu-selection-box').evaluate((b) => b.offsetWidth);
+  await page.mouse.click(p.x, p.y);
+  await page.waitForTimeout(200);
+  const typingWidth = await page.locator('.vu-selection-box').evaluate((b) => b.offsetWidth);
+  check(
+    'wrapping text (scaled up): the frame keeps its width when typing starts',
+    Math.abs(typingWidth - selectedWidth) <= 3,
+    `${selectedWidth} → ${typingWidth}`,
+  );
+  await page.keyboard.press('Escape');
   check('no page errors (desktop)', errors.length === 0, errors.join(' | '));
   await browser.close();
 }
@@ -192,6 +245,45 @@ if (only !== 'desktop') {
     'phone: typing goes on at the end; leaving commits',
     (await textOf(page, id)) === 'HelloSale',
   );
+  // A real finger moves a few pixels during a tap: still a tap, not a drag.
+  await page.waitForTimeout(400);
+  const before = await page.evaluate((itemId) => {
+    for (const t of (window as any).vuEditor.project.tracks)
+      for (const i of t.items) if (i.id === itemId) return i.transform.x as number;
+    return null;
+  }, id);
+  await page.evaluate(
+    ({ x, y }) => {
+      const stage = document.querySelector('.vu-stage')!;
+      const ev = (type: string, dx: number) =>
+        stage.dispatchEvent(
+          new PointerEvent(type, {
+            bubbles: true,
+            pointerId: 7,
+            pointerType: 'touch',
+            isPrimary: true,
+            clientX: x + dx,
+            clientY: y + dx,
+          }),
+        );
+      ev('pointerdown', 0);
+      ev('pointermove', 3);
+      ev('pointermove', 5);
+      ev('pointerup', 5);
+    },
+    { x: p.x, y: p.y },
+  );
+  await page.waitForTimeout(200);
+  check('phone: a tap that wobbles 5 px still opens the field', await field(page).isVisible());
+  check(
+    "phone: …and doesn't move the text",
+    (await page.evaluate((itemId) => {
+      for (const t of (window as any).vuEditor.project.tracks)
+        for (const i of t.items) if (i.id === itemId) return i.transform.x as number;
+      return null;
+    }, id)) === before,
+  );
+  await page.locator('.vu-stage-text').evaluate((el) => (el as HTMLElement).blur());
   check('no page errors (phone)', errors.length === 0, errors.join(' | '));
   await browser.close();
 }

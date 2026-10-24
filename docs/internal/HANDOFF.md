@@ -2,6 +2,30 @@
 
 Where the last session stopped and what comes next. Update before ending every session.
 
+## 2026-10-24/25 (owner's desktop test pass — merged to main and pushed)
+
+Branch `fix/owner-desktop-pass`, merged into main, pushed at the owner's word. Every fix is in
+PROGRESS 2026-10-24 (one line each); the bigger ones: typing on the stage (one click, phone tap
+slop, field = drawn text, frame stays), template titles keep their lines when scaled (#157),
+Transitions panel (chosen one first, then its settings, then the list), timeline cut buttons vs
+trim handles (tap = transition, drag = trim), lazy thumbnails (PERF rule 9), Assistant redone as
+a chat (Undo, Stop, busy message, scrolling), desktop panels resizable (#158). Playground: Read
+aloud only with a voice key (Gemini works), assistant route Gemini → Claude fallback.
+
+- **Owner testing so far — desktop (laptop) only:** Blur, Filters (incl. Apply to all clips),
+  Templates, Text (incl. Read aloud with a real voice service), Stickers, Transitions, Media,
+  Your videos (new video / make a copy) ✓.
+  **Mobile (iPhone, Android): not tested yet** — none of these fixes have been tried on a phone.
+- **Next (owner, tomorrow):** test Assistant, Audio and Captions on desktop.
+- Playground keys live in `apps/playground/.env.local` (git-ignored): `SPEECH_API_KEY` is a
+  Google key (Read aloud + the assistant). For the Claude fallback the owner adds
+  `ANTHROPIC_API_KEY`. Google's flash models were overloaded on 2026-10-24 (the route falls back
+  to `gemini-flash-lite-latest` after 12 s).
+- Docs to write (BACKLOG): speech / assistant with your own backend + JWT, serverless, Gemini.
+- I keep `pnpm dev` running (:3200) while the owner tests. The tsup watcher stops emitting after
+  a file is replaced (`sed -i`, `git checkout`, sometimes Write) — check `dist` is newer than the
+  source and restart it if not.
+
 ## 2026-10-20 (later — audio, release prep, soak; merged to main, not pushed)
 
 - Clean up noise + Clean voice preset; Extract audio keeps fades / effects (#156).

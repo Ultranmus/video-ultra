@@ -361,17 +361,40 @@ export function getCommand(ctl: EditorController, id: CommandId): Command {
     case 'alignBottom': {
       const edge = ALIGN[id];
       const meta = {
-        left: { label: l.alignToLeft, icon: 'alignToLeft' },
-        center: { label: l.alignToCenter, icon: 'alignToCenter' },
-        right: { label: l.alignToRight, icon: 'alignToRight' },
-        top: { label: l.alignToTop, icon: 'alignToTop' },
-        middle: { label: l.alignToMiddle, icon: 'alignToMiddle' },
-        bottom: { label: l.alignToBottom, icon: 'alignToBottom' },
-      }[edge] as { label: string; icon: IconName };
+        left: {
+          label: l.alignToLeft,
+          icon: 'alignToLeft',
+          tip: several ? l.alignLeftEachTip : l.alignLeftTip,
+        },
+        center: {
+          label: l.alignToCenter,
+          icon: 'alignToCenter',
+          tip: several ? l.alignCenterEachTip : l.alignCenterTip,
+        },
+        right: {
+          label: l.alignToRight,
+          icon: 'alignToRight',
+          tip: several ? l.alignRightEachTip : l.alignRightTip,
+        },
+        top: {
+          label: l.alignToTop,
+          icon: 'alignToTop',
+          tip: several ? l.alignTopEachTip : l.alignTopTip,
+        },
+        middle: {
+          label: l.alignToMiddle,
+          icon: 'alignToMiddle',
+          tip: several ? l.alignMiddleEachTip : l.alignMiddleTip,
+        },
+        bottom: {
+          label: l.alignToBottom,
+          icon: 'alignToBottom',
+          tip: several ? l.alignBottomEachTip : l.alignBottomTip,
+        },
+      }[edge] as { label: string; icon: IconName; tip: string };
       return {
         id,
         ...meta,
-        tip: several ? l.alignToEachOtherTip : l.alignToFrameTip,
         disabledReason: ctl.alignReason(),
         run: () => ctl.align(edge),
       };
