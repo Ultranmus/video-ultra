@@ -9,6 +9,7 @@ import {
 } from '@video-ultra/core';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { useController, useLabels, useProject, useUi } from './context';
+import { useNearView } from './browse';
 import { Icon } from './icons';
 import { textItem } from './items';
 import type { PanelId } from './state';
@@ -156,16 +157,26 @@ function AssetTile({ asset }: { asset: Asset }) {
   const ctl = useController();
   const l = useLabels();
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // Only tiles scrolled near the view decode a frame (a long library doesn't decode them all).
+  const [near, setNear] = useState(false);
+  const tileRef = useNearView<HTMLButtonElement>(() => setNear(true));
   useEffect(() => {
+    if (!near) return;
     const controller = new AbortController();
     const canvas = canvasRef.current!;
     const height = Math.round(72 * Math.min(devicePixelRatio || 1, 2));
-    void ctl.analyzer
-      ?.thumbnail(
-        asset.id,
-        Math.min(1, asset.duration / FLICKS_PER_SECOND / 2),
-        height,
-        controller.signal,
+    // On a fresh load the project shows before its files are read back: wait for this one.
+    void ctl
+      .whenMedia(asset.id, controller.signal)
+      .then(() =>
+        controller.signal.aborted
+          ? null
+          : ctl.analyzer?.thumbnail(
+              asset.id,
+              Math.min(1, asset.duration / FLICKS_PER_SECOND / 2),
+              height,
+              controller.signal,
+            ),
       )
       .then((bitmap) => {
         if (!bitmap) return;
@@ -179,9 +190,10 @@ function AssetTile({ asset }: { asset: Asset }) {
         bitmap.close();
       });
     return () => controller.abort();
-  }, [ctl, asset.id, asset.duration]);
+  }, [ctl, asset.id, asset.duration, near]);
   return (
     <button
+      ref={tileRef}
       type="button"
       className="vu-asset"
       aria-label={`${l.addToTimeline}: ${asset.name}${asset.kind === 'video' ? `, ${formatDuration(asset)}` : ''}`}

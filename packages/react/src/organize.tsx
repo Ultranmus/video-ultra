@@ -20,6 +20,7 @@ import { AdjustTool, FadeTool, OpacityTool, SpeedTool, VolumeTool } from './Tool
 import { AllSelected, useSharedReps } from './multiedit';
 import { BlendTool } from './picture';
 import { ALIGN_COMMANDS, getCommand, menuSections, type Command, type CommandId } from './commands';
+import { useNearView } from './browse';
 import { useController, useLabels, useUi } from './context';
 import { Button, IconButton, Section } from './controls';
 import { formatClock } from './format';
@@ -471,27 +472,37 @@ function LayerThumb({ item }: { item: Item }): ReactElement {
         ? item.sourceIn / FLICKS_PER_SECOND
         : 0;
   const picture = !!asset && asset.kind !== 'audio';
+  // Only rows scrolled near the view decode a frame; on a fresh load, once the file is back.
+  const [near, setNear] = useState(false);
+  const thumbRef = useNearView<HTMLSpanElement>(() => setNear(true));
   useEffect(() => {
-    if (!picture || !assetId) return;
+    if (!picture || !assetId || !near) return;
     const controller = new AbortController();
     const canvas = canvasRef.current;
     if (!canvas) return;
     const height = Math.round(32 * Math.min(devicePixelRatio || 1, 2));
-    void ctl.analyzer?.thumbnail(assetId, at, height, controller.signal).then((bitmap) => {
-      if (!bitmap) return;
-      if (controller.signal.aborted) {
+    void ctl
+      .whenMedia(assetId, controller.signal)
+      .then(() =>
+        controller.signal.aborted
+          ? null
+          : ctl.analyzer?.thumbnail(assetId, at, height, controller.signal),
+      )
+      .then((bitmap) => {
+        if (!bitmap) return;
+        if (controller.signal.aborted) {
+          bitmap.close();
+          return;
+        }
+        canvas.width = bitmap.width;
+        canvas.height = bitmap.height;
+        canvas.getContext('2d')?.drawImage(bitmap, 0, 0);
         bitmap.close();
-        return;
-      }
-      canvas.width = bitmap.width;
-      canvas.height = bitmap.height;
-      canvas.getContext('2d')?.drawImage(bitmap, 0, 0);
-      bitmap.close();
-    });
+      });
     return () => controller.abort();
-  }, [ctl, assetId, at, picture]);
+  }, [ctl, assetId, at, picture, near]);
   return (
-    <span className="vu-layer-thumb" data-kind={item.kind} aria-hidden="true">
+    <span ref={thumbRef} className="vu-layer-thumb" data-kind={item.kind} aria-hidden="true">
       {picture ? <canvas ref={canvasRef} /> : <Icon name={KIND_ICON[item.kind]} size={16} />}
     </span>
   );

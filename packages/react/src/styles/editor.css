@@ -135,7 +135,9 @@
 
   @container vu (min-width: 1024px) {
     .vu-shell {
-      grid-template-columns: var(--vu-size-rail) auto minmax(0, 1fr) var(--vu-size-inspector);
+      grid-template-columns:
+        var(--vu-size-rail) auto minmax(0, 1fr)
+        var(--vu-inspector-w, var(--vu-size-inspector));
       grid-template-areas:
         'top top top top'
         'rail panel stage inspector'
@@ -196,7 +198,8 @@
     font-size: var(--vu-text-xs);
   }
 
-  .vu-btn:hover:not([aria-disabled='true']) {
+  /* A pressed / active button keeps its accent on hover, so a click shows its result at once. */
+  .vu-btn:hover:not([aria-disabled='true']):where(:not([aria-pressed='true'], [data-active])) {
     background: var(--vu-surface-2);
     color: var(--vu-text);
   }
@@ -637,6 +640,82 @@
   }
 
   /* Timing curves: small tiles that draw their curve. */
+  /* The chosen transition's settings, above the list. */
+  .vu-transition-settings {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-3);
+  }
+
+  /* Direction: its name, then the arrows, on one line. */
+  .vu-transition-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--vu-space-3);
+    color: var(--vu-text-muted);
+    font-size: var(--vu-text-sm);
+  }
+
+  /* The cut's transition, playing, with its name: what the settings below belong to. */
+  .vu-transition-current {
+    display: flex;
+    align-items: center;
+    gap: var(--vu-space-3);
+  }
+
+  .vu-transition-current-tile {
+    display: flex;
+    padding: var(--vu-space-1);
+    border: 1px solid var(--vu-selection);
+    border-radius: var(--vu-radius-md);
+    background: var(--vu-accent-soft);
+  }
+
+  .vu-transition-current-name {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-1);
+    min-width: 0;
+    color: var(--vu-text-muted);
+    font-size: var(--vu-text-xs);
+  }
+
+  .vu-transition-current-name > strong {
+    color: var(--vu-text);
+    font-size: var(--vu-text-md);
+    font-weight: var(--vu-weight-semibold);
+  }
+
+  /* "Change transition": where the list to pick another one starts — edge to edge like the
+     chip bar under it, so the two read as one header. */
+  .vu-transition-list-head {
+    margin: var(--vu-space-2) calc(var(--vu-space-4) * -1) 0;
+    padding: var(--vu-space-4) var(--vu-space-4) 0;
+    border-top: 1px solid var(--vu-border);
+    /* A section title (like the inspector's), above the list's group names. */
+    color: var(--vu-text);
+    font-size: var(--vu-text-sm);
+    font-weight: var(--vu-weight-semibold);
+  }
+
+  .vu-transition-row > .vu-field {
+    flex: 0 1 auto;
+  }
+
+  /* Feel: one sideways row of curves, so the settings stay shallow. */
+  .vu-transition-settings .vu-ease-grid {
+    display: flex;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding: var(--vu-space-1);
+    margin: calc(var(--vu-space-1) * -1);
+  }
+
+  .vu-transition-settings .vu-ease {
+    flex: 0 0 var(--vu-size-ease-tile);
+  }
+
   .vu-ease-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(var(--vu-size-ease-tile), 1fr));
@@ -815,6 +894,11 @@
     flex: 1;
     min-height: var(--vu-size-choice-lg);
     border-radius: calc(var(--vu-radius-md) - 2px);
+  }
+
+  /* The row is already surface-2, so hover steps up one. */
+  .vu-icon-row .vu-btn:hover:not([aria-disabled='true']):where(:not([aria-pressed='true'])) {
+    background: var(--vu-surface-3);
   }
 
   /* Segmented pill: a few exclusive choices. */
@@ -1414,6 +1498,25 @@
     border-radius: var(--vu-radius-md);
     font-size: var(--vu-text-emoji);
     line-height: 1;
+  }
+
+  /* Animated tab: a still of the placed art; the font emoji only if it didn't load. */
+  .vu-emoji-animated {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--vu-space-1);
+  }
+
+  .vu-emoji-animated img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+  }
+
+  .vu-emoji-animated img:not([hidden]) + span {
+    display: none;
   }
 
   .vu-emoji:hover {
@@ -2619,13 +2722,24 @@
     margin: 0;
     overflow: hidden;
     border: 0;
-    outline: calc(1.5px / var(--vu-stage-zoom, 1)) dashed var(--vu-selection);
-    outline-offset: calc(4px / var(--vu-stage-zoom, 1));
+    /* The selection frame around it stays while typing; the field draws no border of its own. */
+    outline: none;
     caret-color: var(--vu-selection);
     paint-order: stroke fill;
     transform-origin: center;
     resize: none;
     overflow-wrap: break-word;
+  }
+
+  /* No focus ring either (it is always focused while shown). */
+  .vu-root .vu-stage-text:focus-visible {
+    outline: none;
+    box-shadow: none;
+  }
+
+  /* Typing: the frame stays, the handles go (they'd sit on the field). */
+  .vu-selection-box[data-typing] :is(.vu-handle, .vu-rotate-stem) {
+    display: none;
   }
 
   .vu-stage-text[hidden] {
@@ -2868,16 +2982,102 @@
   }
 
   /* v0.4 AI editing */
+  /* AI editing: a short chat — your words on the right, the assistant's replies (with what it
+     changed and Undo) on the left, a compact box with a round send button at the bottom. */
+  /* Exactly the panel's height: the conversation scrolls on its own above the box, which
+     never moves. */
   .vu-assistant {
     display: flex;
+    flex: 1;
     flex-direction: column;
     gap: var(--vu-space-3);
+    min-height: 0;
+    padding-bottom: var(--vu-space-3);
+  }
+
+  .vu-assistant-thread {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: var(--vu-space-4);
+    min-height: 0;
+    margin: calc(var(--vu-space-4) * -1) calc(var(--vu-space-4) * -1) 0;
+    padding: var(--vu-space-4) var(--vu-space-4) var(--vu-space-2);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .vu-assistant-greeting {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--vu-space-2);
+    margin: auto 0;
+    color: var(--vu-text);
+    font-size: var(--vu-text-xl);
+    font-weight: var(--vu-weight-semibold);
+  }
+
+  .vu-assistant-greeting svg {
+    color: var(--vu-accent-text);
+  }
+
+  .vu-assistant-spacer {
+    flex: none;
+    margin-top: calc(var(--vu-space-4) * -1);
+  }
+
+  .vu-assistant-dock {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    gap: var(--vu-space-2);
+  }
+
+  /* Suggestions: small pills with an icon, under the box. */
+  .vu-assistant-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--vu-space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .vu-root .vu-assistant-suggestions button {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vu-space-1);
+    min-height: var(--vu-size-choice);
+    padding: 0 var(--vu-space-3);
+    border: 1px solid var(--vu-border);
+    border-radius: var(--vu-radius-full);
+    color: var(--vu-text-muted);
+    font-size: var(--vu-text-xs);
+  }
+
+  .vu-root .vu-assistant-suggestions button:hover {
+    border-color: var(--vu-border-strong);
+    background: var(--vu-surface-2);
+    color: var(--vu-text);
+  }
+
+  .vu-assistant-avatar {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: var(--vu-size-choice);
+    height: var(--vu-size-choice);
+    border-radius: 50%;
+    background: var(--vu-accent-soft);
+    color: var(--vu-accent-text);
   }
 
   .vu-assistant-turns {
     display: flex;
     flex-direction: column;
-    gap: var(--vu-space-3);
+    gap: var(--vu-space-4);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -2886,7 +3086,7 @@
   .vu-assistant-turn {
     display: flex;
     flex-direction: column;
-    gap: var(--vu-space-1);
+    gap: var(--vu-space-2);
   }
 
   .vu-assistant-turn p {
@@ -2895,21 +3095,39 @@
 
   .vu-assistant-you {
     align-self: flex-end;
-    max-inline-size: 90%;
+    max-inline-size: 85%;
     padding: var(--vu-space-2) var(--vu-space-3);
-    border-radius: var(--vu-radius-md);
+    border-radius: var(--vu-radius-md) var(--vu-radius-md) var(--vu-radius-sm) var(--vu-radius-md);
     background: var(--vu-accent-soft);
+    font-size: var(--vu-text-sm);
   }
 
   .vu-assistant-reply {
-    padding: var(--vu-space-2) var(--vu-space-3);
-    border-radius: var(--vu-radius-md);
-    background: var(--vu-surface-2);
+    display: flex;
+    align-items: flex-start;
+    gap: var(--vu-space-2);
+    max-inline-size: 95%;
   }
 
-  .vu-assistant-result {
-    color: var(--vu-text-muted);
+  .vu-assistant-reply-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-2);
+    min-width: 0;
+    padding: var(--vu-space-2) var(--vu-space-3);
+    border-radius: var(--vu-radius-md) var(--vu-radius-md) var(--vu-radius-md) var(--vu-radius-sm);
+    background: var(--vu-surface-2);
     font-size: var(--vu-text-sm);
+  }
+
+  /* What it changed — a quiet line inside the reply; Undo as a small text button. */
+  .vu-assistant-result {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--vu-space-1) var(--vu-space-2);
+    color: var(--vu-text-muted);
+    font-size: var(--vu-text-xs);
   }
 
   .vu-assistant-result[data-state='done'] {
@@ -2920,14 +3138,116 @@
     color: var(--vu-danger);
   }
 
-  .vu-assistant-form {
-    display: flex;
-    flex-direction: column;
-    gap: var(--vu-space-2);
+  .vu-root .vu-assistant-undo {
+    margin-inline-start: auto;
+    padding: 0 var(--vu-space-1);
+    border-radius: var(--vu-radius-sm);
+    color: var(--vu-accent-text);
+    font-size: var(--vu-text-xs);
+    font-weight: var(--vu-weight-semibold);
   }
 
-  .vu-assistant-input {
-    font-size: var(--vu-text-md);
+  .vu-root .vu-assistant-undo:hover {
+    text-decoration: underline;
+  }
+
+  /* While the answer comes: a reply bubble with three pulsing dots. */
+  .vu-root .vu-assistant-thinking {
+    flex-direction: row;
+    align-items: center;
+    color: var(--vu-text-muted);
+    white-space: nowrap;
+  }
+
+  .vu-assistant-dots {
+    display: inline-flex;
+    gap: 3px;
+  }
+
+  .vu-assistant-dots > span {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--vu-accent-text);
+    animation: vu-assistant-dot 1.2s ease-in-out infinite;
+  }
+
+  .vu-assistant-dots > span:nth-child(2) {
+    animation-delay: 0.15s;
+  }
+
+  .vu-assistant-dots > span:nth-child(3) {
+    animation-delay: 0.3s;
+  }
+
+  @keyframes vu-assistant-dot {
+    0%,
+    60%,
+    100% {
+      opacity: 0.3;
+      transform: translateY(0);
+    }
+    30% {
+      opacity: 1;
+      transform: translateY(-2px);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .vu-assistant-dots > span {
+      animation: none;
+      opacity: 0.7;
+    }
+  }
+
+  /* The box: text, with a round send button in its corner. */
+  .vu-assistant-composer {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-1);
+    padding: var(--vu-space-2) var(--vu-space-2) var(--vu-space-2) var(--vu-space-3);
+    border: 1px solid var(--vu-border-strong);
+    border-radius: var(--vu-radius-lg);
+    background: var(--vu-surface-2);
+  }
+
+  .vu-assistant-composer-bar {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .vu-assistant-composer:focus-within {
+    border-color: var(--vu-selection);
+  }
+
+  .vu-root .vu-assistant-input {
+    min-width: 0;
+    min-height: var(--vu-size-touch);
+    padding: var(--vu-space-1) 0;
+    border: 0;
+    background: transparent;
+    color: var(--vu-text);
+    font-size: var(--vu-text-sm);
+    resize: none;
+  }
+
+  .vu-root .vu-assistant-input:focus-visible {
+    outline: none;
+    box-shadow: none;
+  }
+
+  .vu-root .vu-assistant-composer .vu-btn[data-variant='primary'] {
+    width: var(--vu-size-choice);
+    min-height: var(--vu-size-choice);
+    padding: 0;
+    border-radius: var(--vu-radius-md);
+  }
+
+  .vu-assistant-privacy {
+    margin: 0;
+    text-align: center;
+    color: var(--vu-text-subtle);
+    font-size: var(--vu-text-xs);
   }
 
   /* v0.4 Text to speech */
@@ -3046,6 +3366,81 @@
     .vu-timeline-area {
       height: var(--vu-size-timeline);
     }
+  }
+
+  /* Desktop: the sizes the person dragged (splitters.tsx), else the defaults. */
+  @container vu (min-width: 1024px) {
+    .vu-timeline-area {
+      height: var(--vu-timeline-h, var(--vu-size-timeline));
+    }
+
+    .vu-panel {
+      width: var(--vu-panel-w, var(--vu-size-panel));
+    }
+  }
+
+  /* A thin handle on a panel's inner edge; a line shows on hover, focus and while dragging. */
+  .vu-splitter {
+    position: relative;
+    z-index: 3;
+    touch-action: none;
+  }
+
+  .vu-splitter[data-edge='panel'],
+  .vu-splitter[data-edge='inspector'] {
+    width: var(--vu-space-2);
+    cursor: col-resize;
+  }
+
+  .vu-splitter[data-edge='panel'] {
+    grid-area: panel;
+    justify-self: end;
+    margin-inline-end: calc(var(--vu-space-1) * -1);
+  }
+
+  .vu-splitter[data-edge='inspector'] {
+    grid-area: inspector;
+    justify-self: start;
+    margin-inline-start: calc(var(--vu-space-1) * -1);
+  }
+
+  .vu-splitter[data-edge='timeline'] {
+    grid-area: bottom;
+    align-self: start;
+    height: var(--vu-space-2);
+    margin-top: calc(var(--vu-space-1) * -1);
+    cursor: row-resize;
+  }
+
+  .vu-splitter::after {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    border-radius: var(--vu-radius-full);
+    background: var(--vu-selection);
+    opacity: 0;
+    content: '';
+    transition: opacity var(--vu-duration-fast);
+  }
+
+  .vu-splitter[data-edge='panel']::after,
+  .vu-splitter[data-edge='inspector']::after {
+    width: 2px;
+  }
+
+  .vu-splitter[data-edge='timeline']::after {
+    height: 2px;
+  }
+
+  .vu-splitter:hover::after,
+  .vu-splitter[data-dragging]::after,
+  .vu-splitter:focus-visible::after {
+    opacity: 1;
+  }
+
+  .vu-root .vu-splitter:focus-visible {
+    outline: none;
+    box-shadow: none;
   }
 
   /*
@@ -3404,7 +3799,7 @@
     position: fixed;
     top: 0;
     left: 0;
-    z-index: var(--vu-z-toast);
+    z-index: var(--vu-z-tooltip);
     max-width: var(--vu-size-tooltip);
     padding: var(--vu-space-1) var(--vu-space-2);
     border: 1px solid var(--vu-border);
@@ -4441,6 +4836,11 @@
     flex: 1;
   }
 
+  /* The inspector's sections carry their own padding; the note lines up with them. */
+  .vu-inspector .vu-locked-note {
+    margin: var(--vu-space-3) var(--vu-space-4) 0;
+  }
+
   .vu-tool-body {
     display: flex;
     flex-direction: column;
@@ -4458,6 +4858,13 @@
   }
 
   /* ── v0.2 B. Sound ── */
+
+  /* Sound effects: the look chips, then the sliders, with room between them. */
+  .vu-soundfx {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-3);
+  }
 
   /* Lower under voice: a switch row, then the amount when on. */
   .vu-duck {

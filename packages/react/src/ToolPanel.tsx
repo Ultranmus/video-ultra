@@ -30,7 +30,7 @@ import { DEFAULT_DUCK, isSounding, RATIOS, ratioOf } from './items';
 import { AnimatePanel, FilterStrip, TransitionGrid } from './looks';
 import type { ToolId } from './state';
 import { ArrangeControls, LockedNote } from './organize';
-import { BackgroundTool } from './cutout';
+import { BackgroundTool, canCutOut } from './cutout';
 import { KeyframesTool, usePlayheadFor } from './keyframes';
 import { ProTrimTool } from './protrim';
 import { ScenesTool } from './scenes';
@@ -192,6 +192,7 @@ function ItemTool({ tool, item }: { tool: ToolId; item: Item }): ReactElement | 
 export function InspectorSections({ item }: { item: Item }): ReactElement {
   const ctl = useController();
   const l = useLabels();
+  useUi((s) => s.stickerChecks); // a sticker's background check finished: Remove background may show
   const index = useProject((p) => mainTrack(p).items.findIndex((i) => i.id === item.id));
   const onMain = index !== -1;
   const picture = (
@@ -317,7 +318,7 @@ export function InspectorSections({ item }: { item: Item }): ReactElement {
     case 'sticker':
       return (
         <>
-          {item.assetId && ctl.options.backgroundRemover ? (
+          {ctl.options.backgroundRemover && canCutOut(item, ctl) ? (
             <Section title={l.removeBackground}>
               <BackgroundTool item={item} />
             </Section>
@@ -668,22 +669,39 @@ function TransformTool({ item }: { item: Item }) {
           label={l.rotate90}
           onClick={() =>
             set(l.rotate, {
-              rotation: ((Math.round(tf.rotation / 90) * 90 + 90 + 180) % 360) - 180,
+              // A quarter turn from where it is now (45° → 135°), kept in −180…180.
+              rotation: ((((tf.rotation + 90 + 180) % 360) + 360) % 360) - 180,
             })
           }
         />
-        <IconButton
-          icon="flip"
-          label={l.flipH}
-          pressed={tf.flipX}
-          onClick={() => set(l.flipH, { flipX: !tf.flipX })}
-        />
-        <IconButton
-          icon="flipV"
-          label={l.flipV}
-          pressed={tf.flipY}
-          onClick={() => set(l.flipV, { flipY: !tf.flipY })}
-        />
+        {item.kind === 'region' ? (
+          // A blurred area looks the same mirrored in its own frame, so flipping mirrors it as
+          // it sits on the video: a tilted box tilts the other way.
+          (['flipH', 'flipV'] as const).map((id) => (
+            <IconButton
+              key={id}
+              icon={id === 'flipH' ? 'flip' : 'flipV'}
+              label={l[id]}
+              disabledReason={tf.rotation % 90 === 0 ? l.flipSameRegion : null}
+              onClick={() => set(l[id], { rotation: -tf.rotation || 0 })}
+            />
+          ))
+        ) : (
+          <>
+            <IconButton
+              icon="flip"
+              label={l.flipH}
+              pressed={tf.flipX}
+              onClick={() => set(l.flipH, { flipX: !tf.flipX })}
+            />
+            <IconButton
+              icon="flipV"
+              label={l.flipV}
+              pressed={tf.flipY}
+              onClick={() => set(l.flipV, { flipY: !tf.flipY })}
+            />
+          </>
+        )}
         <IconButton
           icon="undo"
           label={l.resetPosition}

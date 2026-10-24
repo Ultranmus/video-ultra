@@ -238,6 +238,7 @@ export class EditorController {
   #seekScheduled = false;
   #previewProject: Project | null = null;
   #previewScheduled = false;
+  readonly #previewListeners = new Set<(project: Project | null) => void>();
   #toastId = 0;
   #autosave: { flush(): Promise<void>; detach(): void } | null = null;
   /** Bumped by stop(); async work from an older start() checks it and backs out. */
@@ -803,8 +804,11 @@ export class EditorController {
   preview(recipe: ((draft: Project, ctx: EditContext) => void) | null): Project | null {
     recipe = this.#fanned(recipe);
     if (!recipe) {
-      if (this.#previewProject) void this.engine?.setProject(this.project).catch(() => {});
-      this.#previewProject = null;
+      if (this.#previewProject) {
+        void this.engine?.setProject(this.project).catch(() => {});
+        this.#previewProject = null;
+        for (const fn of this.#previewListeners) fn(null);
+      }
       return null;
     }
     try {
@@ -818,9 +822,21 @@ export class EditorController {
     this.#previewScheduled = true;
     requestAnimationFrame(() => {
       this.#previewScheduled = false;
-      if (this.#previewProject) void this.engine?.setProject(this.#previewProject).catch(() => {});
+      const shown = this.#previewProject;
+      if (!shown) return;
+      void this.engine?.setProject(shown).catch(() => {});
+      for (const fn of this.#previewListeners) fn(shown);
     });
     return this.#previewProject;
+  }
+
+  /**
+   * Called (at most once a frame) with each preview shown, and with `null` when it ends. For views
+   * that follow the picture while a slider or drag is in progress; returns an unsubscribe.
+   */
+  onPreview(fn: (project: Project | null) => void): () => void {
+    this.#previewListeners.add(fn);
+    return () => this.#previewListeners.delete(fn);
   }
 
   // ── editing ────────────────────────────────────────────────────────────
@@ -1525,16 +1541,28 @@ export class EditorController {
     );
   }
 
-  /** The same filter on every video and photo clip of the main track. */
-  applyFilterToAll(filterId: string | null): void {
+  /**
+   * Gives every video and photo (main track and layers) the look of `from`: its filter at its
+   * strength, and its LUT look. Locked ones are left alone. Returns how many changed.
+   */
+  applyFilterToAll(from: Item): number {
+    const filter = 'filter' in from ? from.filter : null;
+    const lut = isPicture(from) ? (from.lut ?? null) : undefined;
+    let count = 0;
     this.run(this.labels.filter, (d) => {
-      for (const clip of mainTrack(d).items) {
-        if (!('filter' in clip)) continue;
-        updateItem(d, clip.id, {
-          filter: filterId ? { id: filterId, intensity: clip.filter?.intensity ?? 1 } : null,
-        });
+      for (const track of d.tracks) {
+        if (track.kind === 'audio' || track.locked) continue;
+        for (const clip of track.items) {
+          if (!isPicture(clip) || clip.locked) continue;
+          updateItem(d, clip.id, {
+            filter: filter ? { ...filter } : null,
+            ...(lut === undefined ? {} : { lut: lut ? { ...lut } : null }),
+          });
+          count++;
+        }
       }
     });
+    return count;
   }
 
   #rangeStop: (() => void) | null = null;
@@ -1648,6 +1676,23 @@ export class EditorController {
 
   // ── media ──────────────────────────────────────────────────────────────
 
+  readonly #mediaWaiters = new Map<string, (() => void)[]>();
+
+  /**
+   * Resolves once an asset's file is attached (the analyzer and engine have it): at once if it
+   * is, else when it arrives. A project opens before its media is read back from storage, so
+   * thumbnails wait for this instead of asking too early. Resolves (no wait) if `signal` aborts.
+   */
+  whenMedia(assetId: string, signal?: AbortSignal): Promise<void> {
+    if (this.media.has(assetId) || signal?.aborted) return Promise.resolve();
+    return new Promise((resolve) => {
+      const list = this.#mediaWaiters.get(assetId) ?? [];
+      list.push(resolve);
+      this.#mediaWaiters.set(assetId, list);
+      signal?.addEventListener('abort', () => resolve(), { once: true });
+    });
+  }
+
   #registerMedia(asset: Asset, blob: Blob): void {
     // A combined clip has no file (the engine draws it from its inside).
     if (asset.kind === 'compound') return;
@@ -1662,6 +1707,9 @@ export class EditorController {
       );
     void this.engine?.addMedia(asset.id, blob).catch(() => {});
     if (asset.kind === 'video') void this.#ensureProxy(asset, blob);
+    const waiters = this.#mediaWaiters.get(asset.id);
+    this.#mediaWaiters.delete(asset.id);
+    for (const resolve of waiters ?? []) resolve();
   }
 
   // ── proxies (v0.4) ─────────────────────────────────────────────────────
@@ -2203,6 +2251,30 @@ export class EditorController {
    * stored as a new image the item shows instead (its own image stays: Restore takes the copy
    * away). One undo step. Progress is in `ui.cutoutJob`; `cancelBackgroundRemoval()` stops it.
    */
+  readonly #stickerBackground = new Map<string, boolean | null>();
+
+  /**
+   * Whether a sticker image has a background to remove: not when it's animated (a cut-out is one
+   * still picture — the animation would stop) or already see-through at its edges (library
+   * stickers, cut-out logos). `null` while not known yet: the check runs once per asset, off the
+   * main thread's way (header bytes, a 48 px decode), and bumps `stickerChecks` when done.
+   */
+  stickerHasBackground(assetId: string): boolean | null {
+    if (this.#stickerBackground.has(assetId)) return this.#stickerBackground.get(assetId)!;
+    this.#stickerBackground.set(assetId, null);
+    const asset = this.project.assets[assetId];
+    void (async () => {
+      const blob =
+        this.media.get(assetId) ??
+        (asset ? await this.options.resolveMedia?.(asset).catch(() => null) : null) ??
+        (asset ? await this.storage?.getMedia(asset).catch(() => null) : null);
+      const has = blob ? await hasBackground(blob).catch(() => true) : true;
+      this.#stickerBackground.set(assetId, has);
+      this.ui.setState((s) => ({ stickerChecks: s.stickerChecks + 1 }));
+    })();
+    return null;
+  }
+
   async removeBackground(itemId: string): Promise<void> {
     const remover = this.options.backgroundRemover;
     const l = this.labels;
@@ -2380,7 +2452,7 @@ export class EditorController {
           this.editor.apply(l.assistantEdit, (d, ctx) =>
             applyEditActions(d, answer.actions, ctx.ids),
           );
-          turn = { ...turn, applied: answer.actions.length };
+          turn = { ...turn, applied: answer.actions.length, after: this.editor.getProject() };
           this.toast(l.assistantApplied(answer.actions.length), 'success', {
             label: l.undo,
             run: () => this.undo(),
@@ -2391,9 +2463,14 @@ export class EditorController {
       }
     } catch (error) {
       if (abort.signal.aborted) return null;
+      // Busy or rate limited (the model's service, not this request): say so plainly.
+      const status = (error as { status?: unknown } | null)?.status;
+      const busy = status === 429 || status === 503 || status === 529;
       turn = {
         ...turn,
-        error: l.assistantFailed(error instanceof Error ? error.message : String(error)),
+        error: busy
+          ? l.assistantBusyRetry
+          : l.assistantFailed(error instanceof Error ? error.message : String(error)),
       };
     } finally {
       if (this.#assistantAbort === abort) {
@@ -2403,6 +2480,20 @@ export class EditorController {
     }
     this.ui.setState((s) => ({ assistantTurns: [...s.assistantTurns, turn] }));
     return turn;
+  }
+
+  /**
+   * Undoes an assistant turn's changes — only while they're still the latest step (otherwise
+   * undo would take back something else). Returns whether it did.
+   */
+  undoAssistantTurn(id: number): boolean {
+    const turn = this.ui.getState().assistantTurns.find((t) => t.id === id);
+    if (!turn?.after || turn.undone || turn.after !== this.editor.getProject()) return false;
+    this.undo();
+    this.ui.setState((s) => ({
+      assistantTurns: s.assistantTurns.map((t) => (t.id === id ? { ...t, undone: true } : t)),
+    }));
+    return true;
   }
 
   /** Stops a request to the assistant. */
@@ -2657,4 +2748,50 @@ export class EditorController {
       coalesceKey ? { coalesceKey } : undefined,
     );
   }
+}
+
+/** Animated image? (GIF with a loop block, animated WebP, APNG — from the first bytes.) */
+function isAnimatedImage(head: Uint8Array): boolean {
+  const ascii = (at: number, n: number) => String.fromCharCode(...head.subarray(at, at + n));
+  if (ascii(0, 4) === 'RIFF' && ascii(8, 4) === 'WEBP')
+    return ascii(12, 4) === 'VP8X' && (head[20]! & 0x02) !== 0;
+  const text = String.fromCharCode(...head);
+  if (ascii(0, 3) === 'GIF') return text.includes('NETSCAPE2.0') || text.includes('ANIMEXTS1.0');
+  if (head[0] === 0x89 && ascii(1, 3) === 'PNG') {
+    const idat = text.indexOf('IDAT');
+    const actl = text.indexOf('acTL');
+    return actl >= 0 && (idat < 0 || actl < idat);
+  }
+  return false;
+}
+
+/**
+ * A still image that isn't see-through at its edges (so removing its background does
+ * something). Reads 4 KB of header and decodes a 48 px copy.
+ */
+async function hasBackground(blob: Blob): Promise<boolean> {
+  const head = new Uint8Array(await blob.slice(0, 4096).arrayBuffer());
+  if (isAnimatedImage(head)) return false;
+  if (head[0] === 0xff && head[1] === 0xd8) return true; // JPEG: never see-through
+  const size = 48;
+  const bitmap = await createImageBitmap(blob, {
+    resizeWidth: size,
+    resizeHeight: size,
+    resizeQuality: 'low',
+  });
+  const canvas = new OffscreenCanvas(size, size);
+  const g = canvas.getContext('2d', { willReadFrequently: true })!;
+  g.drawImage(bitmap, 0, 0);
+  bitmap.close();
+  const px = g.getImageData(0, 0, size, size).data;
+  // Any clearly see-through pixel on the border: it already has no background.
+  for (let i = 0; i < size; i++)
+    for (const [x, y] of [
+      [i, 0],
+      [i, size - 1],
+      [0, i],
+      [size - 1, i],
+    ] as const)
+      if (px[(y * size + x) * 4 + 3]! < 200) return false;
+  return true;
 }

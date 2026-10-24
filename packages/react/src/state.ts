@@ -1,3 +1,4 @@
+import type { Project } from '@video-ultra/core';
 import { createStore } from 'zustand/vanilla';
 
 /** Which layout the editor is in (from the root's width; CSS uses container queries too). */
@@ -72,6 +73,13 @@ export interface AssistantTurn {
   applied: number;
   /** Why the changes weren't applied (a bad action, a failed request). */
   error: string | null;
+  /**
+   * The project right after these changes (the editor's own copy): while it's still the current
+   * one, they're the latest step and can be undone from the turn.
+   */
+  after?: Project;
+  /** Undone from the turn. */
+  undone?: boolean;
 }
 
 export interface ImportRow {
@@ -124,6 +132,8 @@ export interface UiState {
   } | null;
   /** Background removal running (v0.3): for which item, what it's doing, how far. */
   cutoutJob: { itemId: string; stage: 'download' | 'work'; fraction: number } | null;
+  /** Bumped when a sticker's "has a background to remove" check finishes (re-shows the tools). */
+  stickerChecks: number;
   /** Scene detection running (v0.4): on which clip, how far. */
   sceneJob: { itemId: string; fraction: number } | null;
   /** AI editing (v0.4): this session's conversation, and whether a request is out. */
@@ -176,6 +186,7 @@ export function createUiStore() {
     announcement: '',
     captionJob: null,
     cutoutJob: null,
+    stickerChecks: 0,
     sceneJob: null,
     proxyJobs: {},
     assistantTurns: [],

@@ -4,6 +4,7 @@ import type { EditorController } from './controller';
 import type { IconSpec } from './icons';
 import { inHostOrder, isHidden } from './embed';
 import type { Labels } from './labels';
+import { canCutOut } from './cutout';
 import { sharedReps } from './multiedit';
 import type { PanelId, ToolId } from './state';
 import { hasCutInto, type Targets } from './targets';
@@ -291,10 +292,10 @@ function singleTools(
           },
         ]
       : [];
-  // v0.3 Background removal (photos, image stickers; when the host gave a remover).
+  // v0.3 Background removal (photos, image stickers with a background; when the host gave a
+  // remover).
   const cutout: ToolEntry[] =
-    ctl.options.backgroundRemover &&
-    (item.kind === 'image' || (item.kind === 'sticker' && item.assetId))
+    ctl.options.backgroundRemover && canCutOut(item, ctl)
       ? [
           {
             key: 'cutout',

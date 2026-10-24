@@ -2,15 +2,20 @@ import type { BackgroundRemoverCheck, Item } from '@video-ultra/core';
 import { useEffect, useState, type ReactElement } from 'react';
 import { useController, useLabels, useUi } from './context';
 import { Button } from './controls';
+import type { EditorController } from './controller';
 
 /**
  * Background removal (v0.3) for a photo or an image sticker: Remove (with progress and Cancel)
  * or Restore. Only shown when the host gave the editor a background remover.
  */
 
-/** Photos and image stickers can lose their background. */
-export function canCutOut(item: Item | null | undefined): boolean {
-  return !!item && (item.kind === 'image' || (item.kind === 'sticker' && !!item.assetId));
+/** Photos, and image stickers that have a background (still, not see-through), can lose it. */
+export function canCutOut(item: Item | null | undefined, ctl: EditorController): boolean {
+  if (!item) return false;
+  if (item.kind === 'image') return true;
+  if (item.kind !== 'sticker' || !item.assetId) return false;
+  // A cut-out sticker keeps Restore; otherwise only one with a background to remove.
+  return !!item.cutout || ctl.stickerHasBackground(item.assetId) === true;
 }
 
 export function BackgroundTool({ item }: { item: Item }): ReactElement | null {
@@ -28,7 +33,7 @@ export function BackgroundTool({ item }: { item: Item }): ReactElement | null {
     };
   }, [ctl]);
   if (!ctl.options.backgroundRemover) return null;
-  if (!canCutOut(item)) return <p className="vu-hint">{l.photoOnly}</p>;
+  if (!canCutOut(item, ctl)) return <p className="vu-hint">{l.photoOnly}</p>;
   const cut = 'cutout' in item && !!item.cutout;
   if (job && job.itemId === item.id)
     return (
