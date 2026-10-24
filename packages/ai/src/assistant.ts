@@ -64,7 +64,11 @@ export function createChatAssistant(options: ChatAssistantOptions): EditingAssis
         }),
         signal: request.signal,
       });
-      if (!response.ok) throw new Error(`The assistant answered ${response.status}`);
+      // The status rides along, so the editor can tell "busy, try again" from a real failure.
+      if (!response.ok)
+        throw Object.assign(new Error(`The assistant answered ${response.status}`), {
+          status: response.status,
+        });
       const body = (await response.json()) as {
         choices?: { message?: { content?: string } }[];
       };
