@@ -57,7 +57,7 @@ in both themes at phone and desktop sizes (`scripts/a11y-check.ts`).
 
 Same scale as image-ultra: `--vu-text-xs…xl` (11–16px), `--vu-weight-*`, `--vu-space-1…8`
 (4–40px), `--vu-radius-sm/md/lg/full`, `--vu-duration-fast/base/slow`, `--vu-ease`,
-`--vu-size-touch` (40px), `--vu-z-overlay/popover/toast`.
+`--vu-size-touch` (40px), `--vu-z-overlay/popover/toast/tooltip` (tooltip on top of everything, popovers included).
 
 Video-specific sizes: `--vu-size-topbar` 48px, `--vu-size-rail` 72px, `--vu-size-panel` 280px,
 `--vu-size-inspector` 280px, `--vu-size-toolbar` 64px, `--vu-size-track` 48px (main track 56px:

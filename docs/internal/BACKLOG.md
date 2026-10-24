@@ -7,6 +7,11 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [ ] mediabunny's dependency `@types/dom-webcodecs` clashes with TypeScript 6's built-in
       WebCodecs types when an app type-checks with `skipLibCheck: false` (Next.js and Vite default
       to true). Upstream; pack-check uses `skipLibCheck: true`.
+- [ ] Docs (AI page, text to speech): show the real-world setups — your own backend with a
+      JWT (a custom `SpeechGenerator`, or `createSpeechEndpoint` with `headers` / a `fetch` that
+      adds a fresh token), a serverless function for sites without a backend, and a Google
+      Gemini server example (the playground's `api/speech/route.ts`). Keys never in the browser.
+      Maybe later: an on-device voice model (`createOnDeviceSpeech`), like on-device captions.
 - [ ] Docs site: no search yet; the phone page list is long (a picker would be shorter).
 
 - [ ] Combined clips (#155): Separate re-makes lanes at the end of their kind (a title can come
