@@ -177,7 +177,11 @@ export function isCut(items: readonly Item[], i: number): boolean {
 /** What a pointer is over. */
 export type Hit =
   | { type: 'ruler'; time: Time }
-  | { type: 'trim'; item: Item; row: Row; edge: 'start' | 'end' }
+  /**
+   * The selected clip's trim handle. `transition`: the handle sits on a cut (it hides that cut's
+   * transition button), so a tap opens this clip's transition there instead of trimming.
+   */
+  | { type: 'trim'; item: Item; row: Row; edge: 'start' | 'end'; transition?: Item }
   | { type: 'item'; item: Item; row: Row }
   | { type: 'transition'; item: Item; row: Row }
   /** A "+" on the main track: after the last clip, or (`atStart`, phones) before the first. */
@@ -204,6 +208,19 @@ export function addStartRect(row: Row, scale: TimeScale): { x: number; y: number
   return { x: timeToX(scale, 0) - 8 - size, y: row.top + (row.height - size) / 2, size };
 }
 
+/**
+ * Whether the cut before item `i` shows a transition button: a cut a transition can go on, with
+ * the clip after it wide enough on screen.
+ */
+export function cutButtonShown(items: readonly Item[], i: number, scale: TimeScale): boolean {
+  return (
+    i > 0 &&
+    i < items.length &&
+    isCut(items, i) &&
+    (items[i]!.duration / FLICKS_PER_SECOND) * scale.pps > 30
+  );
+}
+
 /** Finds what's under (x, y). `selectedId` gets trim handles, which win over the clip body. */
 export function hitTest(
   rows: readonly Row[],
@@ -223,28 +240,28 @@ export function hitTest(
     if (y < row.top - m.gap / 2 || y >= row.top + row.height + m.gap / 2) continue;
     const items = row.track.items;
     const selected = selectedId ? items.find((i) => i.id === selectedId) : undefined;
+    const at = selected ? items.indexOf(selected) : -1;
     if (selected) {
       const left = timeToX(scale, selected.start);
       const right = timeToX(scale, itemEnd(selected));
       const w = m.trimHandle;
+      // A handle on a cut stands in for that cut's transition button (a tap opens it).
+      const cut = (i: number) => (cutButtonShown(items, i, scale) ? { transition: items[i]! } : {});
       if (x >= left - w - slop && x <= left + slop)
-        return { type: 'trim', item: selected, row, edge: 'start' };
+        return { type: 'trim', item: selected, row, edge: 'start', ...cut(at) };
       if (x >= right - slop && x <= right + w + slop)
-        return { type: 'trim', item: selected, row, edge: 'end' };
+        return { type: 'trim', item: selected, row, edge: 'end', ...cut(at + 1) };
     }
     // Transition markers sit on the cuts: every cut of the main track, and where two pictures
     // touch on a layer.
     if (row.track.kind === 'main' || row.track.kind === 'overlay') {
       const r = touch ? 14 : 10;
       for (let i = 1; i < items.length; i++) {
-        if (!isCut(items, i)) continue;
+        // The selected clip's edges show its trim handles instead of buttons.
+        if (!cutButtonShown(items, i, scale) || (at >= 0 && (i === at || i === at + 1))) continue;
         const cx = timeToX(scale, items[i]!.start);
         const cy = row.top + row.height / 2;
-        if (
-          Math.abs(x - cx) <= r &&
-          Math.abs(y - cy) <= r &&
-          (items[i]!.duration / FLICKS_PER_SECOND) * scale.pps > r * 3
-        )
+        if (Math.abs(x - cx) <= r && Math.abs(y - cy) <= r)
           return { type: 'transition', item: items[i]!, row };
       }
       if (row.track.kind === 'main') {
