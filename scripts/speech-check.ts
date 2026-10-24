@@ -4,7 +4,8 @@
  * voice and speed to the host's voice service (mocked here, answering with a real recorded
  * voice) and adds the answer as a sound clip at the playhead; a text's "Read aloud" adds it
  * where the text starts; a failing service says so and adds nothing; without a server key the
- * playground's demo voice answers; axe on the panel.
+ * playground doesn't offer it at all; axe on the panel. `?speech=1` turns it on while the
+ * service is mocked (the dev server has no key).
  * Usage: playground running, then node scripts/speech-check.ts [--port 3200]
  */
 import AxeBuilder from '@axe-core/playwright';
@@ -37,7 +38,7 @@ await page.route('**/api/speech', async (route) => {
   if (fail) return route.fulfill({ status: 500, body: 'boom' });
   return route.fulfill({ contentType: 'audio/mp4', body: voiceBytes });
 });
-await page.goto(`http://localhost:${port}/editor?autosave=0`);
+await page.goto(`http://localhost:${port}/editor?autosave=0&speech=1`);
 await page.waitForFunction(() => (window as any).vuEditor?.engine, null, { timeout: 30000 });
 await page
   .locator('.vu-root input[type=file][accept^="video"]')
@@ -65,7 +66,10 @@ check(
   axe.violations.map((v) => v.id).join(', '),
 );
 await page.locator('.vu-tts textarea').fill('Welcome to my trip.');
-await page.locator('.vu-tts .vu-chip', { hasText: 'Nova' }).click();
+// The second voice (the list depends on the server's service: OpenAI-style or Google's).
+const voiceChip = page.locator('.vu-tts .vu-chip').nth(1);
+const voiceName = (await voiceChip.innerText()).trim();
+await voiceChip.click();
 await page.locator('.vu-tts .vu-btn', { hasText: 'Add voice' }).click();
 await page.waitForFunction(
   () =>
@@ -86,7 +90,9 @@ check(
 );
 check(
   'the service got the text, the chosen voice and the speed',
-  sent?.input === 'Welcome to my trip.' && sent?.voice === 'nova' && sent?.speed === 1,
+  sent?.input === 'Welcome to my trip.' &&
+    String(sent?.voice).toLowerCase() === voiceName.toLowerCase() &&
+    sent?.speed === 1,
   JSON.stringify(sent),
 );
 
@@ -170,15 +176,27 @@ check(
   toast,
 );
 
-// 4. No server key: the demo voice.
-await page.unroute('**/api/speech');
-const demo = await page.evaluate(() =>
-  (window as any).vuEditor.speak('Hello there, this is the demo voice'),
-);
-check(
-  'without a server key the demo voice is added',
-  demo === true && (await sounds(page)).length === before + 1,
-);
+// 4. No voice service on the server: no Text to speech, no Read aloud (only checkable when the
+// dev server has no key).
+const service = await fetch(`http://localhost:${port}/api/speech`, {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: '{}',
+});
+if (service.status === 501) {
+  const plain = await (
+    await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  ).newPage();
+  await plain.goto(`http://localhost:${port}/editor?autosave=0`);
+  await plain.waitForFunction(() => (window as any).vuEditor?.engine, null, { timeout: 30000 });
+  await plain.locator('.vu-rail button', { hasText: 'Audio' }).click();
+  await plain.waitForTimeout(300);
+  check(
+    'without a voice service the Audio panel has no Text to speech',
+    (await plain.locator('.vu-tts').count()) === 0 &&
+      (await plain.evaluate(() => !(window as any).vuEditor.options.speech)),
+  );
+} else results.push('SKIP no-voice-service case (this server has a key)');
 check('no page errors', errors.length === 0, errors.join(' | '));
 await browser.close();
 console.log(results.join('\n'));

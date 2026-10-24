@@ -1,13 +1,19 @@
+import { GEMINI_VOICES, speechKey, speechProvider } from './config';
+
 /**
- * The playground's text-to-speech endpoint: forwards to any OpenAI-compatible `/audio/speech`
- * service so the key stays on the server. `SPEECH_URL` (default OpenAI's), `SPEECH_API_KEY`
- * (falls back to `ASSISTANT_API_KEY`), `SPEECH_MODEL`. Without a key it answers 501 and the
- * editor uses the offline demo voice.
+ * The playground's text-to-speech endpoint, so the key stays on the server. It takes the
+ * editor's OpenAI-style request (`input`, `voice`, `speed`) and either forwards it to an
+ * OpenAI-compatible `/audio/speech` service (`SPEECH_URL`, default OpenAI's; `SPEECH_MODEL`,
+ * default `tts-1`) or asks Google's Gemini speech model (`SPEECH_MODEL`, default
+ * `gemini-2.5-flash-preview-tts`) and answers a WAV. Key: `SPEECH_API_KEY` (falls back to
+ * `ASSISTANT_API_KEY`); which service: see `speechProvider`. Without a key it answers 501.
  */
 export async function POST(request: Request): Promise<Response> {
-  const key = process.env.SPEECH_API_KEY ?? process.env.ASSISTANT_API_KEY;
-  if (!key) return new Response('No voice service configured', { status: 501 });
+  const key = speechKey();
+  const provider = speechProvider();
+  if (!key || !provider) return new Response('No voice service configured', { status: 501 });
   const body = (await request.json()) as Record<string, unknown>;
+  if (provider === 'gemini') return gemini(key, body);
   const upstream = await fetch(process.env.SPEECH_URL ?? 'https://api.openai.com/v1/audio/speech', {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
@@ -17,4 +23,69 @@ export async function POST(request: Request): Promise<Response> {
     status: upstream.status,
     headers: { 'content-type': upstream.headers.get('content-type') ?? 'audio/mpeg' },
   });
+}
+
+/** Gemini speech: one request, raw 16-bit PCM back, wrapped as a WAV. */
+async function gemini(key: string, body: Record<string, unknown>): Promise<Response> {
+  const text = String(body.input ?? '').slice(0, 4000);
+  if (!text.trim()) return new Response('Nothing to say', { status: 400 });
+  const voice = GEMINI_VOICES.some((v) => v.id === body.voice) ? String(body.voice) : 'Kore';
+  // No speed setting in this API: the pace is asked for in words.
+  const speed = Number(body.speed) || 1;
+  const pace =
+    speed >= 1.4
+      ? 'Say quickly'
+      : speed > 1.05
+        ? 'Say a little faster than usual'
+        : speed <= 0.7
+          ? 'Say slowly'
+          : speed < 0.95
+            ? 'Say a little slower than usual'
+            : 'Say';
+  const model = process.env.SPEECH_MODEL ?? 'gemini-2.5-flash-preview-tts';
+  const upstream = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: `${pace}: ${text}` }] }],
+        generationConfig: {
+          responseModalities: ['AUDIO'],
+          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },
+        },
+      }),
+    },
+  );
+  if (!upstream.ok) return new Response(await upstream.text(), { status: upstream.status });
+  const json = (await upstream.json()) as {
+    candidates?: {
+      content?: { parts?: { inlineData?: { mimeType?: string; data?: string } }[] };
+    }[];
+  };
+  const audio = json.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data)?.inlineData;
+  if (!audio?.data) return new Response('The voice service sent no audio', { status: 502 });
+  const rate = Number(/rate=(\d+)/.exec(audio.mimeType ?? '')?.[1]) || 24000;
+  return new Response(new Uint8Array(wav(Buffer.from(audio.data, 'base64'), rate)), {
+    headers: { 'content-type': 'audio/wav' },
+  });
+}
+
+/** 16-bit mono PCM → a WAV file. */
+function wav(pcm: Buffer, rate: number): Buffer {
+  const header = Buffer.alloc(44);
+  header.write('RIFF', 0);
+  header.writeUInt32LE(36 + pcm.length, 4);
+  header.write('WAVE', 8);
+  header.write('fmt ', 12);
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20); // PCM
+  header.writeUInt16LE(1, 22); // mono
+  header.writeUInt32LE(rate, 24);
+  header.writeUInt32LE(rate * 2, 28);
+  header.writeUInt16LE(2, 32);
+  header.writeUInt16LE(16, 34);
+  header.write('data', 36);
+  header.writeUInt32LE(pcm.length, 40);
+  return Buffer.concat([header, pcm]);
 }
