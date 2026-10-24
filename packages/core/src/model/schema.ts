@@ -397,8 +397,10 @@ export const TextItemSchema = z.object({
   /** Transform keyframes (file version 4+). */
   keyframes: z.optional(KeyframesSchema),
   /**
-   * Wrap width as a fraction of the canvas width (file version 3+): lines break at spaces to fit,
-   * balanced so they're about the same length. Missing = lines break only where the text does.
+   * Wrap width as a fraction of the canvas width at scale 1 (file version 3+): lines break at
+   * spaces to fit, balanced so they're about the same length. It grows with the text's scale, so
+   * a bigger title keeps its lines; on the caption track it stays this fraction of the canvas.
+   * Missing = lines break only where the text does.
    */
   maxWidth: z.optional(z.number().check(z.gte(0.05), z.lte(1))),
 });
