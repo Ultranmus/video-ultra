@@ -21,10 +21,12 @@ export function placeTextField(
   const style = item.style;
   const fontPx = textFontPx({ ...item, transform: tf }, canvasH) * scale;
   const pad = style.background ? style.background.padding * fontPx : 0;
-  // Wrapping text gets its full wrap width (the engine balances lines inside it); otherwise the
-  // field hugs the text, with room for the caret.
-  const wrap = item.maxWidth ? item.maxWidth * canvasW * scale : null;
-  const width = Math.max(fontPx, wrap ?? box.width * scale + fontPx * 0.2);
+  // The drawn text's own width (`box` is measured from the typed text, so it grows with the typing
+  // up to a wrapping text's wrap width). A background's padding leaves room for the caret; bare
+  // text gets two pixels, and so does wrapping text, so the field's wrap never breaks a line the
+  // engine kept whole.
+  const wrap = !!item.maxWidth;
+  const width = Math.max(fontPx, box.width * scale + (wrap || !pad ? 2 : 0));
   const s = field.style;
   s.width = `${width}px`;
   s.font = textFont(style, fontPx);

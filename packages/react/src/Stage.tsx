@@ -292,17 +292,21 @@ export function Stage(): ReactElement {
   // frame).
   const previewMode = useUi((s) => s.previewMode);
   const picking = useUi((s) => s.picking !== null);
+  // Hidden while playing: the picture moves (keyframes, animations) and the frame would lag it.
+  const playing = useUi((s) => s.playing);
   useEffect(() => {
-    if (selected.length === 0 || previewMode) {
+    if (selected.length === 0 || previewMode || playing) {
       placeBox([], false);
       return;
     }
     const locked = lockedKey.includes('1') && !lockedKey.includes('0');
+    // Keyframed items move with the playhead: their frame follows every scrub.
+    const keyed = selected.some((i) => 'keyframes' in i && !!i.keyframes);
     let shown = '';
     const update = (t: number) => {
       const entries = boxesAt(ctl.project, selected, t);
       const key = entries.map((e) => e.item.id).join('|');
-      if (key === shown && key !== '') return;
+      if (key === shown && key !== '' && !keyed) return;
       shown = key;
       placeBox(entries, locked);
     };
@@ -310,7 +314,7 @@ export function Stage(): ReactElement {
     return ctl.playhead.subscribe(update);
     // placeBox / boxesAt read refs only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ctl, selected, lockedKey, pw, ph, scale, previewMode]);
+  }, [ctl, selected, lockedKey, pw, ph, scale, previewMode, playing]);
 
   // ── typing on the stage ──────────────────────────────────────────────
   // Double-click a text (mouse) or tap a selected one (touch): a field opens over it, styled like
@@ -320,7 +324,6 @@ export function Stage(): ReactElement {
 
   const fieldRef = useRef<HTMLTextAreaElement>(null);
   const editing = useRef<{ id: string; original: string } | null>(null);
-  const boxShown = useRef(false);
 
   const layoutField = () => {
     const field = fieldRef.current;
@@ -329,7 +332,12 @@ export function Stage(): ReactElement {
     if (!field || !ed || item?.kind !== 'text') return;
     const typed = { ...item, text: field.value || ' ' };
     const box = itemBox(typed, ctl.project, pw, ph, measure, ctl.playhead.time);
-    if (box) placeTextField(field, typed, box, pw, ph, scale, ctl.playhead.time);
+    if (!box) return;
+    placeTextField(field, typed, box, pw, ph, scale, ctl.playhead.time);
+    // The selection frame stays (without handles) and grows with the typing.
+    const w = parseFloat(field.style.width) / (scale || 1);
+    const h = parseFloat(field.style.height) / (scale || 1);
+    placeBox([{ item: typed, box: { ...box, width: w, height: h } }], false);
   };
 
   /** `selectAll`: a mouse replaces the text; a finger types on at the end (keyboard up). */
@@ -343,14 +351,11 @@ export function Stage(): ReactElement {
     editing.current = { id, original: item.text };
     field.value = item.text;
     field.hidden = false;
+    boxRef.current?.toggleAttribute('data-typing', true);
     layoutField();
     field.focus({ preventScroll: true });
     const end = field.value.length;
     field.setSelectionRange(selectAll ? 0 : end, end);
-    if (boxRef.current) {
-      boxShown.current = !boxRef.current.hidden;
-      boxRef.current.hidden = true;
-    }
     ctl.preview((d) => {
       const found = findItem(d, id);
       if (found) found.item.hidden = true;
@@ -363,8 +368,9 @@ export function Stage(): ReactElement {
     if (!field || !ed) return;
     editing.current = null;
     field.hidden = true;
+    boxRef.current?.toggleAttribute('data-typing', false);
+    // Ending the preview puts the frame back on the item as it is (onPreview below).
     ctl.preview(null);
-    if (boxRef.current && boxShown.current) boxRef.current.hidden = false;
     const text = field.value;
     if (keep && text !== ed.original && findItem(ctl.project, ed.id)) {
       ctl.run(l.edit, (d) => updateItem(d, ed.id, { text }));
@@ -381,7 +387,22 @@ export function Stage(): ReactElement {
   // ── gestures ─────────────────────────────────────────────────────────
 
   const drag = useRef<StageDrag | null>(null);
-  const tapToType = useRef<string | null>(null);
+
+  // A slider in the side panel previews without committing: the box follows it. The stage's own
+  // drags place the box themselves.
+  useEffect(() => {
+    if (selected.length === 0 || previewMode) return;
+    const locked = lockedKey.includes('1') && !lockedKey.includes('0');
+    return ctl.onPreview((project) => {
+      if (drag.current || editing.current) return;
+      const shown = project ?? ctl.project;
+      const items = selected.map((i) => findItem(shown, i.id)?.item).filter((i): i is Item => !!i);
+      placeBox(boxesAt(shown, items, ctl.playhead.time), locked);
+    });
+    // placeBox / boxesAt read refs only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ctl, selected, lockedKey, pw, ph, scale, previewMode]);
+  const tapToType = useRef<{ id: string; mouse: boolean } | null>(null);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const longPress = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number } | null>(
     null,
@@ -606,9 +627,11 @@ export function Stage(): ReactElement {
     );
     // Keep the current selection when pressing inside its box (it may be under another layer).
     const inside = box && boxContains(box, p.x, p.y);
-    // Touch: a tap on the one selected text types into it (checked when the finger lifts).
-    tapToType.current = touch && inside && only?.kind === 'text' ? only.id : null;
     const additive = e.shiftKey || e.metaKey || e.ctrlKey;
+    // A click or tap on the one selected text types into it (checked on release, if it didn't
+    // become a drag).
+    tapToType.current =
+      inside && !additive && only?.kind === 'text' ? { id: only.id, mouse: !touch } : null;
     // The main video fills the frame, so with a mouse a drag that starts on it (while it isn't
     // selected) draws a selection rectangle; a click still selects it.
     const onMain =
@@ -767,7 +790,9 @@ export function Stage(): ReactElement {
     }
     if (d.id !== e.pointerId) return;
     const k = scale * view.current.z;
-    if (!d.moved && Math.hypot(p.x - d.x, p.y - d.y) * k < 2) return;
+    // A finger wobbles a few pixels during a tap; only a real move starts a drag.
+    const slop = e.pointerType === 'mouse' ? 2 : 10;
+    if (!d.moved && Math.hypot(p.x - d.x, p.y - d.y) * k < slop) return;
     d.moved = true;
     if (d.type === 'stretch') {
       // The pointer's move along the box's own axes; the opposite side stays where it is.
@@ -900,7 +925,7 @@ export function Stage(): ReactElement {
     if (cancelled || !next) {
       ctl.preview(null);
       if (!cancelled && !next && d.type === 'move' && !d.moved && typeInto)
-        startTyping(typeInto, false);
+        startTyping(typeInto.id, typeInto.mouse);
       return;
     }
     const label =
