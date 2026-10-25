@@ -20,6 +20,8 @@ export async function transcriptionCaptions(
   const sound = new Blob([wav(samples)], { type: 'audio/wav' });
   const detected = await hear(sound, null, service, signal);
   if (detected instanceof Response || language === 'auto') return detected;
+  // Nothing believable heard: its language is a guess too — not "another language".
+  if (detected.words.length === 0) return { words: [], language };
   if (detected.language === language) return detected;
   const forced = await hear(sound, language, service, signal);
   if (forced instanceof Response) return forced;
@@ -40,6 +42,7 @@ async function hear(
   form.append('model', service.model);
   form.append('response_format', 'verbose_json');
   form.append('timestamp_granularities[]', 'word');
+  form.append('timestamp_granularities[]', 'segment');
   form.append('temperature', '0');
   if (language) form.append('language', language);
   const upstream = await fetch(service.url, {
@@ -50,19 +53,54 @@ async function hear(
   }).catch(() => null);
   if (signal.aborted) return new Response(null, { status: 499 });
   if (!upstream) return new Response('The captions service is unreachable', { status: 502 });
-  if (!upstream.ok) return new Response(await upstream.text(), { status: upstream.status });
+  if (!upstream.ok) {
+    // A busy service's "try again in N s" reaches the editor, which waits that long.
+    const retry = upstream.headers.get('retry-after');
+    return new Response(await upstream.text(), {
+      status: upstream.status,
+      ...(retry ? { headers: { 'retry-after': retry } } : {}),
+    });
+  }
   const body = (await upstream.json()) as {
     language?: string;
     text?: string;
     words?: { word?: string; start?: number; end?: number }[];
+    segments?: { start: number; end: number; no_speech_prob?: number; avg_logprob?: number }[];
   };
+  // Stretches Whisper made up (noise, music, speech it can't hear): likely nobody speaking and
+  // a low-confidence guess. Their words are dropped (DECISIONS #166; measured on the test
+  // library's noisy recordings: invented and translated text caught, real speech kept).
+  const invented = (body.segments ?? []).filter(
+    (g) => (g.no_speech_prob ?? 0) > 0.5 && (g.avg_logprob ?? 0) < -0.5,
+  );
+  const madeUp = (t: number) => invented.some((g) => t >= g.start && t < g.end);
   const words = Array.isArray(body.words)
-    ? body.words
-        .filter((w) => typeof w.word === 'string' && w.word.trim())
-        .map((w) => ({ text: w.word!.trim(), start: w.start ?? 0, end: w.end ?? w.start ?? 0 }))
+    ? unsaid(
+        body.words
+          .filter((w) => typeof w.word === 'string' && w.word.trim() && !madeUp(w.start ?? 0))
+          .map((w) => ({ text: w.word!.trim(), start: w.start ?? 0, end: w.end ?? w.start ?? 0 })),
+      )
     : // No word times from this service: the text, timed from the sound by the editor.
-      (body.text ?? '').split(/\s+/).filter(Boolean);
+      invented.length && invented.length === body.segments?.length
+      ? []
+      : (body.text ?? '').split(/\s+/).filter(Boolean);
   return { words, language: isoCode(body.language) ?? language ?? 'en' };
+}
+
+/**
+ * Without runs of words nobody could say: three or more in a row each under 50 ms — Whisper
+ * squeezes made-up endings ("like, share and subscribe") into the last instant of a piece.
+ */
+function unsaid<W extends { start: number; end: number }>(words: W[]): W[] {
+  const quick = (w: W) => w.end - w.start < 0.05;
+  const keep = words.map(() => true);
+  for (let i = 0; i < words.length;) {
+    let j = i;
+    while (j < words.length && quick(words[j]!)) j++;
+    if (j - i >= 3) keep.fill(false, i, j);
+    i = j > i ? j : i + 1;
+  }
+  return words.filter((_, i) => keep[i]);
 }
 
 /** Languages a recogniser easily mistakes for each other (spoken alike): not "another language". */

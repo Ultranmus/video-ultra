@@ -1101,3 +1101,19 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       against voice onsets within ~0.1 s; `scripts/captions-timing.ts`): Groq is within 0.05 s
       on average in English and Hindi (worst 0.15 s); the "0.2 s early" in #164 was the
       on-device reference running late, not Groq. A mid-video pause was already right.
+166.  **Detect decides once; Hindi over Urdu by default; made-up text dropped** (owner,
+      2026-10-25). The owner saw Hindi captions turn into Urdu partway: Detect asked each 30 s
+      piece separately, and Whisper hears Hindi and Urdu alike (same speech, other script; a
+      noisy Hindi clip of ours was detected as Urdu). `createCaptionsEndpoint` now detects on the
+      first piece with speech and asks for that language from then on; when that's Hindi or
+      Urdu it writes Urdu only if the browser is set to Urdu or Pakistan, else Hindi (the
+      owner's audience; choosing Urdu or Hindi always wins). Busy services: four more tries,
+      waiting 3 / 6 / 12 / 24 s or the `Retry-After` the endpoint passes on (≤ 60 s) — Groq's
+      free plan is 7,200 audio-seconds an hour and 2,000 requests a day. **Made-up text**
+      (playground's Groq connection): Whisper invents speech on audio it can't hear ("Hello
+      everyone, welcome to my channel", "like, share and subscribe", a translation into Malay).
+      Dropped: segments with `no_speech_prob > 0.5` and `avg_logprob < −0.5` (OpenAI's own rule,
+      > 0.6 and < −1, missed all of them on our noisy phone recordings), and runs of 3+ words each
+      > under 50 ms. Real speech on the noisy, fan and music clips keeps every word; a piece with
+      > nothing believable reports the chosen language, not the guessed one. Not solved: on speech
+      > buried under room noise Whisper's inventions vary run to run and some pass every check.

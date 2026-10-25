@@ -19,6 +19,11 @@ export interface CaptionsEndpointOptions {
   speed?: number;
   /** For tests / custom transports. Default: the global `fetch`. */
   fetch?: typeof fetch;
+  /**
+   * First wait before trying a busy service again (ms), doubling each time, four tries more;
+   * a `Retry-After` header from your endpoint wins. Default 3000.
+   */
+  retryWait?: number;
 }
 
 /**
@@ -75,8 +80,16 @@ export function createCaptionsEndpoint(options: CaptionsEndpointOptions): Transc
         const sound = chunk.subarray(0, filled);
         // Nearly silent (a quiet room, wind): nobody speaks, and nothing to make up.
         if (voicedShare(sound) >= MIN_VOICE) {
-          const reply = await ask(call, options, sound, language, signal);
-          const heard = reply.language.slice(0, 2).toLowerCase();
+          // Detect decides once, on the first piece with speech; the rest are asked for that
+          // language (piece by piece, Hindi could come back as Urdu: same speech, other script).
+          let reply = await ask(call, options, sound, detected ?? language, signal);
+          let heard = reply.language.slice(0, 2).toLowerCase();
+          // Hindi and Urdu sound the same: Detect writes the one the viewer's browser suggests.
+          const script = language === 'auto' && !detected ? alikeChoice(heard) : heard;
+          if (script !== heard && reply.words.length) {
+            reply = await ask(call, options, sound, script, signal);
+            heard = script;
+          }
           if (language === 'auto' || heard === language) {
             matched++;
             if (reply.words.length) detected ??= heard;
@@ -111,9 +124,22 @@ const SAMPLE_RATE = 16_000;
 /** 30 s of sound per request. */
 const CHUNK = 30 * SAMPLE_RATE;
 const MIN_VOICE = 0.04;
-/** A busy or rate-limited service gets two more tries, a few seconds apart. */
+/** A busy or rate-limited service gets four more tries, waiting longer each time. */
 const RETRY_STATUS = [429, 502, 503, 504];
-const RETRY_WAIT_MS = 3000;
+const RETRIES = 4;
+/** Longest wait a `Retry-After` may ask for (ms). */
+const RETRY_MAX_MS = 60_000;
+
+/**
+ * Hindi or Urdu (spoken alike, written in different scripts): Urdu when the browser is set to
+ * Urdu or to Pakistan, else Hindi (DECISIONS #166). Other languages as heard.
+ */
+function alikeChoice(heard: string): string {
+  if (heard !== 'hi' && heard !== 'ur') return heard;
+  const langs =
+    typeof navigator !== 'undefined' ? (navigator.languages ?? [navigator.language]) : [];
+  return langs.some((l) => /^ur\b|-PK$/i.test(l)) ? 'ur' : 'hi';
+}
 
 /** The reply's words with times: its own, or from the sound when any are missing. */
 function timed(words: CaptionsEndpointReply['words'], sound: Float32Array): TranscriptWord[] {
@@ -162,7 +188,7 @@ async function ask(
       };
     }
     // The status rides along, so the editor can tell "busy, try again" from a real failure.
-    if (attempt >= 2 || !RETRY_STATUS.includes(response.status))
+    if (attempt >= RETRIES || !RETRY_STATUS.includes(response.status))
       throw Object.assign(
         new Error(
           response.status === 429 || response.status === 503
@@ -171,8 +197,11 @@ async function ask(
         ),
         { status: response.status },
       );
+    const asked = Number(response.headers.get('retry-after'));
+    const wait =
+      asked > 0 ? Math.min(RETRY_MAX_MS, asked * 1000) : (options.retryWait ?? 3000) * 2 ** attempt;
     await new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(resolve, RETRY_WAIT_MS);
+      const timer = setTimeout(resolve, wait);
       signal.addEventListener(
         'abort',
         () => {

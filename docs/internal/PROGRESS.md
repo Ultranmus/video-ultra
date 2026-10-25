@@ -487,3 +487,7 @@ merged and re-verified on main; A (captions) and E (layers) here.
   (Whisper stretches the first word over the silence). `snapToVoice` in the helper moves such
   words onto the voice: first caption now at 15.00 s. New `captions-timing` check with true
   word times from the system voice: Groq 0.05 s mean in English and Hindi (#165).
+- Captions (owner): Hindi turned into Urdu partway with Detect — Detect now decides once, and
+  Hindi / Urdu goes to Hindi unless the browser says Urdu or Pakistan. Made-up text from
+  Whisper on unhearable audio dropped (segment confidence + impossibly fast word runs); longer
+  retries honouring Retry-After (#166). All real Hindi test clips: Devanagari only.

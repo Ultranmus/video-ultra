@@ -50,8 +50,12 @@ export async function geminiCaptions(
       const text = body.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('') ?? '';
       return clean(text, language);
     }
+    const retry = upstream?.headers.get('retry-after');
     failed = upstream
-      ? new Response(await upstream.text(), { status: upstream.status })
+      ? new Response(await upstream.text(), {
+          status: upstream.status,
+          ...(retry ? { headers: { 'retry-after': retry } } : {}),
+        })
       : new Response('The captions service is busy', { status: 503 });
     if (upstream && ![404, 429, 500, 502, 503, 504].includes(upstream.status)) break;
   }

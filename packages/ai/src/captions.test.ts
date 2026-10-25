@@ -37,7 +37,7 @@ function fakeServer(
 }
 
 const run = (fetch: typeof globalThis.fetch, audio: Float32Array, language = 'en') =>
-  createCaptionsEndpoint({ endpoint: '/api/captions', fetch }).transcribe({
+  createCaptionsEndpoint({ endpoint: '/api/captions', fetch, retryWait: 10 }).transcribe({
     audio: pieces(audio),
     duration: audio.length / RATE,
     language,
@@ -86,13 +86,35 @@ describe('createCaptionsEndpoint', () => {
     expect(result.language).toBe('hi');
   });
 
+  it('Detect decides the language once and asks for it from then on', async () => {
+    const server = fakeServer((language, _s, n) => ({
+      words: [{ text: `w${n}`, start: 0, end: 1 }],
+      // Piece by piece, the service would hear Hindi, then Urdu.
+      language: language === 'auto' ? (n === 1 ? 'hi' : 'ur') : language,
+    }));
+    const result = await run(server.fetch, speech(90), 'auto');
+    expect(server.calls.map((c) => c.language)).toEqual(['auto', 'hi', 'hi']);
+    expect(result.language).toBe('hi');
+  });
+
   it('retries a busy service, then says it is busy', async () => {
     const ok = fakeServer(() => ({ words: ['hi'], language: 'en' }), [503]);
     await expect(run(ok.fetch, speech(2))).resolves.toMatchObject({ words: [{ text: 'hi' }] });
     expect(ok.calls).toHaveLength(2);
-    const busy = fakeServer(() => ({ words: [], language: 'en' }), [429, 429, 429]);
+    const busy = fakeServer(() => ({ words: [], language: 'en' }), [429, 429, 429, 429, 429]);
     await expect(run(busy.fetch, speech(2))).rejects.toMatchObject({ status: 429 });
-  }, 20_000);
+    expect(busy.calls).toHaveLength(5);
+  });
+
+  it('Detect writes Hindi rather than Urdu (spoken alike) unless the browser says Urdu', async () => {
+    const server = fakeServer((language) => ({
+      words: [{ text: language === 'hi' ? 'नमस्ते' : 'نمستے', start: 0, end: 1 }],
+      language: language === 'auto' ? 'ur' : language,
+    }));
+    const result = await run(server.fetch, speech(2), 'auto');
+    expect(server.calls.map((c) => c.language)).toEqual(['auto', 'hi']);
+    expect(result).toMatchObject({ language: 'hi', words: [{ text: 'नमस्ते' }] });
+  });
 });
 
 describe('snapToVoice', () => {
