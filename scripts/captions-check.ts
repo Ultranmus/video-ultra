@@ -352,6 +352,65 @@ if (webkitModel) {
   await browser.close();
 }
 
+// ── a speech-to-text service with word times, in Chinese (no spaces between words) ──
+{
+  const browser = await chromium.launch({ channel: 'chrome' });
+  const page = await (
+    await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  ).newPage();
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.route('**/api/captions**', (route) =>
+    route.fulfill({
+      json: {
+        words: [
+          { text: '大家好，', start: 0.3, end: 1.0 },
+          { text: '欢迎', start: 1.1, end: 1.5 },
+          { text: '回到', start: 1.5, end: 1.9 },
+          { text: 'iPhone', start: 1.9, end: 2.4 },
+          { text: '频道。', start: 2.4, end: 3.0 },
+        ],
+        language: 'zh',
+      },
+    }),
+  );
+  await load(page, 'transcriber=server', ['speech-en-gb.m4a']);
+  await page.locator('.vu-rail .vu-btn', { hasText: 'Captions' }).click();
+  await page.locator('.vu-panel button', { hasText: /More languages/ }).click();
+  await page
+    .locator('.vu-panel button', { hasText: /^Chinese$/ })
+    .first()
+    .click();
+  await page.locator('.vu-panel .vu-btn', { hasText: 'Make captions' }).click();
+  await page.waitForFunction(
+    () => (window as any).vuEditor.project.tracks.some((t: any) => t.kind === 'caption'),
+    null,
+    { timeout: 60000 },
+  );
+  const zh = await page.evaluate(() => {
+    const t = (window as any).vuEditor.project.tracks.find((x: any) => x.kind === 'caption');
+    const first = t.items[0];
+    return {
+      texts: t.items.map((i: any) => i.text),
+      words: first.words.map((w: any) => w.text),
+      start: first.start / 705_600_000,
+    };
+  });
+  check(
+    'Chinese: words joined without spaces, one highlight word per character, times as given',
+    zh.texts.join('|') === '大家好，欢迎回到iPhone频道。' &&
+      zh.words.join(' ') === '大 家 好， 欢 迎 回 到 iPhone 频 道。' &&
+      Math.abs(zh.start - 0.3) < 0.02,
+    JSON.stringify(zh),
+  );
+  // The word highlight draws on it without errors (Karaoke look: word by word).
+  await page.evaluate(() => (window as any).vuEditor.seek(Math.round(1.3 * 705_600_000)));
+  await page.waitForTimeout(500);
+  await snap(page, 'c7-chinese');
+  check('no page errors (Chinese)', errors.length === 0, errors.join(' | '));
+  await browser.close();
+}
+
 // ── phone ───────────────────────────────────────────────────────────────
 {
   const browser = await webkit.launch();

@@ -15,8 +15,10 @@ Where the last session stopped and what comes next. Update before ending every s
   request. All merged to main, **not pushed**.
 - **Owner's testing (desktop): Assistant — mostly works ✓.** Next: Audio, Captions (desktop),
   then the phones.
-- Captions: on-device English only in the package (#162); the playground uses Gemini for every
-  language when the Google key is set (#163, times from the sound). Merged to main, not pushed.
+- Captions: on-device English only in the package (#162); any language through the host's own
+  service with `createCaptionsEndpoint` (#164). Playground: Groq (`CAPTIONS_API_KEY`, set by the
+  owner) → Gemini → device. Every script (Chinese, Japanese, Thai…) handled. Merged to main,
+  not pushed. Owner to test captions again (Hindi sync with Groq, a Chinese / Japanese clip).
 - Dev watcher: `git switch` / `git stash` stop the tsup watchers — restart `pnpm dev` after.
 
 ## 2026-10-24/25 (owner's desktop test pass — merged to main and pushed)
@@ -34,7 +36,8 @@ aloud only with a voice key (Gemini works), assistant route Gemini → Claude fa
   Your videos (new video / make a copy) ✓.
   **Mobile (iPhone, Android): not tested yet** — none of these fixes have been tried on a phone.
 - **Next (owner, tomorrow):** test Assistant, Audio and Captions on desktop.
-- Playground keys live in `apps/playground/.env.local` (git-ignored): `SPEECH_API_KEY` is a
+- Playground keys live in `apps/playground/.env.local` (git-ignored): `CAPTIONS_API_KEY` is Groq
+  (captions); `SPEECH_API_KEY` is a
   Google key (Read aloud + the assistant). For the Claude fallback the owner adds
   `ANTHROPIC_API_KEY`. Google's flash models were overloaded on 2026-10-24 (the route falls back
   to `gemini-flash-lite-latest` after 12 s).

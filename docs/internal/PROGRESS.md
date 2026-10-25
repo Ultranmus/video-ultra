@@ -470,3 +470,16 @@ merged and re-verified on main; A (captions) and E (layers) here.
   it in Latin letters or nothing). The route now drops words in another language than the one
   chosen and reports the language heard; the editor says "This sounds like Hindi, not French.
   Choose Hindi or Detect". Language chips: English, Hindi, Detect, then the rest.
+
+## 2026-10-25 · Captions in every language (DECISIONS #164)
+
+- Owner: support all languages through a service the host plugs in; Groq for the playground.
+  `createCaptionsEndpoint` (`@video-ultra/ai`) with one fixed reply format (word times
+  optional); the playground route uses Groq (`CAPTIONS_API_KEY`) → Gemini → device.
+- Every script: one word rule in core (Chinese / Japanese / Thai… character by character, no
+  spaces, wrapping between characters, a word's characters kept on one caption); Hindi fill
+  highlight no longer runs ahead (graphemes). ~100 languages in the panel with a search; the
+  list closes after picking; "Added 1 caption".
+- Live through the editor with Groq: English 0.9 s, Hindi 3.6 s (chosen and Detect), Hindi
+  with French chosen → "This sounds like Hindi…", Chinese and Japanese 0.5 s. Tests: core word
+  rule (7), ai helper (5), captions-check (Chinese with word times).

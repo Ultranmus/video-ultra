@@ -1066,3 +1066,27 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       are gathered into 30 s chunks (a tail under a second joins the last): a minute is two
       requests, ~5 s; silent chunks aren't sent. Uploads the sound to Google — the panel says
       "Made by this app's captions service".
+164.  **Captions in every language: your own service, one fixed reply format** (owner,
+      2026-10-25; extends #162, #163). `@video-ultra/ai` gains `createCaptionsEndpoint({ endpoint
+})`: the host's server route receives 30 s pieces (`POST ?language=`, 16 kHz mono float32)
+      and answers `{ words: [{ text, start?, end? }] | string[], language }`. Word times are
+      optional: given, they're used (the highlight follows the recogniser); missing, the words
+      are timed from the sound (`alignWords`, #163). `language` is the language actually spoken:
+      if no piece was in the chosen one, the editor says which it heard; pieces that switch
+      language are kept. The helper chunks (a tail under a second joins the last), skips
+      silence, retries 429/502/503/504 twice. The panel's default list is ~100 languages (the
+      common ones first, the rest behind "More languages…" with a search; Detect third).
+      **Every script:** one word rule in core (`captions/words.ts`) — words at spaces, but each
+      character of Chinese, Japanese, Thai, Lao, Khmer, Myanmar is a word (a recognised word's
+      time shared by its characters, which stay on one caption); lines join without spaces next
+      to them and wrap between their characters; grouping counts them double width; the
+      highlight counts characters as drawn (graphemes — a Hindi vowel sign isn't one: the fill
+      highlight used to run ahead in Hindi). **Playground** (not the package): `CAPTIONS_API_KEY`
+      → a speech-to-text service with the OpenAI transcription API (Groq for a `gsk_` key,
+      `whisper-large-v3`; OpenAI `whisper-1`; `CAPTIONS_URL` / `CAPTIONS_MODEL` for others), else
+      Gemini, else English on the device. A chosen language is heard with detection first; if
+      the language differs (and isn't a look-alike: Hindi / Urdu…) it's heard again forced and
+      the reply says what was heard. Measured (Groq): 30 s English in 0.9 s, 1 min Hindi in
+      3.6 s; English word starts ~0.2 s ahead of the on-device model's (neither is ground
+      truth). YouTube's captions API isn't usable: it only serves videos uploaded to a channel
+      the user owns, after YouTube processes them.

@@ -54,6 +54,7 @@ import type {
 import { fromSeconds, snapToFrame, type Time } from '../model/time';
 import type { CaptionLook, CaptionWord, TextItem } from '../model/schema';
 import { captionWords, captionWordTimes } from '../captions/timing';
+import { joinWords } from '../captions/words';
 import { DEFAULT_CAPTION_PRESET, lookFromPreset, type CaptionPreset } from '../captions/presets';
 
 /**
@@ -1342,7 +1343,7 @@ export function mergeCaptionWithNext(project: Project, itemId: string): void {
     item.words || next.words
       ? [...ownTimes, ...nextTimes.map((w) => ({ ...w, start: w.start + gap, end: w.end + gap }))]
       : undefined;
-  item.text = `${item.text} ${next.text}`.trim();
+  item.text = joinWords(item.text.trim(), next.text.trim());
   item.duration = itemEnd(next) - item.start;
   if (words) item.words = words;
   track.items.splice(index + 1, 1);

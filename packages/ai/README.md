@@ -7,6 +7,9 @@ Optional AI features for `@video-ultra/react`:
 - `createChatAssistant({ endpoint })` — AI editing through your own server (OpenAI-compatible
   chat endpoint): people type what they want, the answer is applied as one undo step.
 - `createSpeechEndpoint({ endpoint })` — text to speech through your own server.
+- `createCaptionsEndpoint({ endpoint })` — auto captions in any language through your own
+  server and the speech service of your choice (one fixed reply format; see the docs,
+  "Captions").
 
 ```sh
 npm install @video-ultra/ai

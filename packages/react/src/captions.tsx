@@ -13,6 +13,7 @@ import { useController, useLabels, useProject, useUi } from './context';
 import { WholeVideoOnly } from './multiedit';
 import { Button, Chips, ColorField, IconButton, Section, Segmented } from './controls';
 import { formatClock, languageName } from './format';
+import { Icon } from './icons';
 
 /**
  * The Captions panel (v0.2 A): make captions from the speech, import a subtitle file or type
@@ -22,10 +23,11 @@ import { formatClock, languageName } from './format';
  */
 
 /**
- * Languages offered for auto captions when the transcriber doesn't list its own (ISO 639-1);
- * names come from the browser, translated.
+ * Languages offered for auto captions when the transcriber doesn't list its own (ISO 639-1;
+ * the ones speech-to-text services commonly hear, DECISIONS #164): the most used first, the rest
+ * behind "More languages…" with a search. Names come from the browser, translated.
  */
-const LANGUAGES = [
+const LANGUAGES: readonly string[] = [
   'en',
   'hi',
   'es',
@@ -43,7 +45,87 @@ const LANGUAGES = [
   'ta',
   'te',
   'mr',
-] as const;
+  'zh',
+  'ja',
+  'ko',
+  'vi',
+  'th',
+  'fa',
+  'pl',
+  'uk',
+  'gu',
+  'kn',
+  'ml',
+  'pa',
+  'ne',
+  'af',
+  'am',
+  'as',
+  'az',
+  'ba',
+  'be',
+  'bg',
+  'bo',
+  'br',
+  'bs',
+  'ca',
+  'cs',
+  'cy',
+  'da',
+  'el',
+  'et',
+  'eu',
+  'fi',
+  'fo',
+  'gl',
+  'ha',
+  'he',
+  'hr',
+  'ht',
+  'hu',
+  'hy',
+  'is',
+  'ka',
+  'kk',
+  'km',
+  'la',
+  'lb',
+  'ln',
+  'lo',
+  'lt',
+  'lv',
+  'mg',
+  'mi',
+  'mk',
+  'mn',
+  'ms',
+  'mt',
+  'my',
+  'nn',
+  'no',
+  'oc',
+  'ps',
+  'ro',
+  'sa',
+  'sd',
+  'si',
+  'sk',
+  'sl',
+  'sn',
+  'so',
+  'sq',
+  'sr',
+  'su',
+  'sv',
+  'sw',
+  'tg',
+  'tk',
+  'tl',
+  'tt',
+  'uz',
+  'yi',
+  'yo',
+];
 
 /** The browser's language, if auto captions offer it. */
 function browserLanguage(offered: readonly string[]): string | null {
@@ -99,6 +181,7 @@ function AutoCaptions({ has }: { has: boolean }): ReactElement | null {
   const [language, setLanguage] = useState(() => startLanguage(offered, detect));
   const [check, setCheck] = useState<TranscriberCheck | null>(null);
   const [allLanguages, setAllLanguages] = useState(false);
+  const [find, setFind] = useState('');
   const available = !!ctl.options.transcriber;
   useEffect(() => {
     let live = true;
@@ -130,15 +213,13 @@ function AutoCaptions({ has }: { has: boolean }): ReactElement | null {
         <Chips
           label={l.spokenLanguage}
           value={language}
-          // The first two, then Detect, then the rest (all, or the chosen and browser's ones).
+          // The first two, then Detect, then the chosen / browser's one, then "More…".
           options={[
             ...offered.slice(0, 2).map((code) => ({ value: code, label: languageName(code) })),
             ...(detect ? [{ value: 'auto', label: l.detectLanguage }] : []),
             ...offered
               .slice(2)
-              .filter(
-                (code) => allLanguages || code === language || code === browserLanguage(offered),
-              )
+              .filter((code) => code === language || code === browserLanguage(offered))
               .map((code) => ({ value: code, label: languageName(code) })),
             ...(allLanguages || offered.length <= 2
               ? []
@@ -147,6 +228,36 @@ function AutoCaptions({ has }: { has: boolean }): ReactElement | null {
           onChange={(code) => (code === 'more' ? setAllLanguages(true) : pick(code))}
         />
       )}
+      {allLanguages ? (
+        // Every other language, by name, with a search (a service may hear ~100).
+        <>
+          <label className="vu-search">
+            <Icon name="search" size={16} />
+            <input
+              type="search"
+              placeholder={l.searchLanguages}
+              aria-label={l.searchLanguages}
+              value={find}
+              onChange={(e) => setFind(e.currentTarget.value)}
+            />
+          </label>
+          <Chips
+            label={l.moreLanguages}
+            value={language}
+            options={offered
+              .slice(2)
+              .map((code) => ({ value: code, label: languageName(code) }))
+              .filter((o) => o.label.toLowerCase().includes(find.trim().toLowerCase()))
+              .sort((a, b) => a.label.localeCompare(b.label))}
+            // Picked: the list closes; the language shows next to the first ones.
+            onChange={(code) => {
+              pick(code);
+              setAllLanguages(false);
+              setFind('');
+            }}
+          />
+        </>
+      ) : null}
       {job ? (
         <div className="vu-caption-job" role="status" aria-live="polite">
           <div className="vu-caption-job-head">

@@ -30,52 +30,67 @@ const transcriber = createOnDeviceTranscriber();
         Long videos on phones take a while; the panel shows progress and can be cancelled. The
         on-device model hears English only, so the panel shows no language choice with it.
       </Note>
-      <h2>Your own captions service</h2>
+      <h2>Your own captions service (any language)</h2>
       <p>
-        For other languages, or to use a speech service you already pay for, leave out{' '}
-        <code>createOnDeviceTranscriber()</code> (and the package) and pass your own{' '}
-        <code>Transcriber</code> (from <code>@video-ultra/core</code>). The editor hands you the
-        sound as 16 kHz mono pieces of at most 30 s and expects timed words back; it groups them
-        into captions, styles them and keeps them in sync with edits. List your service&apos;s
-        languages in <code>languages</code> (add <code>&apos;auto&apos;</code> if it can detect the
-        language): the panel offers exactly those.
+        For other languages, or a speech service you already use, leave out{' '}
+        <code>createOnDeviceTranscriber()</code> and connect your own endpoint with{' '}
+        <code>createCaptionsEndpoint</code> from <code>@video-ultra/ai</code>. Your endpoint is a
+        route on your server: it calls the speech service (its key stays there) and answers in one
+        fixed format. The editor sends the sound in 30&nbsp;s pieces, one at a time, skips silence,
+        retries a busy service, and turns the words into styled captions in sync with edits.
       </p>
       <Code lang="tsx">{`
-import type { Transcriber, TranscriptWord } from '@video-ultra/core';
+import { createCaptionsEndpoint } from '@video-ultra/ai';
 
-const transcriber: Transcriber = {
-  languages: ['en', 'hi', 'es', 'auto'],
-  async transcribe({ audio, duration, language, signal, onProgress }) {
-    const words: TranscriptWord[] = [];
-    let heardLanguage = language;
-    let offset = 0;
-    // One request per piece: memory stays flat on long videos.
-    for await (const piece of audio) {
-      const response = await fetch(\`/api/captions?language=\${language}\`, {
-        method: 'POST',
-        body: piece.slice(), // 32-bit float samples, 16 kHz, mono
-        signal,
-      });
-      if (!response.ok) throw new Error(\`Captions failed (\${response.status})\`);
-      const heard: { words: TranscriptWord[]; language: string } = await response.json();
-      for (const w of heard.words)
-        words.push({ text: w.text, start: w.start + offset, end: w.end + offset });
-      heardLanguage = heard.language;
-      offset += piece.length / 16_000;
-      onProgress?.({ stage: 'transcribe', fraction: Math.min(1, offset / duration) });
-    }
-    return { words, language: heardLanguage };
-  },
-};
-
-<VideoEditor transcriber={transcriber} />;
+<VideoEditor transcriber={createCaptionsEndpoint({ endpoint: '/api/captions' })} />;
 `}</Code>
+      <h3>What your endpoint receives and answers</h3>
       <p>
-        Your <code>/api/captions</code> route keeps the service&apos;s key on your server: it turns
-        the samples into what the service takes (e.g. a WAV file), and answers each word with its
-        start and end in seconds from the start of that piece. Pick a service that gives per-word
-        times — the word-by-word highlight depends on them. With no transcriber at all, the Captions
-        panel offers import and typing only.
+        A <code>POST</code> to <code>/api/captions?language=hi</code> (an ISO 639-1 code, or{' '}
+        <code>auto</code> to detect). The body is the sound: 32-bit float samples, little-endian,
+        16&nbsp;kHz, mono, at most 31&nbsp;s. Answer:
+      </p>
+      <Code lang="json">{`
+{
+  "words": [
+    { "text": "नमस्ते,", "start": 0.42, "end": 0.9 },
+    { "text": "दोस्तों।", "start": 0.95, "end": 1.6 }
+  ],
+  "language": "hi"
+}
+`}</Code>
+      <ul>
+        <li>
+          <strong>Times</strong> are seconds from the start of that piece. Give them when your
+          service has them (most speech-to-text services do) — the word-by-word highlight follows
+          them. Without times (<code>{`"words": ["नमस्ते,", "दोस्तों।"]`}</code>) the words are
+          timed from the sound itself: close on steady speech, less exact.
+        </li>
+        <li>
+          <strong>language</strong> is the language actually spoken. If none of the video was in the
+          language chosen, the editor says which one it heard (&ldquo;This sounds like Hindi, not
+          French&rdquo;) instead of making wrong captions.
+        </li>
+        <li>
+          Chinese, Japanese, Thai and other scripts written without spaces work as they come: the
+          editor joins and wraps them without spaces and highlights them character by character.
+        </li>
+      </ul>
+      <p>
+        Pass <code>languages</code> (e.g. <code>{`['en', 'hi', 'auto']`}</code>) to offer only the
+        ones your service hears; by default the panel offers about 100 and Detect.
+      </p>
+      <Note>
+        A speech-to-text service with the OpenAI transcription API (OpenAI, Groq, or a self-hosted
+        Whisper server) returns exactly these words and times with{' '}
+        <code>response_format: verbose_json</code> and word timestamps — map{' '}
+        <code>words[].word</code> to <code>text</code>. The playground&apos;s own route does this.
+      </Note>
+      <h3>Fully custom</h3>
+      <p>
+        You can also implement <code>Transcriber</code> (from <code>@video-ultra/core</code>)
+        yourself: the editor hands you the sound as 16&nbsp;kHz mono pieces and expects{' '}
+        <code>{`{ words: [{ text, start, end }], language }`}</code> for the whole video.
       </p>
       <PageNav href="/docs/captions" />
     </article>

@@ -6,6 +6,16 @@ Safari) — the rest needs your devices.
 
 Open the branch's Vercel preview (or `pnpm --filter playground dev`), then **`/editor`**.
 
+## 00. 2026-10-25 — captions in every language (Groq in the playground)
+
+- [ ] **Hindi sync.** Captions → Hindi → Make captions on a Hindi clip. Do the words light up
+      with the speech now (try a highlight look such as Karaoke)?
+- [ ] **Detect**, then the **wrong language** (e.g. French on Hindi speech): expect "This sounds
+      like Hindi, not French…".
+- [ ] **More languages…** → search "chi" → Chinese (or Japanese) on a clip in that language: no
+      spaces between characters, lines wrap, highlight goes character by character.
+- [ ] English as before (now through Groq, not the device): sync still good?
+
 ## 0. 2026-10-20 — your list, edit several, Your videos, combined clips (branch `feat/v0.4-finish`)
 
 - [ ] **Align (desktop).** Right-click a title → hover **Align** → the list opens beside the menu
