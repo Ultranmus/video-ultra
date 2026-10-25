@@ -277,4 +277,9 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       ones (English, Spanish, French…), not Hindi. 4. The same safety net as the service path (speech detector, Detect voting, check
       marks, `captions-timing`). 5. Docs: self-hosting a free service (whisper.cpp / faster-whisper with the OpenAI
       transcription API) for apps with their own server.
+      Candidates to measure first (owner, 2026-10-25: the on-device English model is "really
+      good"): Whisper large-v3-turbo on WebGPU (computers, ~99 languages); Whisper small
+      multilingual (phones, well-heard languages); Whisper fine-tuned for Indian languages
+      (e.g. AI4Bharat / community Hindi models — check licence and ONNX builds); Vosk (light,
+      ~20 languages incl. Hindi, word times, less accurate); Moonshine (English, no word times).
       Show the owner the measurement table before building.
