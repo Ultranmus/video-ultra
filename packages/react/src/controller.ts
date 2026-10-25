@@ -57,6 +57,8 @@ import {
   parseSubtitles,
   setCaptionLook,
   setCaptionText,
+  markCaptionChecked,
+  romanizeHindi,
   TRANSCRIBE_SAMPLE_RATE,
   type CaptionLookPatch,
   type SubtitleCue,
@@ -130,6 +132,16 @@ import { measureText } from './stage/measure';
 import { spread } from './fanout';
 
 /** Options the `<VideoEditor />` passes to its controller. */
+/** Choices for auto captions (DECISIONS #167). */
+export interface CaptionOptions {
+  /** Names and words that may be said, for transcribers that take them. */
+  vocabulary?: readonly string[];
+  /** Hindi in Latin letters ("Hinglish") instead of Devanagari. */
+  latin?: boolean;
+  /** Only this part of the video (a part heard again); its captions are replaced. */
+  range?: { start: Time; end: Time };
+}
+
 export interface ControllerOptions {
   labels: Labels;
   backend?: 'auto' | 'webgpu' | 'webgl2';
@@ -2586,18 +2598,27 @@ export class EditorController {
     return (await t.check?.(language).catch(() => null)) ?? { available: true, onDevice: false };
   }
 
+  /** The last auto captions' choices, for hearing a part again the same way. */
+  #captionRequest: { language: string } & CaptionOptions = { language: 'auto' };
+
   /**
    * Auto captions: the video's speech (music lowered under voice is left out, so the words come
    * through) goes to the transcriber piece by piece; the words become captions that replace any
-   * there were. One undo step. Progress is in `ui.captionJob`; `cancelCaptions()` stops it.
+   * there were — only those in `options.range` when it's given (a part heard again). One undo
+   * step. Progress is in `ui.captionJob`; `cancelCaptions()` stops it.
    */
-  async autoCaptions(language: string): Promise<void> {
+  async autoCaptions(language: string, options: CaptionOptions = {}): Promise<void> {
     const transcriber = this.options.transcriber;
     const engine = this.engine;
     const l = this.labels;
     if (!transcriber || !engine) return;
-    const duration = projectDuration(this.project);
-    if (duration === 0) {
+    const { range, ...choices } = options;
+    if (!range) this.#captionRequest = { language, ...choices };
+    const from = range ? Math.max(0, range.start) : 0;
+    const total = projectDuration(this.project);
+    const to = range ? Math.min(total, range.end) : total;
+    const duration = to - from;
+    if (duration <= 0) {
       this.toast(l.needClips, 'info');
       return;
     }
@@ -2612,9 +2633,10 @@ export class EditorController {
     const seconds = duration / FLICKS_PER_SECOND;
     try {
       const result = await transcriber.transcribe({
-        audio: engine.listen(speech, 0, duration, TRANSCRIBE_SAMPLE_RATE, abort.signal),
+        audio: engine.listen(speech, from, to, TRANSCRIBE_SAMPLE_RATE, abort.signal),
         duration: seconds,
         language,
+        ...(choices.vocabulary?.length ? { vocabulary: choices.vocabulary } : {}),
         signal: abort.signal,
         onProgress: (p) =>
           this.ui.setState({
@@ -2627,7 +2649,12 @@ export class EditorController {
           }),
       });
       if (abort.signal.aborted) return;
-      const captions = groupCaptions(result.words, 0);
+      // Hindi in Latin letters ("Hinglish"), when asked for.
+      const words =
+        choices.latin && result.language === 'hi'
+          ? result.words.map((w) => ({ ...w, text: romanizeHindi(w.text) }))
+          : result.words;
+      const captions = groupCaptions(words, from);
       if (captions.length === 0) {
         // Speech in another language than the one chosen: say which.
         const other = language !== 'auto' && result.language && result.language !== language;
@@ -2639,8 +2666,12 @@ export class EditorController {
         );
         return;
       }
-      this.run(l.autoCaptions, (d, ctx) =>
-        addCaptions(d, captions, ctx.ids, { replace: true, preset: this.#captionPreset() }),
+      this.run(range ? l.hearAgain : l.autoCaptions, (d, ctx) =>
+        addCaptions(d, captions, ctx.ids, {
+          replace: true,
+          preset: this.#captionPreset(),
+          ...(range ? { range: { start: from, end: to } } : {}),
+        }),
       );
       this.toast(l.captionsDone(captions.length), 'success', {
         label: l.undo,
@@ -2754,6 +2785,38 @@ export class EditorController {
 
   mergeCaption(itemId: string): void {
     this.run(this.labels.mergeCaptions, (d) => mergeCaptionWithNext(d, itemId));
+  }
+
+  /** The "check this" mark goes: a person read the caption and it's right. */
+  markCaptionChecked(itemId: string): void {
+    this.run(this.labels.captionChecked, (d) => markCaptionChecked(d, itemId));
+  }
+
+  /**
+   * Hears one caption's part of the video again (half a second either side), the way the last
+   * auto captions were made, and replaces the captions there.
+   */
+  hearCaptionAgain(itemId: string): void {
+    const item = captionTrack(this.project)?.items.find((i) => i.id === itemId);
+    if (!item) return;
+    const pad = fromSeconds(0.5);
+    const { language, ...choices } = this.#captionRequest;
+    void this.autoCaptions(language, {
+      ...choices,
+      range: { start: item.start - pad, end: itemEnd(item) + pad },
+    });
+  }
+
+  /** Selects and plays to the next caption marked to check (after the selected one). */
+  nextCaptionToCheck(): void {
+    const items = captionTrack(this.project)?.items ?? [];
+    const at = items.findIndex((i) => i.id === this.ui.getState().selectedId);
+    const next =
+      items.slice(at + 1).find((i) => i.kind === 'text' && i.unsure) ??
+      items.find((i) => i.kind === 'text' && i.unsure);
+    if (!next) return;
+    this.select(next.id, { keepPanel: true });
+    this.seek(next.start);
   }
 
   /** Restyles every caption (one undo step per change; a slider drag is one). */

@@ -564,3 +564,18 @@ count only the tasks a feature adds.
 - Confirmation (10 minutes, after the fix): 0 late frames, 0 underruns. RSS moves in the same
   850–1170 MB band as the 30-minute run (Chrome gives memory back every few minutes: a sawtooth,
   not a climb) — the 10-minute window's +7.6 % sits inside it.
+
+### Captions through a service (DECISIONS #164–#167, 2026-10-25, Mac, Chrome / Node, Groq)
+
+- **Speech detector** (Silero VAD v5, quantized, 0.64 MB, one worker per captions job): ~0.1 s
+  per 22 s of sound on one core (Node, onnxruntime-web WASM); runs per 30 s piece before it's
+  sent. Speech found / taken for speech by mistake, vs loudness: clean 100 % / 0–13 %; speech
+  under music as loud as the voice 99 % (loudness 0 %); under brown noise as loud 98–99 %
+  (loudness 14 %); music or noise alone 0 %.
+- **Requests:** a minute of speech is two pieces; up to three in flight (one while the service
+  is busy). Groq: 30 s of English in ~1 s, a minute of Hindi in ~3.5 s.
+- **Word timing against true times** (`captions-timing`, system voices): English / Hindi 0.05 s
+  mean (worst 0.15 s); under music or noise as loud as the voice 0.04–0.07 s; a 110 s talk 99 %
+  of words, none doubled at a cut; a real clip after 15 s of silence starts at 15.00 s.
+- **Memory:** one 31 s piece buffer plus up to three pieces in flight (~2 MB each) and the
+  detector's worker (closed after the job).

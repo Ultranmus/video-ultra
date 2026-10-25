@@ -1206,6 +1206,8 @@ export interface CaptionInput {
   end: Time;
   text: string;
   words?: CaptionWord[];
+  /** The speech was hard to hear: marked to check (DECISIONS #167). */
+  unsure?: boolean;
 }
 
 /** How wide captions may get before they wrap (fraction of the canvas width). */
@@ -1218,15 +1220,15 @@ export function captionTrack(project: Project): Track | null {
 
 /**
  * Adds captions to the caption row (made on first use, on top of everything). `replace` clears
- * the row first (new auto captions or an imported file). Captions are snapped to frames and
- * never overlap; new ones take the row's current look (or `preset` for a new row). Returns the
- * row's id.
+ * the row first (new auto captions or an imported file) — only the captions touching `range`
+ * when it's given (a part heard again). Captions are snapped to frames and never overlap; new
+ * ones take the row's current look (or `preset` for a new row). Returns the row's id.
  */
 export function addCaptions(
   project: Project,
   captions: readonly CaptionInput[],
   ids: IdFactory,
-  options: { replace?: boolean; preset?: CaptionPreset } = {},
+  options: { replace?: boolean; preset?: CaptionPreset; range?: { start: Time; end: Time } } = {},
 ): string {
   let track = captionTrack(project);
   if (track?.locked) throw new EditError('locked', 'The captions are locked');
@@ -1244,7 +1246,11 @@ export function addCaptions(
     };
     project.tracks.push(track);
   }
-  if (options.replace) track.items = [];
+  const range = options.range;
+  if (options.replace)
+    track.items = range
+      ? track.items.filter((i) => itemEnd(i) <= range.start || i.start >= range.end)
+      : [];
   const frame = projectFrame(project);
   const sorted = [...captions]
     .map((c) => ({ ...c, start: snap(project, c.start), end: snap(project, c.end) }))
@@ -1269,6 +1275,7 @@ export function addCaptions(
       adjust: {},
       maxWidth: template?.kind === 'text' && template.maxWidth ? template.maxWidth : CAPTION_WRAP,
       ...(c.words?.length ? { words: copy(c.words) } : {}),
+      ...(c.unsure ? { unsure: true } : {}),
     };
     insertSorted(track, item);
   }
@@ -1327,6 +1334,15 @@ export function setCaptionText(project: Project, itemId: string, text: string): 
     item.words = item.words.map((w, i) => ({ ...w, text: after[i]! }));
   else delete item.words;
   item.text = next;
+  // Edited: a person has read it.
+  delete item.unsure;
+}
+
+/** Marks a caption as checked: the "check this" mark goes (DECISIONS #167). */
+export function markCaptionChecked(project: Project, itemId: string): void {
+  const { item } = editable(project, itemId);
+  if (item.kind !== 'text') throw new EditError('invalid', 'Only captions are checked');
+  delete item.unsure;
 }
 
 /** Joins a caption with the next one on its row (text, time and words). */
@@ -1344,6 +1360,7 @@ export function mergeCaptionWithNext(project: Project, itemId: string): void {
       ? [...ownTimes, ...nextTimes.map((w) => ({ ...w, start: w.start + gap, end: w.end + gap }))]
       : undefined;
   item.text = joinWords(item.text.trim(), next.text.trim());
+  if (next.unsure) item.unsure = true;
   item.duration = itemEnd(next) - item.start;
   if (words) item.words = words;
   track.items.splice(index + 1, 1);

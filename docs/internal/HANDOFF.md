@@ -19,6 +19,10 @@ Where the last session stopped and what comes next. Update before ending every s
   service with `createCaptionsEndpoint` (#164). Playground: Groq (`CAPTIONS_API_KEY`, set by the
   owner) → Gemini → device. Every script (Chinese, Japanese, Thai…) handled. Merged to main,
   not pushed. Owner to test captions again (Hindi sync with Groq, a Chinese / Japanese clip).
+- Later: Detect once + Hindi over Urdu + made-up text (#166); then all 12 caption improvements
+  (#167): speech detector, cut at pauses, 3 at once, confidence + check marks, Names & words,
+  Hear again, Hinglish, Detect votes, context. Proof: `node scripts/captions-timing.ts`. File
+  version is now 6. Merged to main, not pushed.
 - Dev watcher: `git switch` / `git stash` stop the tsup watchers — restart `pnpm dev` after.
 
 ## 2026-10-24/25 (owner's desktop test pass — merged to main and pushed)

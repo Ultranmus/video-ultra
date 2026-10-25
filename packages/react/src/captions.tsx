@@ -144,6 +144,32 @@ function startLanguage(offered: readonly string[], detect: boolean): string {
   return browserLanguage(offered) ?? offered[0] ?? 'auto';
 }
 
+/** A per-browser convenience value (storage may be blocked: then nothing is kept). */
+function stored(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function store(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* storage blocked */
+  }
+}
+
+/** "Priya, Goa;  Ultranmus" → ["Priya", "Goa", "Ultranmus"] (at most 30). */
+function wordList(text: string): string[] {
+  return text
+    .split(/[,;\n]/)
+    .map((w) => w.trim())
+    .filter(Boolean)
+    .slice(0, 30);
+}
+
 export function CaptionsPanel(): ReactElement {
   const l = useLabels();
   const has = useProject((p) => (captionTrack(p)?.items.length ?? 0) > 0);
@@ -183,6 +209,13 @@ function AutoCaptions({ has }: { has: boolean }): ReactElement | null {
   const [allLanguages, setAllLanguages] = useState(false);
   const [find, setFind] = useState('');
   const available = !!ctl.options.transcriber;
+  const takesWords = !!ctl.options.transcriber?.takesVocabulary;
+  // Names & words, kept per project in this browser (a convenience).
+  const wordsKey = `video-ultra:caption-words:${ctl.project.id}`;
+  const [vocabulary, setVocabulary] = useState(() => stored(wordsKey) ?? '');
+  // Hindi written in Latin letters ("Hinglish") or Devanagari.
+  const [latin, setLatin] = useState(() => stored('video-ultra:caption-hindi-latin') === '1');
+  const hindi = (language === 'hi' || language === 'auto') && offered.includes('hi');
   useEffect(() => {
     let live = true;
     void ctl.checkCaptions(language).then((c) => live && setCheck(c));
@@ -258,6 +291,34 @@ function AutoCaptions({ has }: { has: boolean }): ReactElement | null {
           />
         </>
       ) : null}
+      {hindi ? (
+        <Segmented
+          label={l.hindiScript}
+          value={latin ? 'latin' : 'deva'}
+          options={[
+            { value: 'deva', label: l.hindiDevanagari },
+            { value: 'latin', label: l.hindiLatin },
+          ]}
+          onChange={(v) => {
+            setLatin(v === 'latin');
+            store('video-ultra:caption-hindi-latin', v === 'latin' ? '1' : '0');
+          }}
+        />
+      ) : null}
+      {takesWords ? (
+        <label className="vu-field vu-text-field">
+          <span>{l.captionVocabulary}</span>
+          <input
+            type="text"
+            value={vocabulary}
+            placeholder={l.captionVocabularyHint}
+            onChange={(e) => {
+              setVocabulary(e.currentTarget.value);
+              store(wordsKey, e.currentTarget.value);
+            }}
+          />
+        </label>
+      ) : null}
       {job ? (
         <div className="vu-caption-job" role="status" aria-live="polite">
           <div className="vu-caption-job-head">
@@ -295,7 +356,12 @@ function AutoCaptions({ has }: { has: boolean }): ReactElement | null {
                   ? l.needClips
                   : null
             }
-            onClick={() => void ctl.autoCaptions(language)}
+            onClick={() =>
+              void ctl.autoCaptions(language, {
+                ...(takesWords ? { vocabulary: wordList(vocabulary) } : {}),
+                latin: hindi && latin,
+              })
+            }
           />
           {check && !check.available ? (
             <p className="vu-hint" role="note">
@@ -502,8 +568,20 @@ function CaptionList(): ReactElement {
   );
   const selectedId = useUi((s) => s.selectedId);
   const editing = useUi((s) => s.captionEditing);
+  const unsure = items.filter((i) => i.unsure).length;
   return (
     <Section title={l.captionList} collapsible defaultOpen>
+      {unsure ? (
+        <div className="vu-caption-check" role="note">
+          <Icon name="warning" size={16} />
+          <span>{l.captionsToCheck(unsure)}</span>
+          <Button
+            label={l.nextToCheck}
+            variant="secondary"
+            onClick={() => ctl.nextCaptionToCheck()}
+          />
+        </div>
+      ) : null}
       <ol className="vu-caption-list">
         {items.map((item, i) => (
           <CaptionRow
@@ -546,17 +624,28 @@ function CaptionRow({
     if (value.replace(/\s+/g, ' ').trim() !== item.text && value.trim())
       ctl.setCaptionText(item.id, value);
   };
+  const canHear = !!ctl.options.transcriber;
   return (
-    <li className="vu-caption-row" data-selected={selected || undefined}>
+    <li
+      className="vu-caption-row"
+      data-selected={selected || undefined}
+      data-unsure={item.unsure || undefined}
+    >
       <button
         type="button"
         className="vu-caption-time"
-        aria-label={l.captionAt(formatClock(item.start))}
+        aria-label={
+          item.unsure
+            ? `${l.captionAt(formatClock(item.start))}. ${l.captionUnsure}`
+            : l.captionAt(formatClock(item.start))
+        }
+        data-tooltip={item.unsure ? l.captionUnsure : undefined}
         onClick={() => {
           ctl.select(item.id, { keepPanel: true });
           ctl.seek(item.start);
         }}
       >
+        {item.unsure ? <Icon name="warning" size={12} /> : null}
         {formatClock(item.start)}
       </button>
       <textarea
@@ -583,6 +672,22 @@ function CaptionRow({
         }}
       />
       <div className="vu-caption-actions">
+        {item.unsure ? (
+          <IconButton
+            icon="check"
+            label={l.captionChecked}
+            tip={l.captionCheckedTip}
+            onClick={() => ctl.markCaptionChecked(item.id)}
+          />
+        ) : null}
+        {canHear ? (
+          <IconButton
+            icon="captions"
+            label={l.hearAgain}
+            tip={l.hearAgainTip}
+            onClick={() => ctl.hearCaptionAgain(item.id)}
+          />
+        ) : null}
         <IconButton
           icon="split"
           label={l.split}

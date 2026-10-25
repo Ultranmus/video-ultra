@@ -27,6 +27,11 @@ export {
   type CaptionsEndpointReply,
 } from './captions';
 export { alignWords } from './align-words';
+export {
+  createSpeechDetector,
+  type SpeechDetector,
+  type SpeechDetectorOptions,
+} from './speech-detect';
 
 /** Which model: `people` (small, fast, best on people) or `objects` (anything; bigger). */
 export type BackgroundModel = 'people' | 'objects';

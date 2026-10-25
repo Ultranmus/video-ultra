@@ -72,9 +72,40 @@ import { createCaptionsEndpoint } from '@video-ultra/ai';
           French&rdquo;) instead of making wrong captions.
         </li>
         <li>
+          <strong>confidence</strong> (optional, 0–1 per word): words under 0.3 are dropped as
+          likely made up, and captions averaging under 0.6 get a &ldquo;check this&rdquo; mark in
+          the captions list. Whisper-style services report a per-segment average log-probability —{' '}
+          <code>Math.exp(avg_logprob)</code> is a good confidence.
+        </li>
+        <li>
           Chinese, Japanese, Thai and other scripts written without spaces work as they come: the
           editor joins and wraps them without spaces and highlights them character by character.
         </li>
+      </ul>
+      <p>
+        Two optional query parameters carry hints you can pass to your service (for Whisper, as its{' '}
+        <code>prompt</code>): <code>context</code>, the last words said before this piece, and{' '}
+        <code>vocabulary</code>, names and words the person typed in &ldquo;Names &amp; words&rdquo;
+        (comma-separated), so they&apos;re spelled right.
+      </p>
+      <h3>What the editor does for you</h3>
+      <ul>
+        <li>
+          Cuts the sound at the quietest moment between 25 and 30&nbsp;s (no word cut in two), sends
+          up to three pieces at once (one while your service says it&apos;s busy), and retries a
+          busy service, waiting as long as its <code>Retry-After</code> asks.
+        </li>
+        <li>
+          Finds where people speak with a small speech detector on the device (0.6&nbsp;MB, once):
+          pieces with no speech — music or noise alone — aren&apos;t sent, so nothing is made up
+          there, and a first word your service stretched over the silence before it starts where the
+          voice does.
+        </li>
+        <li>
+          Detect decides the language from the first pieces with speech and asks for it from then on
+          (Hindi and Urdu, spoken alike, are written as the viewer&apos;s browser suggests).
+        </li>
+        <li>If nothing is heard clearly anywhere, it makes no captions rather than guesses.</li>
       </ul>
       <p>
         Pass <code>languages</code> (e.g. <code>{`['en', 'hi', 'auto']`}</code>) to offer only the

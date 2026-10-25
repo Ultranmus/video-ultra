@@ -352,6 +352,118 @@ if (webkitModel) {
   await browser.close();
 }
 
+// ── check marks, names & words, Hinglish, hear again (mocked service, DECISIONS #167) ──
+{
+  const browser = await chromium.launch({ channel: 'chrome' });
+  const page = await (
+    await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  ).newPage();
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  const asked: { seconds: number; vocabulary: string | null }[] = [];
+  await page.route('**/api/captions**', async (route) => {
+    const url = new URL(route.request().url());
+    asked.push({
+      seconds: (route.request().postDataBuffer()?.length ?? 0) / 4 / 16000,
+      vocabulary: url.searchParams.get('vocabulary'),
+    });
+    await route.fulfill({
+      json: {
+        words: [
+          { text: 'नमस्ते', start: 0.3, end: 0.8, confidence: 0.9 },
+          { text: 'दोस्तों।', start: 0.9, end: 1.5, confidence: 0.9 },
+          { text: 'आज', start: 3, end: 3.4, confidence: 0.4 },
+          { text: 'हम।', start: 3.5, end: 4, confidence: 0.45 },
+        ],
+        language: 'hi',
+      },
+    });
+  });
+  await load(page, 'transcriber=server', ['speech-en-gb.m4a']);
+  await page.locator('.vu-rail .vu-btn', { hasText: 'Captions' }).click();
+  await page
+    .locator('.vu-panel button', { hasText: /^Hindi$/ })
+    .first()
+    .click();
+  await page.locator('.vu-panel button', { hasText: 'Hinglish (abc)' }).click();
+  await page.locator('.vu-panel .vu-text-field input').fill('Priya, Goa');
+  await page.locator('.vu-panel .vu-btn', { hasText: 'Make captions' }).click();
+  await page.waitForFunction(
+    () => (window as any).vuEditor.project.tracks.some((t: any) => t.kind === 'caption'),
+    null,
+    { timeout: 60000 },
+  );
+  const made = await page.evaluate(() =>
+    (window as any).vuEditor.project.tracks
+      .find((x: any) => x.kind === 'caption')
+      .items.map((i: any) => ({ text: i.text, unsure: !!i.unsure })),
+  );
+  check(
+    'Hinglish: Hindi written in Latin letters',
+    made[0]?.text === 'namaste doston.' && made[1]?.text === 'aaj hum.',
+    JSON.stringify(made),
+  );
+  check(
+    'names & words reach the service',
+    asked[0]?.vocabulary === 'Priya, Goa',
+    JSON.stringify(asked[0]),
+  );
+  check(
+    'a caption heard with little confidence is marked to check',
+    made.map((m: { unsure: boolean }) => m.unsure).join() === 'false,true' &&
+      (await page.locator('.vu-caption-check').innerText()).includes('1 caption to check'),
+  );
+  await page.locator('.vu-caption-check .vu-btn', { hasText: 'Next to check' }).click();
+  const picked = await page.evaluate(() => {
+    const ctl = (window as any).vuEditor;
+    const t = ctl.project.tracks.find((x: any) => x.kind === 'caption');
+    return ctl.ui.getState().selectedId === t.items[1].id;
+  });
+  check('Next to check selects it', picked);
+  await page.locator('.vu-caption-row[data-unsure] button[aria-label="Looks right"]').click();
+  check(
+    'Looks right takes the mark away',
+    (await page.locator('.vu-caption-row[data-unsure]').count()) === 0 &&
+      (await page.locator('.vu-caption-check').count()) === 0,
+  );
+  const before = asked.length;
+  await page.locator('.vu-caption-row').first().locator('.vu-caption-time').click();
+  await page
+    .locator('.vu-caption-row')
+    .first()
+    .locator('button[aria-label="Hear this part again"]')
+    .click();
+  await page.waitForFunction(
+    () => (window as any).vuEditor.ui.getState().captionJob === null,
+    null,
+    {
+      timeout: 30000,
+    },
+  );
+  await page.waitForTimeout(300);
+  check(
+    'Hear again asks for just that part, and keeps the other captions',
+    asked.length === before + 1 &&
+      asked[before]!.seconds < 4 &&
+      (await page.evaluate(
+        () =>
+          (window as any).vuEditor.project.tracks.find((x: any) => x.kind === 'caption').items
+            .length,
+      )) >= 2,
+    JSON.stringify(asked.slice(before)),
+  );
+  await snap(page, 'c8-check');
+  // The panel with Hinglish, Names & words and check marks on screen.
+  const panelAxe = await new AxeBuilder({ page }).include('.vu-panel').analyze();
+  check(
+    'Captions panel with the new controls passes axe',
+    panelAxe.violations.length === 0,
+    panelAxe.violations.map((v) => v.id).join(', '),
+  );
+  check('no page errors (check marks)', errors.length === 0, errors.join(' | '));
+  await browser.close();
+}
+
 // ── a speech-to-text service with word times, in Chinese (no spaces between words) ──
 {
   const browser = await chromium.launch({ channel: 'chrome' });

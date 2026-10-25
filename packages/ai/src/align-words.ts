@@ -9,8 +9,12 @@ import type { TranscriptWord } from '@video-ultra/core';
  * the speaker does. Measured against the on-device model's times: 0.14–0.25 s mean error on
  * three English clips (one over music), where Gemini's own were off by up to 11 s.
  */
-export function alignWords(words: readonly string[], audio: Float32Array): TranscriptWord[] {
-  const voiced = voicedFrames(audio);
+export function alignWords(
+  words: readonly string[],
+  audio: Float32Array,
+  voice: Uint8Array = voiceOf(audio),
+): TranscriptWord[] {
+  const voiced = framesOf(voice);
   if (words.length === 0 || voiced.length === 0) return [];
   const pauses: number[] = [];
   for (let i = 1; i < voiced.length; i++) if (voiced[i]! - voiced[i - 1]! > FILL) pauses.push(i);
@@ -61,11 +65,10 @@ export function alignWords(words: readonly string[], audio: Float32Array): Trans
 export function snapToVoice(
   words: readonly TranscriptWord[],
   audio: Float32Array,
+  voice: Uint8Array = voiceOf(audio),
 ): TranscriptWord[] {
-  const voiced = voicedFrames(audio);
-  if (voiced.length === 0 || words.length === 0) return words.map((w) => ({ ...w }));
-  const on = new Uint8Array(Math.floor(audio.length / FRAME));
-  for (const f of voiced) on[f] = 1;
+  const on = voice;
+  if (!on.includes(1) || words.length === 0) return words.map((w) => ({ ...w }));
   const frame = (t: number) => Math.max(0, Math.min(on.length, Math.round(t / FRAME_SECONDS)));
   const hasVoice = (a: number, b: number) => {
     for (let f = frame(a); f < frame(b); f++) if (on[f]) return true;
@@ -117,11 +120,53 @@ export function snapToVoice(
   return out;
 }
 
-/** Share of a piece with voice in it (0…1): under a few percent, nobody speaks. */
-export function voicedShare(audio: Float32Array): number {
-  const frames = Math.floor(audio.length / FRAME);
-  return frames ? voicedFrames(audio).length / frames : 0;
+/**
+ * Whether a piece is quiet in itself (most of it under −44 dBFS): nobody can be speaking. Unlike
+ * {@link voiceOf}, which judges against the piece's own background, this isn't fooled by music
+ * playing throughout (where loudness finds almost no voice under it).
+ */
+export function isQuiet(audio: Float32Array): boolean {
+  const n = Math.floor(audio.length / FRAME);
+  if (n === 0) return true;
+  const rms = new Float32Array(n);
+  for (let f = 0; f < n; f++) {
+    let sum = 0;
+    for (let i = f * FRAME; i < (f + 1) * FRAME; i++) sum += audio[i]! * audio[i]!;
+    rms[f] = Math.sqrt(sum / FRAME);
+  }
+  return rms.sort()[Math.floor(n * 0.95)]! < 0.006;
 }
+
+/** Share of a piece with voice in it (0…1): under a few percent, nobody speaks. */
+export function voicedShare(voice: Uint8Array): number {
+  let n = 0;
+  for (const v of voice) n += v;
+  return voice.length ? n / voice.length : 0;
+}
+
+/**
+ * Where to end a piece of about `max` s (DECISIONS #167): the middle of the quietest 300 ms
+ * between `min` and `max` s, so no word is cut in two. In samples.
+ */
+export function quietestCut(audio: Float32Array, min: number, max: number): number {
+  const first = Math.floor((min * RATE) / FRAME);
+  const last = Math.min(Math.floor(audio.length / FRAME), Math.floor((max * RATE) / FRAME));
+  const span = 15; // 300 ms
+  let best = last;
+  let quietest = Infinity;
+  for (let f = first; f + span <= last; f++) {
+    let sum = 0;
+    for (let i = f * FRAME; i < (f + span) * FRAME; i++) sum += audio[i]! * audio[i]!;
+    // The later of equally quiet places: pieces stay long (fewer requests).
+    if (sum <= quietest) {
+      quietest = sum;
+      best = f + Math.floor(span / 2);
+    }
+  }
+  return Math.min(audio.length, best * FRAME);
+}
+
+const RATE = 16_000;
 
 const FRAME = 320; // 20 ms at 16 kHz
 const FRAME_SECONDS = 0.02;
@@ -137,8 +182,19 @@ function spokenLength(word: string): number {
   return Math.max(1, plain.length - digits + digits * 4);
 }
 
-/** Indices of the 20 ms frames with voice: louder than −44 dBFS and the piece's noise floor. */
-function voicedFrames(audio: Float32Array): number[] {
+/** Indices of the voice's 20 ms frames. */
+function framesOf(voice: Uint8Array): number[] {
+  const out: number[] = [];
+  for (let f = 0; f < voice.length; f++) if (voice[f]) out.push(f);
+  return out;
+}
+
+/**
+ * Which 20 ms frames of `audio` have voice (1) by loudness: louder than −44 dBFS and the piece's
+ * noise floor, gaps under 200 ms filled. Music and noise count too (a speech detector, when
+ * there is one, tells them apart).
+ */
+export function voiceOf(audio: Float32Array): Uint8Array {
   const n = Math.floor(audio.length / FRAME);
   const rms = new Float32Array(n);
   for (let f = 0; f < n; f++) {
@@ -156,7 +212,5 @@ function voicedFrames(audio: Float32Array): number[] {
     on[f] = 1;
     last = f;
   }
-  const out: number[] = [];
-  for (let f = 0; f < n; f++) if (on[f]) out.push(f);
-  return out;
+  return on;
 }

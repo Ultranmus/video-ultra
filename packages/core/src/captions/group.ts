@@ -27,6 +27,17 @@ export interface GroupedCaption {
   end: Time;
   text: string;
   words: CaptionWord[];
+  /** Its words were heard with little confidence: worth checking (DECISIONS #167). */
+  unsure?: boolean;
+}
+
+/** Captions whose words average a confidence under this are marked to check. */
+export const UNSURE_BELOW = 0.6;
+
+function unsureOf(words: readonly { confidence?: number }[]): boolean {
+  const known = words.filter((w) => typeof w.confidence === 'number');
+  if (!known.length) return false;
+  return known.reduce((n, w) => n + w.confidence!, 0) / known.length < UNSURE_BELOW;
 }
 
 const SENTENCE_END = /[.!?。！？।]["')\]]*$/u;
@@ -53,6 +64,7 @@ export function groupCaptions(
     const start = offset + fromSeconds(first.start);
     const end = Math.max(offset + fromSeconds(last.end), start + fromSeconds(0.4));
     out.push({
+      ...(unsureOf(current) ? { unsure: true } : {}),
       start,
       end,
       text: joinCaptionWords(current.map((w) => w.text)),
@@ -79,6 +91,7 @@ export function groupCaptions(
       text,
       start: word.start,
       end: Math.max(word.end, word.start),
+      ...(word.confidence !== undefined ? { confidence: word.confidence } : {}),
       ...(word.joinsNext ? { joinsNext: true as const } : {}),
     });
   }
@@ -94,6 +107,7 @@ export function groupCaptions(
     if (a.words.length === 1 && close && fits && !SENTENCE_END.test(a.text)) {
       const shift = b.start - a.start;
       out.splice(i, 2, {
+        ...(a.unsure || b.unsure ? { unsure: true } : {}),
         start: a.start,
         end: b.end,
         text: joinWords(a.text, b.text),
@@ -126,7 +140,9 @@ function shownWords(words: readonly TranscriptWord[]): ShownWord[] {
   const out: ShownWord[] = [];
   for (const word of words) {
     const parts = captionWords(word.text);
-    if (parts.length === 1) out.push({ text: parts[0]!, start: word.start, end: word.end });
+    const sure = word.confidence !== undefined ? { confidence: word.confidence } : {};
+    if (parts.length === 1)
+      out.push({ text: parts[0]!, start: word.start, end: word.end, ...sure });
     if (parts.length < 2) continue;
     const sizes = parts.map((p) => graphemes(p).length);
     const total = sizes.reduce((a, b) => a + b, 0);
@@ -135,7 +151,11 @@ function shownWords(words: readonly TranscriptWord[]): ShownWord[] {
       const start = word.start + ((word.end - word.start) * at) / total;
       at += sizes[i]!;
       const end = word.start + ((word.end - word.start) * at) / total;
-      out.push(i < parts.length - 1 ? { text, start, end, joinsNext: true } : { text, start, end });
+      out.push(
+        i < parts.length - 1
+          ? { text, start, end, joinsNext: true, ...sure }
+          : { text, start, end, ...sure },
+      );
     });
   }
   return out;

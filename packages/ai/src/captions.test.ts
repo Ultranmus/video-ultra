@@ -45,17 +45,22 @@ const run = (fetch: typeof globalThis.fetch, audio: Float32Array, language = 'en
   });
 
 describe('createCaptionsEndpoint', () => {
-  it('sends 30 s chunks (a short tail joins the last) and places each piece’s words', async () => {
+  it('cuts pieces at a pause between 25 and 30 s and places each piece’s words', async () => {
     const server = fakeServer((_l, _s, n) => ({
       words: [{ text: `piece${n}`, start: 1, end: 1.5 }],
       language: 'en',
     }));
     const result = await run(server.fetch, speech(60.5));
-    expect(server.calls.map((c) => c.seconds)).toEqual([30, 30.5]);
-    expect(result.words).toEqual([
-      { text: 'piece1', start: 1, end: 1.5 },
-      { text: 'piece2', start: 31, end: 31.5 },
-    ]);
+    const [first, second] = server.calls.map((c) => c.seconds);
+    // The bursts are silent from .7 to 1 s of every second: the cut lands in one of those gaps.
+    expect(first).toBeGreaterThanOrEqual(25);
+    expect(first).toBeLessThanOrEqual(30);
+    expect((first! % 1) + 1e-9).toBeGreaterThanOrEqual(0.7);
+    expect(first! + second!).toBeCloseTo(60.5, 5);
+    expect(result.words.map((w) => w.text)).toEqual(['piece1', 'piece2']);
+    // At its place in the video (moved onto the voice when its time fell in a gap).
+    expect(result.words[1]!.start).toBeGreaterThanOrEqual(first! + 1 - 1e-9);
+    expect(result.words[1]!.start).toBeLessThan(first! + 1.3);
   });
 
   it('times words from the sound when the service gives only text', async () => {
@@ -86,15 +91,75 @@ describe('createCaptionsEndpoint', () => {
     expect(result.language).toBe('hi');
   });
 
-  it('Detect decides the language once and asks for it from then on', async () => {
+  it('Detect decides by vote, then asks every piece for that language', async () => {
     const server = fakeServer((language, _s, n) => ({
       words: [{ text: `w${n}`, start: 0, end: 1 }],
-      // Piece by piece, the service would hear Hindi, then Urdu.
-      language: language === 'auto' ? (n === 1 ? 'hi' : 'ur') : language,
+      // Piece by piece, the service would hear English, then Spanish, Spanish, Spanish.
+      language: language === 'auto' ? (n === 1 ? 'en' : 'es') : language,
     }));
-    const result = await run(server.fetch, speech(90), 'auto');
-    expect(server.calls.map((c) => c.language)).toEqual(['auto', 'hi', 'hi']);
-    expect(result.language).toBe('hi');
+    const result = await run(server.fetch, speech(120), 'auto');
+    // Three pieces vote (en, es, es): Spanish. The English one is asked again (same length as
+    // the first piece); every later piece is asked for Spanish straight away.
+    const asked = server.calls.map((c) => c.language);
+    expect(asked.slice(0, 3)).toEqual(['auto', 'auto', 'auto']);
+    expect(asked.slice(3).every((l) => l === 'es')).toBe(true);
+    expect(server.calls[3]!.seconds).toBe(server.calls[0]!.seconds);
+    expect(result.language).toBe('es');
+    expect(result.words).toHaveLength(server.calls.length - 1);
+  });
+
+  it('a doubtful piece doesn’t vote, and doubtful words are dropped', async () => {
+    const server = fakeServer((language, _s, n) =>
+      n === 1
+        ? { words: [{ text: 'made', start: 0, end: 0.5, confidence: 0.1 }], language: 'nn' }
+        : {
+            words: [{ text: `w${n}`, start: 0, end: 1, confidence: 0.9 }],
+            language: language === 'auto' ? 'en' : language,
+          },
+    );
+    const result = await run(server.fetch, speech(60), 'auto');
+    expect(result.language).toBe('en');
+    expect(result.words.map((w) => w.text)).not.toContain('made');
+  });
+
+  it('speech heard nowhere clearly makes no captions, and isn’t called another language', async () => {
+    // A doubtful "translation" in every piece (Whisper on speech buried in room noise).
+    const server = fakeServer(() => ({
+      words: [{ text: 'Kami', start: 0, end: 1, confidence: 0.4 }],
+      language: 'ms',
+    }));
+    expect(await run(server.fetch, speech(60), 'en')).toEqual({ words: [], language: 'en' });
+    expect((await run(server.fetch, speech(60), 'auto')).words).toEqual([]);
+  });
+
+  it('leaves out words a service timed past the end of the piece', async () => {
+    const server = fakeServer(() => ({
+      words: [
+        { text: 'in', start: 0.2, end: 0.6 },
+        { text: 'beyond', start: 5, end: 5.5 },
+      ],
+      language: 'en',
+    }));
+    const result = await run(server.fetch, speech(2));
+    expect(result.words.map((w) => w.text)).toEqual(['in']);
+  });
+
+  it('sends the words before as context and the names to listen for', async () => {
+    const urls: string[] = [];
+    const fetch = (async (url: string) => {
+      urls.push(url);
+      return Response.json({ words: [{ text: 'Ultranmus', start: 0, end: 1 }], language: 'en' });
+    }) as typeof globalThis.fetch;
+    await createCaptionsEndpoint({ endpoint: '/api/captions', fetch, parallel: 1 }).transcribe({
+      audio: pieces(speech(60)),
+      duration: 60,
+      language: 'en',
+      vocabulary: ['Ultranmus', 'video-ultra'],
+      signal: new AbortController().signal,
+    });
+    const second = new URL(urls[1]!, 'http://x').searchParams;
+    expect(second.get('vocabulary')).toBe('Ultranmus, video-ultra');
+    expect(second.get('context')).toBe('Ultranmus');
   });
 
   it('retries a busy service, then says it is busy', async () => {
