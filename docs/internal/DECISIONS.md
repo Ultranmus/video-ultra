@@ -1158,3 +1158,8 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       ("Tumhare mata pita kya tumhe itni aazaadi bhi na denge?"); English speech stays English.
       Gemini: the prompt asks for Hinglish, not translated. Languages are compared by their
       base (`hi-Latn` is Hindi heard).
+169.  **Captions: upload and typing always; auto captions only when the app turns them on**
+      (owner, 2026-10-25). Importing .srt / .vtt and typing captions are always there. Auto
+      captions appear only when the host app passes a `transcriber` (its own service through
+      `createCaptionsEndpoint`, or the on-device package) — the app developer decides; the person
+      editing isn't asked separately. Free on-device captions in more languages: BACKLOG.
