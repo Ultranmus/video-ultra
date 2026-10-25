@@ -440,3 +440,5 @@ merged and re-verified on main; A (captions) and E (layers) here.
   rejected turn hides the false claim, and the guide steers main clips to transitions (#160).
   Live with Gemini lite: 3 of 3 right on the first try. `assistant-check` covers the retry; its
   offline-demo part now answers 501 itself (a real key on the dev server made it fail).
+- Assistant: reopening the panel on a long chat started at the top; it now opens at the latest
+  exchange, as right after sending (`assistant-check` covers it).
