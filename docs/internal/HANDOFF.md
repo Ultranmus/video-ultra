@@ -10,7 +10,12 @@ Where the last session stopped and what comes next. Update before ending every s
 - Assistant (#159): sees the video's name and the media library, answers questions in full
   ("list my media"), renames the video, puts library files on the timeline, and edits what it
   added in the same answer. Checked live with Gemini. Merged to main, **not pushed**.
-- **Owner is testing on desktop now:** Assistant (incl. the above), Audio, Captions.
+- Later the same day: a rejected answer is retried once (#160), styled-text edit crash fixed +
+  `place` action (#161), chat reopens at the latest exchange, History names steps after the
+  request. All merged to main, **not pushed**.
+- **Owner's testing (desktop): Assistant — mostly works ✓.** Next: Audio, Captions (desktop),
+  then the phones.
+- Dev watcher: `git switch` / `git stash` stop the tsup watchers — restart `pnpm dev` after.
 
 ## 2026-10-24/25 (owner's desktop test pass — merged to main and pushed)
 

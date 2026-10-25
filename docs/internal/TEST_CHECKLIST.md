@@ -160,6 +160,9 @@ Open the branch's Vercel preview (or `pnpm --filter playground dev`), then **`/e
       seconds", "make the title yellow and bigger"). _Checked here:_ assistant-check (mocked
       model end to end, one undo, bad plan changes nothing, offline demo, axe, phone) + 6 unit
       tests.
+      _Owner, 2026-10-25 — desktop: **mostly works**_ (real Gemini). Fixed while testing: media
+      list, rename, naming files (#159), a rejected answer retried once (#160), styled-text edit
+      crash + `place` (#161), chat reopens at the bottom, History names. Phone not tried yet.
 - [ ] **Text to speech.** Audio panel → **Text to speech** → type a sentence, pick a voice →
       **Add voice** → a sound clip at the playhead. Select a title → **Read aloud** → its words
       are spoken where it starts. Without a server key you hear the demo "voice" (soft tones per
