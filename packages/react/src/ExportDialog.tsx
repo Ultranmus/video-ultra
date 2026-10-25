@@ -6,17 +6,13 @@ import {
   exportAudioBitrate,
   maxExportHeight,
   projectDuration,
-  presetFits,
   resolveExportRange,
-  setCanvasSize,
   setExportRange,
-  EXPORT_PRESETS,
   FLICKS_PER_SECOND,
   type AudioExportFormat,
   type AudioExportResult,
   type ExportLimits,
   type ExportOptions,
-  type ExportPreset,
   type ExportProgress,
   type ExportRange,
   type ExportResult,
@@ -30,7 +26,6 @@ import { useController, useLabels, useProject, useUi } from './context';
 import { Segmented } from './controls';
 import { formatClock, formatDurationShort } from './format';
 import { Icon } from './icons';
-import { ratioOf } from './items';
 
 const HEIGHTS = [480, 720, 1080, 1440, 2160] as const;
 
@@ -147,6 +142,7 @@ function Option<T extends string>({
   current,
   title,
   detail,
+  note,
   disabledReason,
   onPick,
 }: {
@@ -155,6 +151,8 @@ function Option<T extends string>({
   current: T | null;
   title: string;
   detail?: string;
+  /** A third line (the file size). */
+  note?: string;
   disabledReason?: string | null;
   onPick: (v: T) => void;
 }) {
@@ -173,6 +171,7 @@ function Option<T extends string>({
     >
       <span className="vu-export-option-title">{title}</span>
       {detail ? <span className="vu-export-option-detail">{detail}</span> : null}
+      {note ? <span className="vu-export-option-note">{note}</span> : null}
     </button>
   );
 }
@@ -329,10 +328,12 @@ export function ExportDialog(): ReactElement | null {
   const [options, setOptions] = useState<ExportOptions>(() => ({
     format: 'mp4',
     height: Math.min(1080, limit) as ExportOptions['height'],
-    fps: defaultFps,
+    fps: 30,
     quality: 'medium',
   }));
-  const [preset, setPreset] = useState<ExportPreset['id'] | null>(null);
+  // Frame rate: the video's own, unless chosen in More settings.
+  const [fpsChoice, setFpsChoice] = useState<'same' | ExportOptions['fps']>('same');
+  const [more, setMore] = useState(false);
   const [audio, setAudio] = useState<{
     format: AudioExportFormat;
     quality: ExportOptions['quality'];
@@ -348,7 +349,8 @@ export function ExportDialog(): ReactElement | null {
   useEffect(() => {
     if (!open) return;
     const previous = document.activeElement as HTMLElement | null;
-    dialogRef.current?.querySelector<HTMLElement>('button, [tabindex]')?.focus();
+    // The dialog itself takes focus (Tab reaches its controls), so nothing is outlined on open.
+    dialogRef.current?.focus();
     return () => previous?.focus?.();
   }, [open, ctl]);
 
@@ -416,7 +418,7 @@ export function ExportDialog(): ReactElement | null {
   const startVideo = () =>
     run(async (signal) => {
       const result = await ctl.exportVideo(
-        { ...options, height: outHeight, ...(part && span ? { range: span } : {}) },
+        { ...videoOptions, ...(part && span ? { range: span } : {}) },
         setProgress,
         signal,
       );
@@ -447,15 +449,22 @@ export function ExportDialog(): ReactElement | null {
     }
   };
 
-  const pickPreset = (p: ExportPreset) => {
-    setPreset(p.id);
-    setOptions({ ...options, height: p.height, fps: p.fps ?? defaultFps, format: p.format });
+  // Smaller files (HEVC in MP4, else AV1) where this device can encode them at this size.
+  const smallerCodec: ExportOptions['videoCodec'] | null = !limits
+    ? null
+    : options.format === 'mp4' && limits.hevc.includes(outHeight)
+      ? 'hevc'
+      : limits.av1.includes(outHeight)
+        ? 'av1'
+        : null;
+  const smaller = !!smallerCodec && options.videoCodec === smallerCodec;
+  // What's exported: the choices above, the frame rate resolved, a codec only where it applies.
+  const videoOptions: ExportOptions = {
+    ...options,
+    height: outHeight,
+    fps: fpsChoice === 'same' ? defaultFps : fpsChoice,
+    videoCodec: smaller ? smallerCodec! : 'auto',
   };
-  const chosenPreset = EXPORT_PRESETS.find((p) => p.id === preset) ?? null;
-  const ratio = ratioOf(width, height) ?? `${width}×${height}`;
-  const presetRatio = chosenPreset
-    ? (ratioOf(chosenPreset.aspect.width, chosenPreset.aspect.height) ?? '')
-    : '';
 
   const busy = progress !== null || savingImage;
   const percent = progress ? Math.floor(progress.fraction * 100) : 0;
@@ -467,15 +476,19 @@ export function ExportDialog(): ReactElement | null {
     : `${base}.${options.format}`;
   const seconds = spanLength / FLICKS_PER_SECOND;
   const out = exportSize(width, height, outHeight);
-  const estimate = estimateMb(
-    out.width,
-    out.height,
-    options.fps,
-    options.quality,
-    seconds,
-    options.format,
-    options.videoCodec,
-  );
+  const sizeOf = (h: number, quality: ExportOptions['quality']) => {
+    const o = exportSize(width, height, h);
+    return estimateMb(
+      o.width,
+      o.height,
+      videoOptions.fps,
+      quality,
+      seconds,
+      videoOptions.format,
+      videoOptions.videoCodec,
+    );
+  };
+  const estimate = sizeOf(outHeight, options.quality);
   const aspect = width / height;
   const doneBlob = done ? (done.kind === 'image' ? done.image.blob : done.result.blob) : null;
   const shareFile =
@@ -544,6 +557,7 @@ export function ExportDialog(): ReactElement | null {
         role="dialog"
         aria-modal="true"
         aria-labelledby="vu-export-title"
+        tabIndex={-1}
         data-state={done ? 'done' : busy ? 'busy' : 'form'}
         data-kind={kind}
         onKeyDown={(e) => {
@@ -727,60 +741,14 @@ export function ExportDialog(): ReactElement | null {
                 {kind === 'video' ? (
                   <>
                     <div className="vu-field">
-                      <span className="vu-field-row" id="vu-export-preset">
-                        {l.madeFor}
+                      <span className="vu-field-row" id="vu-export-q">
+                        {l.quality}
                       </span>
+                      {/* One choice for size and sharpness: each resolution with its file size. */}
                       <div
                         className="vu-export-options"
                         role="radiogroup"
-                        aria-labelledby="vu-export-preset"
-                      >
-                        {EXPORT_PRESETS.map((p) => (
-                          <Option
-                            key={p.id}
-                            group="preset"
-                            value={p.id}
-                            current={preset}
-                            title={l.presetName(p.id)}
-                            detail={l.presetUse(p.id)}
-                            onPick={() => pickPreset(p)}
-                          />
-                        ))}
-                      </div>
-                      {chosenPreset && !presetFits(chosenPreset, width, height) ? (
-                        <div className="vu-export-note" role="status">
-                          <p>{l.presetShapeNote(ratio, presetRatio)}</p>
-                          <button
-                            type="button"
-                            className="vu-btn"
-                            data-variant="secondary"
-                            data-layout="row"
-                            onClick={() => {
-                              const target = chosenPreset;
-                              ctl.run(l.aspectRatio, (d) =>
-                                setCanvasSize(d, target.aspect.width, target.aspect.height),
-                              );
-                              ctl.toast(l.canvasChangedTo(presetRatio), 'success', {
-                                label: l.undo,
-                                run: () => ctl.undo(),
-                              });
-                            }}
-                          >
-                            <Icon name="canvas" />
-                            <span>{l.changeCanvasTo(presetRatio)}</span>
-                          </button>
-                        </div>
-                      ) : null}
-                    </div>
-                    {lengthField}
-                    <div className="vu-field">
-                      <span className="vu-field-row" id="vu-export-res">
-                        {l.resolution}
-                      </span>
-                      <div
-                        className="vu-export-options"
-                        role="radiogroup"
-                        aria-labelledby="vu-export-res"
+                        aria-labelledby="vu-export-q"
                       >
                         {available.map((h) => (
                           <Option
@@ -788,15 +756,15 @@ export function ExportDialog(): ReactElement | null {
                             group="resolution"
                             value={String(h)}
                             current={String(outHeight)}
-                            title={h === 2160 ? '4K' : `${h}p`}
-                            detail={l.resolutionName(h)}
-                            onPick={(v) => {
-                              setPreset(null);
+                            title={l.resolutionName(h)}
+                            detail={h === 2160 ? '4K' : `${h}p`}
+                            note={l.aboutSize(formatMb(sizeOf(h, options.quality)))}
+                            onPick={(v) =>
                               setOptions({
                                 ...options,
                                 height: Number(v) as ExportOptions['height'],
-                              });
-                            }}
+                              })
+                            }
                           />
                         ))}
                       </div>
@@ -804,97 +772,92 @@ export function ExportDialog(): ReactElement | null {
                         <p className="vu-hint">{l.deviceLimit}</p>
                       ) : null}
                     </div>
-                    <div className="vu-field">
-                      <span className="vu-field-row" id="vu-export-q">
-                        {l.quality}
-                      </span>
-                      <div
-                        className="vu-export-options"
-                        role="radiogroup"
-                        aria-labelledby="vu-export-q"
-                      >
-                        {(['low', 'medium', 'high'] as const).map((q) => (
-                          <Option
-                            key={q}
-                            group="quality"
-                            value={q}
-                            current={options.quality}
-                            title={
-                              q === 'low'
-                                ? l.qualityLow
-                                : q === 'medium'
-                                  ? l.qualityMedium
-                                  : l.qualityHigh
+                    {lengthField}
+                    <button
+                      type="button"
+                      className="vu-export-more"
+                      aria-expanded={more}
+                      aria-controls="vu-export-more"
+                      onClick={() => setMore(!more)}
+                    >
+                      <Icon name="chevronDown" size={16} />
+                      <span>{l.moreSettings}</span>
+                      {more ? null : <span className="vu-hint">{l.moreSettingsHint}</span>}
+                    </button>
+                    {more ? (
+                      <div className="vu-export-more-body" id="vu-export-more">
+                        <Segmented
+                          label={l.frameRate}
+                          value={String(fpsChoice)}
+                          options={[
+                            { value: 'same', label: l.sameAsVideo(defaultFps) },
+                            ...(['24', '30', '60'] as const).map((f) => ({ value: f, label: f })),
+                          ]}
+                          onChange={(v) =>
+                            setFpsChoice(
+                              v === 'same' ? 'same' : (Number(v) as ExportOptions['fps']),
+                            )
+                          }
+                        />
+                        <Segmented
+                          label={l.fileType}
+                          value={options.format}
+                          options={[
+                            { value: 'mp4', label: l.fileTypeMp4, tip: l.formatMp4Tip },
+                            { value: 'webm', label: 'WebM', tip: l.formatWebmTip },
+                          ]}
+                          onChange={(format) => setOptions({ ...options, format })}
+                        />
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={options.quality === 'high'}
+                          className="vu-switch-row"
+                          onClick={() =>
+                            setOptions({
+                              ...options,
+                              quality: options.quality === 'high' ? 'medium' : 'high',
+                            })
+                          }
+                        >
+                          <span className="vu-switch-text">
+                            <span>{l.extraQuality}</span>
+                            <span className="vu-hint">
+                              {l.extraQualityNote(formatMb(sizeOf(outHeight, 'high')))}
+                            </span>
+                          </span>
+                          <span className="vu-switch" aria-hidden="true">
+                            <span className="vu-switch-knob" />
+                          </span>
+                        </button>
+                        {smallerCodec ? (
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={smaller}
+                            className="vu-switch-row"
+                            onClick={() =>
+                              setOptions({
+                                ...options,
+                                videoCodec: smaller ? 'auto' : smallerCodec,
+                              })
                             }
-                            detail={formatMb(
-                              estimateMb(
-                                out.width,
-                                out.height,
-                                options.fps,
-                                q,
-                                seconds,
-                                options.format,
-                                options.videoCodec,
-                              ),
-                            )}
-                            onPick={(quality) => setOptions({ ...options, quality })}
-                          />
-                        ))}
+                          >
+                            <span className="vu-switch-text">
+                              <span>
+                                {l.smallerFile}
+                                <span className="vu-tag">{l.newerDevices}</span>
+                              </span>
+                              <span className="vu-hint">
+                                {smallerCodec === 'hevc' ? l.codecHevcTip : l.codecAv1Tip}
+                              </span>
+                            </span>
+                            <span className="vu-switch" aria-hidden="true">
+                              <span className="vu-switch-knob" />
+                            </span>
+                          </button>
+                        ) : null}
                       </div>
-                    </div>
-                    <div className="vu-export-pair">
-                      <Segmented
-                        label={l.frameRate}
-                        value={String(options.fps)}
-                        options={(['24', '30', '60'] as const).map((f) => ({
-                          value: f,
-                          label: f,
-                        }))}
-                        onChange={(v) => {
-                          setPreset(null);
-                          setOptions({ ...options, fps: Number(v) as ExportOptions['fps'] });
-                        }}
-                      />
-                      <Segmented
-                        label={l.format}
-                        value={options.format}
-                        options={[
-                          { value: 'mp4', label: 'MP4', tip: l.formatMp4Tip },
-                          { value: 'webm', label: 'WebM', tip: l.formatWebmTip },
-                        ]}
-                        onChange={(format) => {
-                          setPreset(null);
-                          // HEVC is MP4-only: WebM falls back to its own default.
-                          setOptions({
-                            ...options,
-                            format,
-                            ...(format === 'webm' && options.videoCodec === 'hevc'
-                              ? { videoCodec: 'auto' as const }
-                              : {}),
-                          });
-                        }}
-                      />
-                    </div>
-                    {limits &&
-                    (limits.hevc.includes(outHeight) || limits.av1.includes(outHeight)) ? (
-                      <Segmented
-                        label={l.videoCodec}
-                        value={options.videoCodec ?? 'auto'}
-                        options={[
-                          {
-                            value: 'auto' as const,
-                            label: options.format === 'mp4' ? 'H.264' : 'VP9',
-                            tip: l.codecStandardTip,
-                          },
-                          ...(options.format === 'mp4' && limits.hevc.includes(outHeight)
-                            ? [{ value: 'hevc' as const, label: 'HEVC', tip: l.codecHevcTip }]
-                            : []),
-                          ...(limits.av1.includes(outHeight)
-                            ? [{ value: 'av1' as const, label: 'AV1', tip: l.codecAv1Tip }]
-                            : []),
-                        ]}
-                        onChange={(videoCodec) => setOptions({ ...options, videoCodec })}
-                      />
                     ) : null}
                   </>
                 ) : kind === 'audio' ? (
@@ -1003,67 +966,72 @@ export function ExportDialog(): ReactElement | null {
                     {kind === 'image' ? error : l.exportFailed(error)}
                   </p>
                 ) : null}
-                <div className="vu-export-summary">
-                  <span>
-                    {kind === 'video'
-                      ? `${out.width}×${out.height} · ${options.fps} fps`
-                      : kind === 'audio'
-                        ? `48 kHz stereo · ${formatDurationShort(spanLength)}`
-                        : `${width}×${height} · ${imageFormat === 'png' ? 'PNG' : 'JPEG'}`}
-                  </span>
-                  {kind === 'image' ? null : (
-                    <span>
-                      {l.aboutSize(
-                        formatMb(
-                          kind === 'video'
-                            ? estimate
-                            : estimateAudioMb(audio.format, audio.quality, seconds),
-                        ),
-                      )}
-                    </span>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  className="vu-btn vu-wide vu-export-go"
-                  data-variant="primary"
-                  data-layout="row"
-                  aria-disabled={
-                    duration === 0 || (kind === 'audio' && !sound) || savingImage || undefined
-                  }
-                  data-tooltip={
-                    duration === 0
-                      ? l.needClips
-                      : kind === 'audio' && !sound
-                        ? l.noSoundToExport
-                        : undefined
-                  }
-                  onClick={() => {
-                    if (duration === 0 || savingImage) return;
-                    if (kind === 'video') void startVideo();
-                    else if (kind === 'audio') {
-                      if (sound) void startAudio();
-                    } else void saveImage();
-                  }}
-                >
-                  {savingImage ? (
-                    <span className="vu-spinner" aria-hidden="true" />
-                  ) : (
-                    <Icon name={kind === 'image' ? 'image' : 'download'} />
-                  )}
-                  <span>
-                    {kind === 'video'
-                      ? l.startExport
-                      : kind === 'audio'
-                        ? l.startAudioExport
-                        : savingImage
-                          ? l.savingImage
-                          : l.saveImage}
-                  </span>
-                </button>
               </div>
             )}
           </div>
+          {done || progress ? null : (
+            // What will be made, and the button — under the preview (on phones, kept in view).
+            <div className="vu-export-actions">
+              <div className="vu-export-summary">
+                <span>
+                  {kind === 'video'
+                    ? `${out.width}×${out.height} · ${videoOptions.fps} fps · ${videoOptions.format.toUpperCase()}`
+                    : kind === 'audio'
+                      ? `48 kHz stereo · ${formatDurationShort(spanLength)}`
+                      : `${width}×${height} · ${imageFormat === 'png' ? 'PNG' : 'JPEG'}`}
+                </span>
+                {kind === 'image' ? null : (
+                  <span>
+                    {l.aboutSize(
+                      formatMb(
+                        kind === 'video'
+                          ? estimate
+                          : estimateAudioMb(audio.format, audio.quality, seconds),
+                      ),
+                    )}
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                className="vu-btn vu-wide vu-export-go"
+                data-variant="primary"
+                data-layout="row"
+                aria-disabled={
+                  duration === 0 || (kind === 'audio' && !sound) || savingImage || undefined
+                }
+                data-tooltip={
+                  duration === 0
+                    ? l.needClips
+                    : kind === 'audio' && !sound
+                      ? l.noSoundToExport
+                      : undefined
+                }
+                onClick={() => {
+                  if (duration === 0 || savingImage) return;
+                  if (kind === 'video') void startVideo();
+                  else if (kind === 'audio') {
+                    if (sound) void startAudio();
+                  } else void saveImage();
+                }}
+              >
+                {savingImage ? (
+                  <span className="vu-spinner" aria-hidden="true" />
+                ) : (
+                  <Icon name={kind === 'image' ? 'image' : 'download'} />
+                )}
+                <span>
+                  {kind === 'video'
+                    ? l.startExport
+                    : kind === 'audio'
+                      ? l.startAudioExport
+                      : savingImage
+                        ? l.savingImage
+                        : l.saveImage}
+                </span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -6,6 +6,14 @@ Safari) — the rest needs your devices.
 
 Open the branch's Vercel preview (or `pnpm --filter playground dev`), then **`/editor`**.
 
+## 0000. 2026-10-25 — export dialog and camera
+
+- [ ] **Export:** Export → Quality tiles (sizes shown), Length, More settings (Same as video,
+      file type, Extra quality, Smaller file where offered) → Export video → plays? Phone: the
+      Export button stays at the bottom while scrolling.
+- [ ] **Camera:** Media → Record with camera → the round microphone button beside the record
+      button (and switch camera on a phone) — tap it off and on.
+
 ## 000. 2026-10-25 — captions: check marks, names, Hear again, Hinglish
 
 _Owner, 2026-10-25 — desktop: **captions tested ✓** (Groq, Gemini fallback, on-device English "really good", without the package)._

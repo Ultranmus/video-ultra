@@ -511,3 +511,13 @@ merged and re-verified on main; A (captions) and E (layers) here.
 - Captions panel (owner: too much text): the notes under the button are one line ("Under a
   minute · Replaces your captions"; "On this device · 77 MB once" for the on-device model);
   "Names & words (optional)" → "Names to spell right", placeholder "e.g. Priya, Goa".
+
+## 2026-10-25 · Export dialog and camera buttons (DECISIONS #170)
+
+- Owner: the export dialog had too much at once; built from the approved mockup — Quality tiles
+  with sizes, Length, "More settings" (frame rate, file type, Extra quality, Smaller file),
+  summary + Export under the preview (sticky on phones), "Made for" removed.
+- Camera: round microphone / switch-camera buttons beside the record button.
+- Resize handles: aria values from the start (a11y-check was failing on them).
+- Checks: editor-interact (Chrome + WebKit export), a11y-check dark + light 0 violations,
+  camera-check, combine-ui-check, ui-review (no page errors).

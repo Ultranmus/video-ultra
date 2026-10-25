@@ -138,13 +138,24 @@ export function Splitter({ edge }: { edge: SplitEdge }): ReactElement {
   );
   const spec = EDGES[edge];
   const root = () => ref.current?.closest<HTMLElement>('.vu-root') ?? null;
-  const apply = (r: HTMLElement, size: number) => {
-    r.style.setProperty(spec.variable, `${Math.round(size)}px`);
+  /** Tells assistive tech the size and its range (a focusable separator must have them). */
+  const describe = (r: HTMLElement, size: number) => {
     const [min, max] = limits(r, edge, size);
     ref.current?.setAttribute('aria-valuenow', String(Math.round(size)));
     ref.current?.setAttribute('aria-valuemin', String(Math.round(min)));
     ref.current?.setAttribute('aria-valuemax', String(Math.round(max)));
   };
+  const apply = (r: HTMLElement, size: number) => {
+    r.style.setProperty(spec.variable, `${Math.round(size)}px`);
+    describe(r, size);
+  };
+  // From the start, not only after a drag (the size itself stays the layout's own).
+  useLayoutEffect(() => {
+    const r = root();
+    if (r) describe(r, sizeOf(r, edge));
+    // Once, when the handle appears.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const reset = () => {
     const r = root();
     if (!r) return;
