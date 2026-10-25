@@ -115,7 +115,8 @@ export type {
 // Captions: subtitle files, words → captions, speech timing, style presets
 export { parseSubtitles, formatSrt, formatVtt } from './captions/subtitles';
 export type { SubtitleCue } from './captions/subtitles';
-export { groupCaptions } from './captions/group';
+export { groupCaptions, UNSURE_BELOW } from './captions/group';
+export { hasDevanagari, romanizeHindi } from './captions/romanize';
 export type { GroupOptions, GroupedCaption } from './captions/group';
 export { captionWords, captionWordTimes, speechAt } from './captions/timing';
 export type { SpeechPosition } from './captions/timing';

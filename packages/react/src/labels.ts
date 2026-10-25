@@ -1086,7 +1086,25 @@ export const DEFAULT_LABELS = {
     `Downloading the speech model · ${Math.round(done)} of ${Math.round(total)} MB`,
   captionsTranscribing: (percent: number) => `Listening · ${percent}%`,
   captionsCancel: 'Stop',
-  captionsNoSpeech: 'No speech was heard in this video.',
+  captionsNoSpeech: 'No clear speech was heard in this video.',
+  /** History step: one part of the video captioned again. */
+  hearAgain: 'Hear this part again',
+  hearAgainTip: 'Make this caption again from the video’s sound',
+  /** History step / button: a caption marked to check is right. */
+  captionChecked: 'Looks right',
+  captionCheckedTip: 'The words are right — remove the check mark',
+  /** A caption marked to check (the speech was hard to hear). */
+  captionUnsure: 'Check this caption — the speech was hard to hear here',
+  captionsToCheck: (n: number) =>
+    n === 1 ? '1 caption to check (marked ⚠)' : `${n} captions to check (marked ⚠)`,
+  nextToCheck: 'Next to check',
+  /** Names & words field (Auto captions). */
+  captionVocabulary: 'Names & words (optional)',
+  captionVocabularyHint: 'e.g. Priya, Ultranmus, Goa — helps spell them right',
+  /** How Hindi is written in captions. */
+  hindiScript: 'Write Hindi in',
+  hindiDevanagari: 'हिन्दी',
+  hindiLatin: 'Hinglish (abc)',
   /** Auto captions heard another language than the one chosen. */
   captionsOtherLanguage: (heard: string, chosen: string) =>
     `This sounds like ${heard}, not ${chosen}. Choose ${heard} or Detect, then try again.`,

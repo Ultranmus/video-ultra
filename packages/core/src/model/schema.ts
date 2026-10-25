@@ -10,7 +10,7 @@ import * as z from 'zod/mini';
  *   that fits the item inside the canvas, so changing the aspect ratio keeps layouts sensible.
  */
 
-export const PROJECT_VERSION = 5;
+export const PROJECT_VERSION = 6;
 
 const time = z.int().check(z.nonnegative());
 const positiveTime = z.int().check(z.positive());
@@ -403,6 +403,11 @@ export const TextItemSchema = z.object({
    * Missing = lines break only where the text does.
    */
   maxWidth: z.optional(z.number().check(z.gte(0.05), z.lte(1))),
+  /**
+   * Auto captions (file version 6+): the speech was hard to hear here, so the words may be wrong
+   * — the captions list asks to check it. Cleared when its text is edited or marked right.
+   */
+  unsure: z.optional(z.boolean()),
 });
 
 export const StickerItemSchema = z.object({

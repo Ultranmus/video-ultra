@@ -89,3 +89,58 @@ describe('words in every language', () => {
     expect(layout.words).toBe(4);
   });
 });
+
+describe('checking and hearing again', () => {
+  it('marks captions heard with little confidence, and clears the mark when checked or edited', async () => {
+    const { addCaptions, markCaptionChecked, setCaptionText, captionTrack } =
+      await import('../edit/ops');
+    const { fixtureProject } = await import('../test/fixtures');
+    const { sequentialIds } = await import('../model/project');
+    const caps = groupCaptions([
+      { text: 'Clear', start: 0, end: 0.5, confidence: 0.95 },
+      { text: 'words.', start: 0.5, end: 1, confidence: 0.9 },
+      { text: 'Mumbled', start: 2, end: 2.5, confidence: 0.4 },
+      { text: 'bit.', start: 2.5, end: 3, confidence: 0.5 },
+    ]);
+    expect(caps.map((c) => !!c.unsure)).toEqual([false, true]);
+    const project = fixtureProject();
+    const ids = sequentialIds('c');
+    addCaptions(project, caps, ids);
+    const flags = () =>
+      captionTrack(project)!.items.map((i) => (i.kind === 'text' ? !!i.unsure : null));
+    expect(flags()).toEqual([false, true]);
+    markCaptionChecked(project, captionTrack(project)!.items[1]!.id);
+    expect(flags()).toEqual([false, false]);
+    // Made again: marked again; editing the words counts as checking them.
+    addCaptions(project, caps, ids, { replace: true });
+    expect(flags()).toEqual([false, true]);
+    setCaptionText(project, captionTrack(project)!.items[1]!.id, 'Mumbled bit!');
+    expect(flags()).toEqual([false, false]);
+  });
+
+  it('a part heard again replaces only the captions there', async () => {
+    const { addCaptions, captionTrack } = await import('../edit/ops');
+    const { fixtureProject } = await import('../test/fixtures');
+    const { sequentialIds } = await import('../model/project');
+    const project = fixtureProject();
+    const ids = sequentialIds('c');
+    addCaptions(
+      project,
+      groupCaptions([
+        { text: 'One.', start: 0, end: 1 },
+        { text: 'Two.', start: 2, end: 3 },
+        { text: 'Three.', start: 4, end: 5 },
+      ]),
+      ids,
+    );
+    addCaptions(project, groupCaptions([{ text: 'Deux.', start: 2.1, end: 2.9 }]), ids, {
+      replace: true,
+      range: { start: s(1.5), end: s(3.5) },
+    });
+    expect(captionTrack(project)!.items.map((i) => (i.kind === 'text' ? i.text : ''))).toEqual([
+      'One.',
+      'Deux.',
+      'Three.',
+    ]);
+  });
+});

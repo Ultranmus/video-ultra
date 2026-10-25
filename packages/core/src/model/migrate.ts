@@ -49,6 +49,8 @@ const MIGRATIONS: Record<number, (old: Record<string, unknown>) => Record<string
   3: (old) => ({ ...old, version: 4 }),
   /** 4 → 5: combined clips (assets of kind `compound`; none yet). */
   4: (old) => ({ ...old, version: 5 }),
+  /** 5 → 6: captions may be marked unsure (optional, none yet). */
+  5: (old) => ({ ...old, version: 6 }),
 };
 
 /**

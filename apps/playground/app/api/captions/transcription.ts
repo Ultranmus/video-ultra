@@ -15,15 +15,17 @@ export async function transcriptionCaptions(
   samples: Float32Array,
   language: string,
   service: { key: string; url: string; model: string },
+  hints: { context: string; vocabulary: string },
   signal: AbortSignal,
 ): Promise<CaptionsEndpointReply | Response> {
   const sound = new Blob([wav(samples)], { type: 'audio/wav' });
-  const detected = await hear(sound, null, service, signal);
+  const prompt = promptOf(hints);
+  const detected = await hear(sound, null, prompt, service, signal);
   if (detected instanceof Response || language === 'auto') return detected;
   // Nothing believable heard: its language is a guess too — not "another language".
-  if (detected.words.length === 0) return { words: [], language };
+  if (!believable(detected)) return { words: [], language };
   if (detected.language === language) return detected;
-  const forced = await hear(sound, language, service, signal);
+  const forced = await hear(sound, language, prompt, service, signal);
   if (forced instanceof Response) return forced;
   return {
     words: forced.words,
@@ -31,9 +33,19 @@ export async function transcriptionCaptions(
   };
 }
 
+/** Whisper's `prompt`: names to spell right, then the words said just before (≤ ~224 tokens). */
+function promptOf(hints: { context: string; vocabulary: string }): string {
+  return [hints.vocabulary, hints.context].filter(Boolean).join('. ').slice(-600);
+}
+
+/** Some words the editor will keep (it drops those under 0.3). */
+const believable = (reply: CaptionsEndpointReply) =>
+  reply.words.some((w) => typeof w === 'string' || (w.confidence ?? 1) >= 0.3);
+
 async function hear(
   sound: Blob,
   language: string | null,
+  prompt: string,
   service: { key: string; url: string; model: string },
   signal: AbortSignal,
 ): Promise<CaptionsEndpointReply | Response> {
@@ -45,6 +57,7 @@ async function hear(
   form.append('timestamp_granularities[]', 'segment');
   form.append('temperature', '0');
   if (language) form.append('language', language);
+  if (prompt) form.append('prompt', prompt);
   const upstream = await fetch(service.url, {
     method: 'POST',
     headers: { authorization: `Bearer ${service.key}` },
@@ -67,40 +80,38 @@ async function hear(
     words?: { word?: string; start?: number; end?: number }[];
     segments?: { start: number; end: number; no_speech_prob?: number; avg_logprob?: number }[];
   };
-  // Stretches Whisper made up (noise, music, speech it can't hear): likely nobody speaking and
-  // a low-confidence guess. Their words are dropped (DECISIONS #166; measured on the test
-  // library's noisy recordings: invented and translated text caught, real speech kept).
-  const invented = (body.segments ?? []).filter(
-    (g) => (g.no_speech_prob ?? 0) > 0.5 && (g.avg_logprob ?? 0) < -0.5,
-  );
-  const madeUp = (t: number) => invented.some((g) => t >= g.start && t < g.end);
+  const segments = body.segments ?? [];
+  const confidenceAt = (t: number) => {
+    const g = segments.find((s) => t >= s.start && t < s.end) ?? segments.at(-1);
+    return g ? confidenceOf(g) : undefined;
+  };
   const words = Array.isArray(body.words)
-    ? unsaid(
-        body.words
-          .filter((w) => typeof w.word === 'string' && w.word.trim() && !madeUp(w.start ?? 0))
-          .map((w) => ({ text: w.word!.trim(), start: w.start ?? 0, end: w.end ?? w.start ?? 0 })),
-      )
+    ? body.words
+        .filter((w) => typeof w.word === 'string' && w.word.trim())
+        .map((w) => {
+          const confidence = confidenceAt(w.start ?? 0);
+          return {
+            text: w.word!.trim(),
+            start: w.start ?? 0,
+            end: w.end ?? w.start ?? 0,
+            ...(confidence !== undefined ? { confidence } : {}),
+          };
+        })
     : // No word times from this service: the text, timed from the sound by the editor.
-      invented.length && invented.length === body.segments?.length
-      ? []
-      : (body.text ?? '').split(/\s+/).filter(Boolean);
+      (body.text ?? '').split(/\s+/).filter(Boolean);
   return { words, language: isoCode(body.language) ?? language ?? 'en' };
 }
 
 /**
- * Without runs of words nobody could say: three or more in a row each under 50 ms — Whisper
- * squeezes made-up endings ("like, share and subscribe") into the last instant of a piece.
+ * How sure Whisper is of a stretch (0…1, DECISIONS #166, #167): its average token probability,
+ * and when it also thinks nobody was speaking (made-up speech), that much less. Measured on the
+ * test library: real speech 0.55–0.95; invented and translated text 0.04–0.18 (dropped < 0.3).
  */
-function unsaid<W extends { start: number; end: number }>(words: W[]): W[] {
-  const quick = (w: W) => w.end - w.start < 0.05;
-  const keep = words.map(() => true);
-  for (let i = 0; i < words.length;) {
-    let j = i;
-    while (j < words.length && quick(words[j]!)) j++;
-    if (j - i >= 3) keep.fill(false, i, j);
-    i = j > i ? j : i + 1;
-  }
-  return words.filter((_, i) => keep[i]);
+function confidenceOf(g: { no_speech_prob?: number; avg_logprob?: number }): number {
+  const sure = Math.exp(Math.min(0, g.avg_logprob ?? 0));
+  const silent = g.no_speech_prob ?? 0;
+  const value = silent > 0.5 && (g.avg_logprob ?? 0) < -0.5 ? sure * (1 - silent) : sure;
+  return Math.round(Math.max(0, Math.min(1, value)) * 100) / 100;
 }
 
 /** Languages a recogniser easily mistakes for each other (spoken alike): not "another language". */

@@ -491,3 +491,17 @@ merged and re-verified on main; A (captions) and E (layers) here.
   Hindi / Urdu goes to Hindi unless the browser says Urdu or Pakistan. Made-up text from
   Whisper on unhearable audio dropped (segment confidence + impossibly fast word runs); longer
   retries honouring Retry-After (#166). All real Hindi test clips: Devanagari only.
+
+## 2026-10-25 · Captions: all 12 improvements (DECISIONS #167)
+
+- Helper (every service): Detect votes; cuts at pauses; up to 3 pieces at once; context and
+  names sent; confidence → drop doubtful words, mark captions to check; impossibly fast words
+  dropped; no captions when nothing is heard clearly; words past a piece left out.
+- On-device speech detector (Silero VAD, 0.64 MB, worker): fixed a real bug — speech under
+  music playing throughout was skipped as silence by the loudness method.
+- Editor: "N captions to check" + Next + Looks right; Names & words field; Hear this part again;
+  Hinglish (Hindi in Latin letters). File version 6 (`unsure`).
+- Proof: `captions-timing` — English / Hindi / under music / under noise 0.04–0.07 s mean, 110 s
+  talk 99 % words and none doubled, music / noise alone and two buried-speech clips 0 words; one
+  known limit (a confident Malay "translation"). captions-check: Hinglish, names, marks, Next,
+  Looks right, Hear again, axe with the new controls.

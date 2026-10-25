@@ -10,6 +10,11 @@ export interface TranscriptWord {
   text: string;
   start: number;
   end: number;
+  /**
+   * How sure the recogniser is of this word, 0…1 (optional). Captions whose words average under
+   * 0.6 are marked to check (DECISIONS #167).
+   */
+  confidence?: number;
 }
 
 /** Progress of a transcription, for a progress bar. */
@@ -34,6 +39,11 @@ export interface TranscribeRequest {
   duration: number;
   /** Spoken language as an ISO 639-1 code (`'en'`, …), or `'auto'` to detect it (one of `languages`). */
   language: string;
+  /**
+   * Names and words that may be said (people, brands, places), so they're spelled right — for
+   * transcribers with `takesVocabulary`. Optional.
+   */
+  vocabulary?: readonly string[];
   /** Cancels the transcription; the promise then rejects with an `AbortError`. */
   signal: AbortSignal;
   onProgress?: (progress: TranscribeProgress) => void;
@@ -71,6 +81,8 @@ export interface Transcriber {
    * list and Detect.
    */
   readonly languages?: readonly string[];
+  /** It uses `TranscribeRequest.vocabulary`: the Captions panel offers a "Names & words" field. */
+  readonly takesVocabulary?: boolean;
   transcribe(request: TranscribeRequest): Promise<TranscribeResult>;
   /** Optional: whether and how `language` can be transcribed here, before starting. */
   check?(language: string): Promise<TranscriberCheck>;

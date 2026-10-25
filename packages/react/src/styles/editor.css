@@ -1912,13 +1912,15 @@
     max-height: none;
   }
 
-  .vu-template-field {
+  .vu-template-field,
+  .vu-text-field {
     display: flex;
     flex-direction: column;
     gap: var(--vu-space-1);
   }
 
-  .vu-template-field input {
+  .vu-template-field input,
+  .vu-text-field input {
     height: var(--vu-size-touch);
     padding: 0 var(--vu-space-3);
     border: 1px solid var(--vu-border-strong);
@@ -1927,6 +1929,7 @@
     color: var(--vu-text);
   }
 
+  .vu-text-field input:focus-visible,
   .vu-template-field input:focus-visible {
     border-color: var(--vu-accent);
     outline: none;
@@ -5641,6 +5644,33 @@
 
   .vu-caption-row[data-selected] {
     background: var(--vu-accent-soft);
+  }
+
+  /* Marked to check (the speech was hard to hear): a warning edge and mark (DECISIONS #167). */
+  .vu-caption-row[data-unsure] .vu-caption-text {
+    border-inline-start: 3px solid var(--vu-warning);
+  }
+
+  .vu-caption-row[data-unsure] .vu-caption-time {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vu-space-1);
+    color: var(--vu-warning);
+  }
+
+  .vu-caption-check {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--vu-space-2);
+    margin-bottom: var(--vu-space-2);
+    color: var(--vu-warning);
+    font-size: var(--vu-text-sm);
+  }
+
+  .vu-caption-check > span {
+    flex: 1;
+    color: var(--vu-text);
   }
 
   .vu-caption-time {

@@ -1117,3 +1117,32 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       > under 50 ms. Real speech on the noisy, fan and music clips keeps every word; a piece with
       > nothing believable reports the chosen language, not the guessed one. Not solved: on speech
       > buried under room noise Whisper's inventions vary run to run and some pass every check.
+167.  **Captions: the best we can do, for every service** (owner, 2026-10-25, "do all 12"). In
+      `createCaptionsEndpoint`, so every service gets it: (1) **Detect votes** — the first
+      three pieces with speech (doubtful ones don't count) decide, earlier pieces heard otherwise
+      are asked again; (3) runs of 3+ words under 50 ms dropped; (4) the reply format gains an
+      optional per-word **`confidence`** (0–1): under 0.3 dropped, captions averaging under 0.6
+      marked **`unsure`** (TextItem, file version 6) — (2) the captions list shows "N captions
+      to check (marked ⚠)", Next to check, a ⚠ and warning edge on the row, and Looks right
+      (editing the text clears it too); a chosen language is only called "another language" on
+      pieces heard with confidence, and when nothing is heard clearly anywhere there are no
+      captions ("No clear speech was heard"); (5) a **speech detector** on the device (Silero
+      VAD v5, MIT, 0.64 MB quantized, a worker per job, `createSpeechDetector`): no-speech pieces
+      aren't sent and words stretched over silence move onto real speech. It replaced loudness,
+      which judged against the piece's own background — under music playing throughout it found
+      0 % of the speech, so such pieces were skipped as silent (a real bug); without the detector
+      a piece is only skipped when it's quiet in itself; (6) pieces **cut at the quietest 300 ms
+      between 25 and 30 s**; (7) **context** (the previous piece's last ~200 characters, when it's
+      done) and **vocabulary** (the new "Names & words" field, kept per project in this browser)
+      sent as query parameters — Whisper `prompt` / Gemini prompt in the playground; (8) up to
+      **three pieces at once**, one while the service is busy. Editor: (10) **Hear this part
+      again** per caption (± 0.5 s, the last choices, replaces only captions there; words a
+      service times past the piece are left out); (11) **Hinglish**: "Write Hindi in हिन्दी /
+      Hinglish (abc)" → `romanizeHindi` in core (rules — inherent "a", final and medial schwa
+      dropped except after a nasal, "aa" in one-syllable words — plus ~30 common words: हम →
+      hum); some words come out a little off (आजादी → "aajadi"), captions are editable. (12)
+      `captions-timing` grew: true word times under music / noise, a 110 s talk, music / noise
+      alone, buried speech. Results in PERF.md "Captions through a service". Known limit: on
+      speech buried in room noise Whisper can answer a confident translation into another
+      language labelled as the right one (our en-tts-phone clip → Malay) — every signal says it's
+      fine; reported by the check, not counted.

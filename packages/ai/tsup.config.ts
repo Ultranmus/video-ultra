@@ -6,6 +6,7 @@ export default defineConfig({
   entry: {
     index: 'src/index.ts',
     'background.worker': 'src/background/worker.ts',
+    'speech.worker': 'src/speech-detect/worker.ts',
   },
   splitting: true,
   format: ['esm'],

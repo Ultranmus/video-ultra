@@ -11,6 +11,7 @@ export async function geminiCaptions(
   samples: Float32Array,
   language: string,
   key: string,
+  hints: { context: string; vocabulary: string },
   signal: AbortSignal,
 ): Promise<CaptionsEndpointReply | Response> {
   const seconds = samples.length / SAMPLE_RATE;
@@ -28,7 +29,7 @@ export async function geminiCaptions(
           contents: [
             {
               parts: [
-                { text: prompt(language, seconds) },
+                { text: prompt(language, seconds, hints) },
                 { inline_data: { mime_type: 'audio/wav', data: audio } },
               ],
             },
@@ -73,7 +74,11 @@ const SCHEMA = {
   required: ['language', 'text'],
 };
 
-function prompt(language: string, seconds: number): string {
+function prompt(
+  language: string,
+  seconds: number,
+  hints: { context: string; vocabulary: string },
+): string {
   const spoken =
     language === 'auto'
       ? 'Detect the spoken language and write it in its own script.'
@@ -84,6 +89,8 @@ function prompt(language: string, seconds: number): string {
     'Write every spoken word in order, with punctuation.',
     'Write only what is said: no speaker names, no descriptions of sounds or music.',
     'If nobody speaks, the text is empty.',
+    ...(hints.vocabulary ? [`Names and words that may be said: ${hints.vocabulary}.`] : []),
+    ...(hints.context ? [`Said just before this recording: "${hints.context}".`] : []),
     'Answer with "language" (the ISO 639-1 code of the language actually spoken, even if it is not the one named) and "text".',
   ].join(' ');
 }

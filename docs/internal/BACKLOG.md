@@ -260,7 +260,9 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [ ] Perf: editor-interact (Chrome) shows one ~108 ms main-thread task around "drag text on
       stage" (~1.7 s into the flow) — present on main before 2026-10-25's captions work too
       (A/B measured); find what it is (text raster? selection frame?).
-- [ ] Captions: speech buried under room noise (the phone re-recordings) still gets invented
-      text from Whisper some runs — it varies run to run (DECISIONS #166). Options: a voice /
-      speech detector before sending, or reject a piece whose detected language flips between
-      tries.
+- [x] Captions: speech buried under room noise — the speech detector and confidence rules
+      (DECISIONS #167) give no captions on our two Hindi phone clips. Still open: a confident
+      wrong-language "translation" (en-tts-phone → Malay); asking twice and keeping what agrees
+      would catch it (costs double requests).
+- [ ] Captions: Hinglish spelling is rule-based — a few words come out a little off (आजादी →
+      "aajadi"); a bigger common-word list, or the service writing Latin directly, would help.
