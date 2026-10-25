@@ -1030,3 +1030,13 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       guide also says animations are for text, stickers and layers (never main-video clips) and
       that "smoother" main video means transitions — the owner's "make it smoother, high class"
       had the light model animate main clips.
+161.  **The assistant can place things; edits copy drafts safely** (owner, 2026-10-25; extends
+      #149). New action `place` (17): centre x / y as canvas fractions, scale, rotation (degrees
+      clockwise), opacity — for any item with a transform. `describeProject` gives lane items
+      their x, y, scale, rotation, opacity and texts their colour, so "a bit higher" has a
+      reference (main clips left out to keep it small). The guide spells out a bottom-left →
+      top-right diagonal (−45°, centred, scale ≈ 2): the light model picked the wrong direction
+      and left a watermark small at the bottom without it. Bug found by the owner: editing a
+      styled text failed with "could not be cloned" — `{ ...draft.style }` keeps nested drafts
+      (outline, shadow…) that `structuredClone` can't copy; `ops.ts` `copy()` now turns drafts
+      into plain data at any depth, for every op that takes a patch.

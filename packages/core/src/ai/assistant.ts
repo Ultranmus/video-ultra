@@ -112,6 +112,16 @@ export const EditActionSchema = z.discriminatedUnion('action', [
     in: z.optional(z.nullable(z.string())),
     out: z.optional(z.nullable(z.string())),
   }),
+  /** Where a picture, text or sticker sits: centre as canvas fractions, size, turn, see-through. */
+  z.object({
+    action: z.literal('place'),
+    itemId,
+    x: z.optional(z.number().check(z.gte(-0.5), z.lte(1.5))),
+    y: z.optional(z.number().check(z.gte(-0.5), z.lte(1.5))),
+    scale: z.optional(z.number().check(z.gte(0.05), z.lte(10))),
+    rotation: z.optional(z.number().check(z.gte(-360), z.lte(360))),
+    opacity: z.optional(z.number().check(z.gte(0), z.lte(1))),
+  }),
   z.object({
     action: z.literal('canvas'),
     ratio: z.enum(['9:16', '16:9', '1:1', '4:5', '4:3', '21:9']),
@@ -191,6 +201,7 @@ export interface ProjectDescription {
   };
 }
 
+const two = (n: number) => Math.round(n * 100) / 100;
 const round = (flicks: number) => Math.round((flicks / FLICKS_PER_SECOND) * 100) / 100;
 
 /** A compact, model-friendly description of `project` (ids, kinds, times in seconds, texts). */
@@ -217,6 +228,17 @@ export function describeProject(project: Project): ProjectDescription {
           row.volume = item.volume;
           if (item.muted) row.muted = true;
         }
+        if ('transform' in item && track.kind !== 'main') {
+          const { x, y, scale, rotation, opacity } = item.transform;
+          Object.assign(row, {
+            x: two(x),
+            y: two(y),
+            scale: two(scale),
+            rotation,
+            opacity: two(opacity),
+          });
+        }
+        if (item.kind === 'text') row.color = item.style.color;
         if ('filter' in item && item.filter) row.filter = item.filter.id;
         if ('transitionIn' in item && item.transitionIn) row.transitionIn = item.transitionIn.type;
         return row;
@@ -269,6 +291,7 @@ Actions:
 - {"action":"addText","ref"?,"text","start","duration"?,"position"?("top"|"center"|"bottom"),"color"?(#rrggbb),"size"?("small"|"medium"|"large")}
 - {"action":"editText","itemId","text"?,"color"?,"size"?}
 - {"action":"animate","itemId","in"?(catalog.animationsIn or null),"out"?(catalog.animationsOut or null)} text, stickers and layers only, never main-video clips
+- {"action":"place","itemId","x"?,"y"?,"scale"?,"rotation"?,"opacity"?} position (centre; x 0 = left … 1 = right, y 0 = top … 1 = bottom), size (1 = as added), turn in degrees clockwise, see-through (0–1). Diagonal across the video from bottom-left to top-right: rotation −45 (top-left to bottom-right: 45), centred (x 0.5, y 0.5) and bigger (scale about 2) so it spans the frame
 - {"action":"canvas","ratio"("9:16"|"16:9"|"1:1"|"4:5"|"4:3"|"21:9")}
 - {"action":"marker","time","label"?}
 - {"action":"rename","name"} rename the video
@@ -465,6 +488,15 @@ function applyOne(project: Project, a: EditAction, ids: IdFactory): string | und
         });
       }
       return;
+    case 'place': {
+      const it = item(project, a.itemId);
+      if (!('transform' in it)) throw new EditError('invalid', `${it.kind} items have no position`);
+      const transform = { ...it.transform };
+      for (const key of ['x', 'y', 'scale', 'rotation', 'opacity'] as const)
+        if (a[key] !== undefined) transform[key] = a[key];
+      updateItem(project, a.itemId, { transform });
+      return;
+    }
     case 'canvas': {
       const [w, h] = RATIOS[a.ratio];
       setCanvasSize(project, w, h);

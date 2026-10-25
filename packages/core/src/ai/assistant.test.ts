@@ -1,3 +1,4 @@
+import { produce } from 'immer';
 import { describe, expect, it } from 'vitest';
 import { EditError, insertMain, addToLane } from '../edit/ops';
 import { checkInvariants } from '../model/invariants';
@@ -193,6 +194,39 @@ describe('AI edit actions', () => {
     expect(
       project.tracks.some((t) => t.items.some((i) => i.kind === 'text' && i.text === 'Goa')),
     ).toBe(false);
+  });
+
+  it('edits a styled text and places it, inside the editor’s draft (as the editor runs it)', () => {
+    const { project, ids } = setup();
+    const styled = produce(project, (d) => {
+      const t = findItem(d, 't')!.item;
+      if (t.kind === 'text') t.style.outline = { color: '#000000', width: 0.1 };
+    });
+    const next = produce(styled, (d) => {
+      applyEditActions(
+        d,
+        [
+          { action: 'editText', itemId: 't', color: '#ff3366' },
+          { action: 'place', itemId: 't', x: 0.5, y: 0.5, scale: 2, rotation: -45, opacity: 0.4 },
+        ],
+        ids,
+      );
+    });
+    const t = findItem(next, 't')!.item;
+    expect(t.kind === 'text' && [t.style.color, t.style.outline?.width]).toEqual(['#ff3366', 0.1]);
+    expect(t.kind === 'text' && t.transform).toMatchObject({
+      scale: 2,
+      rotation: -45,
+      opacity: 0.4,
+    });
+    expect(
+      describeProject(next)
+        .tracks.flatMap((x) => x.items)
+        .find((i) => i.id === 't'),
+    ).toMatchObject({ rotation: -45, opacity: 0.4, color: '#ff3366' });
+    expect(() =>
+      applyEditActions(next, [{ action: 'place', itemId: 't', opacity: 2 }], ids),
+    ).toThrow(/isn't valid/);
   });
 
   it('the schema accepts what the guide documents', () => {

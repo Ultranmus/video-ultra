@@ -84,7 +84,16 @@ const isMedia = (item: Item): item is MediaItem => item.kind === 'video' || item
 
 /** Deep copy that also works on Immer drafts (structuredClone can't clone a draft proxy). */
 function copy<T>(value: T): T {
-  return structuredClone(isDraft(value) ? (current(value as Draft<T>) as T) : value);
+  return structuredClone(undraft(value));
+}
+
+/** Plain data from a value that may hold drafts anywhere (`{ ...draft.style }` keeps nested ones). */
+function undraft<T>(value: T): T {
+  if (isDraft(value)) return current(value as Draft<T>) as T;
+  if (Array.isArray(value)) return value.map(undraft) as T;
+  if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype)
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, undraft(v)])) as T;
+  return value;
 }
 
 function snap(project: Project, time: Time): Time {
