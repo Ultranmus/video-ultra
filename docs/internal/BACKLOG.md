@@ -40,10 +40,12 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 
 - [ ] (v0.2 A) Captions: right-to-left captions show without the word highlight; Chinese /
       Japanese / Thai need character-based words (not offered yet); one caption row (no
-      multi-language rows); "Detect" uses the default model (Hindi needs Hindi chosen); the
-      captions list renders every row (virtualise past a few hundred); WebGPU decoding could keep
-      the cache on the GPU (faster small model); phones not measured yet; a fine-tuned Hindi model
-      could beat `small` at a third of the size (research).
+      multi-language rows); the captions list renders every row (virtualise past a few hundred);
+      phones not measured yet. (Hindi / other languages on the device: dropped — English only,
+      other languages through the host's own service, DECISIONS #162.)
+- [ ] Captions: the on-device model could be the English-only Whisper builds (`*.en`: same size,
+      a little more accurate on English) — needs timestamped ONNX builds and a captions-bench
+      run first.
 - [ ] (v0.2 A) Export dialog: offer the .srt next to the video download (today: Captions panel).
 
 - [ ] (v0.2 B) A ducking badge on timeline clips; optional look-ahead or a "listen to" choice so

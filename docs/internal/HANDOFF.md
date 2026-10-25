@@ -280,7 +280,7 @@ node scripts/export-check.ts                    # ffprobe/ffmpeg-verified export
 node scripts/composite-check.ts                 # golden frames, both backends
 node scripts/analyzer-check.ts / storage-check.ts
 node scripts/bench.ts --browsers chrome,webkit,firefox
-node scripts/organize-check.ts / picture-check.ts / camera-check.ts / captions-check.ts [--no-model] [--hindi]
+node scripts/organize-check.ts / picture-check.ts / camera-check.ts / captions-check.ts [--no-model]
 node scripts/speech-media.ts                    # speech clips with known text (macOS `say`)
 node scripts/captions-bench.ts / captions-memory.ts   # model speed, accuracy, memory
 FC_RUNS=30000 pnpm --filter @video-ultra/core test   # deep property tests

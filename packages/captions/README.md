@@ -14,5 +14,6 @@ const transcriber = createOnDeviceTranscriber();
 <VideoEditor transcriber={transcriber} />;
 ```
 
-Languages the small models hear badly (Hindi, Bangla, Urdu…) use a larger model where the device
-can run it; the panel says when a language needs a computer. MIT licensed.
+**English only.** For other languages, or to use your own speech service instead of the on-device
+model, don't install this package: pass your own `transcriber` to `<VideoEditor>` (see the
+docs, "Your own captions service"). MIT licensed.

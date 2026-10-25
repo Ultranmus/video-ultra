@@ -21,7 +21,10 @@ import { formatClock } from './format';
  * export like any text.
  */
 
-/** Languages offered for auto captions (ISO 639-1); names come from the browser, translated. */
+/**
+ * Languages offered for auto captions when the transcriber doesn't list its own (ISO 639-1);
+ * names come from the browser, translated.
+ */
 const LANGUAGES = [
   'en',
   'hi',
@@ -51,21 +54,20 @@ function languageName(code: string): string {
 }
 
 /** The browser's language, if auto captions offer it. */
-function browserLanguage(): string | null {
+function browserLanguage(offered: readonly string[]): string | null {
   const code = typeof navigator !== 'undefined' ? navigator.language.slice(0, 2) : '';
-  return (LANGUAGES as readonly string[]).includes(code) ? code : null;
+  return offered.includes(code) ? code : null;
 }
 
-/** The language to start with: last used, else the browser's, else English. */
-function startLanguage(): string {
+/** The language to start with: last used, else the browser's, else the first offered. */
+function startLanguage(offered: readonly string[], detect: boolean): string {
   try {
     const saved = localStorage.getItem('video-ultra:caption-language');
-    if (saved) return saved;
+    if (saved && (offered.includes(saved) || (detect && saved === 'auto'))) return saved;
   } catch {
     /* storage blocked */
   }
-  const nav = typeof navigator !== 'undefined' ? navigator.language.slice(0, 2) : 'en';
-  return (LANGUAGES as readonly string[]).includes(nav) ? nav : 'en';
+  return browserLanguage(offered) ?? offered[0] ?? 'auto';
 }
 
 export function CaptionsPanel(): ReactElement {
@@ -98,7 +100,11 @@ function AutoCaptions({ has }: { has: boolean }): ReactElement | null {
   const ctl = useController();
   const l = useLabels();
   const job = useUi((s) => s.captionJob);
-  const [language, setLanguage] = useState(startLanguage);
+  // The transcriber's own languages (e.g. English only on the device), else the panel's list.
+  const own = ctl.options.transcriber?.languages;
+  const offered = own ? own.filter((code) => code !== 'auto') : LANGUAGES;
+  const detect = !own || own.includes('auto');
+  const [language, setLanguage] = useState(() => startLanguage(offered, detect));
   const [check, setCheck] = useState<TranscriberCheck | null>(null);
   const [allLanguages, setAllLanguages] = useState(false);
   const available = !!ctl.options.transcriber;
@@ -126,21 +132,27 @@ function AutoCaptions({ has }: { has: boolean }): ReactElement | null {
   return (
     <Section title={l.autoCaptions}>
       <p className="vu-hint">{l.autoCaptionsBody}</p>
-      <Chips
-        label={l.spokenLanguage}
-        value={language}
-        options={[
-          ...(allLanguages
-            ? LANGUAGES
-            : LANGUAGES.filter(
-                (code, i) => i < 2 || code === language || code === browserLanguage(),
-              )
-          ).map((code) => ({ value: code as string, label: languageName(code) })),
-          { value: 'auto', label: l.detectLanguage },
-          ...(allLanguages ? [] : [{ value: 'more', label: l.moreLanguages }]),
-        ]}
-        onChange={(code) => (code === 'more' ? setAllLanguages(true) : pick(code))}
-      />
+      {offered.length === 1 && !detect ? (
+        <p className="vu-hint">{l.spokenLanguageOnly(languageName(offered[0]!))}</p>
+      ) : (
+        <Chips
+          label={l.spokenLanguage}
+          value={language}
+          options={[
+            ...(allLanguages
+              ? offered
+              : offered.filter(
+                  (code, i) => i < 2 || code === language || code === browserLanguage(offered),
+                )
+            ).map((code) => ({ value: code, label: languageName(code) })),
+            ...(detect ? [{ value: 'auto', label: l.detectLanguage }] : []),
+            ...(allLanguages || offered.length <= 2
+              ? []
+              : [{ value: 'more', label: l.moreLanguages }]),
+          ]}
+          onChange={(code) => (code === 'more' ? setAllLanguages(true) : pick(code))}
+        />
+      )}
       {job ? (
         <div className="vu-caption-job" role="status" aria-live="polite">
           <div className="vu-caption-job-head">

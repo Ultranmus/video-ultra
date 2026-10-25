@@ -32,7 +32,7 @@ export interface TranscribeRequest {
   audio: AsyncIterable<Float32Array>;
   /** Length of the whole sound in seconds (for progress). */
   duration: number;
-  /** Spoken language as an ISO 639-1 code (`'en'`, `'hi'`, …), or `'auto'` to detect it. */
+  /** Spoken language as an ISO 639-1 code (`'en'`, …), or `'auto'` to detect it (one of `languages`). */
   language: string;
   /** Cancels the transcription; the promise then rejects with an `AbortError`. */
   signal: AbortSignal;
@@ -65,6 +65,12 @@ export interface TranscriberCheck {
 
 /** Turns speech into timed words. Implement this to use your own speech service. */
 export interface Transcriber {
+  /**
+   * Languages it hears (ISO 639-1), plus `'auto'` if it can detect the language. The Captions
+   * panel offers only these, and shows no choice when there's one. Default: the panel's own
+   * list and Detect.
+   */
+  readonly languages?: readonly string[];
   transcribe(request: TranscribeRequest): Promise<TranscribeResult>;
   /** Optional: whether and how `language` can be transcribed here, before starting. */
   check?(language: string): Promise<TranscriberCheck>;
