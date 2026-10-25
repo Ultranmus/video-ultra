@@ -505,3 +505,6 @@ merged and re-verified on main; A (captions) and E (layers) here.
   talk 99 % words and none doubled, music / noise alone and two buried-speech clips 0 words; one
   known limit (a confident Malay "translation"). captions-check: Hinglish, names, marks, Next,
   Looks right, Hear again, axe with the new controls.
+- Hinglish (owner): a language of its own (`hi-Latn`, "Hinglish" chip after Detect), written by
+  the service — our own converter removed. Groq: English + a Hinglish prompt → Hinglish on all
+  19 Hindi test pieces (#168).

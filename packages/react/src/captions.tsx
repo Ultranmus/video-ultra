@@ -30,6 +30,8 @@ import { Icon } from './icons';
 const LANGUAGES: readonly string[] = [
   'en',
   'hi',
+  // Hinglish: Hindi written in Latin letters, the way it's typed (DECISIONS #168).
+  'hi-Latn',
   'es',
   'fr',
   'de',
@@ -213,9 +215,6 @@ function AutoCaptions({ has }: { has: boolean }): ReactElement | null {
   // Names & words, kept per project in this browser (a convenience).
   const wordsKey = `video-ultra:caption-words:${ctl.project.id}`;
   const [vocabulary, setVocabulary] = useState(() => stored(wordsKey) ?? '');
-  // Hindi written in Latin letters ("Hinglish") or Devanagari.
-  const [latin, setLatin] = useState(() => stored('video-ultra:caption-hindi-latin') === '1');
-  const hindi = (language === 'hi' || language === 'auto') && offered.includes('hi');
   useEffect(() => {
     let live = true;
     void ctl.checkCaptions(language).then((c) => live && setCheck(c));
@@ -246,13 +245,16 @@ function AutoCaptions({ has }: { has: boolean }): ReactElement | null {
         <Chips
           label={l.spokenLanguage}
           value={language}
-          // The first two, then Detect, then the chosen / browser's one, then "More…".
+          // The first two, Detect, Hinglish when offered, the chosen / browser's one, "More…".
           options={[
             ...offered.slice(0, 2).map((code) => ({ value: code, label: languageName(code) })),
             ...(detect ? [{ value: 'auto', label: l.detectLanguage }] : []),
             ...offered
               .slice(2)
-              .filter((code) => code === language || code === browserLanguage(offered))
+              .filter(
+                (code) =>
+                  code === 'hi-Latn' || code === language || code === browserLanguage(offered),
+              )
               .map((code) => ({ value: code, label: languageName(code) })),
             ...(allLanguages || offered.length <= 2
               ? []
@@ -290,20 +292,6 @@ function AutoCaptions({ has }: { has: boolean }): ReactElement | null {
             }}
           />
         </>
-      ) : null}
-      {hindi ? (
-        <Segmented
-          label={l.hindiScript}
-          value={latin ? 'latin' : 'deva'}
-          options={[
-            { value: 'deva', label: l.hindiDevanagari },
-            { value: 'latin', label: l.hindiLatin },
-          ]}
-          onChange={(v) => {
-            setLatin(v === 'latin');
-            store('video-ultra:caption-hindi-latin', v === 'latin' ? '1' : '0');
-          }}
-        />
       ) : null}
       {takesWords ? (
         <label className="vu-field vu-text-field">
@@ -359,7 +347,6 @@ function AutoCaptions({ has }: { has: boolean }): ReactElement | null {
             onClick={() =>
               void ctl.autoCaptions(language, {
                 ...(takesWords ? { vocabulary: wordList(vocabulary) } : {}),
-                latin: hindi && latin,
               })
             }
           />

@@ -39,7 +39,8 @@ export interface CaptionsEndpointOptions {
 
 /**
  * What your endpoint answers for one piece of sound (DECISIONS #164, #167). It receives a
- * `POST` to `<endpoint>?language=<code>` (an ISO 639-1 code, or `auto` to detect) whose body is
+ * `POST` to `<endpoint>?language=<code>` (an ISO 639-1 code; `hi-Latn` for Hinglish — Hindi in
+ * Latin letters, as people type it; or `auto` to detect) whose body is
  * the sound: 32-bit float samples, little-endian, 16 kHz, mono, at most 31 s
  * (`application/octet-stream`). Optional query parameters, to pass on to your service as a hint
  * (e.g. Whisper's `prompt`): `context` — the last words said before this piece; `vocabulary` —
@@ -200,6 +201,8 @@ export function createCaptionsEndpoint(options: CaptionsEndpointOptions): Transc
     // In order. A chosen language that no piece was in: say what was heard instead — judged
     // only on pieces heard with confidence (a doubtful guess at "Malay" isn't evidence).
     const words: TranscriptWord[] = [];
+    // The language itself (Hinglish, `hi-Latn`, is Hindi heard).
+    const base = language.split('-')[0]!;
     let matched = 0;
     let other: string | null = null;
     let clear = 0;
@@ -208,7 +211,7 @@ export function createCaptionsEndpoint(options: CaptionsEndpointOptions): Transc
       const doubtful =
         heard.words.length > 0 && mean(heard.words.map((w) => w.confidence ?? 1)) < 0.5;
       if (heard.words.length && !doubtful) clear++;
-      if (language === 'auto' || heard.language === language || doubtful) matched++;
+      if (language === 'auto' || heard.language === base || doubtful) matched++;
       else other ??= heard.language;
       for (const w of heard.words)
         words.push({ ...w, start: w.start + heard.start, end: w.end + heard.start });

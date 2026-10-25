@@ -296,7 +296,11 @@ if (webkitModel) {
   const chips = await page
     .locator('.vu-panel .vu-captions [role=radio], .vu-panel .vu-captions .vu-chip')
     .allInnerTexts();
-  check('service: Detect is the third choice', chips[2]?.trim() === 'Detect', chips.join(' · '));
+  check(
+    'service: Detect is the third choice, Hinglish the fourth',
+    chips[2]?.trim() === 'Detect' && chips[3]?.trim() === 'Hinglish',
+    chips.join(' · '),
+  );
   // Hindi speech with French chosen: says which language it heard.
   await page.locator('.vu-panel button', { hasText: /More languages/ }).click();
   await page
@@ -360,32 +364,33 @@ if (webkitModel) {
   ).newPage();
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  const asked: { seconds: number; vocabulary: string | null }[] = [];
+  const asked: { seconds: number; vocabulary: string | null; language: string | null }[] = [];
+  // Hinglish is the service's work: it answers in Latin letters when asked for `hi-Latn`.
   await page.route('**/api/captions**', async (route) => {
     const url = new URL(route.request().url());
     asked.push({
       seconds: (route.request().postDataBuffer()?.length ?? 0) / 4 / 16000,
       vocabulary: url.searchParams.get('vocabulary'),
+      language: url.searchParams.get('language'),
     });
     await route.fulfill({
       json: {
         words: [
-          { text: 'नमस्ते', start: 0.3, end: 0.8, confidence: 0.9 },
-          { text: 'दोस्तों।', start: 0.9, end: 1.5, confidence: 0.9 },
-          { text: 'आज', start: 3, end: 3.4, confidence: 0.4 },
-          { text: 'हम।', start: 3.5, end: 4, confidence: 0.45 },
+          { text: 'Namaste', start: 0.3, end: 0.8, confidence: 0.9 },
+          { text: 'dosto.', start: 0.9, end: 1.5, confidence: 0.9 },
+          { text: 'Aaj', start: 3, end: 3.4, confidence: 0.4 },
+          { text: 'hum.', start: 3.5, end: 4, confidence: 0.45 },
         ],
-        language: 'hi',
+        language: 'hi-Latn',
       },
     });
   });
   await load(page, 'transcriber=server', ['speech-en-gb.m4a']);
   await page.locator('.vu-rail .vu-btn', { hasText: 'Captions' }).click();
   await page
-    .locator('.vu-panel button', { hasText: /^Hindi$/ })
+    .locator('.vu-panel button', { hasText: /^Hinglish$/ })
     .first()
     .click();
-  await page.locator('.vu-panel button', { hasText: 'Hinglish (abc)' }).click();
   await page.locator('.vu-panel .vu-text-field input').fill('Priya, Goa');
   await page.locator('.vu-panel .vu-btn', { hasText: 'Make captions' }).click();
   await page.waitForFunction(
@@ -399,9 +404,9 @@ if (webkitModel) {
       .items.map((i: any) => ({ text: i.text, unsure: !!i.unsure })),
   );
   check(
-    'Hinglish: Hindi written in Latin letters',
-    made[0]?.text === 'namaste doston.' && made[1]?.text === 'aaj hum.',
-    JSON.stringify(made),
+    'Hinglish: a language of its own, asked of the service as hi-Latn',
+    asked[0]?.language === 'hi-Latn' && made[0]?.text === 'Namaste dosto.',
+    JSON.stringify({ asked: asked[0]?.language, made }),
   );
   check(
     'names & words reach the service',

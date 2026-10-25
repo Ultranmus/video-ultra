@@ -1146,3 +1146,15 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       speech buried in room noise Whisper can answer a confident translation into another
       language labelled as the right one (our en-tts-phone clip → Malay) — every signal says it's
       fine; reported by the check, not counted.
+168.  **Hinglish is a language, written by the service** (owner, 2026-10-25; replaces #167's own
+      converter). Hinglish (Hindi in Latin letters, as people type it) is a language like any
+      other: `hi-Latn` (Hindi, Latin script), named "Hinglish", fourth in the chips (English ·
+      Hindi · Detect · Hinglish · More). The editor converts nothing itself — `romanizeHindi`
+      and the "Write Hindi in" switch are gone: the plugged-in service writes it, and does it
+      better. Playground: Whisper (Groq) writes Hinglish when asked for English with a Hinglish
+      example as its prompt (asked for Hindi it writes Devanagari whatever the prompt) — one
+      request per piece. Measured on every Hindi recording in the test library (19 pieces,
+      clean, noisy, fan, a 6-minute reading): 19 Hinglish, no Devanagari, no translation
+      ("Tumhare mata pita kya tumhe itni aazaadi bhi na denge?"); English speech stays English.
+      Gemini: the prompt asks for Hinglish, not translated. Languages are compared by their
+      base (`hi-Latn` is Hindi heard).

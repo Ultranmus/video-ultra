@@ -1101,10 +1101,6 @@ export const DEFAULT_LABELS = {
   /** Names & words field (Auto captions). */
   captionVocabulary: 'Names & words (optional)',
   captionVocabularyHint: 'e.g. Priya, Ultranmus, Goa — helps spell them right',
-  /** How Hindi is written in captions. */
-  hindiScript: 'Write Hindi in',
-  hindiDevanagari: 'हिन्दी',
-  hindiLatin: 'Hinglish (abc)',
   /** Auto captions heard another language than the one chosen. */
   captionsOtherLanguage: (heard: string, chosen: string) =>
     `This sounds like ${heard}, not ${chosen}. Choose ${heard} or Detect, then try again.`,

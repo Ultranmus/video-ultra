@@ -58,7 +58,6 @@ import {
   setCaptionLook,
   setCaptionText,
   markCaptionChecked,
-  romanizeHindi,
   TRANSCRIBE_SAMPLE_RATE,
   type CaptionLookPatch,
   type SubtitleCue,
@@ -136,8 +135,6 @@ import { spread } from './fanout';
 export interface CaptionOptions {
   /** Names and words that may be said, for transcribers that take them. */
   vocabulary?: readonly string[];
-  /** Hindi in Latin letters ("Hinglish") instead of Devanagari. */
-  latin?: boolean;
   /** Only this part of the video (a part heard again); its captions are replaced. */
   range?: { start: Time; end: Time };
 }
@@ -2649,15 +2646,14 @@ export class EditorController {
           }),
       });
       if (abort.signal.aborted) return;
-      // Hindi in Latin letters ("Hinglish"), when asked for.
-      const words =
-        choices.latin && result.language === 'hi'
-          ? result.words.map((w) => ({ ...w, text: romanizeHindi(w.text) }))
-          : result.words;
-      const captions = groupCaptions(words, from);
+      const captions = groupCaptions(result.words, from);
       if (captions.length === 0) {
         // Speech in another language than the one chosen: say which.
-        const other = language !== 'auto' && result.language && result.language !== language;
+        // (Compared by language: Hinglish, `hi-Latn`, is Hindi heard.)
+        const other =
+          language !== 'auto' &&
+          result.language &&
+          result.language.split('-')[0] !== language.split('-')[0];
         this.toast(
           other
             ? l.captionsOtherLanguage(languageName(result.language), languageName(language))
