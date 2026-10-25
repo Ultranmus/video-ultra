@@ -48,9 +48,10 @@ export function AssistantPanel(): ReactElement {
     spacer.style.height = `${Math.max(0, thread.clientHeight - gap - below)}px`;
     return at;
   };
+  // Also on opening the panel: it shows the latest exchange, as right after sending.
   useLayoutEffect(() => {
     const at = fitSpacer();
-    if (sent && at !== null && threadRef.current) threadRef.current.scrollTop = at;
+    if (at !== null && threadRef.current) threadRef.current.scrollTop = at;
   }, [sent]);
   useLayoutEffect(() => {
     fitSpacer();

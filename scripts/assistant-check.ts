@@ -163,6 +163,25 @@ check(
 );
 await page.evaluate(() => (window as any).vuEditor.undo());
 
+// 2c. A long chat reopens at its latest exchange, not at the top.
+for (let i = 0; i < 6; i++) await ask(page, `Make the first clip warm, take ${i + 1}`);
+await page.evaluate(() => (window as any).vuEditor.undo());
+await page.locator('.vu-rail button', { hasText: 'Text' }).click();
+await page.locator('.vu-rail button', { hasText: 'Assistant' }).click();
+await page.locator('.vu-assistant-thread').waitFor();
+const view = await page.evaluate(() => {
+  const thread = document.querySelector('.vu-assistant-thread')!;
+  const mine = thread.querySelectorAll('.vu-assistant-you');
+  const box = thread.getBoundingClientRect();
+  const last = mine[mine.length - 1]!.getBoundingClientRect();
+  return { scrolled: thread.scrollTop, inView: last.top >= box.top && last.bottom <= box.bottom };
+});
+check(
+  'reopening a long chat shows the latest exchange',
+  view.scrolled > 0 && view.inView,
+  JSON.stringify(view),
+);
+
 // 3. No server key → the offline demo (answered 501 here: the dev server may have a real key).
 await page.unroute('**/api/assistant');
 await page.route('**/api/assistant', (route) =>
