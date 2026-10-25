@@ -122,6 +122,12 @@ check(
     JSON.parse(sent.messages.at(-1).content).project.tracks[0].items.length === 2 &&
     !JSON.stringify(sent).includes('blob:'),
 );
+const steps = await page.evaluate(() => (window as any).vuEditor.editor.history().labels);
+check(
+  'History names the step after the request',
+  steps.at(-1) === 'Assistant: Make the first clip warm and say hello',
+  steps.at(-1),
+);
 await page.evaluate(() => (window as any).vuEditor.undo());
 const undone = await page.evaluate(() => {
   const p = (window as any).vuEditor.project;

@@ -909,7 +909,8 @@ export const DEFAULT_LABELS = {
   assistantPlaceholder: 'Ask for any change…',
   assistantSend: 'Send',
   assistantThinking: 'Editing your video…',
-  assistantEdit: 'Assistant edit',
+  /** A History step made by the assistant, named after the request. */
+  assistantEdit: (request: string) => `Assistant: ${request}`,
   assistantApplied: (n: number) => (n === 1 ? 'Made 1 change' : `Made ${n} changes`),
   assistantNothing: 'No changes',
   assistantFailed: (why: string) => `The assistant couldn’t answer: ${why}`,
