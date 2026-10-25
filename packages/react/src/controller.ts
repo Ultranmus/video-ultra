@@ -2454,7 +2454,7 @@ export class EditorController {
         turn = { ...turn, reply: answer.reply, error: null };
         if (answer.actions.length === 0) break;
         try {
-          this.editor.apply(l.assistantEdit, (d, ctx) =>
+          this.editor.apply(l.assistantEdit(text), (d, ctx) =>
             applyEditActions(d, answer.actions, ctx.ids),
           );
           turn = { ...turn, applied: answer.actions.length, after: this.editor.getProject() };

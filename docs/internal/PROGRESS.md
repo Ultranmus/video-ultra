@@ -446,3 +446,5 @@ merged and re-verified on main; A (captions) and E (layers) here.
   (editing a styled text inside the editor's draft). Fixed in `ops.ts` `copy()` for every op;
   new `place` action (position, size, rotation, opacity); lane items' placement in the
   description (#161). Live with Gemini lite: 5 of 5 centred, −45°, scale 2, coloured, 0.8.
+- Assistant: History steps are named after the request ("Assistant: put the watermark…")
+  instead of "Assistant edit" for every one (owner couldn't find them; `assistant-check`).
