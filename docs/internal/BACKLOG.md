@@ -265,3 +265,16 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       wrong-language "translation" (en-tts-phone → Malay); asking twice and keeping what agrees
       would catch it (costs double requests).
 - [x] Captions: Hinglish spelling — done by the service now (`hi-Latn`, DECISIONS #168).
+- [ ] **Captions package: free on-device captions in more languages** (owner, 2026-10-25 —
+      planned, not started). `@video-ultra/captions` becomes "free, private captions for every
+      language that genuinely works on this device": 1. A test set per language with the system voices + `scripts/tts-words.swift` (known text,
+      true word times): es, fr, de, it, pt, ru, ja, zh, ko, ar, tr, hi, ta, … 2. Measure per model × language: word accuracy, timing, speed, memory — phone-sized
+      (Whisper base / small multilingual, Moonshine for English: no word times, timed from
+      the sound) and computer-sized (Whisper large-v3-turbo on WebGPU: download size to
+      measure). 3. Offer a language on a device only when it passes a bar (e.g. < 15 % wrong words,
+      timing within 0.2 s); keep the result as a table in the package, re-checked when a
+      model changes. Computers with WebGPU → nearly every language; phones → the well-heard
+      ones (English, Spanish, French…), not Hindi. 4. The same safety net as the service path (speech detector, Detect voting, check
+      marks, `captions-timing`). 5. Docs: self-hosting a free service (whisper.cpp / faster-whisper with the OpenAI
+      transcription API) for apps with their own server.
+      Show the owner the measurement table before building.
