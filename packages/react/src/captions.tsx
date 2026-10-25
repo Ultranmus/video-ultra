@@ -12,7 +12,7 @@ import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { useController, useLabels, useProject, useUi } from './context';
 import { WholeVideoOnly } from './multiedit';
 import { Button, Chips, ColorField, IconButton, Section, Segmented } from './controls';
-import { formatClock } from './format';
+import { formatClock, languageName } from './format';
 
 /**
  * The Captions panel (v0.2 A): make captions from the speech, import a subtitle file or type
@@ -44,14 +44,6 @@ const LANGUAGES = [
   'te',
   'mr',
 ] as const;
-
-function languageName(code: string): string {
-  try {
-    return new Intl.DisplayNames(undefined, { type: 'language' }).of(code) ?? code;
-  } catch {
-    return code;
-  }
-}
 
 /** The browser's language, if auto captions offer it. */
 function browserLanguage(offered: readonly string[]): string | null {
@@ -138,14 +130,16 @@ function AutoCaptions({ has }: { has: boolean }): ReactElement | null {
         <Chips
           label={l.spokenLanguage}
           value={language}
+          // The first two, then Detect, then the rest (all, or the chosen and browser's ones).
           options={[
-            ...(allLanguages
-              ? offered
-              : offered.filter(
-                  (code, i) => i < 2 || code === language || code === browserLanguage(offered),
-                )
-            ).map((code) => ({ value: code, label: languageName(code) })),
+            ...offered.slice(0, 2).map((code) => ({ value: code, label: languageName(code) })),
             ...(detect ? [{ value: 'auto', label: l.detectLanguage }] : []),
+            ...offered
+              .slice(2)
+              .filter(
+                (code) => allLanguages || code === language || code === browserLanguage(offered),
+              )
+              .map((code) => ({ value: code, label: languageName(code) })),
             ...(allLanguages || offered.length <= 2
               ? []
               : [{ value: 'more', label: l.moreLanguages }]),

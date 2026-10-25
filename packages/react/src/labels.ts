@@ -1086,6 +1086,9 @@ export const DEFAULT_LABELS = {
   captionsTranscribing: (percent: number) => `Listening · ${percent}%`,
   captionsCancel: 'Stop',
   captionsNoSpeech: 'No speech was heard in this video.',
+  /** Auto captions heard another language than the one chosen. */
+  captionsOtherLanguage: (heard: string, chosen: string) =>
+    `This sounds like ${heard}, not ${chosen}. Choose ${heard} or Detect, then try again.`,
   appliesToAll: (n: number) => `Changes here apply to all ${n} selected.`,
   yourVideos: 'Your videos',
   tipYourVideos: 'Your videos (saved in this browser): start a new one, copy this one, or switch',

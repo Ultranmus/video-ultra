@@ -18,3 +18,12 @@ export function formatDurationShort(t: number): string {
   const m = Math.floor(seconds / 60);
   return `${m} min ${String(Math.round(seconds % 60)).padStart(2, '0')} s`;
 }
+
+/** A language's name in the reader's language (`'hi'` → "Hindi"), from the browser. */
+export function languageName(code: string): string {
+  try {
+    return new Intl.DisplayNames(undefined, { type: 'language' }).of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
