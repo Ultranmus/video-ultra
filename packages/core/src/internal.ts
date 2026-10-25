@@ -3,6 +3,7 @@
  */
 export * from './index';
 export { ALLOWED_KINDS, laneKindFor } from './model/project';
+export { visualItem, audioItem } from './model/items';
 export { createLabSession } from './lab/client';
 export type { LabSession } from './lab/client';
 export type * from './lab/protocol';

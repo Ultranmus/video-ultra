@@ -123,6 +123,78 @@ describe('AI edit actions', () => {
     expect(() => applyEditActions(project, new Array(201).fill({}), ids)).toThrow(/200/);
   });
 
+  it('lists the media library and the name, so files can be named and listed', () => {
+    const { project } = setup();
+    const d = describeProject(project);
+    expect(d.name).toBe(project.name);
+    // The LUT isn't media; the photo has no length.
+    expect(d.media).toEqual([
+      { id: 'vidA', name: 'vidA.bin', kind: 'video', duration: 10, onTimeline: true },
+      { id: 'vidB', name: 'vidB.bin', kind: 'video', duration: 4, onTimeline: false },
+      { id: 'img', name: 'img.bin', kind: 'photo', onTimeline: false },
+      { id: 'music', name: 'music.bin', kind: 'sound', duration: 30, onTimeline: false },
+    ]);
+  });
+
+  it('renames the video and puts media-library files on the timeline', () => {
+    const { project, ids } = setup();
+    applyEditActions(
+      project,
+      [
+        { action: 'rename', name: '  Holiday  ' },
+        { action: 'addMedia', mediaId: 'vidB' },
+        { action: 'addMedia', mediaId: 'img', start: 5 },
+        { action: 'addMedia', mediaId: 'music', start: 1 },
+        { action: 'addMedia', mediaId: 'vidB', start: 2, asLayer: true },
+      ],
+      ids,
+    );
+    expect(project.name).toBe('Holiday');
+    const main = project.tracks[0]!.items;
+    // The photo went before the clip at 5 s, the video at the end.
+    expect(main.map((i) => (i.kind === 'video' || i.kind === 'image' ? i.assetId : ''))).toEqual([
+      'vidA',
+      'img',
+      'vidA',
+      'vidB',
+    ]);
+    const lanes = project.tracks.slice(1).flatMap((t) => t.items);
+    const music = lanes.find((i) => i.kind === 'audio');
+    expect(music && [music.start, music.duration]).toEqual([s(1), s(30)]);
+    const layer = lanes.find((i) => i.kind === 'video');
+    expect(layer && [layer.assetId, layer.start]).toEqual(['vidB', s(2)]);
+    expect(describeProject(project).media.every((m) => m.onTimeline)).toBe(true);
+    expect(checkInvariants(project)).toEqual([]);
+    expect(ProjectSchema.safeParse(project).success).toBe(true);
+
+    expect(() => applyEditActions(project, [{ action: 'addMedia', mediaId: 'look' }], ids)).toThrow(
+      /No media look/,
+    );
+    expect(() => applyEditActions(project, [{ action: 'rename', name: '' }], ids)).toThrow(
+      /isn't valid/,
+    );
+  });
+
+  it('edits what it adds in the same answer, by the name it gave it', () => {
+    const { project, ids } = setup();
+    applyEditActions(
+      project,
+      [
+        { action: 'addMedia', mediaId: 'img', ref: 'new1' },
+        { action: 'filter', itemId: 'new1', filter: 'mono' },
+        { action: 'addText', ref: 'title', text: 'Goa', start: 0 },
+        { action: 'animate', itemId: 'title', in: 'fade-in' },
+        { action: 'delete', itemIds: ['title'] },
+      ],
+      ids,
+    );
+    const photo = project.tracks[0]!.items.at(-1)!;
+    expect(photo.kind === 'image' && photo.filter?.id).toBe('mono');
+    expect(
+      project.tracks.some((t) => t.items.some((i) => i.kind === 'text' && i.text === 'Goa')),
+    ).toBe(false);
+  });
+
   it('the schema accepts what the guide documents', () => {
     expect(EditActionSchema.safeParse({ action: 'delete', itemIds: ['a', 'b'] }).success).toBe(
       true,

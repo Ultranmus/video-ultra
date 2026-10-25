@@ -1010,3 +1010,15 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       CSS variable on the root (no render per move); release keeps the size in this browser
       (`localStorage`, a per-viewer convenience). Arrow keys / Home / End on a focused handle,
       double-click or Enter resets. `splitters.tsx`.
+159.  **The assistant sees the media library and can rename** (owner, 2026-10-25; extends #149).
+      `describeProject` now carries the video's `name` and `media` (every imported video, photo
+      and sound: id, name, kind, length, on the timeline or not — LUTs and combined clips are
+      left out), so "list my media" has an answer and a file can be named ("make beach.mp4 black
+      and white"). Two new actions (16): `rename`, and `addMedia` (a sound on a sound lane at
+      `start`; a video / photo into the main video before the clip at `start`, at the end without
+      one, or on a layer with `asLayer`). `addMedia` and `addText` take a `ref`, a name the model
+      gives the new item so later actions of the same answer can edit it ("add the photo and
+      make it black and white" is one answer, one undo). Questions are answered in `reply`, one
+      entry per line (the chat keeps line breaks). The item factories `visualItem` / `audioItem`
+      moved to core (`model/items.ts`, internal) so the assistant and the editor build the same
+      items.

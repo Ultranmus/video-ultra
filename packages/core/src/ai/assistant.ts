@@ -4,9 +4,12 @@ import { ANIMATION_PRESETS, FILTER_PRESETS, TRANSITION_PRESETS } from '../effect
 import {
   addMarker,
   addToLane,
+  assetInUse,
   deleteItem,
   EditError,
+  insertMain,
   moveItem,
+  renameProject,
   setAnimation,
   setCanvasSize,
   setSpeed,
@@ -19,9 +22,11 @@ import {
   DEFAULT_TEXT_STYLE,
   DEFAULT_TRANSFORM,
   findItem,
+  mainTrack,
   projectDuration,
   type IdFactory,
 } from '../model/project';
+import { audioItem, visualItem } from '../model/items';
 import type { Item, Project, TextItem } from '../model/schema';
 import { FLICKS_PER_SECOND, fromSeconds } from '../model/time';
 
@@ -35,6 +40,8 @@ import { FLICKS_PER_SECOND, fromSeconds } from '../model/time';
 
 const seconds = z.number().check(z.gte(0), z.lte(24 * 3600));
 const itemId = z.string().check(z.minLength(1));
+/** A name the model gives a new item, to edit it in later actions of the same answer. */
+const ref = z.optional(z.string().check(z.minLength(1), z.maxLength(40)));
 
 /** The actions a model may ask for. Times are seconds on the timeline unless said otherwise. */
 export const EditActionSchema = z.discriminatedUnion('action', [
@@ -83,6 +90,7 @@ export const EditActionSchema = z.discriminatedUnion('action', [
   }),
   z.object({
     action: z.literal('addText'),
+    ref,
     text: z.string().check(z.minLength(1), z.maxLength(500)),
     start: seconds,
     duration: z.optional(z.number().check(z.gte(0.2), z.lte(600))),
@@ -109,6 +117,22 @@ export const EditActionSchema = z.discriminatedUnion('action', [
     ratio: z.enum(['9:16', '16:9', '1:1', '4:5', '4:3', '21:9']),
   }),
   z.object({ action: z.literal('marker'), time: seconds, label: z.optional(z.string()) }),
+  z.object({
+    action: z.literal('rename'),
+    name: z.string().check(z.minLength(1), z.maxLength(200)),
+  }),
+  /**
+   * Puts a file from the media library on the timeline: a sound on a sound lane at `start`; a
+   * video or photo into the main video before the clip at `start` (the end without one), or on
+   * a layer at `start` with `asLayer`.
+   */
+  z.object({
+    action: z.literal('addMedia'),
+    mediaId: z.string().check(z.minLength(1)),
+    ref,
+    start: z.optional(seconds),
+    asLayer: z.optional(z.boolean()),
+  }),
 ]);
 
 /** One edit a model asked for (validated by {@link EditActionSchema}). */
@@ -147,6 +171,8 @@ export interface EditingAssistant {
 
 /** The compact view of a project a model reads. */
 export interface ProjectDescription {
+  /** The video's name. */
+  name: string;
   canvas: { width: number; height: number };
   duration: number;
   tracks: {
@@ -154,6 +180,8 @@ export interface ProjectDescription {
     items: Record<string, string | number | boolean | null>[];
   }[];
   markers: { time: number; label?: string }[];
+  /** The media library: every imported video, photo and sound, on the timeline or not. */
+  media: { id: string; name: string; kind: string; duration?: number; onTimeline: boolean }[];
   catalog: {
     filters: string[];
     transitions: string[];
@@ -168,6 +196,7 @@ const round = (flicks: number) => Math.round((flicks / FLICKS_PER_SECOND) * 100)
 /** A compact, model-friendly description of `project` (ids, kinds, times in seconds, texts). */
 export function describeProject(project: Project): ProjectDescription {
   return {
+    name: project.name,
     canvas: { width: project.settings.width, height: project.settings.height },
     duration: round(projectDuration(project)),
     tracks: project.tracks.map((track) => ({
@@ -197,6 +226,15 @@ export function describeProject(project: Project): ProjectDescription {
       time: round(m.time),
       ...(m.label ? { label: m.label } : {}),
     })),
+    media: Object.values(project.assets)
+      .filter((a) => a.kind === 'video' || a.kind === 'image' || a.kind === 'audio')
+      .map((a) => ({
+        id: a.id,
+        name: a.name,
+        kind: a.kind === 'image' ? 'photo' : a.kind === 'audio' ? 'sound' : 'video',
+        ...(a.kind === 'image' ? {} : { duration: round(a.duration) }),
+        onTimeline: assetInUse(project, a.id),
+      })),
     catalog: {
       filters: FILTER_PRESETS.map((f) => f.id),
       transitions: TRANSITION_PRESETS.map((t) => t.id),
@@ -209,8 +247,13 @@ export function describeProject(project: Project): ProjectDescription {
 
 /** For the model's instructions: what each action does. */
 export const EDIT_ACTIONS_GUIDE = `You edit a video project for the person. Answer with JSON only:
-{"reply": "<one short sentence for the person>", "actions": [<actions>]}.
+{"reply": "<for the person>", "actions": [<actions>]}.
+"reply" is one short sentence about what you did; when the person asks about the project (e.g. "list
+the media", "how long is it"), answer fully in "reply" instead, one entry per line, using names
+people see, never ids.
 Times are seconds on the timeline. Use only item ids from the project description.
+When the person names a file, match it to "name" in the tracks' items (on the timeline) or in
+"media" (the media library); a file not on the timeline must be added before it can be edited.
 "This", "it" and "the selected one" mean the items in "selection". Change only what the person asked
 for: touch every item only when they ask for all of them.
 Actions:
@@ -223,11 +266,15 @@ Actions:
 - {"action":"filter","itemId","filter"(catalog.filters or null),"intensity"?(0–1)}
 - {"action":"adjust","itemId","brightness"?,"contrast"?,"saturation"?,"warmth"?} each −1…1
 - {"action":"transition","itemId","transition"(catalog.transitions or null),"duration"?} into a main-video clip from the one before
-- {"action":"addText","text","start","duration"?,"position"?("top"|"center"|"bottom"),"color"?(#rrggbb),"size"?("small"|"medium"|"large")}
+- {"action":"addText","ref"?,"text","start","duration"?,"position"?("top"|"center"|"bottom"),"color"?(#rrggbb),"size"?("small"|"medium"|"large")}
 - {"action":"editText","itemId","text"?,"color"?,"size"?}
 - {"action":"animate","itemId","in"?(catalog.animationsIn or null),"out"?(catalog.animationsOut or null)}
 - {"action":"canvas","ratio"("9:16"|"16:9"|"1:1"|"4:5"|"4:3"|"21:9")}
 - {"action":"marker","time","label"?}
+- {"action":"rename","name"} rename the video
+- {"action":"addMedia","mediaId","ref"?,"start"?,"asLayer"?} put a "media" file on the timeline: a sound on a sound lane at start; a video / photo into the main video before the clip at start (at the end without start), or on a layer at start with asLayer:true
+To edit something you add in the same answer, give it a "ref" (e.g. "new1") and use that as the
+itemId in the actions after it.
 If the request is unclear or impossible, return no actions and ask or explain in "reply".`;
 
 const SIZES = { small: 0.04, medium: 0.06, large: 0.1 } as const;
@@ -263,6 +310,9 @@ export function applyEditActions(project: Project, actions: unknown[], ids: IdFa
   if (!Array.isArray(actions)) throw new EditError('invalid', 'Actions must be a list');
   if (actions.length > 200)
     throw new EditError('invalid', 'Too many actions at once (200 at most)');
+  // A model's names for items it adds ("ref") → their ids.
+  const refs = new Map<string, string>();
+  const resolve = (id: string) => refs.get(id) ?? id;
   actions.forEach((raw, index) => {
     const parsed = EditActionSchema.safeParse(raw);
     if (!parsed.success)
@@ -270,8 +320,12 @@ export function applyEditActions(project: Project, actions: unknown[], ids: IdFa
         'invalid',
         `Action ${index + 1} isn't valid: ${JSON.stringify(raw).slice(0, 200)}`,
       );
+    const a = parsed.data;
+    if ('itemId' in a) a.itemId = resolve(a.itemId);
+    if ('itemIds' in a) a.itemIds = a.itemIds.map(resolve);
     try {
-      applyOne(project, parsed.data, ids);
+      const added = applyOne(project, a, ids);
+      if ('ref' in a && a.ref && added) refs.set(a.ref, added);
     } catch (error) {
       const why = error instanceof Error ? error.message : String(error);
       throw new EditError('invalid', `Action ${index + 1} (${parsed.data.action}): ${why}`);
@@ -280,7 +334,8 @@ export function applyEditActions(project: Project, actions: unknown[], ids: IdFa
   return actions.length;
 }
 
-function applyOne(project: Project, a: EditAction, ids: IdFactory): void {
+/** Applies one checked action; returns the id of the item it added, if any. */
+function applyOne(project: Project, a: EditAction, ids: IdFactory): string | undefined {
   const t = (s: number) => fromSeconds(s);
   switch (a.action) {
     case 'split':
@@ -369,7 +424,7 @@ function applyOne(project: Project, a: EditAction, ids: IdFactory): void {
         adjust: {},
       };
       addToLane(project, text, ids);
-      return;
+      return text.id;
     }
     case 'editText': {
       const it = item(project, a.itemId);
@@ -409,5 +464,23 @@ function applyOne(project: Project, a: EditAction, ids: IdFactory): void {
     case 'marker':
       addMarker(project, t(a.time), ids, a.label);
       return;
+    case 'rename':
+      renameProject(project, a.name);
+      return;
+    case 'addMedia': {
+      const asset = project.assets[a.mediaId];
+      if (!asset || (asset.kind !== 'video' && asset.kind !== 'image' && asset.kind !== 'audio'))
+        throw new EditError('not-found', `No media ${a.mediaId}`);
+      const start = t(a.start ?? 0);
+      const id = ids();
+      if (asset.kind === 'audio') addToLane(project, audioItem(asset, id, start), ids);
+      else if (a.asLayer) addToLane(project, visualItem(asset, id, start), ids);
+      else {
+        const main = mainTrack(project).items;
+        const at = a.start === undefined ? main.length : main.filter((i) => i.start < start).length;
+        insertMain(project, visualItem(asset, id), at);
+      }
+      return id;
+    }
   }
 }

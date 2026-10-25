@@ -422,3 +422,14 @@ merged and re-verified on main; A (captions) and E (layers) here.
   first (`turbo run build --filter=playground^...`), then TypeDoc, then the playground.
 - GitHub "Release" workflow failed only because the repo doesn't allow Actions to open pull
   requests (owner setting: Settings → Actions → General → Workflow permissions).
+
+## 2026-10-25 · Assistant: media library, rename, naming files (DECISIONS #159)
+
+- Owner asked the assistant to list the media: it said "here it is" and showed nothing — it
+  never saw the media library and was told to answer in one sentence. It now gets the video's
+  name and the media library, and answers questions in full, one entry per line.
+- New actions: rename the video; put a media-library file on the timeline (main video, layer or
+  sound lane). New items can be edited in the same answer (`ref`).
+- Checked live with Gemini through `/api/assistant`: list media, rename, "put beach.jpg after
+  the first clip", music from the start, "make sunset.mov black and white", "add beach.jpg at
+  the end and make it black and white", "add a title … and make it fade in" — all applied.
