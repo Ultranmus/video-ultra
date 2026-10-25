@@ -13,8 +13,9 @@ Where the last session stopped and what comes next. Update before ending every s
 - Later the same day: a rejected answer is retried once (#160), styled-text edit crash fixed +
   `place` action (#161), chat reopens at the latest exchange, History names steps after the
   request. All merged to main, **not pushed**.
-- **Owner's testing (desktop): Assistant — mostly works ✓.** Next: Audio, Captions (desktop),
-  then the phones.
+- **Owner's testing (desktop): Assistant — mostly works ✓; Captions — tested ✓** (Groq, Gemini
+  fallback, on-device English "really good", without the package). Next: Audio (desktop), then
+  the phones.
 - Captions: on-device English only in the package (#162); any language through the host's own
   service with `createCaptionsEndpoint` (#164). Playground: Groq (`CAPTIONS_API_KEY`, set by the
   owner) → Gemini → device. Every script (Chinese, Japanese, Thai…) handled. Merged to main,

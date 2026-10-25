@@ -8,25 +8,29 @@ Open the branch's Vercel preview (or `pnpm --filter playground dev`), then **`/e
 
 ## 000. 2026-10-25 — captions: check marks, names, Hear again, Hinglish
 
-- [ ] **Hinglish:** Captions → **Hinglish** (after Detect) → Make captions on a Hindi clip.
+_Owner, 2026-10-25 — desktop: **captions tested ✓** (Groq, Gemini fallback, on-device English "really good", without the package)._
+
+- [x] **Hinglish:** Captions → **Hinglish** (after Detect) → Make captions on a Hindi clip.
       Readable the way you'd type it? Note words that look wrong.
-- [ ] **Names to spell right:** type names said in the video (e.g. your channel's name) → Make captions
+- [x] **Names to spell right:** type names said in the video (e.g. your channel's name) → Make captions
       → spelled right?
-- [ ] **Check marks:** on a clip with a hard-to-hear part — lines marked ⚠, "N captions to check",
+- [x] **Check marks:** on a clip with a hard-to-hear part — lines marked ⚠, "N captions to check",
       Next to check, Looks right.
-- [ ] **Hear again:** pick a caption → the captions button on its row → just that part redone.
-- [ ] **Talk over music:** a clip with music playing all through — captions now come (they could
+- [x] **Hear again:** pick a caption → the captions button on its row → just that part redone.
+- [x] **Talk over music:** a clip with music playing all through — captions now come (they could
       be skipped before).
 
 ## 00. 2026-10-25 — captions in every language (Groq in the playground)
 
-- [ ] **Hindi sync.** Captions → Hindi → Make captions on a Hindi clip. Do the words light up
+_Owner, 2026-10-25 — desktop: **captions tested ✓** (Groq, Gemini fallback, on-device English "really good", without the package)._
+
+- [x] **Hindi sync.** Captions → Hindi → Make captions on a Hindi clip. Do the words light up
       with the speech now (try a highlight look such as Karaoke)?
-- [ ] **Detect**, then the **wrong language** (e.g. French on Hindi speech): expect "This sounds
+- [x] **Detect**, then the **wrong language** (e.g. French on Hindi speech): expect "This sounds
       like Hindi, not French…".
-- [ ] **More languages…** → search "chi" → Chinese (or Japanese) on a clip in that language: no
+- [x] **More languages…** → search "chi" → Chinese (or Japanese) on a clip in that language: no
       spaces between characters, lines wrap, highlight goes character by character.
-- [ ] English as before (now through Groq, not the device): sync still good?
+- [x] English as before (now through Groq, not the device): sync still good?
 
 ## 0. 2026-10-20 — your list, edit several, Your videos, combined clips (branch `feat/v0.4-finish`)
 
