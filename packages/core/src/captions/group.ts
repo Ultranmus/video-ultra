@@ -1,6 +1,7 @@
 import type { TranscriptWord } from './transcriber';
 import { fromSeconds, type Time } from '../model/time';
 import type { CaptionWord } from '../model/schema';
+import { captionWords, graphemes, joinCaptionWords, joinWords, textWidth } from './words';
 
 /**
  * Timed words → captions people can read (v0.2 A1): a caption ends at a sentence end, a pause,
@@ -9,7 +10,10 @@ import type { CaptionWord } from '../model/schema';
 
 /** Options of {@link groupCaptions}. */
 export interface GroupOptions {
-  /** Most characters on screen at once (one line ≈ 32). Default 32. */
+  /**
+   * Most characters on screen at once (one line ≈ 32; a Chinese / Japanese character counts
+   * two). Default 32.
+   */
   maxChars?: number;
   /** Longest a caption stays (s). Default 3.5. */
   maxSeconds?: number;
@@ -41,7 +45,7 @@ export function groupCaptions(
   const maxSeconds = options.maxSeconds ?? 3.5;
   const pause = options.pauseSeconds ?? 0.6;
   const out: GroupedCaption[] = [];
-  let current: TranscriptWord[] = [];
+  let current: ShownWord[] = [];
   const flush = () => {
     if (!current.length) return;
     const first = current[0]!;
@@ -51,7 +55,7 @@ export function groupCaptions(
     out.push({
       start,
       end,
-      text: current.map((w) => w.text).join(' '),
+      text: joinCaptionWords(current.map((w) => w.text)),
       words: current.map((w) => ({
         text: w.text,
         start: Math.max(0, offset + fromSeconds(w.start) - start),
@@ -60,16 +64,23 @@ export function groupCaptions(
     });
     current = [];
   };
-  for (const word of words) {
-    const text = word.text.trim();
-    if (!text) continue;
+  for (const word of shownWords(words)) {
+    const text = word.text;
     const prev = current[current.length - 1];
     if (prev) {
-      const chars = current.reduce((n, w) => n + w.text.length + 1, 0) + text.length;
+      const chars = textWidth(joinCaptionWords([...current.map((w) => w.text), text]));
       const long = chars > maxChars || word.end - current[0]!.start > maxSeconds;
-      if (word.start - prev.end >= pause || long || SENTENCE_END.test(prev.text)) flush();
+      // Characters of one word ("首先") stay together unless the line gets far too long.
+      const inside = !!prev.joinsNext && chars <= maxChars + 8;
+      if (!inside && (word.start - prev.end >= pause || long || SENTENCE_END.test(prev.text)))
+        flush();
     }
-    current.push({ text, start: word.start, end: Math.max(word.end, word.start) });
+    current.push({
+      text,
+      start: word.start,
+      end: Math.max(word.end, word.start),
+      ...(word.joinsNext ? { joinsNext: true as const } : {}),
+    });
   }
   flush();
   // A lone word (a pause at a comma) joins the caption after it when that's close and still fits.
@@ -78,14 +89,14 @@ export function groupCaptions(
     const b = out[i + 1]!;
     const close = b.start - a.end <= fromSeconds(1);
     const fits =
-      a.text.length + 1 + b.text.length <= maxChars &&
+      textWidth(joinWords(a.text, b.text)) <= maxChars &&
       b.end - a.start <= fromSeconds(maxSeconds + 1);
     if (a.words.length === 1 && close && fits && !SENTENCE_END.test(a.text)) {
       const shift = b.start - a.start;
       out.splice(i, 2, {
         start: a.start,
         end: b.end,
-        text: `${a.text} ${b.text}`,
+        text: joinWords(a.text, b.text),
         words: [
           ...a.words,
           ...b.words.map((w) => ({ ...w, start: w.start + shift, end: w.end + shift })),
@@ -99,6 +110,33 @@ export function groupCaptions(
     const a = out[i]!;
     const b = out[i + 1]!;
     if (a.end > b.start) a.end = Math.max(a.start + 1, b.start);
+  }
+  return out;
+}
+
+/**
+ * The words as the screen shows them (DECISIONS #164): a transcript word of a script written
+ * without spaces ("你好") becomes one word per character, its time shared out by length, so a
+ * caption's words always match what's drawn.
+ */
+/** A word as shown; `joinsNext`: the next one is another character of the same transcript word. */
+type ShownWord = TranscriptWord & { joinsNext?: true };
+
+function shownWords(words: readonly TranscriptWord[]): ShownWord[] {
+  const out: ShownWord[] = [];
+  for (const word of words) {
+    const parts = captionWords(word.text);
+    if (parts.length === 1) out.push({ text: parts[0]!, start: word.start, end: word.end });
+    if (parts.length < 2) continue;
+    const sizes = parts.map((p) => graphemes(p).length);
+    const total = sizes.reduce((a, b) => a + b, 0);
+    let at = 0;
+    parts.forEach((text, i) => {
+      const start = word.start + ((word.end - word.start) * at) / total;
+      at += sizes[i]!;
+      const end = word.start + ((word.end - word.start) * at) / total;
+      out.push(i < parts.length - 1 ? { text, start, end, joinsNext: true } : { text, start, end });
+    });
   }
   return out;
 }

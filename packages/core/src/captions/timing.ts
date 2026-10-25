@@ -1,5 +1,6 @@
 import type { CaptionWord, TextItem } from '../model/schema';
 import type { Time } from '../model/time';
+import { captionWords, graphemes } from './words';
 
 /**
  * Where a caption's speech is at a moment (v0.2 A6): which word, and how far through it, so the
@@ -7,10 +8,7 @@ import type { Time } from '../model/time';
  * edited so they no longer match, its time is shared out by word length. Pure; tested.
  */
 
-/** Words of a caption as the screen shows them (split on spaces). */
-export function captionWords(text: string): string[] {
-  return text.split(/\s+/).filter(Boolean);
-}
+export { captionWords };
 
 /** Each shown word's start / end relative to the caption's start (flicks). */
 export function captionWordTimes(
@@ -20,11 +18,11 @@ export function captionWordTimes(
   const words = item.words;
   if (words && words.length === shown.length && words.length > 0)
     return shown.map((text, i) => ({ text, start: words[i]!.start, end: words[i]!.end }));
-  const total = shown.reduce((n, w) => n + w.length, 0) || 1;
+  const total = shown.reduce((n, w) => n + graphemes(w).length, 0) || 1;
   let at = 0;
   return shown.map((text) => {
     const start = (at / total) * item.duration;
-    at += text.length;
+    at += graphemes(text).length;
     return { text, start: Math.round(start), end: Math.round((at / total) * item.duration) };
   });
 }
@@ -49,10 +47,11 @@ export function speechAt(
   let word = -1;
   let progress = 0;
   let chars = 0;
-  const totalChars = times.reduce((n, w) => n + Array.from(w.text).length, 0);
+  // Characters as drawn (graphemes): a Hindi vowel sign isn't a character of its own.
+  const totalChars = times.reduce((n, w) => n + graphemes(w.text).length, 0);
   for (let i = 0; i < times.length; i++) {
     const w = times[i]!;
-    const len = Array.from(w.text).length;
+    const len = graphemes(w.text).length;
     if (local < w.start) break;
     word = i;
     if (local >= w.end) {

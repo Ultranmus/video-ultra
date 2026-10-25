@@ -1,3 +1,4 @@
+import { captionWords, graphemes, joinWords, wordSpans } from '../captions/words';
 import type { TextItem, TextStyle } from '../model/schema';
 
 /**
@@ -43,17 +44,18 @@ interface BlockLayout {
 }
 
 /**
- * Breaks a paragraph at spaces so no line is wider than `max` px, with lines about the same
+ * Breaks a paragraph between words so no line is wider than `max` px, with lines about the same
  * length (the narrowest width that still needs no more lines than filling greedily would).
+ * Words as captions see them: Chinese, Japanese, Thai… break between any two characters.
  */
 function wrapLine(line: string, max: number, width: (s: string) => number): string[] {
-  const words = line.split(/ +/).filter(Boolean);
+  const words = captionWords(line);
   if (words.length < 2 || width(line) <= max) return [line];
   const greedy = (limit: number) => {
     const out: string[] = [];
     let current = '';
     for (const w of words) {
-      const next = current ? `${current} ${w}` : w;
+      const next = joinWords(current, w);
       if (current && width(next) > limit) {
         out.push(current);
         current = w;
@@ -232,16 +234,6 @@ export function revealCuts(
 }
 
 /** Splits text into user-perceived characters (grapheme clusters where the engine can). */
-function graphemes(text: string): string[] {
-  const Seg = (Intl as { Segmenter?: typeof Intl.Segmenter }).Segmenter;
-  if (Seg)
-    return Array.from(
-      new Seg(undefined, { granularity: 'grapheme' }).segment(text),
-      (s) => s.segment,
-    );
-  return Array.from(text);
-}
-
 /**
  * Measures where each character and word of the lines of a text block sits (px), with the same
  * maths as the rasteriser: the line's measured prefix widths plus letter spacing.
@@ -269,16 +261,10 @@ export function measureReveal(
       x = measure(font, prefix) + spacingPx * (k + 1);
       charEnd[k] = x;
     });
-    const ws: number[] = [];
-    const we: number[] = [];
-    let inWord = false;
-    g.forEach((ch, k) => {
-      const space = /^\s+$/.test(ch);
-      if (!space && !inWord) ws.push(charStart[k]!);
-      if (space && inWord) we.push(charEnd[k - 1]!);
-      inWord = !space;
-    });
-    if (inWord) we.push(charEnd[g.length - 1]!);
+    // Words as captions count them (a Chinese character is a word of its own).
+    const spans = wordSpans(text, g);
+    const ws = spans.map(([a]) => charStart[a]!);
+    const we = spans.map(([, b]) => charEnd[b - 1]!);
     chars += g.length;
     words += ws.length;
     return {

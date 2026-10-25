@@ -8,8 +8,8 @@
  * AI Assistant (it uses `/api/assistant` when the server has a key, else an offline demo);
  * Text to speech shows only when the server has a voice service (`/api/speech` has a key);
  * `?speech=0` hides it, `?speech=1` shows it anyway (checks that mock the service).
- * Captions use the server's captions service (`/api/captions`, any language) when it has a
- * Google key, else English on the device; `?transcriber=device` forces the device,
+ * Captions use the server's captions service (`/api/captions`, any language) when it has one
+ * (a speech-to-text key, or a Google key), else English on the device; `?transcriber=device` forces the device,
  * `=server` the service (checks that mock it), `=fake` a stand-in, `=0` none.
  * `?device=phone|phone-small|tablet|tablet-portrait` shows it at that device's size (the editor
  * picks its layout from its own width), so phone and tablet layouts can be checked on a desktop
@@ -20,13 +20,12 @@ import { VideoEditor } from '@video-ultra/react';
 import '@video-ultra/react/styles.css';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
-import { createBackgroundRemover } from '@video-ultra/ai';
+import { createBackgroundRemover, createCaptionsEndpoint } from '@video-ultra/ai';
 import { createPlaygroundAssistant } from './demo-assistant';
 import { createPlaygroundSpeech } from './demo-speech';
 import { createOnDeviceTranscriber } from '@video-ultra/captions';
 import { createDemoSounds } from './demo-sounds';
 import { createFakeTranscriber } from './fake-transcriber';
-import { createServerCaptions } from './server-captions';
 import { embedDemo, logEvent } from './embed-demo';
 
 const DEVICES = {
@@ -53,7 +52,8 @@ function Editor({ speechSetup, captions }: { speechSetup: SpeechSetup; captions:
   const [transcriber] = useState(() => {
     const pick = params.get('transcriber');
     if (pick === 'fake') return createFakeTranscriber();
-    if (pick === 'server' || (captions && pick !== 'device')) return createServerCaptions();
+    if (pick === 'server' || (captions && pick !== 'device'))
+      return createCaptionsEndpoint({ endpoint: '/api/captions' });
     return createOnDeviceTranscriber();
   });
   // Background removal on this device (`?cutout=0`: none; `=people` / `=objects`: that model).

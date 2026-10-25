@@ -839,6 +839,7 @@ export const DEFAULT_LABELS = {
   spokenLanguageOnly: (language: string) => `Spoken language: ${language}`,
   detectLanguage: 'Detect',
   moreLanguages: 'More languages…',
+  searchLanguages: 'Search languages',
   captionsOnDevice: (mb: number) =>
     `Runs on this device, nothing is uploaded · about ${Math.round(mb)} MB to download the first time`,
   captionsOnDeviceCached: 'Runs on this device, nothing is uploaded',
@@ -1108,7 +1109,7 @@ export const DEFAULT_LABELS = {
     "Captions can't hear the video on this connection: browsers only let pages read sound on secure (https) pages.",
   captionsSoundUnreadable:
     "This browser can't read this video's sound, so it can't make captions from it. Try another browser.",
-  captionsDone: (n: number) => `Added ${n} captions`,
+  captionsDone: (n: number) => (n === 1 ? 'Added 1 caption' : `Added ${n} captions`),
   captionsFailed: (why: string) => `Couldn’t make captions: ${why}`,
   captionsReplaceNote: 'Making them again replaces the captions you have.',
   importCaptions: 'Import captions',

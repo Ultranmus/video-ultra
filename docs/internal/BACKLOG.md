@@ -39,7 +39,7 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       itself hears 1–3 words; consider a speech-band filter / noise reduction before the model.
 
 - [ ] (v0.2 A) Captions: right-to-left captions show without the word highlight; Chinese /
-      Japanese / Thai need character-based words (not offered yet); one caption row (no
+      Japanese / Thai: character-based words done (DECISIONS #164); one caption row (no
       multi-language rows); the captions list renders every row (virtualise past a few hundred);
       phones not measured yet. (Hindi / other languages on the device: dropped — English only,
       other languages through the host's own service, DECISIONS #162.)
@@ -251,6 +251,10 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [ ] Text to speech on the device (#150): needs an MIT/Apache phonemizer (or a character-level
       voice model small enough for phones with a permissive licence). Until then voices come
       from the host's service.
-- [ ] Captions: offer the playground's `alignWords` (times from the sound for a service that
-      gives only text, DECISIONS #163) as a package helper — hosts using Gemini-like services
-      hit the same drift. Measure on real Hindi with a reference first (none yet).
+- [x] Captions: offer the playground's `alignWords` as a package helper — done:
+      `createCaptionsEndpoint` times text-only replies from the sound (DECISIONS #164).
+- [ ] Captions: measure word timing on real Hindi against a true reference (none yet; Groq's
+      times are the recogniser's own, Gemini's are from the sound).
+- [ ] Perf: editor-interact (Chrome) shows one ~108 ms main-thread task around "drag text on
+      stage" (~1.7 s into the flow) — present on main before 2026-10-25's captions work too
+      (A/B measured); find what it is (text raster? selection frame?).
