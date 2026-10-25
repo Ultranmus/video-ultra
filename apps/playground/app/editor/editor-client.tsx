@@ -8,6 +8,9 @@
  * AI Assistant (it uses `/api/assistant` when the server has a key, else an offline demo);
  * Text to speech shows only when the server has a voice service (`/api/speech` has a key);
  * `?speech=0` hides it, `?speech=1` shows it anyway (checks that mock the service).
+ * Captions use the server's captions service (`/api/captions`, any language) when it has a
+ * Google key, else English on the device; `?transcriber=device` forces the device,
+ * `=server` the service (checks that mock it), `=fake` a stand-in, `=0` none.
  * `?device=phone|phone-small|tablet|tablet-portrait` shows it at that device's size (the editor
  * picks its layout from its own width), so phone and tablet layouts can be checked on a desktop
  * without deploying. A strip at the top switches devices; it hides itself on real phones.
@@ -23,6 +26,7 @@ import { createPlaygroundSpeech } from './demo-speech';
 import { createOnDeviceTranscriber } from '@video-ultra/captions';
 import { createDemoSounds } from './demo-sounds';
 import { createFakeTranscriber } from './fake-transcriber';
+import { createServerCaptions } from './server-captions';
 import { embedDemo, logEvent } from './embed-demo';
 
 const DEVICES = {
@@ -34,7 +38,7 @@ const DEVICES = {
 } as const;
 type Device = keyof typeof DEVICES;
 
-function Editor({ speechSetup }: { speechSetup: SpeechSetup }) {
+function Editor({ speechSetup, captions }: { speechSetup: SpeechSetup; captions: boolean }) {
   const params = useSearchParams();
   const router = useRouter();
   const theme = (params.get('theme') ?? 'dark') as 'dark' | 'light' | 'auto';
@@ -45,10 +49,13 @@ function Editor({ speechSetup }: { speechSetup: SpeechSetup }) {
   const device: Device = requested && requested in DEVICES ? requested : 'full';
   // The switcher only makes sense on a big screen (on a phone the editor already is the phone).
   const [sounds] = useState(createDemoSounds);
-  // Auto captions on this device (`?transcriber=fake`: a stand-in for checks; `=0`: none).
-  const [transcriber] = useState(() =>
-    params.get('transcriber') === 'fake' ? createFakeTranscriber() : createOnDeviceTranscriber(),
-  );
+  // Auto captions: the server's service, else on this device (see the top comment).
+  const [transcriber] = useState(() => {
+    const pick = params.get('transcriber');
+    if (pick === 'fake') return createFakeTranscriber();
+    if (pick === 'server' || (captions && pick !== 'device')) return createServerCaptions();
+    return createOnDeviceTranscriber();
+  });
   // Background removal on this device (`?cutout=0`: none; `=people` / `=objects`: that model).
   const [backgroundRemover] = useState(() => {
     const model = params.get('cutout');
@@ -155,10 +162,10 @@ function Editor({ speechSetup }: { speechSetup: SpeechSetup }) {
 type SpeechSetup = { voices?: SpeechVoice[] } | null;
 
 /** The editor page's client side. */
-export function EditorClient({ speech }: { speech: SpeechSetup }) {
+export function EditorClient({ speech, captions }: { speech: SpeechSetup; captions: boolean }) {
   return (
     <Suspense>
-      <Editor speechSetup={speech} />
+      <Editor speechSetup={speech} captions={captions} />
     </Suspense>
   );
 }

@@ -457,3 +457,12 @@ merged and re-verified on main; A (captions) and E (layers) here.
   one language shows "Spoken language: English". Docs: "Your own captions service" with a
   typed example (checked with tsc). captions-check: Hindi part removed; checks that the device
   offers no language choice; a host service (no list) still offers Hindi.
+
+## 2026-10-25 · Playground captions with Gemini (DECISIONS #163)
+
+- Owner: use Gemini for all captions in the playground. `/api/captions` (Gemini, text only) +
+  `server-captions.ts` (30 s chunks, silent ones skipped, retries when busy) + `align-words.ts`
+  (word times from the sound — Gemini's own drift by seconds). Live: English 30 s in 3.2 s,
+  real Hindi 1 min in ~5 s (chosen and Detect), right script. Timing vs the on-device model:
+  0.14–0.25 s mean on three clips. captions-check: a mocked-service section (languages, chunks,
+  timing); the on-device parts now force `?transcriber=device`.

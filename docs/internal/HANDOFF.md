@@ -15,6 +15,8 @@ Where the last session stopped and what comes next. Update before ending every s
   request. All merged to main, **not pushed**.
 - **Owner's testing (desktop): Assistant — mostly works ✓.** Next: Audio, Captions (desktop),
   then the phones.
+- Captions: on-device English only in the package (#162); the playground uses Gemini for every
+  language when the Google key is set (#163, times from the sound). Merged to main, not pushed.
 - Dev watcher: `git switch` / `git stash` stop the tsup watchers — restart `pnpm dev` after.
 
 ## 2026-10-24/25 (owner's desktop test pass — merged to main and pushed)
