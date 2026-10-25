@@ -413,3 +413,12 @@ merged and re-verified on main; A (captions) and E (layers) here.
 - Assistant instructions: "this / it / the selected one" = the selection; change only what was asked for.
 - Timeline can shrink below its default too: 160 px minimum (owner).
 - Timeline floor: exactly the ruler + the whole main video row (92 px at normal density; read from the timeline's sizes), owner's ask; the lanes below scroll.
+
+## 2026-10-25 · Vercel build fix
+
+- The first Vercel deploy failed: `pnpm docs:api` (TypeDoc) ran before the packages were built,
+  so `@video-ultra/react` couldn't find `@video-ultra/core`'s types (they come from `dist/`,
+  which a fresh clone doesn't have). The build command now builds the playground's packages
+  first (`turbo run build --filter=playground^...`), then TypeDoc, then the playground.
+- GitHub "Release" workflow failed only because the repo doesn't allow Actions to open pull
+  requests (owner setting: Settings → Actions → General → Workflow permissions).
