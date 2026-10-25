@@ -177,7 +177,11 @@ the stage and everything drawn on it don't mirror. Text items in RTL scripts ren
   pixelate); a blurred area stretches from side handles when it's larger than 88 px on screen.
 - **Capture & export:** "Record with camera" in the Media panel opens a recorder over the whole
   editor (preview, switch camera, mic, record / stop with a clock, then Add to video / Add as a
-  layer / Retake). The export dialog has three kinds — Video (Length: whole / part, presets),
+  layer / Retake): round microphone and switch-camera buttons sit right beside the round record
+  button (#170). The export dialog has three kinds — Video (Quality: one tile per resolution with
+  its file size; Length: whole / part; "More settings", closed by default: frame rate (same as
+  the video), file type, Extra quality, Smaller file — no "Made for": the shape is Video
+  settings'; the summary and Export button under the preview, kept in view on phones, #170),
   Sound only (M4A / Ogg / WAV), Picture (the frame at the playhead, PNG / JPEG). I / O set the
   part from the playhead; the ruler shows it as a band.
 

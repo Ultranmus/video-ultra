@@ -1163,3 +1163,19 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       captions appear only when the host app passes a `transcriber` (its own service through
       `createCaptionsEndpoint`, or the on-device package) — the app developer decides; the person
       editing isn't asked separately. Free on-device captions in more languages: BACKLOG.
+170.  **Export: one quality choice, the rest behind "More settings"; camera buttons beside
+      record** (owner, 2026-10-25, from a mockup). The Video export showed seven choices at
+      once (Made for, Length, Resolution, Quality, Frame rate, Format, Codec). Now: **Quality** —
+      one tile per resolution this device can encode (Small 480p · HD 720p · Full HD 1080p · 2K ·
+      Ultra HD), each with its file size; **Length**; **More settings** (closed): Frame rate (Same
+      as video / 24 / 30 / 60), File type (MP4 · works everywhere / WebM), **Extra quality**
+      (switch: the high bitrate, with its size), **Smaller file** (switch, "newer devices": HEVC in
+      MP4, else AV1 — only where this device can encode it at that size). "Made for" is gone (it
+      changed the video's shape from the export dialog; the shape is Video settings', and the
+      preview shows it). The summary (size · fps · type · about N MB) and the Export button sit
+      under the preview; on phones they're a bar kept in view at the bottom of the sheet. The
+      dialog takes focus itself on opening (no outline on ✕ until Tab). The old "Smaller file"
+      quality step is now the Small tile. Camera: the microphone and switch-camera buttons are
+      round (52 px) and sit right beside the record button instead of centred in the empty
+      halves. Also: the panel resize handles state their size from the start (axe
+      aria-required-attr on focusable separators).

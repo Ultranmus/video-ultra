@@ -220,7 +220,6 @@ export const DEFAULT_LABELS = {
   // Export
   exportTitle: 'Export video',
   format: 'Format',
-  resolution: 'Resolution',
   frameRate: 'Frame rate',
   quality: 'Quality',
   qualityLow: 'Smaller file',
@@ -246,6 +245,16 @@ export const DEFAULT_LABELS = {
   exportUnavailable: "Export isn't available in this build yet.",
   exportKeepOpen: 'Keep this tab open until the export finishes.',
   deviceLimit: 'Higher resolutions need a more powerful device.',
+  /** Export · More settings (closed by default). */
+  moreSettings: 'More settings',
+  moreSettingsHint: 'frame rate, file type, smaller files',
+  sameAsVideo: (fps: number) => `Same as video (${fps})`,
+  fileType: 'File type',
+  fileTypeMp4: 'MP4 · works everywhere',
+  extraQuality: 'Extra quality',
+  extraQualityNote: (size: string) => `Sharper fast motion · about ${size}`,
+  smallerFile: 'Smaller file',
+  newerDevices: 'newer devices',
   // Status / errors
   loading: 'Loading the editor…',
   stoppedTitle: 'The editor stopped',
@@ -641,27 +650,6 @@ export const DEFAULT_LABELS = {
   exportKindImage: 'Picture',
   exportAudioTitle: 'Export sound',
   exportImageTitle: 'Save a picture',
-  madeFor: 'Made for',
-  presetName: (id: string) =>
-    (
-      ({
-        vertical: 'Vertical 9:16',
-        widescreen: 'Widescreen 16:9',
-        square: 'Square 1:1',
-      }) as Record<string, string>
-    )[id] ?? id,
-  presetUse: (id: string) =>
-    (
-      ({
-        vertical: 'Reels, Shorts, TikTok',
-        widescreen: 'YouTube, TVs, computers',
-        square: 'Feed posts',
-      }) as Record<string, string>
-    )[id] ?? '',
-  presetShapeNote: (have: string, want: string) =>
-    `This video is ${have}. Change the canvas to ${want} to fill the frame — or it exports as ${have}.`,
-  changeCanvasTo: (ratio: string) => `Change canvas to ${ratio}`,
-  canvasChangedTo: (ratio: string) => `Canvas changed to ${ratio}`,
   exportLength: 'Length',
   lengthWhole: 'Whole video',
   lengthPart: 'Part',
@@ -863,8 +851,6 @@ export const DEFAULT_LABELS = {
   backgroundUnavailable: 'Background removal isn’t available here.',
   photoOnly: 'Works on photos and image stickers.',
   // v0.4 Export codecs
-  videoCodec: 'Codec',
-  codecStandardTip: 'Plays everywhere',
   codecHevcTip: 'About 40 % smaller; plays on most phones and Macs, not every PC browser',
   codecAv1Tip: 'About half the size; plays in new browsers and phones',
   // v0.4 Sound effects and meters

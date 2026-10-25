@@ -219,8 +219,8 @@ if (only !== 'phone' && only !== 'sound') {
   await page.evaluate(() => (window as any).vuEditor.setPreviewMode(false));
   await page.evaluate(() => (window as any).vuEditor.seek(705_600_000 * 2));
   await page.locator('.vu-topbar .vu-btn', { hasText: 'Export' }).click();
-  await page.locator('.vu-modal .vu-export-option', { hasText: 'Widescreen' }).click();
-  await snap(page, 'd15-export-preset-note');
+  await page.locator('.vu-modal .vu-export-more').click();
+  await snap(page, 'd15-export-more');
   await page.locator('.vu-modal .vu-segment', { hasText: 'Part' }).click();
   await page.locator('.vu-modal .vu-range').scrollIntoViewIfNeeded();
   await snap(page, 'd16-export-part');
@@ -288,9 +288,8 @@ if (only !== 'desktop' && only !== 'sound') {
   // v0.2 D. Capture & export
   await page.locator('.vu-topbar .vu-btn', { hasText: 'Export' }).tap();
   await snap(page, 'p10-export');
-  await page.locator('.vu-modal .vu-export-option', { hasText: 'Square' }).tap();
-  await page.locator('.vu-modal .vu-export-note').scrollIntoViewIfNeeded();
-  await snap(page, 'p11-export-preset-note');
+  await page.locator('.vu-modal .vu-export-more').tap();
+  await snap(page, 'p11-export-more');
   await page.locator('.vu-modal .vu-segment', { hasText: 'Part' }).tap();
   await page.locator('.vu-modal .vu-range').scrollIntoViewIfNeeded();
   await snap(page, 'p12-export-part');
