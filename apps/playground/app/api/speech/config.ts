@@ -4,6 +4,9 @@ import type { SpeechVoice } from '@video-ultra/core';
 export const speechKey = (): string | undefined =>
   process.env.SPEECH_API_KEY ?? process.env.ASSISTANT_API_KEY;
 
+/** Whether `/api/captions` can make captions (it uses Gemini: a Google key). */
+export const captionsService = (): boolean => speechProvider() === 'gemini';
+
 /** Which API the key is for. */
 export type SpeechProvider = 'openai' | 'gemini';
 

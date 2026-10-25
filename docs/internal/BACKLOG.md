@@ -251,3 +251,6 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [ ] Text to speech on the device (#150): needs an MIT/Apache phonemizer (or a character-level
       voice model small enough for phones with a permissive licence). Until then voices come
       from the host's service.
+- [ ] Captions: offer the playground's `alignWords` (times from the sound for a service that
+      gives only text, DECISIONS #163) as a package helper — hosts using Gemini-like services
+      hit the same drift. Measure on real Hindi with a reference first (none yet).

@@ -3,7 +3,8 @@
  * Captions (v0.2 A) in a real browser: auto captions through the editor's audio path (a stand-in
  * transcriber, then the real on-device one on a speech clip), styles and word highlight drawn by
  * the engine, editing in the list, import / download of .srt, dragging moves every caption, undo,
- * axe on the panel; phone: the Captions tool and sheet. Screenshots with --shots.
+ * axe on the panel; the playground's captions service (mocked: 30 s chunks, every language,
+ * words timed from the sound); phone: the Captions tool and sheet. Screenshots with --shots.
  * Usage: playground running, then node scripts/captions-check.ts [--shots <dir>] [--no-model]
  *   [--port 3200]
  */
@@ -206,7 +207,7 @@ if (withModel) {
   ).newPage();
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await load(page, '', ['avc-1080p30.mp4', 'speech-en-gb.m4a']);
+  await load(page, 'transcriber=device', ['avc-1080p30.mp4', 'speech-en-gb.m4a']);
   // Put the speech under the video and lower nothing.
   await page.locator('.vu-rail .vu-btn', { hasText: 'Captions' }).click();
   check(
@@ -241,7 +242,7 @@ if (webkitModel) {
   const page = await (await browser.newContext({ ...devices['iPhone 13'] })).newPage();
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await load(page, '', ['speech-en-gb.m4a']);
+  await load(page, 'transcriber=device', ['speech-en-gb.m4a']);
   await page.locator('.vu-toolbar .vu-btn', { hasText: 'Captions' }).first().tap();
   const t0 = Date.now();
   await page.locator('.vu-dock .vu-btn', { hasText: 'Make captions' }).tap();
@@ -262,6 +263,64 @@ if (webkitModel) {
     `${((Date.now() - t0) / 1000).toFixed(1)} s: "${text.slice(0, 70)}"`,
   );
   check('no page errors (WebKit model)', errors.length === 0, errors.join(' | '));
+  await browser.close();
+}
+
+// ── the playground's captions service (mocked: any language; times come from the sound) ──
+{
+  const browser = await chromium.launch({ channel: 'chrome' });
+  const page = await (
+    await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  ).newPage();
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  const sent: { language: string; seconds: number }[] = [];
+  await page.route('**/api/captions**', async (route) => {
+    const url = new URL(route.request().url());
+    const bytes = route.request().postDataBuffer()?.length ?? 0;
+    sent.push({ language: url.searchParams.get('language') ?? '', seconds: bytes / 4 / 16000 });
+    const said = 'नमस्ते दोस्तों, आज हम चावल बनाएंगे। पहले चावल धो लीजिए।'.split(' ');
+    await route.fulfill({ json: { words: said, language: 'hi' } });
+  });
+  await load(page, 'transcriber=server', ['speech-en-gb.m4a']);
+  await page.locator('.vu-rail .vu-btn', { hasText: 'Captions' }).click();
+  const panel = await page.locator('.vu-panel .vu-captions').innerText();
+  check(
+    'service: every language and Detect offered, made by the service',
+    /Hindi/.test(panel) && /Detect/.test(panel) && /captions service/.test(panel),
+  );
+  await page
+    .locator('.vu-panel button', { hasText: /^Hindi$/ })
+    .first()
+    .click();
+  await page.locator('.vu-panel .vu-btn', { hasText: 'Make captions' }).click();
+  await page.waitForFunction(
+    () => (window as any).vuEditor.project.tracks.some((t: any) => t.kind === 'caption'),
+    null,
+    { timeout: 60000 },
+  );
+  const caps = await captions(page);
+  const timed = await page.evaluate(() => {
+    const t = (window as any).vuEditor.project.tracks.find((x: any) => x.kind === 'caption');
+    const words = t.items.flatMap((i: any) =>
+      (i.words ?? []).map((w: any) => (i.start + w.start) / 705_600_000),
+    );
+    return {
+      first: words[0],
+      ordered: words.every((w: number, k: number) => !k || w >= words[k - 1]),
+    };
+  });
+  check(
+    'service: 30 s chunks (a short tail joins the last), in the chosen language',
+    sent.length === 1 && sent[0]!.seconds > 30 && sent.every((r) => r.language === 'hi'),
+    JSON.stringify(sent),
+  );
+  check(
+    'service: the words become captions, timed from the sound (in order, from the start)',
+    !!caps && caps.items.some((i) => i.text.includes('नमस्ते')) && timed.ordered && timed.first < 1,
+    `${caps?.items.length} captions, first word at ${timed.first?.toFixed(2)} s`,
+  );
+  check('no page errors (service)', errors.length === 0, errors.join(' | '));
   await browser.close();
 }
 

@@ -1052,3 +1052,17 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       Detect, as before. "Bring your own": leave out the package and pass a `Transcriber` that
       calls your server — the docs' Captions page has the example (one request per 30 s piece,
       so memory stays flat). We don't ship a third-party speech service ourselves.
+163.  **The playground makes captions with Gemini; the times come from the sound** (owner,
+      2026-10-25; the package still ships no service — #162). With a Google key the playground
+      passes its own `Transcriber` (`server-captions.ts`): every language and Detect, through
+      `/api/captions` (Gemini, light model first, the server keeps the key); without one, English
+      on the device as before (`?transcriber=device|server` to force). Gemini's text is right
+      (English, real Hindi in Devanagari, Detect) but its **word times drift by seconds** over 30 s
+      (measured: a word at 18 s placed at 29 s), so the route asks for the text only and the
+      browser times the words from the sound (`align-words.ts`): voice = 20 ms frames above the
+      noise floor, gaps under 200 ms filled; words share it by length (digits count 4); phrase
+      ends pin to the nearest pause within 1.5 s of voice. Against the on-device model's times:
+      0.14 / 0.17 / 0.25 s mean error (two English voices, one over music). The editor's pieces
+      are gathered into 30 s chunks (a tail under a second joins the last): a minute is two
+      requests, ~5 s; silent chunks aren't sent. Uploads the sound to Google — the panel says
+      "Made by this app's captions service".
