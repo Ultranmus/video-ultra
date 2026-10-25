@@ -50,6 +50,73 @@ export function alignWords(words: readonly string[], audio: Float32Array): Trans
   return out;
 }
 
+/**
+ * Moves word times that a recogniser put in silence onto the voice (DECISIONS #165). Whisper
+ * stretches the first word after a silence back over it ("Welcome" 0–12 s when the speech starts
+ * at 15 s), so captions showed before anyone spoke. A word that starts where there's no voice
+ * starts where the voice does — only when a later word's own time holds voice (quiet or music-
+ * heavy sound is left alone) — and words moved together share the time up to the next word that
+ * wasn't moved, by length. Order is kept; times are seconds within `audio`.
+ */
+export function snapToVoice(
+  words: readonly TranscriptWord[],
+  audio: Float32Array,
+): TranscriptWord[] {
+  const voiced = voicedFrames(audio);
+  if (voiced.length === 0 || words.length === 0) return words.map((w) => ({ ...w }));
+  const on = new Uint8Array(Math.floor(audio.length / FRAME));
+  for (const f of voiced) on[f] = 1;
+  const frame = (t: number) => Math.max(0, Math.min(on.length, Math.round(t / FRAME_SECONDS)));
+  const hasVoice = (a: number, b: number) => {
+    for (let f = frame(a); f < frame(b); f++) if (on[f]) return true;
+    return false;
+  };
+  const firstVoice = (from: number, limit: number) => {
+    for (let f = frame(from); f < frame(limit); f++) if (on[f]) return f * FRAME_SECONDS;
+    return null;
+  };
+  // Where each word starts on the voice (null: it already does, or no voice to move it to).
+  const moved: (number | null)[] = words.map((w, i) => {
+    if (on[frame(w.start)]) return null;
+    // The voice it belongs to: up to the end of the first word (from this one) that holds voice.
+    let limit: number | null = null;
+    for (let j = i; j < words.length; j++)
+      if (hasVoice(words[j]!.start, words[j]!.end)) {
+        limit = words[j]!.end;
+        break;
+      }
+    if (limit === null) return null;
+    const at = firstVoice(w.start, limit);
+    return at !== null && at > w.start + FRAME_SECONDS ? at : null;
+  });
+  const out = words.map((w) => ({ ...w }));
+  for (let i = 0; i < out.length;) {
+    if (moved[i] === null) {
+      i++;
+      continue;
+    }
+    // A run of moved words that land on the same voice: share it up to the next word's start.
+    let j = i;
+    while (j + 1 < out.length && moved[j + 1] !== null && moved[j + 1]! <= moved[i]! + 0.05) j++;
+    const from = moved[i]!;
+    const next = j + 1 < out.length ? out[j + 1]!.start : Math.max(from, words[j]!.end);
+    const to = Math.max(
+      from + FRAME_SECONDS * (j - i + 1),
+      Math.min(next, Math.max(from, words[j]!.end)),
+    );
+    const weights = out.slice(i, j + 1).map((w) => spokenLength(w.text));
+    const total = weights.reduce((a, b) => a + b, 0);
+    let at = 0;
+    for (let k = i; k <= j; k++) {
+      out[k]!.start = from + ((to - from) * at) / total;
+      at += weights[k - i]!;
+      out[k]!.end = Math.max(out[k]!.start, from + ((to - from) * at) / total);
+    }
+    i = j + 1;
+  }
+  return out;
+}
+
 /** Share of a piece with voice in it (0…1): under a few percent, nobody speaks. */
 export function voicedShare(audio: Float32Array): number {
   const frames = Math.floor(audio.length / FRAME);

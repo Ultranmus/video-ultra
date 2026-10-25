@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { snapToVoice } from './align-words';
 import { createCaptionsEndpoint } from './captions';
 
 const RATE = 16_000;
@@ -92,4 +93,32 @@ describe('createCaptionsEndpoint', () => {
     const busy = fakeServer(() => ({ words: [], language: 'en' }), [429, 429, 429]);
     await expect(run(busy.fetch, speech(2))).rejects.toMatchObject({ status: 429 });
   }, 20_000);
+});
+
+describe('snapToVoice', () => {
+  // 15 s of silence, then voice in bursts (0.7 s of every second).
+  const lead = new Float32Array(25 * RATE);
+  lead.set(speech(10), 15 * RATE);
+
+  it('moves words a recogniser stretched over the silence before the speech onto the voice', () => {
+    const words = snapToVoice(
+      [
+        { text: 'Welcome', start: 0, end: 11.98 },
+        { text: 'back', start: 11.98, end: 15.6 },
+        { text: 'to', start: 15.6, end: 15.7 },
+      ],
+      lead,
+    );
+    expect(words[0]!.start).toBeCloseTo(15, 1);
+    expect(words[1]!.start).toBeGreaterThan(words[0]!.start);
+    expect(words[1]!.end).toBeLessThanOrEqual(15.6 + 1e-9);
+    expect(words[2]).toEqual({ text: 'to', start: 15.6, end: 15.7 });
+  });
+
+  it('leaves words on the voice, and sound with no voice at all, as they are', () => {
+    const onVoice = [{ text: 'hi', start: 15.1, end: 15.5 }];
+    expect(snapToVoice(onVoice, lead)).toEqual(onVoice);
+    const quiet = [{ text: 'hi', start: 0, end: 2 }];
+    expect(snapToVoice(quiet, new Float32Array(3 * RATE))).toEqual(quiet);
+  });
 });

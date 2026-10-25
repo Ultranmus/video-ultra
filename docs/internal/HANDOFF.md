@@ -288,6 +288,7 @@ node scripts/bench.ts --browsers chrome,webkit,firefox
 node scripts/organize-check.ts / picture-check.ts / camera-check.ts / captions-check.ts [--no-model]
 node scripts/speech-media.ts                    # speech clips with known text (macOS `say`)
 node scripts/captions-bench.ts / captions-memory.ts   # model speed, accuracy, memory
+node scripts/captions-timing.ts                 # word timing vs true times (macOS voices; needs a captions key)
 FC_RUNS=30000 pnpm --filter @video-ultra/core test   # deep property tests
 ```
 

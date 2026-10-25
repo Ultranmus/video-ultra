@@ -1090,3 +1090,14 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       3.6 s; English word starts ~0.2 s ahead of the on-device model's (neither is ground
       truth). YouTube's captions API isn't usable: it only serves videos uploaded to a channel
       the user owns, after YouTube processes them.
+165.  **Caption words stretched over silence go onto the voice; timing measured against the
+      truth** (owner, 2026-10-25). The owner saw captions start at 0 s on a clip whose speech
+      starts at 15 s: Whisper (Groq) put "Welcome" at 0–12 s and "back" at 12–15.6 s. The
+      editor's helper now corrects any service's times (`snapToVoice`, `@video-ultra/ai`): a
+      word that starts where there's no voice starts where the voice does — only when a later
+      word's own time holds voice, so quiet or music-heavy sound is left alone — and words moved
+      together share the time up to the next unmoved word. Measured with **true word times**
+      (the system voice reports when it says each word: `scripts/tts-words.swift`, checked
+      against voice onsets within ~0.1 s; `scripts/captions-timing.ts`): Groq is within 0.05 s
+      on average in English and Hindi (worst 0.15 s); the "0.2 s early" in #164 was the
+      on-device reference running late, not Groq. A mid-video pause was already right.

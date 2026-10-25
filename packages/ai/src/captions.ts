@@ -1,5 +1,5 @@
 import type { Transcriber, TranscriptWord } from '@video-ultra/core';
-import { alignWords, voicedShare } from './align-words';
+import { alignWords, snapToVoice, voicedShare } from './align-words';
 
 /** Options of {@link createCaptionsEndpoint}. */
 export interface CaptionsEndpointOptions {
@@ -130,11 +130,13 @@ function timed(words: CaptionsEndpointReply['words'], sound: Float32Array): Tran
     );
   const end = sound.length / SAMPLE_RATE;
   let at = 0;
-  return list.map((w) => {
+  const given = list.map((w) => {
     const start = Math.min(end, Math.max(at, w.start!));
     at = start;
     return { text: w.text.trim(), start, end: Math.min(end, Math.max(start, w.end!)) };
   });
+  // Recognisers stretch a word back over the silence before it: put it on the voice.
+  return snapToVoice(given, sound);
 }
 
 async function ask(
