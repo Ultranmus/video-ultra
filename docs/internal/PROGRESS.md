@@ -435,3 +435,8 @@ merged and re-verified on main; A (captions) and E (layers) here.
   the end and make it black and white", "add a title … and make it fade in" — all applied.
 - Playground assistant asks Gemini's lite model first (flash only if lite is busy): answers in
   1–2 s instead of ~13 s while flash is overloaded (owner's choice; no Claude key on a Pro plan).
+- Assistant: "make it smoother and high class" was rejected (it tried to animate main clips) and
+  the chat still said "I added…". Now a rejected answer is retried once with the reason, a
+  rejected turn hides the false claim, and the guide steers main clips to transitions (#160).
+  Live with Gemini lite: 3 of 3 right on the first try. `assistant-check` covers the retry; its
+  offline-demo part now answers 501 itself (a real key on the dev server made it fail).

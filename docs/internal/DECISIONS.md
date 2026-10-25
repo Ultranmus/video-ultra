@@ -1022,3 +1022,11 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       entry per line (the chat keeps line breaks). The item factories `visualItem` / `audioItem`
       moved to core (`model/items.ts`, internal) so the assistant and the editor build the same
       items.
+160.  **A rejected assistant answer gets one second try** (owner, 2026-10-25; extends #149). When
+      `applyEditActions` rejects the model's plan, the editor asks once more with the reason
+      (`correctionRequest`) and applies the corrected plan; only if that fails too does the turn
+      show the error (one extra request at most — a model that keeps getting it wrong can't loop).
+      A rejected turn hides the model's reply, which would claim changes that weren't made. The
+      guide also says animations are for text, stickers and layers (never main-video clips) and
+      that "smoother" main video means transitions — the owner's "make it smoother, high class"
+      had the light model animate main clips.

@@ -59,19 +59,24 @@ const ask = async (page: Page, text: string) => {
 const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
 // The server's model, mocked: an OpenAI-shaped answer. Captures what the editor sent.
 let sent: any = null;
+let calls = 0;
 await page.route('**/api/assistant', async (route) => {
+  calls++;
   sent = JSON.parse(route.request().postData() ?? '{}');
   const user = JSON.parse(sent.messages[sent.messages.length - 1].content);
   const first = user.project.tracks.find((t: any) => t.kind === 'main video').items[0].id;
-  const plan = user.instruction.includes('broken')
-    ? [
-        { action: 'filter', itemId: first, filter: 'warm' },
-        { action: 'split', itemId: 'made-up-id', at: 1 },
-      ]
-    : [
-        { action: 'filter', itemId: first, filter: 'warm', intensity: 0.7 },
-        { action: 'addText', text: 'Hello', start: 0, duration: 2, position: 'top' },
-      ];
+  // "once": broken first, right when told why (the editor's second try).
+  const retry = user.instruction.startsWith('Your last answer was rejected');
+  const plan =
+    user.instruction.includes('broken') && !(retry && user.instruction.includes('once'))
+      ? [
+          { action: 'filter', itemId: first, filter: 'warm' },
+          { action: 'split', itemId: 'made-up-id', at: 1 },
+        ]
+      : [
+          { action: 'filter', itemId: first, filter: 'warm', intensity: 0.7 },
+          { action: 'addText', text: 'Hello', start: 0, duration: 2, position: 'top' },
+        ];
   await route.fulfill({
     contentType: 'application/json',
     body: JSON.stringify({
@@ -132,19 +137,37 @@ check(
   (await page.locator('.vu-assistant-turn').last().innerText()).includes('Made 2 changes'),
 );
 
-// 2. A plan with one bad action changes nothing and says why.
+// 2. A plan with one bad action changes nothing and says why — after one second try.
+calls = 0;
 turn = await ask(page, 'something broken');
 const filterAfter = await page.evaluate(
   () => (window as any).vuEditor.project.tracks[0].items[0].filter,
 );
 check(
-  'a plan with a made-up id changes nothing and says which action',
-  turn.applied === 0 && /Action 2/.test(turn.error ?? '') && !filterAfter,
-  turn.error,
+  'a plan with a made-up id changes nothing and says which action (asked twice)',
+  turn.applied === 0 && /Action 2/.test(turn.error ?? '') && !filterAfter && calls === 2,
+  `${turn.error} · ${calls} requests`,
+);
+check(
+  'a rejected answer doesn’t show its claim of changes',
+  !(await page.locator('.vu-assistant-turn').last().innerText()).includes('Warmed it'),
 );
 
-// 3. No server key → the offline demo.
+// 2b. Rejected once, then corrected: the second answer is applied.
+calls = 0;
+turn = await ask(page, 'broken once');
+check(
+  'a rejected answer is retried once with the reason, and the fix applied',
+  turn.applied === 2 && !turn.error && calls === 2 && sent.messages.length >= 4,
+  `${turn.error} · ${calls} requests`,
+);
+await page.evaluate(() => (window as any).vuEditor.undo());
+
+// 3. No server key → the offline demo (answered 501 here: the dev server may have a real key).
 await page.unroute('**/api/assistant');
+await page.route('**/api/assistant', (route) =>
+  route.fulfill({ status: 501, body: 'No assistant configured' }),
+);
 turn = await ask(page, 'Make the whole video warmer');
 const warm = await page.evaluate(() =>
   (window as any).vuEditor.project.tracks[0].items.map((i: any) => i.adjust.warmth),

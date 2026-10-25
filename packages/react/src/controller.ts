@@ -1,6 +1,7 @@
 import type { EditorCustomization, EditorEvent } from './embed';
 import {
   applyEditActions,
+  correctionRequest,
   describeProject,
   type EditingAssistant,
   type SpeechGenerator,
@@ -2435,19 +2436,23 @@ export class EditorController {
       error: null,
     };
     try {
-      const answer = await assistant.edit({
-        instruction: text,
-        project: describeProject(this.project),
-        selection: [...state.selectedIds],
-        playhead: this.playhead.time / FLICKS_PER_SECOND,
-        history: state.assistantTurns
-          .slice(-6)
-          .map((t) => ({ instruction: t.instruction, reply: t.reply })),
-        signal: abort.signal,
-      });
-      if (abort.signal.aborted) return null;
-      turn = { ...turn, reply: answer.reply };
-      if (answer.actions.length > 0) {
+      const history = state.assistantTurns
+        .slice(-6)
+        .map((t) => ({ instruction: t.instruction, reply: t.reply }));
+      let ask = text;
+      // A rejected answer gets one second try: the model reads why and answers again.
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const answer = await assistant.edit({
+          instruction: ask,
+          project: describeProject(this.project),
+          selection: [...state.selectedIds],
+          playhead: this.playhead.time / FLICKS_PER_SECOND,
+          history,
+          signal: abort.signal,
+        });
+        if (abort.signal.aborted) return null;
+        turn = { ...turn, reply: answer.reply, error: null };
+        if (answer.actions.length === 0) break;
         try {
           this.editor.apply(l.assistantEdit, (d, ctx) =>
             applyEditActions(d, answer.actions, ctx.ids),
@@ -2457,8 +2462,12 @@ export class EditorController {
             label: l.undo,
             run: () => this.undo(),
           });
+          break;
         } catch (error) {
-          turn = { ...turn, error: error instanceof EditError ? error.message : String(error) };
+          const why = error instanceof EditError ? error.message : String(error);
+          turn = { ...turn, error: why };
+          history.push({ instruction: ask, reply: answer.reply });
+          ask = correctionRequest(text, why);
         }
       }
     } catch (error) {
