@@ -84,7 +84,7 @@ function prompt(language: string, seconds: number): string {
     'Write every spoken word in order, with punctuation.',
     'Write only what is said: no speaker names, no descriptions of sounds or music.',
     'If nobody speaks, the text is empty.',
-    'Answer with "language" (the ISO 639-1 code of the speech) and "text".',
+    'Answer with "language" (the ISO 639-1 code of the language actually spoken, even if it is not the one named) and "text".',
   ].join(' ');
 }
 
@@ -97,11 +97,12 @@ function clean(text: string, language: string): { words: string[]; language: str
     /* not JSON: no words */
   }
   const said = typeof value.text === 'string' ? value.text : '';
-  const heard = typeof value.language === 'string' && value.language ? value.language : language;
-  return {
-    words: said.split(/\s+/).filter(Boolean),
-    language: heard === 'auto' ? 'en' : heard.slice(0, 2).toLowerCase(),
-  };
+  const raw = typeof value.language === 'string' && value.language ? value.language : language;
+  const heard = raw === 'auto' ? 'en' : raw.slice(0, 2).toLowerCase();
+  // Another language than the one chosen: Gemini then writes it in Latin letters or translates
+  // it. No words; the language heard lets the editor say which one to choose.
+  if (language !== 'auto' && heard !== language) return { words: [], language: heard };
+  return { words: said.split(/\s+/).filter(Boolean), language: heard };
 }
 
 /** 16-bit PCM WAV of 16 kHz mono float samples. */

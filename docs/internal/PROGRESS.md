@@ -466,3 +466,7 @@ merged and re-verified on main; A (captions) and E (layers) here.
   real Hindi 1 min in ~5 s (chosen and Detect), right script. Timing vs the on-device model:
   0.14–0.25 s mean on three clips. captions-check: a mocked-service section (languages, chunks,
   timing); the on-device parts now force `?transcriber=device`.
+- Captions (owner): Hindi speech with another language chosen said "No speech" (Gemini writes
+  it in Latin letters or nothing). The route now drops words in another language than the one
+  chosen and reports the language heard; the editor says "This sounds like Hindi, not French.
+  Choose Hindi or Detect". Language chips: English, Hindi, Detect, then the rest.

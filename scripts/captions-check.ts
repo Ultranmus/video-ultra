@@ -278,9 +278,13 @@ if (webkitModel) {
   await page.route('**/api/captions**', async (route) => {
     const url = new URL(route.request().url());
     const bytes = route.request().postDataBuffer()?.length ?? 0;
-    sent.push({ language: url.searchParams.get('language') ?? '', seconds: bytes / 4 / 16000 });
+    const language = url.searchParams.get('language') ?? '';
+    sent.push({ language, seconds: bytes / 4 / 16000 });
+    // Hindi speech: any other language chosen hears no words, and says it heard Hindi.
     const said = 'नमस्ते दोस्तों, आज हम चावल बनाएंगे। पहले चावल धो लीजिए।'.split(' ');
-    await route.fulfill({ json: { words: said, language: 'hi' } });
+    await route.fulfill({
+      json: { words: language === 'hi' || language === 'auto' ? said : [], language: 'hi' },
+    });
   });
   await load(page, 'transcriber=server', ['speech-en-gb.m4a']);
   await page.locator('.vu-rail .vu-btn', { hasText: 'Captions' }).click();
@@ -289,6 +293,30 @@ if (webkitModel) {
     'service: every language and Detect offered, made by the service',
     /Hindi/.test(panel) && /Detect/.test(panel) && /captions service/.test(panel),
   );
+  const chips = await page
+    .locator('.vu-panel .vu-captions [role=radio], .vu-panel .vu-captions .vu-chip')
+    .allInnerTexts();
+  check('service: Detect is the third choice', chips[2]?.trim() === 'Detect', chips.join(' · '));
+  // Hindi speech with French chosen: says which language it heard.
+  await page.locator('.vu-panel button', { hasText: /More languages/ }).click();
+  await page
+    .locator('.vu-panel button', { hasText: /^French$/ })
+    .first()
+    .click();
+  await page.locator('.vu-panel .vu-btn', { hasText: 'Make captions' }).click();
+  const toast = page.locator('.vu-toast', { hasText: 'sounds like Hindi' });
+  await toast.waitFor({ timeout: 30000 }).catch(() => undefined);
+  check(
+    'service: another language than the one spoken says which to choose',
+    (await toast.count()) > 0 &&
+      (await toast.first().innerText()).includes('not French') &&
+      !(await captions(page)),
+    await toast
+      .first()
+      .innerText()
+      .catch(() => 'no toast'),
+  );
+  sent.length = 0;
   await page
     .locator('.vu-panel button', { hasText: /^Hindi$/ })
     .first()

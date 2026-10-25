@@ -28,7 +28,9 @@ export function createServerCaptions(endpoint = '/api/captions'): Transcriber {
         // Nearly silent (a quiet room, wind): nobody speaks, and nothing to make up.
         if (voicedShare(sound) >= MIN_VOICE) {
           const answer = await ask(endpoint, sound, language, signal);
-          if (language === 'auto' && answer.words.length) heard = answer.language;
+          // Detect: the language heard. Chosen: a different one heard (no words came back).
+          if (answer.words.length ? language === 'auto' : answer.language !== language)
+            heard = answer.language;
           for (const w of alignWords(answer.words, sound))
             words.push({ text: w.text, start: w.start + offset, end: w.end + offset });
         }

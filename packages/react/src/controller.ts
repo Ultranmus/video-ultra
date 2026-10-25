@@ -111,7 +111,7 @@ import {
   visualItem,
 } from './items';
 import { audioExtension, type AudioLibrary, type AudioLibraryTrack } from './library/audio-library';
-import { formatClock } from './format';
+import { formatClock, languageName } from './format';
 import { DEFAULT_KEY, isPicture } from './picture';
 import { computeTargets, type Targets } from './targets';
 import type { Labels } from './labels';
@@ -2629,7 +2629,14 @@ export class EditorController {
       if (abort.signal.aborted) return;
       const captions = groupCaptions(result.words, 0);
       if (captions.length === 0) {
-        this.toast(l.captionsNoSpeech, 'info');
+        // Speech in another language than the one chosen: say which.
+        const other = language !== 'auto' && result.language && result.language !== language;
+        this.toast(
+          other
+            ? l.captionsOtherLanguage(languageName(result.language), languageName(language))
+            : l.captionsNoSpeech,
+          'info',
+        );
         return;
       }
       this.run(l.autoCaptions, (d, ctx) =>
