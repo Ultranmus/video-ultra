@@ -433,3 +433,5 @@ merged and re-verified on main; A (captions) and E (layers) here.
 - Checked live with Gemini through `/api/assistant`: list media, rename, "put beach.jpg after
   the first clip", music from the start, "make sunset.mov black and white", "add beach.jpg at
   the end and make it black and white", "add a title … and make it fade in" — all applied.
+- Playground assistant asks Gemini's lite model first (flash only if lite is busy): answers in
+  1–2 s instead of ~13 s while flash is overloaded (owner's choice; no Claude key on a Pro plan).

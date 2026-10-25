@@ -63,11 +63,11 @@ export async function POST(request: Request): Promise<Response> {
 }
 
 /**
- * Gemini models to try in turn: the current flash, then the lite one, which stays quick when
- * the others are overloaded (measured 2026-10-24: flash 503 after 11 s or hanging past 60 s,
- * lite 6 s).
+ * Gemini models to try in turn: the lite one first — quick, and it handled every edit we tried
+ * (2026-10-25) — then the current flash if lite is busy or down (measured 2026-10-24: flash
+ * 503 after 11 s or hanging past 60 s, lite 6 s).
  */
-const GEMINI_MODELS = ['gemini-3.8-flash', 'gemini-flash-lite-latest'];
+const GEMINI_MODELS = ['gemini-flash-lite-latest', 'gemini-3.8-flash'];
 /** How long a model that isn't the last one may take before the next is tried. */
 const MODEL_WAIT_MS = 12_000;
 
