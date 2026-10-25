@@ -835,6 +835,8 @@ export const DEFAULT_LABELS = {
   makeCaptions: 'Make captions',
   remakeCaptions: 'Make them again',
   spokenLanguage: 'Spoken language',
+  /** Auto captions hear one language only (no choice to make). */
+  spokenLanguageOnly: (language: string) => `Spoken language: ${language}`,
   detectLanguage: 'Detect',
   moreLanguages: 'More languages…',
   captionsOnDevice: (mb: number) =>

@@ -92,8 +92,9 @@ export interface VideoEditorProps {
   audioLibrary?: AudioLibrary | undefined;
   /**
    * Turns speech into timed words for Auto captions: `createOnDeviceTranscriber()` from the
-   * optional `@video-ultra/captions` package (runs on the device, nothing uploaded), or your own
-   * service. Without it, captions can still be imported (.srt / .vtt) or typed.
+   * optional `@video-ultra/captions` package (English, on the device, nothing uploaded), or your
+   * own service for any language. Without it, captions can still be imported (.srt / .vtt) or
+   * typed.
    */
   transcriber?: Transcriber | undefined;
   /**

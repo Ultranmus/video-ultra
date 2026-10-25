@@ -23,7 +23,8 @@ Open the branch's Vercel preview (or `pnpm --filter playground dev`), then **`/e
       at the start.
 - [ ] **Film strip flicker (desktop).** Didn't reproduce here (Chrome, WebKit, 1×/2× pixels,
       clips and video layers). If you still see it: a short screen recording please.
-- [ ] **Hindi captions on the iPhone.** Make captions on the clip that said "No speech" (open the
+- [x] ~~**Hindi captions on the iPhone.**~~ Dropped: on-device captions are English only now
+      (owner, DECISIONS #162). Make captions on the clip that said "No speech" (open the
       playground over **https**: `pnpm --filter playground dev:https`). Real Hindi under music
       now comes through (DECISIONS #152); if the phone can't read the sound you get a plain
       message saying so. Tell me how many lines it made.
@@ -44,7 +45,7 @@ Open the branch's Vercel preview (or `pnpm --filter playground dev`), then **`/e
 
 ## 1. Fixes
 
-- [ ] **Hindi captions on the iPhone don't crash the tab any more.** Captions → Hindi → Make
+- [x] ~~**Hindi captions on the iPhone don't crash the tab any more.**~~ Dropped (#162). Captions → Hindi → Make
       captions on a clip where someone speaks Hindi. Expected: the panel first warns that the
       large model may not fit a phone; then either it works (say how long it took), or — if the
       tab reloads — open Captions again: Hindi now says "ran out of memory… try on a computer"

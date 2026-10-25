@@ -448,3 +448,12 @@ merged and re-verified on main; A (captions) and E (layers) here.
   description (#161). Live with Gemini lite: 5 of 5 centred, −45°, scale 2, coloured, 0.8.
 - Assistant: History steps are named after the request ("Assistant: put the watermark…")
   instead of "Assistant edit" for every one (owner couldn't find them; `assistant-check`).
+
+## 2026-10-25 · Captions: English on the device, your own service for the rest (DECISIONS #162)
+
+- Owner: Hindi on the device isn't good enough; offer English only and let hosts plug in their
+  own service. `createOnDeviceTranscriber()` hears English only (no `small` model, no Detect /
+  model switch, no phone memory warning); `Transcriber.languages` drives the panel's choice —
+  one language shows "Spoken language: English". Docs: "Your own captions service" with a
+  typed example (checked with tsc). captions-check: Hindi part removed; checks that the device
+  offers no language choice; a host service (no list) still offers Hindi.

@@ -2,7 +2,7 @@
 /**
  * Captions memory over time (v0.2 A0): the test browser's own processes only (renderer = page +
  * speech worker), sampled every 200 ms through two runs and 3 s after.
- * Usage: playground running, then node scripts/captions-memory.ts [wasm|webgpu] [tiny|base|small]
+ * Usage: playground running, then node scripts/captions-memory.ts [wasm|webgpu] [tiny|base]
  *   [file] [session-options-json] [files-json, e.g. {"encoder":"encoder_model_q4.onnx",…}]
  */
 import { chromium } from '@playwright/test';
@@ -62,7 +62,7 @@ for (let i = 0; i < 2; i++) {
         file: f,
         model: m,
         device: dev,
-        language: f.includes('hi') ? 'hi' : 'en',
+        language: 'en',
         reference: ref,
         ...(s || fs
           ? { debug: { ...(s ? { session: s } : {}), ...(fs ? { files: fs } : {}) } }

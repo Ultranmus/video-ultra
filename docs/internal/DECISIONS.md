@@ -1040,3 +1040,15 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       styled text failed with "could not be cloned" — `{ ...draft.style }` keeps nested drafts
       (outline, shadow…) that `structuredClone` can't copy; `ops.ts` `copy()` now turns drafts
       into plain data at any depth, for every op that takes a patch.
+162.  **On-device captions are English only; other languages through the host's own service**
+      (owner, 2026-10-25; replaces the language parts of #120, #128, #132). The owner found the
+      on-device Hindi results not good enough to offer. `createOnDeviceTranscriber()` now hears
+      English only (`base`, or `tiny` where the device is short of memory, on WebAssembly): the
+      `small` model, the language list, "Detect" with its model switch and the phone memory
+      warning are gone — less to download, nothing near a phone's memory limit. `Transcriber`
+      gains `languages` (ISO codes, plus `'auto'` if it detects): the Captions panel offers
+      exactly those, and with one language shows "Spoken language: English" instead of a choice.
+      A transcriber without the list (a host's own service) gets the panel's full list and
+      Detect, as before. "Bring your own": leave out the package and pass a `Transcriber` that
+      calls your server — the docs' Captions page has the example (one request per 30 s piece,
+      so memory stays flat). We don't ship a third-party speech service ourselves.

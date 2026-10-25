@@ -20,7 +20,6 @@ const arg = (name: string) =>
 const port = arg('port') ?? '3200';
 const shots = arg('shots');
 const withModel = !process.argv.includes('--no-model');
-const hindi = process.argv.includes('--hindi');
 const webkitModel = process.argv.includes('--webkit-model');
 let failures = 0;
 const results: string[] = [];
@@ -210,10 +209,12 @@ if (withModel) {
   await load(page, '', ['avc-1080p30.mp4', 'speech-en-gb.m4a']);
   // Put the speech under the video and lower nothing.
   await page.locator('.vu-rail .vu-btn', { hasText: 'Captions' }).click();
-  await page
-    .locator('.vu-panel button', { hasText: /^English$/ })
-    .first()
-    .click();
+  check(
+    'on the device: English only, no language to choose',
+    (await page.locator('.vu-panel .vu-captions').innerText()).includes(
+      'Spoken language: English',
+    ) && (await page.locator('.vu-panel button', { hasText: /^Hindi$|^Detect$/ }).count()) === 0,
+  );
   const t0 = Date.now();
   await page.locator('.vu-panel .vu-btn', { hasText: 'Make captions' }).click();
   await page.waitForFunction(
@@ -242,10 +243,6 @@ if (webkitModel) {
   page.on('pageerror', (e) => errors.push(e.message));
   await load(page, '', ['speech-en-gb.m4a']);
   await page.locator('.vu-toolbar .vu-btn', { hasText: 'Captions' }).first().tap();
-  await page
-    .locator('.vu-dock button', { hasText: /^English$/ })
-    .first()
-    .tap();
   const t0 = Date.now();
   await page.locator('.vu-dock .vu-btn', { hasText: 'Make captions' }).tap();
   const outcome = await page
@@ -268,37 +265,6 @@ if (webkitModel) {
   await browser.close();
 }
 
-// ── Hindi (the small model; slow on WebAssembly, so WebGPU) ───────────────
-if (hindi) {
-  const browser = await chromium.launch({ channel: 'chrome', args: ['--enable-unsafe-webgpu'] });
-  const page = await (
-    await browser.newContext({ viewport: { width: 1440, height: 900 } })
-  ).newPage();
-  await load(page, '', ['speech-hi.m4a']);
-  await page.locator('.vu-rail .vu-btn', { hasText: 'Captions' }).click();
-  await page
-    .locator('.vu-panel button', { hasText: /^Hindi$/ })
-    .first()
-    .click();
-  const t0 = Date.now();
-  await page.locator('.vu-panel .vu-btn', { hasText: 'Make captions' }).click();
-  await page.waitForFunction(
-    () => (window as any).vuEditor.project.tracks.some((t: any) => t.kind === 'caption'),
-    null,
-    { timeout: 900000 },
-  );
-  const caps = await captions(page);
-  const text = caps!.items.map((i) => i.text).join(' ');
-  check(
-    'Hindi captions come out in Devanagari',
-    /[\u0900-\u097F]{3}/.test(text) && /चाय|चाए/.test(text),
-    `${caps!.items.length} captions in ${((Date.now() - t0) / 1000).toFixed(1)} s: "${text.slice(0, 50)}…"`,
-  );
-  await page.evaluate((t) => (window as any).vuEditor.seek(t + 300_000_000), caps!.items[1]!.start);
-  await snap(page, 'c6-hindi');
-  await browser.close();
-}
-
 // ── phone ───────────────────────────────────────────────────────────────
 {
   const browser = await webkit.launch();
@@ -311,14 +277,17 @@ if (hindi) {
     'phone: Captions opens in the sheet',
     await page.locator('.vu-dock .vu-captions').isVisible(),
   );
-  // Hindi works on a phone without WebGPU too (the larger model, slower — the estimate says so).
+  // A host's own service with no language list: the panel offers its languages (Hindi too).
   await page
     .locator('.vu-dock button', { hasText: /^Hindi$/ })
     .first()
     .tap();
   await page.waitForTimeout(300);
   const make = page.locator('.vu-dock .vu-btn', { hasText: 'Make captions' });
-  check('phone: Hindi can be captioned', (await make.getAttribute('aria-disabled')) !== 'true');
+  check(
+    'phone: a host service can caption Hindi',
+    (await make.getAttribute('aria-disabled')) !== 'true',
+  );
   await page
     .locator('.vu-dock button', { hasText: /^English$/ })
     .first()

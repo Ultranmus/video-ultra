@@ -62,7 +62,7 @@ const ROWS: [string, string, string][] = [
   [
     'transcriber',
     'Transcriber',
-    'Auto captions: createOnDeviceTranscriber() from @video-ultra/captions, or your service.',
+    'Auto captions: createOnDeviceTranscriber() from @video-ultra/captions (English), or your own service (any language).',
   ],
   [
     'backgroundRemover',
