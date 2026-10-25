@@ -442,3 +442,7 @@ merged and re-verified on main; A (captions) and E (layers) here.
   offline-demo part now answers 501 itself (a real key on the dev server made it fail).
 - Assistant: reopening the panel on a long chat started at the top; it now opens at the latest
   exchange, as right after sending (`assistant-check` covers it).
+- Assistant: "put the watermark diagonal… colour with opacity" failed with "could not be cloned"
+  (editing a styled text inside the editor's draft). Fixed in `ops.ts` `copy()` for every op;
+  new `place` action (position, size, rotation, opacity); lane items' placement in the
+  description (#161). Live with Gemini lite: 5 of 5 centred, −45°, scale 2, coloured, 0.8.
