@@ -2,6 +2,28 @@
 
 Where the last session stopped and what comes next. Update before ending every session.
 
+## 2026-10-25 end of day — where to pick up
+
+**State:** everything is merged into main locally; **not pushed** since the Vercel fix (the owner
+says when). The dev server runs on :3200. Keys in `apps/playground/.env.local` are **commented
+out** by the owner (`SPEECH_API_KEY`, `CAPTIONS_API_KEY`): the playground runs without
+services — captions on the device (English), assistant offline demo, no Read aloud.
+`?transcriber=0` shows the editor without the captions package.
+
+**Done today (DECISIONS #159–#170):** assistant (media library, rename, retry, place, history
+names); captions (English-only device model, any language through the host's service with
+`createCaptionsEndpoint`, Groq / Gemini in the playground, every script, speech detector,
+timing vs true times, check marks, names to spell right, hear again, Hinglish as a language);
+captions panel text trimmed; export dialog rebuilt (one quality choice, More settings); camera
+buttons; resize-handle a11y.
+
+**Owner's desktop testing:** Assistant mostly ✓, Captions ✓, everything from the 10-24 pass ✓.
+**Next (owner, tomorrow):** the export dialog and camera (TEST_CHECKLIST 0000), then Audio, then
+the rest of the desktop list (editing tools, export codecs, check-ups — see the list given on
+2026-10-25), then the phones (nothing since the last desktop pass has been tried on a phone).
+**Backlog worth remembering:** free on-device captions in more languages (measure first);
+the ~108 ms task during text drag (pre-existing).
+
 ## 2026-10-25 (Vercel fixed; assistant: media library + rename — merged to main)
 
 - Vercel deploy fixed (packages built before TypeDoc) and pushed; the deploy succeeds. GitHub
