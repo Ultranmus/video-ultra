@@ -268,14 +268,23 @@ Actions:
 - {"action":"transition","itemId","transition"(catalog.transitions or null),"duration"?} into a main-video clip from the one before
 - {"action":"addText","ref"?,"text","start","duration"?,"position"?("top"|"center"|"bottom"),"color"?(#rrggbb),"size"?("small"|"medium"|"large")}
 - {"action":"editText","itemId","text"?,"color"?,"size"?}
-- {"action":"animate","itemId","in"?(catalog.animationsIn or null),"out"?(catalog.animationsOut or null)}
+- {"action":"animate","itemId","in"?(catalog.animationsIn or null),"out"?(catalog.animationsOut or null)} text, stickers and layers only, never main-video clips
 - {"action":"canvas","ratio"("9:16"|"16:9"|"1:1"|"4:5"|"4:3"|"21:9")}
 - {"action":"marker","time","label"?}
 - {"action":"rename","name"} rename the video
 - {"action":"addMedia","mediaId","ref"?,"start"?,"asLayer"?} put a "media" file on the timeline: a sound on a sound lane at start; a video / photo into the main video before the clip at start (at the end without start), or on a layer at start with asLayer:true
 To edit something you add in the same answer, give it a "ref" (e.g. "new1") and use that as the
 itemId in the actions after it.
+To make main-video clips flow ("smoother", "more polished"), use transitions between them.
 If the request is unclear or impossible, return no actions and ask or explain in "reply".`;
+
+/**
+ * What to send the model when the editor rejected its answer (`error` from
+ * {@link applyEditActions}), to get a corrected one for the same `instruction`.
+ */
+export function correctionRequest(instruction: string, error: string): string {
+  return `Your last answer was rejected and nothing changed: ${error}. Answer again for the same request with only actions that are allowed (or none, explaining in "reply"). Request: ${instruction}`;
+}
 
 const SIZES = { small: 0.04, medium: 0.06, large: 0.1 } as const;
 const POSITIONS = { top: 0.15, center: 0.5, bottom: 0.82 } as const;

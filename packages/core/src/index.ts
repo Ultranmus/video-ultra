@@ -145,6 +145,7 @@ export {
 // AI editing (v0.4, optional): the action language a host's model answers in.
 export {
   applyEditActions,
+  correctionRequest,
   describeProject,
   EditActionSchema,
   EDIT_ACTIONS_GUIDE,

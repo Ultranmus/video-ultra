@@ -76,7 +76,8 @@ export function AssistantPanel(): ReactElement {
                       <Icon name="sparkle" size={14} />
                     </span>
                     <div className="vu-assistant-reply-body">
-                      {t.reply ? <p>{t.reply}</p> : null}
+                      {/* A rejected answer's reply would claim changes that weren't made. */}
+                      {t.reply && !t.error ? <p>{t.reply}</p> : null}
                       <div className="vu-assistant-result" data-state={state}>
                         {state === 'done' ? <Icon name="check" size={14} /> : null}
                         {state === 'error' ? <Icon name="warning" size={14} /> : null}
