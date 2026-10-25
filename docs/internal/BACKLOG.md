@@ -253,8 +253,10 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       from the host's service.
 - [x] Captions: offer the playground's `alignWords` as a package helper — done:
       `createCaptionsEndpoint` times text-only replies from the sound (DECISIONS #164).
-- [ ] Captions: measure word timing on real Hindi against a true reference (none yet; Groq's
-      times are the recogniser's own, Gemini's are from the sound).
+- [x] Captions: measure word timing against a true reference — done with the system voice's own
+      word times (`captions-timing`, DECISIONS #165): Groq 0.05 s mean in English and Hindi.
+      Still open: Chinese / Japanese (the voice and Groq split words differently) and Gemini's
+      sound-based times on the same reference.
 - [ ] Perf: editor-interact (Chrome) shows one ~108 ms main-thread task around "drag text on
       stage" (~1.7 s into the flow) — present on main before 2026-10-25's captions work too
       (A/B measured); find what it is (text raster? selection frame?).
