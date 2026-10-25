@@ -2,6 +2,16 @@
 
 Where the last session stopped and what comes next. Update before ending every session.
 
+## 2026-10-25 (Vercel fixed; assistant: media library + rename — merged to main)
+
+- Vercel deploy fixed (packages built before TypeDoc) and pushed; the deploy succeeds. GitHub
+  "Release" still fails until the owner allows Actions to open pull requests (Settings →
+  Actions → General → Workflow permissions).
+- Assistant (#159): sees the video's name and the media library, answers questions in full
+  ("list my media"), renames the video, puts library files on the timeline, and edits what it
+  added in the same answer. Checked live with Gemini. Merged to main, **not pushed**.
+- **Owner is testing on desktop now:** Assistant (incl. the above), Audio, Captions.
+
 ## 2026-10-24/25 (owner's desktop test pass — merged to main and pushed)
 
 Branch `fix/owner-desktop-pass`, merged into main, pushed at the owner's word. Every fix is in

@@ -3120,6 +3120,12 @@
     font-size: var(--vu-text-sm);
   }
 
+  /* Answers to questions ("list the media") come one entry per line. */
+  .vu-assistant-reply-body > p {
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+  }
+
   /* What it changed — a quiet line inside the reply; Undo as a small text button. */
   .vu-assistant-result {
     display: flex;
