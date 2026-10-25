@@ -19,8 +19,12 @@ export function formatDurationShort(t: number): string {
   return `${m} min ${String(Math.round(seconds % 60)).padStart(2, '0')} s`;
 }
 
-/** A language's name in the reader's language (`'hi'` → "Hindi"), from the browser. */
+/**
+ * A language's name in the reader's language (`'hi'` → "Hindi"), from the browser; Hindi in
+ * Latin letters (`'hi-Latn'`) is "Hinglish", the name people use.
+ */
 export function languageName(code: string): string {
+  if (code === 'hi-Latn') return 'Hinglish';
   try {
     return new Intl.DisplayNames(undefined, { type: 'language' }).of(code) ?? code;
   } catch {

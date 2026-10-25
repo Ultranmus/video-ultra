@@ -37,7 +37,10 @@ export interface TranscribeRequest {
   audio: AsyncIterable<Float32Array>;
   /** Length of the whole sound in seconds (for progress). */
   duration: number;
-  /** Spoken language as an ISO 639-1 code (`'en'`, …), or `'auto'` to detect it (one of `languages`). */
+  /**
+   * Spoken language as an ISO 639-1 code (`'en'`, …), `'hi-Latn'` for Hinglish (Hindi written in
+   * Latin letters), or `'auto'` to detect it (one of `languages`).
+   */
   language: string;
   /**
    * Names and words that may be said (people, brands, places), so they're spelled right — for

@@ -82,7 +82,9 @@ function prompt(
   const spoken =
     language === 'auto'
       ? 'Detect the spoken language and write it in its own script.'
-      : `The speech is in the language with ISO 639-1 code "${language}"; write it in that language's own script.`;
+      : language === 'hi-Latn'
+        ? 'The speech is Hindi, maybe mixed with English; write it in Latin letters the way people type Hindi in chat (Hinglish, e.g. "Tum kaise ho? Main theek hoon"), not translated.'
+        : `The speech is in the language with ISO 639-1 code "${language}"; write it in that language's own script.`;
   return [
     `Transcribe the speech in this ${seconds.toFixed(1)}-second recording for video captions.`,
     spoken,
@@ -108,6 +110,7 @@ function clean(text: string, language: string): CaptionsEndpointReply {
   const heard = raw === 'auto' ? 'en' : raw.slice(0, 2).toLowerCase();
   // Another language than the one chosen: Gemini then writes it in Latin letters or translates
   // it. No words; the language heard lets the editor say which one to choose.
-  if (language !== 'auto' && heard !== language) return { words: [], language: heard };
+  if (language !== 'auto' && heard !== language.split('-')[0])
+    return { words: [], language: heard };
   return { words: captionWords(said), language: heard };
 }

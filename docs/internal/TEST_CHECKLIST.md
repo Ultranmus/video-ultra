@@ -8,8 +8,8 @@ Open the branch's Vercel preview (or `pnpm --filter playground dev`), then **`/e
 
 ## 000. 2026-10-25 — captions: check marks, names, Hear again, Hinglish
 
-- [ ] **Hinglish:** Captions → Hindi → "Write Hindi in: Hinglish (abc)" → Make captions on a
-      Hindi clip. Readable the way you'd type it? Note words that look wrong.
+- [ ] **Hinglish:** Captions → **Hinglish** (after Detect) → Make captions on a Hindi clip.
+      Readable the way you'd type it? Note words that look wrong.
 - [ ] **Names & words:** type names said in the video (e.g. your channel's name) → Make captions
       → spelled right?
 - [ ] **Check marks:** on a clip with a hard-to-hear part — lines marked ⚠, "N captions to check",

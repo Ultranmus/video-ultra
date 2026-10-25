@@ -264,5 +264,4 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       (DECISIONS #167) give no captions on our two Hindi phone clips. Still open: a confident
       wrong-language "translation" (en-tts-phone → Malay); asking twice and keeping what agrees
       would catch it (costs double requests).
-- [ ] Captions: Hinglish spelling is rule-based — a few words come out a little off (आजादी →
-      "aajadi"); a bigger common-word list, or the service writing Latin directly, would help.
+- [x] Captions: Hinglish spelling — done by the service now (`hi-Latn`, DECISIONS #168).

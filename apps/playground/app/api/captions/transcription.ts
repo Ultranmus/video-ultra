@@ -20,6 +20,19 @@ export async function transcriptionCaptions(
 ): Promise<CaptionsEndpointReply | Response> {
   const sound = new Blob([wav(samples)], { type: 'audio/wav' });
   const prompt = promptOf(hints);
+  // Hinglish (Hindi in Latin letters, DECISIONS #168): Whisper writes it when asked for English
+  // with Hinglish to go on (measured: "Tumhare mata pita kya tumhe itni azaadi bhi na denge?");
+  // asked for Hindi it writes Devanagari whatever the hint. English said stays English.
+  if (language === 'hi-Latn') {
+    const latin = await hear(
+      sound,
+      'en',
+      `${HINGLISH}${prompt ? ` ${prompt}` : ''}`,
+      service,
+      signal,
+    );
+    return latin instanceof Response ? latin : { words: latin.words, language };
+  }
   const detected = await hear(sound, null, prompt, service, signal);
   if (detected instanceof Response || language === 'auto') return detected;
   // Nothing believable heard: its language is a guess too — not "another language".
@@ -32,6 +45,10 @@ export async function transcriptionCaptions(
     language: sameAs(language, detected.language) ? language : detected.language,
   };
 }
+
+/** A Hinglish example: Whisper writes in the style of its prompt. */
+const HINGLISH =
+  'Haan bhai, aaj hum log baat karenge. Tum kaise ho? Main theek hoon, bahut accha laga.';
 
 /** Whisper's `prompt`: names to spell right, then the words said just before (≤ ~224 tokens). */
 function promptOf(hints: { context: string; vocabulary: string }): string {

@@ -109,7 +109,10 @@ import { createCaptionsEndpoint } from '@video-ultra/ai';
       </ul>
       <p>
         Pass <code>languages</code> (e.g. <code>{`['en', 'hi', 'auto']`}</code>) to offer only the
-        ones your service hears; by default the panel offers about 100 and Detect.
+        ones your service hears; by default the panel offers about 100 and Detect, including{' '}
+        <strong>Hinglish</strong> — <code>hi-Latn</code>, Hindi written in Latin letters the way
+        people type it, which your service writes (Whisper does when asked for English with a
+        Hinglish example as its prompt).
       </p>
       <Note>
         A speech-to-text service with the OpenAI transcription API (OpenAI, Groq, or a self-hosted
