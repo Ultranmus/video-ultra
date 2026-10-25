@@ -290,8 +290,8 @@ if (webkitModel) {
   await page.locator('.vu-rail .vu-btn', { hasText: 'Captions' }).click();
   const panel = await page.locator('.vu-panel .vu-captions').innerText();
   check(
-    'service: every language and Detect offered, made by the service',
-    /Hindi/.test(panel) && /Detect/.test(panel) && /captions service/.test(panel),
+    'service: every language and Detect offered, with a short time note',
+    /Hindi/.test(panel) && /Detect/.test(panel) && /Under a minute/.test(panel),
   );
   const chips = await page
     .locator('.vu-panel .vu-captions [role=radio], .vu-panel .vu-captions .vu-chip')
@@ -458,7 +458,7 @@ if (webkitModel) {
     JSON.stringify(asked.slice(before)),
   );
   await snap(page, 'c8-check');
-  // The panel with Hinglish, Names & words and check marks on screen.
+  // The panel with Hinglish, names to spell right and check marks on screen.
   const panelAxe = await new AxeBuilder({ page }).include('.vu-panel').analyze();
   check(
     'Captions panel with the new controls passes axe',

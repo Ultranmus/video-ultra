@@ -508,3 +508,6 @@ merged and re-verified on main; A (captions) and E (layers) here.
 - Hinglish (owner): a language of its own (`hi-Latn`, "Hinglish" chip after Detect), written by
   the service — our own converter removed. Groq: English + a Hinglish prompt → Hinglish on all
   19 Hindi test pieces (#168).
+- Captions panel (owner: too much text): the notes under the button are one line ("Under a
+  minute · Replaces your captions"; "On this device · 77 MB once" for the on-device model);
+  "Names & words (optional)" → "Names to spell right", placeholder "e.g. Priya, Goa".

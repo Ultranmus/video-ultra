@@ -840,9 +840,9 @@ export const DEFAULT_LABELS = {
   detectLanguage: 'Detect',
   moreLanguages: 'More languages…',
   searchLanguages: 'Search languages',
-  captionsOnDevice: (mb: number) =>
-    `Runs on this device, nothing is uploaded · about ${Math.round(mb)} MB to download the first time`,
-  captionsOnDeviceCached: 'Runs on this device, nothing is uploaded',
+  /** Auto captions' one-line note, in parts joined by " · ". */
+  captionsOnDevice: (mb: number) => `On this device · ${Math.round(mb)} MB once`,
+  captionsOnDeviceCached: 'On this device',
   // v0.3 Embedding API: the host's media sources
   mediaSources: 'More media',
   searchMedia: 'Search videos and photos',
@@ -1077,10 +1077,9 @@ export const DEFAULT_LABELS = {
   },
   captionsMemoryRisk:
     'This language needs the large speech model. It may not fit in a phone’s memory — if the page reloads, use a computer for this language.',
-  captionsByHost: 'Made by this app’s captions service',
   captionsUnavailable: 'Auto captions aren’t available here — import a file or type them.',
   captionsAbout: (minutes: number) =>
-    minutes < 1 ? 'Takes under a minute' : `Takes about ${Math.round(minutes)} min`,
+    minutes < 1 ? 'Under a minute' : `About ${Math.round(minutes)} min`,
   captionsListening: 'Getting the sound…',
   captionsDownloading: (done: number, total: number) =>
     `Downloading the speech model · ${Math.round(done)} of ${Math.round(total)} MB`,
@@ -1098,9 +1097,9 @@ export const DEFAULT_LABELS = {
   captionsToCheck: (n: number) =>
     n === 1 ? '1 caption to check (marked ⚠)' : `${n} captions to check (marked ⚠)`,
   nextToCheck: 'Next to check',
-  /** Names & words field (Auto captions). */
-  captionVocabulary: 'Names & words (optional)',
-  captionVocabularyHint: 'e.g. Priya, Ultranmus, Goa — helps spell them right',
+  /** "Names to spell right" field (Auto captions). */
+  captionVocabulary: 'Names to spell right',
+  captionVocabularyHint: 'e.g. Priya, Goa',
   /** Auto captions heard another language than the one chosen. */
   captionsOtherLanguage: (heard: string, chosen: string) =>
     `This sounds like ${heard}, not ${chosen}. Choose ${heard} or Detect, then try again.`,
@@ -1125,7 +1124,7 @@ export const DEFAULT_LABELS = {
     "This browser can't read this video's sound, so it can't make captions from it. Try another browser.",
   captionsDone: (n: number) => (n === 1 ? 'Added 1 caption' : `Added ${n} captions`),
   captionsFailed: (why: string) => `Couldn’t make captions: ${why}`,
-  captionsReplaceNote: 'Making them again replaces the captions you have.',
+  captionsReplaceNote: 'Replaces your captions',
   importCaptions: 'Import captions',
   importCaptionsTip: 'An .srt or .vtt subtitle file',
   subtitlesUnreadable: (name: string) => `${name} has no captions this editor can read.`,

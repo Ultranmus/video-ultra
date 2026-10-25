@@ -212,7 +212,7 @@ function AutoCaptions({ has }: { has: boolean }): ReactElement | null {
   const [find, setFind] = useState('');
   const available = !!ctl.options.transcriber;
   const takesWords = !!ctl.options.transcriber?.takesVocabulary;
-  // Names & words, kept per project in this browser (a convenience).
+  // Names to spell right, kept per project in this browser (a convenience).
   const wordsKey = `video-ultra:caption-words:${ctl.project.id}`;
   const [vocabulary, setVocabulary] = useState(() => stored(wordsKey) ?? '');
   useEffect(() => {
@@ -356,13 +356,20 @@ function AutoCaptions({ has }: { has: boolean }): ReactElement | null {
             </p>
           ) : null}
           {check?.available ? (
+            // One short line: where it runs (on the device: privacy matters), how long, and
+            // that it replaces the captions there are.
             <p className="vu-hint">
-              {check.onDevice
-                ? check.downloadMB
-                  ? l.captionsOnDevice(check.downloadMB)
-                  : l.captionsOnDeviceCached
-                : l.captionsByHost}
-              {minutes !== null ? ` · ${l.captionsAbout(minutes)}` : ''}
+              {[
+                check.onDevice
+                  ? check.downloadMB
+                    ? l.captionsOnDevice(check.downloadMB)
+                    : l.captionsOnDeviceCached
+                  : null,
+                minutes !== null ? l.captionsAbout(minutes) : null,
+                has ? l.captionsReplaceNote : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
             </p>
           ) : null}
           {check?.available && check.memoryRisk ? (
@@ -370,7 +377,6 @@ function AutoCaptions({ has }: { has: boolean }): ReactElement | null {
               {l.captionsMemoryRisk}
             </p>
           ) : null}
-          {has ? <p className="vu-hint">{l.captionsReplaceNote}</p> : null}
         </>
       )}
     </Section>
