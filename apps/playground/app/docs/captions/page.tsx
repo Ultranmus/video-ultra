@@ -85,7 +85,7 @@ import { createCaptionsEndpoint } from '@video-ultra/ai';
       <p>
         Two optional query parameters carry hints you can pass to your service (for Whisper, as its{' '}
         <code>prompt</code>): <code>context</code>, the last words said before this piece, and{' '}
-        <code>vocabulary</code>, names and words the person typed in &ldquo;Names &amp; words&rdquo;
+        <code>vocabulary</code>, names the person typed in &ldquo;Names to spell right&rdquo;
         (comma-separated), so they&apos;re spelled right.
       </p>
       <h3>What the editor does for you</h3>

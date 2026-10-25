@@ -84,7 +84,7 @@ export interface Transcriber {
    * list and Detect.
    */
   readonly languages?: readonly string[];
-  /** It uses `TranscribeRequest.vocabulary`: the Captions panel offers a "Names & words" field. */
+  /** It uses `TranscribeRequest.vocabulary`: the Captions panel offers a "Names to spell right" field. */
   readonly takesVocabulary?: boolean;
   transcribe(request: TranscribeRequest): Promise<TranscribeResult>;
   /** Optional: whether and how `language` can be transcribed here, before starting. */
