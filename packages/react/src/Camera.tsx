@@ -2,7 +2,7 @@ import { randomId, type Asset, type DeviceTier } from '@video-ultra/core';
 import type { MediaRecordingWriter } from '@video-ultra/core/internal';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { useController, useLabels, useUi } from './context';
-import { Button, IconButton, ToolButton } from './controls';
+import { Button, IconButton } from './controls';
 import { Icon } from './icons';
 import type { Labels } from './labels';
 
@@ -525,7 +525,8 @@ function CameraView(): ReactElement {
         </div>
       ) : phase === 'error' ? null : (
         <div className="vu-camera-bar">
-          <ToolButton
+          <IconButton
+            className="vu-camera-side"
             icon={micOn ? 'mic' : 'micOff'}
             label={l.microphone}
             tip={micOn ? l.micOnTip : l.micOffTip}
@@ -551,7 +552,8 @@ function CameraView(): ReactElement {
             <span className="vu-record-mark" aria-hidden="true" />
           </button>
           {cameras > 1 ? (
-            <ToolButton
+            <IconButton
+              className="vu-camera-side"
               icon="switchCamera"
               label={l.switchCamera}
               disabledReason={

@@ -168,10 +168,10 @@ check(
 await page.evaluate(() => (window as any).vuEditor.seek(0));
 await page.locator('.vu-panel .vu-camera-open').click();
 await page.locator('.vu-camera[data-phase="live"]').waitFor({ timeout: 20000 });
-await page.locator('.vu-camera-bar .vu-btn', { hasText: 'Microphone' }).click();
+await page.locator('.vu-camera-bar button[aria-label="Microphone"]').click();
 check(
   (await page
-    .locator('.vu-camera-bar .vu-btn', { hasText: 'Microphone' })
+    .locator('.vu-camera-bar button[aria-label="Microphone"]')
     .getAttribute('aria-pressed')) === 'false',
   'microphone switched off',
 );

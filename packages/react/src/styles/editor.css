@@ -5176,7 +5176,41 @@
   }
 
   .vu-camera-spacer {
-    width: var(--vu-size-tool);
+    width: var(--vu-size-camera-side);
+  }
+
+  /* The side buttons sit right beside the record button (not out in the corners): round, like
+     the record button, the microphone on its left and switch camera on its right. */
+  .vu-camera-bar:not([data-review]) {
+    gap: var(--vu-space-7);
+  }
+
+  .vu-camera-bar:not([data-review]) > :first-child {
+    justify-self: end;
+  }
+
+  .vu-camera-bar:not([data-review]) > :last-child {
+    justify-self: start;
+  }
+
+  .vu-camera-side.vu-btn {
+    width: var(--vu-size-camera-side);
+    height: var(--vu-size-camera-side);
+    border-radius: 50%;
+    background: var(--vu-surface-3);
+    color: var(--vu-text);
+  }
+
+  .vu-camera-side.vu-btn svg {
+    width: var(--vu-size-camera-side-icon);
+    height: var(--vu-size-camera-side-icon);
+  }
+
+  /* Microphone off: the crossed-out icon on a quiet button (on is the usual look). */
+  .vu-camera-side.vu-btn[aria-pressed='false'] {
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--vu-border-strong);
+    color: var(--vu-text-muted);
   }
 
   /* The record button: a ring with a red dot that becomes a rounded stop square. */

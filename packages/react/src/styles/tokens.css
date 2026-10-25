@@ -210,6 +210,9 @@
     --vu-size-record-mark: 52px;
     --vu-size-record-stop: 24px;
     --vu-size-record-ring: 4px;
+    /* The camera's round side buttons (microphone, switch camera) beside the record button. */
+    --vu-size-camera-side: 52px;
+    --vu-size-camera-side-icon: 22px;
     --vu-size-camera-dot: 8px;
     --vu-size-range-track: 6px;
     --vu-size-range-thumb: 20px;
