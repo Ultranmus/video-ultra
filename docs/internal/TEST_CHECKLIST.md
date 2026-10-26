@@ -161,7 +161,7 @@ _Owner, 2026-10-25 — desktop: **captions tested ✓** (Groq, Gemini fallback, 
       doesn't jump. Small ◆ marks show on the selected clip in the timeline.
       _Checked here:_ keyframes-check (auto-key by drag, exported positions, curve, undo,
       split) + 9 unit tests.
-- [ ] **Fine trims (desktop timeline).** With 3 clips: hold **⌥ Option** (Alt on Windows) and drag the trim
+- [x] **Fine trims (desktop timeline).** With 3 clips: hold **⌥ Option** (Alt on Windows) and drag the trim
       handle at a cut → the cut moves (one clip longer, the next shorter, the video the same
       length). Alt-drag a video clip → it shows a different part of the video in the same place.
       Alt+Shift-drag the middle clip → it slides between its neighbours. On the phone: select a
