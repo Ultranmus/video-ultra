@@ -1173,7 +1173,9 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       MP4, else AV1 — only where this device can encode it at that size). "Made for" is gone (it
       changed the video's shape from the export dialog; the shape is Video settings', and the
       preview shows it). The summary (size · fps · type · about N MB) and the Export button sit
-      under the preview; on phones they're a bar kept in view at the bottom of the sheet. The
+      at the bottom of the settings column, lined up with the preview's bottom (owner,
+      2026-10-26: the button belongs on the right, where the choices end), and the preview is as tall
+      as that column (square and wide videos get an equal column so they can grow); on phones they're a bar kept in view at the bottom of the sheet. The
       dialog takes focus itself on opening (no outline on ✕ until Tab). The old "Smaller file"
       quality step is now the Small tile. Camera: the microphone and switch-camera buttons are
       round (52 px) and sit right beside the record button instead of centred in the empty

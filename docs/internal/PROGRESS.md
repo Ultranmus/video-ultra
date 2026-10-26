@@ -530,3 +530,11 @@ merged and re-verified on main; A (captions) and E (layers) here.
   after load, before the 3 s idle preparation. That is PERF.md's one accepted long task; moving it
   earlier would land it in the user's first edits instead. No code change; BACKLOG and PERF.md
   corrected.
+
+## 2026-10-26 · Export dialog: button on the right, preview full height (owner)
+
+- Owner tested the camera ✓. Export dialog (desktop): the summary + Export button moved to the
+  bottom of the settings column; the preview before export fills the column's height (container
+  size on the preview cell; equal columns for square / wide videos; min 320 px). Phones unchanged.
+- Checks: editor-interact (Chrome + WebKit export), a11y-check (export dialog every tab, 0
+  violations), typecheck, lint; screenshots 9:16 / 1:1 / 16:9 / phone.

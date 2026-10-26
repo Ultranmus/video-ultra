@@ -197,6 +197,7 @@
     --vu-size-modal-wide: 760px;
     --vu-size-export-poster: 460px;
     --vu-size-export-poster-phone: 200px;
+    --vu-size-export-poster-min: 320px;
     --vu-size-export-ring: 72px;
     --vu-size-export-option: 96px;
     --vu-size-export-go: 48px;
