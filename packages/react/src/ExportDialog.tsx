@@ -506,9 +506,9 @@ export function ExportDialog(): ReactElement | null {
       ? frameTime
       : part && span
         ? span.start
-        : ctl.playhead.time > 0 && ctl.playhead.time < duration
+        : ctl.playhead.time < duration
           ? ctl.playhead.time
-          : Math.floor(duration / 3);
+          : 0;
   const title = done
     ? l.exportReadyTitle
     : progress
