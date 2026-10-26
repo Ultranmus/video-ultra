@@ -4558,15 +4558,12 @@
     flex-direction: column;
     gap: var(--vu-space-1);
     margin: 0;
-    padding: 0 var(--vu-space-1) 0 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    scrollbar-gutter: stable;
+    padding: 0;
     list-style: none;
   }
 
-  /* Phones: History spans the width under the top bar (centred on its button it ran off the
-     left edge). */
+  /* Phones: a top-bar popover (Your videos) spans the width under the top bar (centred on its
+     button it ran off the left edge). */
   @container vu (max-width: 767px) {
     .vu-topbar {
       position: relative;

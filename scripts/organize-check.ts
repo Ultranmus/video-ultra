@@ -192,7 +192,9 @@ if (only !== 'phone') {
   check('⇧⌘L again unlocks', !(await item(page, a))?.locked);
 
   // History: back to Original, then forward to the latest.
-  await page.locator('[data-history-toggle] .vu-btn').click();
+  const historyButton = page.locator('.vu-topbar .vu-btn[aria-label="History"]');
+  await historyButton.click();
+  check('History opens as a panel', await page.locator('.vu-panel .vu-history').isVisible());
   const steps = await page.locator('.vu-history-step').count();
   check('History lists Original + steps', steps >= 6, `${steps}`);
   await snap(page, 'd4-history');
@@ -203,8 +205,8 @@ if (only !== 'phone') {
   check('History › Original restores the start', original === 0);
   await page.locator('.vu-history-step').last().click();
   check('History › last step comes back', !!(await item(page, a))?.groupId);
-  await page.keyboard.press('Escape');
-  check('Esc closes History', !(await page.locator('.vu-history').isVisible()));
+  await historyButton.click();
+  check('History button closes it', !(await page.locator('.vu-history').isVisible()));
 
   // Layers panel: rows, hide, restack.
   await page.evaluate(() => (window as any).vuEditor.seek(705_600_000));

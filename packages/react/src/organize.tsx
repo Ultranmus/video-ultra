@@ -47,7 +47,7 @@ const KIND_ICON: Record<Item['kind'], IconName> = {
 function useCommandState(): void {
   const ctl = useController();
   useStore(ctl.editor.store, (s) => s);
-  useUi((s) => [s.selectedId, s.selectedIds, s.panel, s.historyOpen]);
+  useUi((s) => [s.selectedId, s.selectedIds, s.panel]);
 }
 
 /** A registry command as a button: label, icon, tooltip, shortcut and why it's disabled. */
@@ -82,56 +82,24 @@ export function CommandButton({
 
 // ── History ─────────────────────────────────────────────────────────────
 
-/** The History popover (TopBar): "Original" and every step; tap one to go back to it. */
-export function HistoryPopover(): ReactElement | null {
+/** The History panel (top bar's clock): "Original" and every step; tap one to go back to it. */
+export function HistoryPanel(): ReactElement {
   const ctl = useController();
   const l = useLabels();
-  const open = useUi((s) => s.historyOpen);
   // Any commit, undo or redo changes the project or the undo flags.
   useStore(ctl.editor.store, (s) => s);
-  const ref = useRef<HTMLDivElement>(null);
   const currentRef = useRef<HTMLButtonElement>(null);
-  const close = () => ctl.ui.setState({ historyOpen: false });
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: PointerEvent) => {
-      const target = e.target as HTMLElement;
-      if (ref.current?.contains(target) || target.closest('[data-history-toggle]')) return;
-      close();
-    };
-    document.addEventListener('pointerdown', onDown, true);
-    return () => document.removeEventListener('pointerdown', onDown, true);
-    // close only sets state
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
 
   useLayoutEffect(() => {
-    if (open) currentRef.current?.scrollIntoView({ block: 'nearest' });
+    currentRef.current?.scrollIntoView({ block: 'nearest' });
   });
 
-  if (!open) return null;
   const { labels, position } = ctl.editor.history();
   const rows = [l.historyOriginal, ...labels];
   return (
-    <div
-      ref={ref}
-      className="vu-popover vu-history"
-      role="dialog"
-      aria-label={l.history}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') {
-          e.stopPropagation();
-          close();
-        }
-      }}
-    >
-      <div className="vu-popover-head">
-        <h2 className="vu-popover-title">{l.history}</h2>
-        <IconButton icon="close" label={l.close} onClick={close} />
-      </div>
+    <div className="vu-panel-body vu-history">
       {labels.length === 0 ? <p className="vu-hint">{l.historyEmpty}</p> : null}
-      <ol className="vu-history-list">
+      <ol className="vu-history-list" aria-label={l.history}>
         {rows.map((label, i) => {
           const current = i === position;
           return (
@@ -144,7 +112,6 @@ export function HistoryPopover(): ReactElement | null {
                 data-undone={i > position || undefined}
                 aria-current={current ? 'step' : undefined}
                 data-tooltip={current ? undefined : l.historyStepTip}
-                autoFocus={current}
                 onClick={() => ctl.jumpToHistory(i)}
               >
                 <span className="vu-history-dot" aria-hidden="true" />
