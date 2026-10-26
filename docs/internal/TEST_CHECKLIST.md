@@ -15,7 +15,7 @@ Open the branch's Vercel preview (or `pnpm --filter playground dev`), then **`/e
 - [ ] **Clean up noise:** select a clip with room noise → **Clean up noise** / **Clean voice**.
 - [ ] **Extract audio:** select a video → **Extract audio** → its sound becomes its own clip and
       keeps the fades / effects.
-- [ ] **Record a voiceover:** Audio → record → it lands at the playhead; mute it, unmute it.
+- [ ] **Record voiceover:** Audio → **Record voiceover** → it lands at the playhead; mute it, unmute it.
 - [ ] **Sound effects (headphones):** see section 3 — Clear voice, Podcast, Phone call, Deep
       voice, Chipmunk, Bass / Middle / Treble, Pitch; 1.5× speed + **Keep the voice natural**.
 - [ ] **Level meter:** the two thin bars next to the time move while playing, rest when paused.
