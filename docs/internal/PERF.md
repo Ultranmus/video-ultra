@@ -371,6 +371,10 @@ calls started in one task, each 8–15 ms synchronous in Chrome, plus the WebGL2
 
 Result: long tasks `['3281+116']` (the audio service only), none during startup or editing.
 
+2026-10-26: editor-interact's ~105 ms task right after "delete selection" is this same task — the
+check taps Play ~1.8 s after load, before the idle preparation, so it runs inside the tap
+(CDP profile: 103–105 ms self time in `prepareAudio`). Text add / type / drag: no long task.
+
 ## v0.2 sound, picture tools, capture & export (2026-10-19)
 
 - **Ducking DSP:** ~20 µs per 2048-frame block (0.05 % of real time); 600 s of audio in ~270 ms;
