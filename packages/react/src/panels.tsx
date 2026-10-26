@@ -10,6 +10,7 @@ import {
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { useController, useLabels, useProject, useUi } from './context';
 import { useNearView } from './browse';
+import { formatClock } from './format';
 import { Icon } from './icons';
 import { textItem } from './items';
 import type { PanelId } from './state';
@@ -373,7 +374,9 @@ function Voiceover() {
   const ctl = useController();
   const l = useLabels();
   const recording = useUi((s) => s.recording);
+  const counting = useUi((s) => s.countdown !== null);
   const recorder = useRef<MediaRecorder | null>(null);
+  const cancelCountdown = useRef<(() => void) | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Without headphones the video's sound would be recorded too: muted while recording by default.
   const [muteWhile, setMuteWhile] = useState(() => {
@@ -383,7 +386,32 @@ function Voiceover() {
       return true;
     }
   });
-  useEffect(() => () => recorder.current?.stop(), []);
+  useEffect(
+    () => () => {
+      cancelCountdown.current?.();
+      recorder.current?.stop();
+    },
+    [],
+  );
+
+  /** 3, 2, 1 on the video; false when cancelled. */
+  const countdown = () =>
+    new Promise<boolean>((resolve) => {
+      let n = 3;
+      ctl.ui.setState({ countdown: n });
+      const timer = setInterval(() => {
+        n -= 1;
+        if (n > 0) return ctl.ui.setState({ countdown: n });
+        end(true);
+      }, 1000);
+      const end = (go: boolean) => {
+        clearInterval(timer);
+        cancelCountdown.current = null;
+        ctl.ui.setState({ countdown: null });
+        resolve(go);
+      };
+      cancelCountdown.current = () => end(false);
+    });
 
   const start = async () => {
     setError(null);
@@ -394,6 +422,12 @@ function Voiceover() {
       });
     } catch {
       setError(l.microphoneBlocked);
+      return;
+    }
+    // The microphone is asked for first, so its permission prompt never interrupts the count.
+    ctl.pause();
+    if (!(await countdown())) {
+      for (const track of stream.getTracks()) track.stop();
       return;
     }
     const type = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm'].find((t) =>
@@ -416,8 +450,12 @@ function Voiceover() {
         `Voiceover ${new Date().toLocaleTimeString()}.${mime.includes('mp4') ? 'm4a' : 'webm'}`,
         { type: mime },
       );
+      // Where recording started, so the words line up with the picture they were said over; the
+      // playhead goes back there to play it straight away.
       ctl.seek(startAt);
-      void ctl.importFiles([file]);
+      void ctl
+        .importFiles([file], { at: startAt })
+        .then(() => ctl.toast(l.voiceoverAdded(formatClock(startAt)), 'success'));
     };
     recorder.current = rec;
     rec.start(1000);
@@ -429,7 +467,18 @@ function Voiceover() {
 
   return (
     <div className="vu-voiceover">
-      {recording ? (
+      {counting ? (
+        <button
+          type="button"
+          className="vu-btn vu-wide"
+          data-variant="secondary"
+          data-layout="row"
+          onClick={() => cancelCountdown.current?.()}
+        >
+          <Icon name="close" />
+          <span>{l.cancel}</span>
+        </button>
+      ) : recording ? (
         <button
           type="button"
           className="vu-btn vu-wide"
@@ -452,6 +501,7 @@ function Voiceover() {
           <span>{l.recordVoiceover}</span>
         </button>
       )}
+      <p className="vu-hint">{l.voiceoverHint}</p>
       {error ? (
         <p className="vu-error" role="alert">
           {error}
@@ -462,7 +512,7 @@ function Voiceover() {
         role="switch"
         aria-checked={muteWhile}
         className="vu-switch-row"
-        disabled={recording}
+        disabled={recording || counting}
         onClick={() => {
           const next = !muteWhile;
           setMuteWhile(next);

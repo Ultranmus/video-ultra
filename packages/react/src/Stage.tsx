@@ -1043,6 +1043,7 @@ export function Stage(): ReactElement {
         aria-label={l.previewLabel}
       >
         {frame.w > 0 ? <ScrubPreview width={frame.w} height={frame.h} /> : null}
+        <Countdown />
         {empty ? (
           <div className="vu-stage-empty" onPointerDown={(e) => e.stopPropagation()}>
             <EmptyState
@@ -1147,4 +1148,19 @@ function normalizeAngle(deg: number): number {
 
 function clampScale(s: number): number {
   return Math.min(8, Math.max(0.03, s));
+}
+
+/** Voiceover: the 3, 2, 1 before recording starts, big on the video (renders once a second). */
+function Countdown(): ReactElement | null {
+  const l = useLabels();
+  const n = useUi((s) => s.countdown);
+  if (n === null) return null;
+  return (
+    <div className="vu-countdown" role="status">
+      <span className="vu-sr-only">{l.recordingIn(n)}</span>
+      <span key={n} className="vu-countdown-number" aria-hidden="true">
+        {n}
+      </span>
+    </div>
+  );
 }
