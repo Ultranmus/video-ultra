@@ -85,7 +85,7 @@ _Owner, 2026-10-25 — desktop: **captions tested ✓** (Groq, Gemini fallback, 
       Inspector: Speed 2×, Mute, Adjust — all change; Filters panel → a look → both; two titles →
       Opacity, Transitions → an entrance → both. One undo each. Phone: the same tools in the
       multi-selection toolbar. _Checked here:_ multiedit-check.
-- [ ] **Your videos.** Top-left button → Make a copy (you're now in "… (copy)"; "Back to
+- [x] **Your videos.** Top-left button → Make a copy (you're now in "… (copy)"; "Back to
       original" in the note) → change something → Your videos → open the original: unchanged.
       New video; delete the copy (it asks). _Checked here:_ videos-check (desktop + phone).
 - [x] **Combine into one clip.** Select two clips and a title → right-click / long-press →
@@ -133,7 +133,7 @@ _Owner, 2026-10-25 — desktop: **captions tested ✓** (Groq, Gemini fallback, 
       animated stickers move? (If Safari lacks `ImageDecoder` they stay still — tell me.)
       _Checked here:_ stickers-check (GIF plays and is exact; SVG → 2048 px PNG; animated emoji
       added with its licence and plays).
-- [ ] **Templates (192).** Left menu (phone: toolbar) → **Templates** → scroll the 9 groups →
+- [x] **Templates (192).** Left menu (phone: toolbar) → **Templates** → scroll the 9 groups →
       tap one → change the words → **Add to video**. It appears at the playhead as one group
       (drag moves all of it; double-tap a text to edit); the playhead jumps in so you see it.
       Play it — entrances and exits animate. Try the same template on 16:9 and 1:1 too.
@@ -205,7 +205,7 @@ _Owner, 2026-10-25 — desktop: **captions tested ✓** (Groq, Gemini fallback, 
       `/editor?proxies=always`. _Checked here:_ proxies-check (copy made, 540p, keyframe each
       second, every frame decodes, playback 17 → 70 frames shown in 3 s, export reads the
       original, reused after reopening).
-- [ ] **AI Assistant.** Left menu (phone: last tool) → **Assistant** → tap an example or type
+- [x] **AI Assistant.** Left menu (phone: last tool) → **Assistant** → tap an example or type
       "Make the whole video warmer", "Add a title “Day one” at the start", "Add a fade between
       every clip", "Make it square" → it edits; **Undo** takes the whole answer back. With no
       server key this is an offline demo (a few phrases only). To try a real model: on Vercel set
