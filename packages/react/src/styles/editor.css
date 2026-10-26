@@ -4351,30 +4351,26 @@
       padding-bottom: calc(var(--vu-space-5) + env(safe-area-inset-bottom));
     }
 
-    /* Export is a sheet like the editor's: it slides up, follows a drag on its head, slides away. */
+    /* Export fills the phone: the head stays at the top, the button at the bottom. */
     .vu-export {
+      width: 100%;
+      height: 100%;
+      max-height: none;
+      padding-top: calc(var(--vu-space-4) + env(safe-area-inset-top));
+      border: 0;
+      border-radius: 0;
       animation-name: vu-dock-in;
-      transition: transform var(--vu-duration-base) var(--vu-ease-out);
     }
 
-    .vu-export[data-dragging] {
-      transition: none;
-    }
-
-    .vu-export[data-leaving] {
-      transform: translateY(100%);
-    }
-
-    /* The head (with the grab handle) stays in view while the sheet scrolls. */
-    .vu-modal-head[data-grab] {
+    .vu-export .vu-modal-head {
       position: sticky;
-      top: calc(var(--vu-space-4) * -1);
+      top: calc((var(--vu-space-4) + env(safe-area-inset-top)) * -1);
       z-index: 1;
-      margin: calc(var(--vu-space-4) * -1) calc(var(--vu-space-5) * -1) 0;
-      padding: var(--vu-space-5) var(--vu-space-5) var(--vu-space-2);
+      margin: calc((var(--vu-space-4) + env(safe-area-inset-top)) * -1) calc(var(--vu-space-5) * -1)
+        0;
+      padding: calc(var(--vu-space-4) + env(safe-area-inset-top)) var(--vu-space-5)
+        var(--vu-space-2);
       background: var(--vu-surface-1);
-      touch-action: none;
-      cursor: grab;
     }
   }
 
