@@ -6,24 +6,24 @@ Safari) — the rest needs your devices.
 
 Open the branch's Vercel preview (or `pnpm --filter playground dev`), then **`/editor`**.
 
-## 00000. 2026-10-26 — Audio (desktop first)
+## 00000. 2026-10-26 — Audio (desktop ✓ owner 2026-10-26; phones not yet)
 
-- [ ] **Music:** Audio panel → music library → search, ▶ preview, **+ Add** → it plays under the
+- [x] **Music:** Audio panel → music library → search, ▶ preview, **+ Add** → it plays under the
       video. Select it → Volume, fade in / out.
-- [ ] **Lower under voice:** select the music → Volume / Sound → **Lower under voice** → the
+- [x] **Lower under voice:** select the music → Volume / Sound → **Lower under voice** → the
       music dips when someone talks in the video.
-- [ ] **Clean up noise:** select a clip with room noise → **Clean up noise** / **Clean voice**.
-- [ ] **Extract audio:** select a video → **Extract audio** → its sound becomes its own clip and
+- [x] **Clean up noise:** select a clip with room noise → **Clean up noise** / **Clean voice**.
+- [x] **Extract audio:** select a video → **Extract audio** → its sound becomes its own clip and
       keeps the fades / effects.
-- [ ] **Record voiceover:** Audio → **Record voiceover** → 3, 2, 1 on the video (try Cancel once)
+- [x] **Record voiceover:** Audio → **Record voiceover** → 3, 2, 1 on the video (try Cancel once)
       → the video plays while you talk → **Stop recording** → the clip starts where you started,
       the playhead goes back there, "Voiceover added at …". Mute it, unmute it.
-- [ ] **Sound effects (headphones):** see section 3 — Clear voice, Podcast, Phone call, Deep
+- [x] **Sound effects (headphones):** see section 3 — Clear voice, Podcast, Phone call, Deep
       voice, Chipmunk, Bass / Middle / Treble, Pitch; 1.5× speed + **Keep the voice natural**.
-- [ ] **Level meter:** the two thin bars next to the time move while playing, rest when paused.
-- [ ] **Text to speech:** type a sentence, pick a voice → **Add voice** → a real voice at the
+- [x] **Level meter:** the two thin bars next to the time move while playing, rest when paused.
+- [x] **Text to speech:** type a sentence, pick a voice → **Add voice** → a real voice at the
       playhead (the playground's `SPEECH_API_KEY` is set). It shows only when a key is set.
-- [ ] **Export → Sound only** (M4A / Ogg / WAV) → the file sounds like the preview.
+- [x] **Export → Sound only** (M4A / Ogg / WAV) → the file sounds like the preview.
 
 ## 0000. 2026-10-25 — export dialog and camera
 
