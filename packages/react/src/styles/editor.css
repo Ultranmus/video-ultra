@@ -3939,6 +3939,11 @@
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 
+  /* Desktop: no box of its own (the preview and the settings are grid cells). */
+  .vu-export-scroll {
+    display: contents;
+  }
+
   .vu-export-side {
     display: flex;
     grid-area: side;
@@ -4291,30 +4296,45 @@
     }
   }
 
-  /* Phones: one column; the summary and button stay in view at the bottom of the sheet. */
+  /* Phones: one column. Only the preview and the choices scroll; the summary and button are a
+     bar fixed at the bottom of the screen. */
   @container vu (max-width: 767px) {
     .vu-export-body,
     .vu-export-body[data-wide] {
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .vu-export-scroll {
+      display: grid;
+      flex: 1;
       grid-template-areas:
         'side'
-        'main'
-        'actions';
+        'main';
       grid-template-columns: minmax(0, 1fr);
-      grid-template-rows: auto;
+      /* The screen's spare room goes to the preview. */
+      grid-template-rows: minmax(var(--vu-size-export-poster-phone), 1fr) auto;
       gap: var(--vu-space-4);
+      min-height: 0;
+      margin: 0 calc(var(--vu-space-5) * -1);
+      padding: 0 var(--vu-space-5) var(--vu-space-4);
+      overflow-y: auto;
+      overscroll-behavior: contain;
     }
 
     .vu-export-actions {
-      position: sticky;
-      bottom: calc(var(--vu-space-5) * -1 - env(safe-area-inset-bottom));
+      flex: none;
       margin: 0 calc(var(--vu-space-5) * -1);
-      padding: var(--vu-space-3) var(--vu-space-5);
+      padding: var(--vu-space-3) var(--vu-space-5)
+        calc(var(--vu-space-3) + env(safe-area-inset-bottom));
       border-top: 1px solid var(--vu-border);
       background: var(--vu-surface-1);
     }
 
-    /* The screen's spare room goes to the preview (it fills its row and keeps its shape); with
-       More settings open it's back to its smallest and the page scrolls. */
+    /* The preview fills its row and keeps its shape; with More settings open it's back to its
+       smallest and the choices scroll. */
     .vu-export-side:has(> .vu-export-poster) {
       align-items: center;
       min-height: var(--vu-size-export-poster-phone);
@@ -4352,32 +4372,17 @@
       padding-bottom: calc(var(--vu-space-5) + env(safe-area-inset-bottom));
     }
 
-    /* Export fills the phone: the head stays at the top, the button at the bottom. */
+    /* Export fills the phone; only its middle scrolls. */
     .vu-export {
       width: 100%;
       height: 100%;
       max-height: none;
+      overflow: hidden;
       padding-top: calc(var(--vu-space-4) + env(safe-area-inset-top));
+      padding-bottom: 0;
       border: 0;
       border-radius: 0;
       animation-name: vu-dock-in;
-    }
-
-    .vu-export-body,
-    .vu-export-body[data-wide] {
-      flex: 1 0 auto;
-      grid-template-rows: minmax(var(--vu-size-export-poster-phone), 1fr) auto auto;
-    }
-
-    .vu-export .vu-modal-head {
-      position: sticky;
-      top: calc((var(--vu-space-4) + env(safe-area-inset-top)) * -1);
-      z-index: 1;
-      margin: calc((var(--vu-space-4) + env(safe-area-inset-top)) * -1) calc(var(--vu-space-5) * -1)
-        0;
-      padding: calc(var(--vu-space-4) + env(safe-area-inset-top)) var(--vu-space-5)
-        var(--vu-space-2);
-      background: var(--vu-surface-1);
     }
   }
 
