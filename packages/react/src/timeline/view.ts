@@ -107,6 +107,8 @@ type Drag =
       y: number;
       hit: Hit;
       timer: ReturnType<typeof setTimeout> | null;
+      /** A handle on a cut pressed with Alt: roll with this clip once it drags. */
+      roll?: Item | null;
     }
   | { type: 'scrub'; id: number }
   | {
@@ -567,24 +569,20 @@ export class TimelineView {
         else this.#ctl.openTool('transition');
         return;
       case 'trim': {
+        // Alt: roll the cut — the clip that touches this edge gives or takes the time.
+        const roll = e.altKey && !this.#touch ? this.#rollPartner(hit.item, hit.edge) : null;
         // A handle on a cut: a tap opens the transition there, a drag trims (#move, #up).
         if (hit.transition) {
-          this.#drag = { type: 'pending', id: e.pointerId, x: p.x, y: p.y, hit, timer: null };
+          this.#drag = {
+            type: 'pending',
+            id: e.pointerId,
+            x: p.x,
+            y: p.y,
+            hit,
+            timer: null,
+            roll,
+          };
           return;
-        }
-        // Alt: roll the cut — the clip that touches this edge gives or takes the time.
-        let roll: Item | null = null;
-        if (e.altKey && !this.#touch) {
-          const track = this.#ctl.project.tracks.find((t) => t.items.includes(hit.item));
-          const i = track ? track.items.indexOf(hit.item) : -1;
-          const other = hit.edge === 'end' ? track?.items[i + 1] : track?.items[i - 1];
-          if (
-            other &&
-            (hit.edge === 'end'
-              ? other.start === itemEnd(hit.item)
-              : itemEnd(other) === hit.item.start)
-          )
-            roll = hit.edge === 'end' ? hit.item : other;
         }
         this.#drag = {
           type: 'trim',
@@ -648,6 +646,17 @@ export class TimelineView {
       }
     }
     this.#drag = pending;
+  }
+
+  /** The clip a roll moves time with: `item` itself or its touching neighbour; null if none. */
+  #rollPartner(item: Item, edge: 'start' | 'end'): Item | null {
+    const track = this.#ctl.project.tracks.find((t) => t.items.includes(item));
+    const i = track ? track.items.indexOf(item) : -1;
+    const other = edge === 'end' ? track?.items[i + 1] : track?.items[i - 1];
+    if (!other) return null;
+    const touching = edge === 'end' ? other.start === itemEnd(item) : itemEnd(other) === item.start;
+    if (!touching) return null;
+    return edge === 'end' ? item : other;
   }
 
   #startItemDrag(pending: Extract<Drag, { type: 'pending' }>, x: number, y: number): void {
@@ -824,7 +833,7 @@ export class TimelineView {
             item: drag.hit.item,
             edge: drag.hit.edge,
             delta: 0,
-            roll: null,
+            roll: drag.roll ?? null,
           };
           this.invalidate();
           this.#move(e);
