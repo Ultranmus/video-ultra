@@ -4313,13 +4313,14 @@
       background: var(--vu-surface-1);
     }
 
+    /* The screen's spare room goes to the preview (it fills its row and keeps its shape); with
+       More settings open it's back to its smallest and the page scrolls. */
     .vu-export-side:has(> .vu-export-poster) {
-      min-height: 0;
-      container-type: normal;
+      align-items: center;
+      min-height: var(--vu-size-export-poster-phone);
     }
 
     .vu-export-poster,
-    .vu-export-side > .vu-export-poster,
     .vu-export-result {
       max-height: var(--vu-size-export-poster-phone);
       width: auto;
@@ -4360,6 +4361,12 @@
       border: 0;
       border-radius: 0;
       animation-name: vu-dock-in;
+    }
+
+    .vu-export-body,
+    .vu-export-body[data-wide] {
+      flex: 1 0 auto;
+      grid-template-rows: minmax(var(--vu-size-export-poster-phone), 1fr) auto auto;
     }
 
     .vu-export .vu-modal-head {
