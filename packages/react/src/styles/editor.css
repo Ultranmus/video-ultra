@@ -363,6 +363,21 @@
     .vu-export-button .vu-icon {
       display: none;
     }
+
+    /* A host's buttons with an icon show just the icon (the label is still read out). */
+    .vu-host-button:has(.vu-icon) {
+      min-width: var(--vu-size-touch);
+      padding-inline: 0;
+    }
+
+    .vu-host-button:has(.vu-icon) .vu-btn-label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
   }
 
   /* ── rail, panel, inspector ──────────────────────────────────────────── */
@@ -3672,6 +3687,18 @@
   .vu-browser-section + .vu-browser-section {
     padding-top: var(--vu-space-3);
     border-top: 1px solid var(--vu-border);
+  }
+
+  /* Host media sources (customize.mediaSources): search, then each source under its heading. */
+  .vu-media-sources,
+  .vu-media-source {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-2);
+  }
+
+  .vu-media-sources {
+    gap: var(--vu-space-3);
   }
 
   .vu-browser-heading {
