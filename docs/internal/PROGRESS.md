@@ -540,3 +540,5 @@ merged and re-verified on main; A (captions) and E (layers) here.
   violations), typecheck, lint; screenshots 9:16 / 1:1 / 16:9 / phone.
 - Owner: with More settings open the square preview floated mid-column with gaps above and
   below — the preview now lines up with the tabs at the top; extra room is only below it.
+- Owner: the export preview showed a frame a third of the way in when the playhead was at the
+  start — it now shows the first frame (playhead inside the video: that frame; Part: its start).
