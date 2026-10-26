@@ -667,6 +667,9 @@ export class EditorController {
       // late — applying them would pull a scrubbing timeline back and make it jitter. Time from
       // the engine counts while playing and at the moment playback stops.
       if (!playing && !this.ui.getState().playing) return;
+      // Ticks sent before the engine took a pause in: stale (they'd move the playhead after a
+      // pause-then-seek and mark it playing again).
+      if (playing && this.#pausing !== 0) return;
       this.playhead.set(time);
       if (this.ui.getState().playing !== playing) this.ui.setState({ playing });
     };
@@ -737,9 +740,21 @@ export class EditorController {
     void this.engine.play().catch((e: unknown) => this.toast(String(e), 'error'));
   }
 
+  /** Non-zero from pause() until the engine has taken it in (see onTime). */
+  #pausing = 0;
+  #pauseSeq = 0;
+
   pause(): void {
     this.ui.setState({ playing: false });
-    void this.engine?.pause();
+    if (!this.engine) return;
+    const id = ++this.#pauseSeq;
+    this.#pausing = id;
+    void this.engine
+      .pause()
+      .catch(() => {})
+      .finally(() => {
+        if (this.#pausing === id) this.#pausing = 0;
+      });
   }
 
   /** Moves the playhead. Engine seeks are coalesced to one per animation frame (latest wins). */
