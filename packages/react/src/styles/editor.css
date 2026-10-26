@@ -4350,6 +4350,32 @@
       border-radius: var(--vu-radius-lg) var(--vu-radius-lg) 0 0;
       padding-bottom: calc(var(--vu-space-5) + env(safe-area-inset-bottom));
     }
+
+    /* Export is a sheet like the editor's: it slides up, follows a drag on its head, slides away. */
+    .vu-export {
+      animation-name: vu-dock-in;
+      transition: transform var(--vu-duration-base) var(--vu-ease-out);
+    }
+
+    .vu-export[data-dragging] {
+      transition: none;
+    }
+
+    .vu-export[data-leaving] {
+      transform: translateY(100%);
+    }
+
+    /* The head (with the grab handle) stays in view while the sheet scrolls. */
+    .vu-modal-head[data-grab] {
+      position: sticky;
+      top: calc(var(--vu-space-4) * -1);
+      z-index: 1;
+      margin: calc(var(--vu-space-4) * -1) calc(var(--vu-space-5) * -1) 0;
+      padding: var(--vu-space-5) var(--vu-space-5) var(--vu-space-2);
+      background: var(--vu-surface-1);
+      touch-action: none;
+      cursor: grab;
+    }
   }
 
   /* ── Layers & organising (v0.2) ─────────────────────────────────────── */
