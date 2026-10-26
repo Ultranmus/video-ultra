@@ -3266,6 +3266,11 @@
     gap: var(--vu-space-2);
   }
 
+  /* A normal bordered text box, in the panel's text size (the text tool's box is larger). */
+  .vu-tts .vu-textarea {
+    font-size: var(--vu-text-sm);
+  }
+
   /* v0.4 Scopes */
   .vu-scopes {
     display: flex;

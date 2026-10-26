@@ -97,7 +97,7 @@ export function TextToSpeech(): ReactElement | null {
     <section className="vu-tts" aria-label={l.textToSpeech}>
       <h3 className="vu-audiolib-title">{l.textToSpeech}</h3>
       <textarea
-        className="vu-textarea vu-assistant-input"
+        className="vu-textarea"
         aria-label={l.textToSpeech}
         placeholder={l.speechPlaceholder}
         value={text}
