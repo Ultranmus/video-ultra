@@ -521,3 +521,12 @@ merged and re-verified on main; A (captions) and E (layers) here.
 - Resize handles: aria values from the start (a11y-check was failing on them).
 - Checks: editor-interact (Chrome + WebKit export), a11y-check dark + light 0 violations,
   camera-check, combine-ui-check, ui-review (no page errors).
+
+## 2026-10-26 · The "108 ms task during text drag" (BACKLOG)
+
+- Profiled the editor-interact flow with CDP (5 runs): add text, typing and dragging text on the
+  stage cause no long task. The ~105 ms task comes right after "delete selection": the check's
+  first Play tap runs `prepareAudio` (Chrome starting its audio service), because it plays ~1.8 s
+  after load, before the 3 s idle preparation. That is PERF.md's one accepted long task; moving it
+  earlier would land it in the user's first edits instead. No code change; BACKLOG and PERF.md
+  corrected.

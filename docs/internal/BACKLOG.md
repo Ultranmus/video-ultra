@@ -257,9 +257,11 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       word times (`captions-timing`, DECISIONS #165): Groq 0.05 s mean in English and Hindi.
       Still open: Chinese / Japanese (the voice and Groq split words differently) and Gemini's
       sound-based times on the same reference.
-- [ ] Perf: editor-interact (Chrome) shows one ~108 ms main-thread task around "drag text on
-      stage" (~1.7 s into the flow) — present on main before 2026-10-25's captions work too
-      (A/B measured); find what it is (text raster? selection frame?).
+- [x] Perf: editor-interact (Chrome) shows one ~108 ms main-thread task around "drag text on
+      stage" (~1.7 s into the flow). Profiled 2026-10-26: it is not the drag — it is the first
+      Play tap (`prepareAudio`, Chrome starting its audio service), which the check presses
+      ~1.8 s after load, before the 3 s idle preparation. The one accepted long task (PERF.md
+      "AudioContext"); no change.
 - [x] Captions: speech buried under room noise — the speech detector and confidence rules
       (DECISIONS #167) give no captions on our two Hindi phone clips. Still open: a confident
       wrong-language "translation" (en-tts-phone → Malay); asking twice and keeping what agrees
