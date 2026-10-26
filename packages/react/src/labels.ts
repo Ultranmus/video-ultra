@@ -273,6 +273,7 @@ export const DEFAULT_LABELS = {
   storageFull:
     "There's no space left to store this file. Free up space on this device or remove media you don't use.",
   notPersistent: 'This browser may clear your work after a while — export to keep it.',
+  voiceoverTitle: 'Voiceover',
   muteWhileRecording: 'Mute video while recording',
   recordingIn: (seconds: number) => `Recording in ${seconds}`,
   voiceoverAdded: (time: string) => `Voiceover added at ${time}, where you started`,
@@ -931,7 +932,6 @@ export const DEFAULT_LABELS = {
   tipReadAloud: 'A voice reads this text — added as a sound clip where the text starts',
   voiceFile: 'Voice',
   speechFailed: (why: string) => `Couldn't make the voice: ${why}`,
-  speechHint: 'Uses an online voice service',
   // v0.4 Proxies
   makingProxy: (name: string) =>
     `Making a lighter copy of "${name}" for smooth editing — your export still uses the original`,

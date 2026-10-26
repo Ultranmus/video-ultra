@@ -94,7 +94,7 @@ export function TextToSpeech(): ReactElement | null {
   const [speed, setSpeed] = useState(1);
   if (!ctl.options.speech) return null;
   return (
-    <section className="vu-tts" aria-label={l.textToSpeech}>
+    <section className="vu-tts vu-panel-section" aria-label={l.textToSpeech}>
       <h3 className="vu-audiolib-title">{l.textToSpeech}</h3>
       <textarea
         className="vu-textarea"
@@ -120,7 +120,6 @@ export function TextToSpeech(): ReactElement | null {
           }
         />
       )}
-      <p className="vu-hint">{l.speechHint}</p>
     </section>
   );
 }

@@ -342,27 +342,32 @@ function AudioPanel() {
           void ctl.importFiles(files);
         }}
       />
-      <Voiceover />
-      <TextToSpeech />
       <ImportRows />
-      {assets.length && library ? <h3 className="vu-audiolib-title">{l.yourAudio}</h3> : null}
+      <section className="vu-panel-section" aria-label={l.voiceoverTitle}>
+        <h3 className="vu-audiolib-title">{l.voiceoverTitle}</h3>
+        <Voiceover />
+      </section>
+      <TextToSpeech />
       {assets.length ? (
-        <ul className="vu-list" aria-label={l.yourAudio}>
-          {assets.map((asset) => (
-            <li key={asset.id}>
-              <button
-                type="button"
-                className="vu-list-item"
-                data-tooltip={asset.credit ? `${l.addToTimeline} · ${asset.credit}` : undefined}
-                onClick={() => ctl.addAssetToTimeline(asset.id)}
-              >
-                <Icon name="audio" size={16} />
-                <span className="vu-list-text">{asset.name}</span>
-                <span className="vu-list-meta">{formatDuration(asset)}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
+        <section className="vu-panel-section" aria-label={l.yourAudio}>
+          <h3 className="vu-audiolib-title">{l.yourAudio}</h3>
+          <ul className="vu-list">
+            {assets.map((asset) => (
+              <li key={asset.id}>
+                <button
+                  type="button"
+                  className="vu-list-item"
+                  data-tooltip={asset.credit ? `${l.addToTimeline} · ${asset.credit}` : undefined}
+                  onClick={() => ctl.addAssetToTimeline(asset.id)}
+                >
+                  <Icon name="audio" size={16} />
+                  <span className="vu-list-text">{asset.name}</span>
+                  <span className="vu-list-meta">{formatDuration(asset)}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
       ) : null}
       {library ? <AudioLibraryPanel library={library} /> : null}
     </div>
