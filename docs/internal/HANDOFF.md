@@ -2,6 +2,24 @@
 
 Where the last session stopped and what comes next. Update before ending every session.
 
+## 2026-10-26 — where to pick up
+
+**State:** everything merged into main locally, **not pushed** (the owner says when). Dev server
+on :3200 (`git switch` / merges often stop the tsup watchers — check `dist` is newer than the
+source; restart `pnpm dev` if not). Keys in `apps/playground/.env.local` are **set**.
+
+**Done today (owner-tested ✓ on desktop):** export dialog (button bottom right, preview as tall
+as the settings, first frame; phones full screen with a fixed button bar), camera, Audio
+(sections, voiceover 3-2-1 countdown + placed where recording started, #171), History as a panel
+like Layers (#172), phone top bar fits down to 360 px. Also fixed: a playback race (a stale
+"playing" tick undid pause-then-seek). The "108 ms text-drag task" was the first Play's audio
+start (PERF's accepted task).
+
+**Next (owner, desktop):** editing tools — Align in the menu, type on the stage, edit several,
+combine into one clip, copy / paste, grouping with the mouse, keyframes, markers (M), fine trims
+(Alt-drag), split at scenes, scopes, Export → Smaller file. Then the phones (nothing from
+10-24 on has been tried on a phone).
+
 ## 2026-10-25 end of day — where to pick up
 
 **State:** everything is merged into main locally; **not pushed** since the Vercel fix (the owner
