@@ -566,3 +566,10 @@ merged and re-verified on main; A (captions) and E (layers) here.
   set (the handoff wrongly said the keys were commented out; corrected).
 - Record voiceover plays the video while recording — by design (talk along, the video muted by
   default); asked the owner whether to add a countdown / a note.
+- Voiceover (owner's choice, DECISIONS #171): 3-2-1 countdown on the video (Cancel; mic asked
+  first), note under the button, clip placed where recording started (explicit `at`), toast
+  "Voiceover added at …". Found and fixed a playback race: a tick sent before the engine took a
+  pause in moved the playhead after Stop (it stayed at 4.5 s instead of going back to 2 s).
+  Checked with a fake microphone in Chrome (count 3→2 with the video paused, cancel = nothing
+  recorded, clip at 2.00 s, playhead back at 2 s and staying), editor-interact Chrome / WebKit /
+  Firefox, audio-check, a11y-check 0 violations.

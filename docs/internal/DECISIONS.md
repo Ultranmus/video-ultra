@@ -1181,3 +1181,15 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       round (52 px) and sit right beside the record button instead of centred in the empty
       halves. Also: the panel resize handles state their size from the start (axe
       aria-required-attr on focusable separators).
+
+171.  **Voiceover: a 3-2-1 countdown, and the clip goes where recording started** (owner,
+      2026-10-26). Pressing Record voiceover started recording and playback at once, which felt
+      sudden. Now the microphone is asked for first (its permission prompt never interrupts the
+      count), then 3, 2, 1 shows on the video (Cancel stops it and frees the microphone), then
+      recording and playback start together. A line under the button says so. The clip is placed
+      where recording started — passed in explicitly (`importFiles(…, { at })`), not read from
+      the playhead after the import — so the words line up with the picture they were said over;
+      the playhead goes back there and a toast says "Voiceover added at 0:02.0, where you
+      started". Also a playback fix: after `pause()` the controller ignores the engine's
+      "playing" ticks until the engine has taken the pause in — a stale tick undid a
+      pause-then-seek (the playhead jumped forward and showed playing again).
