@@ -129,7 +129,8 @@ the stage and everything drawn on it don't mirror. Text items in RTL scripts ren
 
 ## 5b. Layers & organising (v0.2, DECISIONS #116–117)
 
-- **Top bar:** ↶ Undo, ↷ Redo | 🕘 History, ▤ Layers. History is a popover: "Original" and every
+- **Top bar:** ↶ Undo, ↷ Redo | 🕘 History, ▤ Layers. History is a panel like Layers (left panel on
+  desktop / tablet, the sheet on phones): "Original" and every
   step by name, the current one marked, later ones faded; tap any to go there (and back).
 - **Layers** (left panel on desktop / tablet, the sheet on phones): what's on screen at the
   playhead, front first, the main video last. Row = grip, picture, name (double-click / F2 to
