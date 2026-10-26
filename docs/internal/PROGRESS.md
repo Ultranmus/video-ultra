@@ -640,3 +640,8 @@ merged and re-verified on main; A (captions) and E (layers) here.
   all passed.
 - Owner: the host's Share was shorter than Export (secondary buttons are 32 px). In the top bar
   every button is now the touch height (40 px) and the same text size, whatever its look.
+- Owner: the embed demo's Share did nothing visible (it only set a value for embed-check). Now
+  it does what a host's Share might: "Making a small video to share…", a 480p MP4 through the
+  editor's own `exportVideo`, then the system share sheet (`navigator.share`, phones / Mac
+  Chrome), or a "Ready to share (demo)" toast with Save where there's none. Checked: the MP4
+  (1.3 MB) reaches the share sheet, export events start → done; embed-check all passed.
