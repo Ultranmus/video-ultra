@@ -169,8 +169,8 @@ _Owner, 2026-10-25 — desktop: **captions tested ✓** (Groq, Gemini fallback, 
 - [ ] **Markers.** Press **M** to drop a marker (a flag on the ruler); M again on it removes it;
       **,** and **.** jump between markers; dragging the playhead or clips snaps to them.
       _Checked here:_ protrim-check.
-- [ ] **Smaller files: HEVC / AV1 export.** Export → Video → a **Codec** row appears where your
-      device can encode them: on the Mac / iPhone pick **HEVC** (about 40 % smaller) or **AV1** —
+- [ ] **Smaller files: HEVC / AV1 export.** Export → Video → More settings → **Smaller file**
+      (shown where your device can encode it: HEVC on the Mac / iPhone, else AV1) —
       the file plays in Photos / QuickTime? (HEVC should; AV1 needs a new device.) _Checked
       here:_ codecs-check (AV1 in MP4 and WebM, every frame decodes, half the size; HEVC absent
       on Linux with a clear message).
@@ -181,7 +181,7 @@ _Owner, 2026-10-25 — desktop: **captions tested ✓** (Groq, Gemini fallback, 
       Slow cross-fades stay in one clip (by design for now). _Checked here:_ scenes-check (exact
       cuts at 3 / 6 / 8 s in real footage, at 2× speed too, Sintel trailer, no false cut, Cancel,
       no long tasks, phone toolbar) + 6 unit tests.
-- [ ] **Sound effects (listen with headphones).** Select a video where someone talks →
+- [x] **Sound effects (listen with headphones).** Select a video where someone talks →
       **Sound effects** (inspector; phone: toolbar) → try **Clear voice**, **Podcast**, **Phone
       call**, **Deep voice**, **Chipmunk**; then Bass / Middle / Treble, **Even out** and
       **Pitch**. Does the voice sound clean (no warble, no clicks while playing)? Speed a clip to
@@ -189,7 +189,7 @@ _Owner, 2026-10-25 — desktop: **captions tested ✓** (Groq, Gemini fallback, 
       sounds the same as the preview. _Checked here:_ soundfx-check (pitch, keep pitch, EQ,
       compressor measured on exported WAVs; axe) + 7 unit tests. Nobody has listened yet — your
       ears are the test.
-- [ ] **Level meter (desktop).** Play a video: two thin bars next to the time move with the
+- [x] **Level meter (desktop).** Play a video: two thin bars next to the time move with the
       sound, amber near the top, red if it's too loud; they rest when paused. _Checked here:_
       soundfx-check (reads the tone's level, rests at 0).
 - [ ] **Scopes (desktop).** Click empty space (video settings) → open **Scopes** → switch
@@ -217,7 +217,7 @@ _Owner, 2026-10-25 — desktop: **captions tested ✓** (Groq, Gemini fallback, 
       _Owner, 2026-10-25 — desktop: **mostly works**_ (real Gemini). Fixed while testing: media
       list, rename, naming files (#159), a rejected answer retried once (#160), styled-text edit
       crash + `place` (#161), chat reopens at the bottom, History names. Phone not tried yet.
-- [ ] **Text to speech.** Audio panel → **Text to speech** → type a sentence, pick a voice →
+- [x] **Text to speech.** Audio panel → **Text to speech** → type a sentence, pick a voice →
       **Add voice** → a sound clip at the playhead. Select a title → **Read aloud** → its words
       are spoken where it starts. Without a server key you hear the demo "voice" (soft tones per
       syllable) — set `SPEECH_API_KEY` (or the assistant's key) on Vercel for a real voice.
