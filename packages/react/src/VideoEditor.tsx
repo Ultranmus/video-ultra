@@ -501,6 +501,10 @@ function useKeyboard(rootRef: React.RefObject<HTMLDivElement | null>) {
       }
     };
     root.addEventListener('keydown', onKey);
+    // Shortcuts work straight away: the editor takes focus on opening — only when nothing else
+    // on the page has it (a host's own field keeps it), and without scrolling the page.
+    const active = document.activeElement;
+    if (!active || active === document.body) root.focus({ preventScroll: true });
     return () => root.removeEventListener('keydown', onKey);
   }, [ctl, rootRef]);
 }
