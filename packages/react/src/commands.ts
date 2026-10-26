@@ -130,8 +130,8 @@ export function getCommand(ctl: EditorController, id: CommandId): Command {
         icon: 'history',
         tip: l.tipHistory,
         disabledReason: null,
-        pressed: ctl.ui.getState().historyOpen,
-        run: () => ctl.ui.setState((s) => ({ historyOpen: !s.historyOpen, menu: null })),
+        pressed: ctl.ui.getState().panel === 'history',
+        run: () => ctl.toggleSidePanel('history'),
       };
     case 'layers':
       return {
@@ -141,7 +141,7 @@ export function getCommand(ctl: EditorController, id: CommandId): Command {
         tip: l.tipLayers,
         disabledReason: null,
         pressed: ctl.ui.getState().panel === 'layers',
-        run: () => ctl.toggleLayers(),
+        run: () => ctl.toggleSidePanel('layers'),
       };
     case 'split': {
       const { split } = ctl.targets();

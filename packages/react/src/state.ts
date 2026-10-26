@@ -14,6 +14,8 @@ export type PanelId =
   | 'filters'
   | 'transitions'
   | 'layers'
+  /** Every step since the project opened; tap one to go back to it. */
+  | 'history'
   | 'captions'
   /** Blurred / pixelated areas (v0.2 C3). */
   | 'blur'
@@ -110,7 +112,6 @@ export interface UiState {
    * a group). Empty when nothing is selected.
    */
   selectedIds: readonly string[];
-  /** The History popover is open. */
   /**
    * Combined clips opened for editing, outermost first (DECISIONS #155): the timeline, stage and
    * inspector show the innermost one's inside. `outerTime`: the playhead before it opened.
@@ -118,7 +119,6 @@ export interface UiState {
   inside: readonly { assetId: string; itemId: string; name: string; outerTime: number }[];
   /** "Your videos" popover (top bar). */
   videosOpen: boolean;
-  historyOpen: boolean;
   /** Layers panel: tapping rows adds to the selection (phones have no Shift key). */
   layersSelecting: boolean;
   /** The context menu, at a point in the editor root (px). */
@@ -180,7 +180,6 @@ export function createUiStore() {
     layout: 'desktop',
     selectedId: null,
     selectedIds: [],
-    historyOpen: false,
     videosOpen: false,
     inside: [],
     layersSelecting: false,

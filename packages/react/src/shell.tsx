@@ -30,13 +30,7 @@ import { CanvasTool, InspectorSections, ToolPanel } from './ToolPanel';
 import { toolsFor } from './tools';
 import { LevelMeter } from './meter';
 import { ScopesView } from './scopes';
-import {
-  ArrangeControls,
-  CommandButton,
-  HistoryPopover,
-  LockedNote,
-  SelectionInspector,
-} from './organize';
+import { ArrangeControls, CommandButton, LockedNote, SelectionInspector } from './organize';
 
 // ── Top bar ─────────────────────────────────────────────────────────────────
 
@@ -52,9 +46,9 @@ export function TopBar({ onClose }: { onClose?: (() => void) | undefined }): Rea
   const save = useUi((s) => s.save);
   const readOnly = useUi((s) => s.readOnly);
   const layout = useUi((s) => s.layout);
-  const historyOpen = useUi((s) => s.historyOpen);
   const videosOpen = useUi((s) => s.videosOpen);
   const layersOpen = useUi((s) => s.panel === 'layers' && (s.layout !== 'phone' || s.sheetPanel));
+  const historyOpen = useUi((s) => s.panel === 'history' && (s.layout !== 'phone' || s.sheetPanel));
   const ratio = ratioOf(width, height);
   return (
     <header className="vu-topbar">
@@ -67,9 +61,7 @@ export function TopBar({ onClose }: { onClose?: (() => void) | undefined }): Rea
               label={l.yourVideos}
               tip={l.tipYourVideos}
               pressed={videosOpen}
-              onClick={() =>
-                ctl.ui.setState({ videosOpen: !videosOpen, historyOpen: false, menu: null })
-              }
+              onClick={() => ctl.ui.setState({ videosOpen: !videosOpen, menu: null })}
             />
             <VideosPopover />
           </span>
@@ -129,22 +121,19 @@ export function TopBar({ onClose }: { onClose?: (() => void) | undefined }): Rea
           onClick={() => ctl.redo()}
         />
         <span className="vu-topbar-divider" aria-hidden="true" />
-        <span className="vu-popover-anchor" data-history-toggle="">
-          <IconButton
-            icon="history"
-            label={l.history}
-            tip={l.tipHistory}
-            pressed={historyOpen}
-            onClick={() => ctl.ui.setState({ historyOpen: !historyOpen, menu: null })}
-          />
-          <HistoryPopover />
-        </span>
+        <IconButton
+          icon="history"
+          label={l.history}
+          tip={l.tipHistory}
+          pressed={historyOpen}
+          onClick={() => ctl.toggleSidePanel('history')}
+        />
         <IconButton
           icon="layers"
           label={l.layers}
           tip={l.tipLayers}
           pressed={layersOpen}
-          onClick={() => ctl.toggleLayers()}
+          onClick={() => ctl.toggleSidePanel('layers')}
         />
       </div>
       <div className="vu-topbar-end">
@@ -296,7 +285,9 @@ export function Panel(): ReactElement | null {
       ? l[entry.key]
       : panel === 'layers'
         ? l.layers
-        : l.canvas;
+        : panel === 'history'
+          ? l.history
+          : l.canvas;
   return (
     <aside className="vu-panel" aria-label={title}>
       <div className="vu-panel-head">
@@ -898,7 +889,9 @@ function Sheet({ tool, panel }: { tool: ToolId | null; panel: PanelId | null }):
         ? l[entry.key]
         : panel === 'layers'
           ? l.layers
-          : l.canvas;
+          : panel === 'history'
+            ? l.history
+            : l.canvas;
 
   /**
    * The sheet is always full height and only ever moves with `transform` (no height animation,

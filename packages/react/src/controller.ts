@@ -624,7 +624,6 @@ export class EditorController {
       selectedId: null,
       selectedIds: [],
       menu: null,
-      historyOpen: false,
       save: 'idle',
       inside: [],
     });
@@ -1297,24 +1296,27 @@ export class EditorController {
     });
   }
 
-  /** Opens or closes the Layers panel (left panel on desktop / tablet, the sheet on phones). */
-  toggleLayers(): void {
+  /**
+   * Opens or closes Layers or History (top bar): the left panel on desktop / tablet, the sheet on
+   * phones.
+   */
+  toggleSidePanel(id: 'layers' | 'history'): void {
     const s = this.ui.getState();
     if (s.layout !== 'phone') {
       this.ui.setState({
-        panel: s.panel === 'layers' ? null : 'layers',
+        panel: s.panel === id ? null : id,
         tool: null,
         layersSelecting: false,
       });
       return;
     }
-    const open = s.panel === 'layers' && s.sheetPanel;
-    this.ui.setState({ panel: 'layers', sheetPanel: !open, tool: null, layersSelecting: false });
+    const open = s.panel === id && s.sheetPanel;
+    this.ui.setState({ panel: id, sheetPanel: !open, tool: null, layersSelecting: false });
   }
 
   /** Opens the context menu for the selection at a point in the editor root (px). */
   openMenu(x: number, y: number): void {
-    this.ui.setState({ menu: { x, y }, historyOpen: false });
+    this.ui.setState({ menu: { x, y } });
   }
 
   closeMenu(): void {

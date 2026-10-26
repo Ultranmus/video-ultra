@@ -1,4 +1,4 @@
-import { LayersPanel } from './organize';
+import { HistoryPanel, LayersPanel } from './organize';
 import { CaptionsPanel } from './captions';
 import {
   findItem,
@@ -54,6 +54,8 @@ export function AddPanel({ panel }: { panel: PanelId }): ReactElement {
       );
     case 'layers':
       return <LayersPanel />;
+    case 'history':
+      return <HistoryPanel />;
     case 'captions':
       return <CaptionsPanel />;
     case 'blur':
