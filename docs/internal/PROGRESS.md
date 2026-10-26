@@ -585,3 +585,7 @@ merged and re-verified on main; A (captions) and E (layers) here.
   phones), toggled by the clock; Layers and History replace each other. organize-check updated
   (opens as a panel, Original / last step, the clock closes it) — all passed; a11y-check 0
   violations; screenshots desktop + phone.
+- Owner (iPhone frame): the phone top bar overflowed — Layers slid under the canvas-size button
+  (with "Your videos" shown the bar needs ~408 px; it was so before History moved). Phones now
+  hide the divider and the icons on the canvas size and Export (words only): no overlap at 393
+  or 360 px, every button still 40 px. a11y-check 0 violations.
