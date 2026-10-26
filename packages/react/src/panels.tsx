@@ -501,7 +501,6 @@ function Voiceover() {
           <span>{l.recordVoiceover}</span>
         </button>
       )}
-      <p className="vu-hint">{l.voiceoverHint}</p>
       {error ? (
         <p className="vu-error" role="alert">
           {error}
