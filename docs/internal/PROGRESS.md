@@ -550,3 +550,8 @@ merged and re-verified on main; A (captions) and E (layers) here.
   code removed). Head pinned at the top, summary + button at the bottom, the preview grows into
   the spare room (318 px tall on a 390×844 screen, 200 px with More settings open). Chrome +
   WebKit checked; ✕ closes.
+- Owner: the phone Export button moved with the scroll (sticky inside the scrolling dialog).
+  Now only the middle (`.vu-export-scroll`, `display: contents` on desktop) scrolls; the head and
+  the button bar are outside it and fixed. Checked with wheel scrolls over the middle and the
+  bar in Chrome + WebKit (button stays at 784–832 px); desktop layout unchanged; a11y 0
+  violations; editor-interact export ✓ (Chrome, WebKit).
