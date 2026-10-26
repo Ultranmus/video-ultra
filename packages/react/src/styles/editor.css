@@ -364,6 +364,11 @@
       display: none;
     }
 
+    /* A host's own buttons need the room: the canvas size goes (it's in the toolbar's Canvas). */
+    .vu-topbar-end:has(.vu-host-button) .vu-ratio-button {
+      display: none;
+    }
+
     /* A host's buttons with an icon show just the icon (the label is still read out). */
     .vu-host-button:has(.vu-icon) {
       min-width: var(--vu-size-touch);
