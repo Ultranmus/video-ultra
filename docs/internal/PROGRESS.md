@@ -575,3 +575,6 @@ merged and re-verified on main; A (captions) and E (layers) here.
   Firefox, audio-check, a11y-check 0 violations.
 - Owner: too much text in the Audio panel — the voiceover note removed, "Mute video while
   recording" (one line), text to speech note "Uses an online voice service" (was two lines).
+- Owner: Audio panel in sections — Voiceover, Text to speech, In this project, the library —
+  each under a heading, set apart by space (owner: not too many dividers; one line, above the
+  library). "Uses an online voice service" removed. a11y-check 0 violations.
