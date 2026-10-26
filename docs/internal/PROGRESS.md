@@ -632,3 +632,9 @@ merged and re-verified on main; A (captions) and E (layers) here.
   light: 0 violations.
 - Owner: high contrast borders still too strong at 42 % / 55 % white. Now just above WCAG's 3:1
   on every surface: dark 36 % / 40 % white, light 44 % / 48 % black.
+- Owner (`?embed=1`): a host media source's heading sat on the search box (no layout CSS on
+  `.vu-media-sources`) — spaced like the other libraries. Phone top bar overflowed with the
+  host's Share button: host buttons with an icon show just the icon on phones (label kept for
+  screen readers), and when a host adds buttons the canvas-size button steps aside on phones
+  (the toolbar has Canvas). No overlap at 393 / 360 with or without host buttons; embed-check
+  all passed.
