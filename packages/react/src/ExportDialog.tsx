@@ -584,394 +584,397 @@ export function ExportDialog(): ReactElement | null {
           </button>
         </div>
         <div className="vu-export-body" data-wide={aspect >= 1 || undefined}>
-          <div className="vu-export-side">
-            {done?.kind === 'video' ? (
-              <video
-                className="vu-export-result"
-                src={done.url}
-                controls
-                playsInline
-                style={{ aspectRatio: String(done.result.width / done.result.height) }}
-              />
-            ) : done?.kind === 'image' ? (
-              <img
-                className="vu-export-result vu-export-image"
-                src={done.url}
-                alt={l.imageFrameAt(formatClock(frameTime))}
-                style={{ aspectRatio: String(done.image.width / done.image.height) }}
-              />
-            ) : (
-              <Poster
-                aspect={aspect}
-                time={posterTime}
-                progress={progress ? progress.fraction : null}
-              >
-                {progress ? (
-                  <div className="vu-export-ring" aria-hidden="true">
-                    <svg viewBox="0 0 60 60">
-                      <circle className="vu-export-ring-track" cx="30" cy="30" r="26" />
-                      <circle
-                        className="vu-export-ring-fill"
-                        cx="30"
-                        cy="30"
-                        r="26"
-                        strokeDasharray={ring}
-                        strokeDashoffset={ring * (1 - progress.fraction)}
-                      />
-                    </svg>
-                    <span>{percent}%</span>
-                  </div>
-                ) : (
-                  <span className="vu-export-badge">
-                    {kind === 'image' ? formatClock(frameTime) : formatDurationShort(spanLength)}
-                  </span>
-                )}
-                {done?.kind === 'audio' ? (
-                  <span className="vu-export-sound" aria-hidden="true">
-                    <Icon name="audio" size={28} />
-                  </span>
-                ) : null}
-              </Poster>
-            )}
-          </div>
-          <div className="vu-export-main">
-            {done ? (
-              <div className="vu-export-done">
-                <span className="vu-export-check" aria-hidden="true">
-                  <svg viewBox="0 0 52 52">
-                    <circle cx="26" cy="26" r="24" />
-                    <path d="M15 27l7 7 15-16" />
-                  </svg>
-                </span>
-                <p className="vu-export-done-title">
-                  {done.kind === 'video'
-                    ? l.exportDone
-                    : done.kind === 'audio'
-                      ? l.audioExportDone
-                      : l.imageDone}
-                </p>
-                <p className="vu-hint">
-                  {done.kind === 'image'
-                    ? `${done.image.width}×${done.image.height} · ${formatMb(done.image.blob.size / 1e6)} · ${done.image.extension.toUpperCase()}`
-                    : done.kind === 'audio'
-                      ? `${formatDurationShort(done.result.durationSeconds * FLICKS_PER_SECOND)} · ${formatMb(done.result.blob.size / 1e6)} · ${done.result.extension.toUpperCase()}`
-                      : `${done.result.width}×${done.result.height} · ${formatMb(done.result.blob.size / 1e6)} · ${done.result.extension.toUpperCase()}`}
-                </p>
-                {done.kind === 'audio' ? (
-                  <audio className="vu-export-audio" src={done.url} controls />
-                ) : null}
-                <a
-                  className="vu-btn vu-wide"
-                  data-variant="primary"
-                  data-layout="row"
-                  href={done.url}
-                  download={fileName}
+          {/* Phones: only this part scrolls; the head and the button bar stay put. */}
+          <div className="vu-export-scroll">
+            <div className="vu-export-side">
+              {done?.kind === 'video' ? (
+                <video
+                  className="vu-export-result"
+                  src={done.url}
+                  controls
+                  playsInline
+                  style={{ aspectRatio: String(done.result.width / done.result.height) }}
+                />
+              ) : done?.kind === 'image' ? (
+                <img
+                  className="vu-export-result vu-export-image"
+                  src={done.url}
+                  alt={l.imageFrameAt(formatClock(frameTime))}
+                  style={{ aspectRatio: String(done.image.width / done.image.height) }}
+                />
+              ) : (
+                <Poster
+                  aspect={aspect}
+                  time={posterTime}
+                  progress={progress ? progress.fraction : null}
                 >
-                  <Icon name="download" />
-                  <span>{l.download}</span>
-                </a>
-                {canShare ? (
+                  {progress ? (
+                    <div className="vu-export-ring" aria-hidden="true">
+                      <svg viewBox="0 0 60 60">
+                        <circle className="vu-export-ring-track" cx="30" cy="30" r="26" />
+                        <circle
+                          className="vu-export-ring-fill"
+                          cx="30"
+                          cy="30"
+                          r="26"
+                          strokeDasharray={ring}
+                          strokeDashoffset={ring * (1 - progress.fraction)}
+                        />
+                      </svg>
+                      <span>{percent}%</span>
+                    </div>
+                  ) : (
+                    <span className="vu-export-badge">
+                      {kind === 'image' ? formatClock(frameTime) : formatDurationShort(spanLength)}
+                    </span>
+                  )}
+                  {done?.kind === 'audio' ? (
+                    <span className="vu-export-sound" aria-hidden="true">
+                      <Icon name="audio" size={28} />
+                    </span>
+                  ) : null}
+                </Poster>
+              )}
+            </div>
+            <div className="vu-export-main">
+              {done ? (
+                <div className="vu-export-done">
+                  <span className="vu-export-check" aria-hidden="true">
+                    <svg viewBox="0 0 52 52">
+                      <circle cx="26" cy="26" r="24" />
+                      <path d="M15 27l7 7 15-16" />
+                    </svg>
+                  </span>
+                  <p className="vu-export-done-title">
+                    {done.kind === 'video'
+                      ? l.exportDone
+                      : done.kind === 'audio'
+                        ? l.audioExportDone
+                        : l.imageDone}
+                  </p>
+                  <p className="vu-hint">
+                    {done.kind === 'image'
+                      ? `${done.image.width}×${done.image.height} · ${formatMb(done.image.blob.size / 1e6)} · ${done.image.extension.toUpperCase()}`
+                      : done.kind === 'audio'
+                        ? `${formatDurationShort(done.result.durationSeconds * FLICKS_PER_SECOND)} · ${formatMb(done.result.blob.size / 1e6)} · ${done.result.extension.toUpperCase()}`
+                        : `${done.result.width}×${done.result.height} · ${formatMb(done.result.blob.size / 1e6)} · ${done.result.extension.toUpperCase()}`}
+                  </p>
+                  {done.kind === 'audio' ? (
+                    <audio className="vu-export-audio" src={done.url} controls />
+                  ) : null}
+                  <a
+                    className="vu-btn vu-wide"
+                    data-variant="primary"
+                    data-layout="row"
+                    href={done.url}
+                    download={fileName}
+                  >
+                    <Icon name="download" />
+                    <span>{l.download}</span>
+                  </a>
+                  {canShare ? (
+                    <button
+                      type="button"
+                      className="vu-btn vu-wide"
+                      data-variant="secondary"
+                      data-layout="row"
+                      onClick={() => void navigator.share({ files: [shareFile!] }).catch(() => {})}
+                    >
+                      <Icon name="share" />
+                      <span>{l.share}</span>
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="vu-btn vu-wide"
+                    data-variant="ghost"
+                    data-layout="row"
+                    onClick={close}
+                  >
+                    {l.backToEditing}
+                  </button>
+                </div>
+              ) : progress ? (
+                <div className="vu-export-progress">
+                  <div
+                    className="vu-progress"
+                    role="progressbar"
+                    aria-label={l.exporting}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={percent}
+                  >
+                    <div className="vu-progress-fill" style={{ width: `${percent}%` }} />
+                  </div>
+                  <p className="vu-export-status">
+                    {l.exportProgress(
+                      percent,
+                      progress.etaSeconds != null ? formatEta(progress.etaSeconds) : null,
+                    )}
+                  </p>
+                  {progress.framesTotal && kind === 'video' ? (
+                    <p className="vu-hint">
+                      {l.exportFrames(progress.framesDone, progress.framesTotal)}
+                    </p>
+                  ) : null}
+                  <p className="vu-hint">{l.exportKeepOpen}</p>
                   <button
                     type="button"
                     className="vu-btn vu-wide"
                     data-variant="secondary"
                     data-layout="row"
-                    onClick={() => void navigator.share({ files: [shareFile!] }).catch(() => {})}
+                    onClick={() => abort.current?.abort()}
                   >
-                    <Icon name="share" />
-                    <span>{l.share}</span>
+                    {l.cancel}
                   </button>
-                ) : null}
-                <button
-                  type="button"
-                  className="vu-btn vu-wide"
-                  data-variant="ghost"
-                  data-layout="row"
-                  onClick={close}
-                >
-                  {l.backToEditing}
-                </button>
-              </div>
-            ) : progress ? (
-              <div className="vu-export-progress">
-                <div
-                  className="vu-progress"
-                  role="progressbar"
-                  aria-label={l.exporting}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={percent}
-                >
-                  <div className="vu-progress-fill" style={{ width: `${percent}%` }} />
                 </div>
-                <p className="vu-export-status">
-                  {l.exportProgress(
-                    percent,
-                    progress.etaSeconds != null ? formatEta(progress.etaSeconds) : null,
-                  )}
-                </p>
-                {progress.framesTotal && kind === 'video' ? (
-                  <p className="vu-hint">
-                    {l.exportFrames(progress.framesDone, progress.framesTotal)}
-                  </p>
-                ) : null}
-                <p className="vu-hint">{l.exportKeepOpen}</p>
-                <button
-                  type="button"
-                  className="vu-btn vu-wide"
-                  data-variant="secondary"
-                  data-layout="row"
-                  onClick={() => abort.current?.abort()}
-                >
-                  {l.cancel}
-                </button>
-              </div>
-            ) : (
-              <div className="vu-export-form">
-                <Segmented
-                  label={l.exportWhat}
-                  hideLabel
-                  value={kind}
-                  options={[
-                    { value: 'video', label: l.exportKindVideo, icon: 'media' },
-                    { value: 'audio', label: l.exportKindAudio, icon: 'audio' },
-                    { value: 'image', label: l.exportKindImage, icon: 'image' },
-                  ]}
-                  onChange={(k) => {
-                    setError(null);
-                    setKind(k);
-                  }}
-                />
-                {kind === 'video' ? (
-                  <>
-                    <div className="vu-field">
-                      <span className="vu-field-row" id="vu-export-q">
-                        {l.quality}
-                      </span>
-                      {/* One choice for size and sharpness: each resolution with its file size. */}
-                      <div
-                        className="vu-export-options"
-                        role="radiogroup"
-                        aria-labelledby="vu-export-q"
+              ) : (
+                <div className="vu-export-form">
+                  <Segmented
+                    label={l.exportWhat}
+                    hideLabel
+                    value={kind}
+                    options={[
+                      { value: 'video', label: l.exportKindVideo, icon: 'media' },
+                      { value: 'audio', label: l.exportKindAudio, icon: 'audio' },
+                      { value: 'image', label: l.exportKindImage, icon: 'image' },
+                    ]}
+                    onChange={(k) => {
+                      setError(null);
+                      setKind(k);
+                    }}
+                  />
+                  {kind === 'video' ? (
+                    <>
+                      <div className="vu-field">
+                        <span className="vu-field-row" id="vu-export-q">
+                          {l.quality}
+                        </span>
+                        {/* One choice for size and sharpness: each resolution with its file size. */}
+                        <div
+                          className="vu-export-options"
+                          role="radiogroup"
+                          aria-labelledby="vu-export-q"
+                        >
+                          {available.map((h) => (
+                            <Option
+                              key={h}
+                              group="resolution"
+                              value={String(h)}
+                              current={String(outHeight)}
+                              title={l.resolutionName(h)}
+                              detail={h === 2160 ? '4K' : `${h}p`}
+                              note={l.aboutSize(formatMb(sizeOf(h, options.quality)))}
+                              onPick={(v) =>
+                                setOptions({
+                                  ...options,
+                                  height: Number(v) as ExportOptions['height'],
+                                })
+                              }
+                            />
+                          ))}
+                        </div>
+                        {limit < 2160 && maxExportHeight(tier) < 2160 ? (
+                          <p className="vu-hint">{l.deviceLimit}</p>
+                        ) : null}
+                      </div>
+                      {lengthField}
+                      <button
+                        type="button"
+                        className="vu-export-more"
+                        aria-expanded={more}
+                        aria-controls="vu-export-more"
+                        onClick={() => setMore(!more)}
                       >
-                        {available.map((h) => (
-                          <Option
-                            key={h}
-                            group="resolution"
-                            value={String(h)}
-                            current={String(outHeight)}
-                            title={l.resolutionName(h)}
-                            detail={h === 2160 ? '4K' : `${h}p`}
-                            note={l.aboutSize(formatMb(sizeOf(h, options.quality)))}
-                            onPick={(v) =>
-                              setOptions({
-                                ...options,
-                                height: Number(v) as ExportOptions['height'],
-                              })
+                        <Icon name="chevronDown" size={16} />
+                        <span>{l.moreSettings}</span>
+                        {more ? null : <span className="vu-hint">{l.moreSettingsHint}</span>}
+                      </button>
+                      {more ? (
+                        <div className="vu-export-more-body" id="vu-export-more">
+                          <Segmented
+                            label={l.frameRate}
+                            value={String(fpsChoice)}
+                            options={[
+                              { value: 'same', label: l.sameAsVideo(defaultFps) },
+                              ...(['24', '30', '60'] as const).map((f) => ({ value: f, label: f })),
+                            ]}
+                            onChange={(v) =>
+                              setFpsChoice(
+                                v === 'same' ? 'same' : (Number(v) as ExportOptions['fps']),
+                              )
                             }
                           />
-                        ))}
-                      </div>
-                      {limit < 2160 && maxExportHeight(tier) < 2160 ? (
-                        <p className="vu-hint">{l.deviceLimit}</p>
-                      ) : null}
-                    </div>
-                    {lengthField}
-                    <button
-                      type="button"
-                      className="vu-export-more"
-                      aria-expanded={more}
-                      aria-controls="vu-export-more"
-                      onClick={() => setMore(!more)}
-                    >
-                      <Icon name="chevronDown" size={16} />
-                      <span>{l.moreSettings}</span>
-                      {more ? null : <span className="vu-hint">{l.moreSettingsHint}</span>}
-                    </button>
-                    {more ? (
-                      <div className="vu-export-more-body" id="vu-export-more">
-                        <Segmented
-                          label={l.frameRate}
-                          value={String(fpsChoice)}
-                          options={[
-                            { value: 'same', label: l.sameAsVideo(defaultFps) },
-                            ...(['24', '30', '60'] as const).map((f) => ({ value: f, label: f })),
-                          ]}
-                          onChange={(v) =>
-                            setFpsChoice(
-                              v === 'same' ? 'same' : (Number(v) as ExportOptions['fps']),
-                            )
-                          }
-                        />
-                        <Segmented
-                          label={l.fileType}
-                          value={options.format}
-                          options={[
-                            { value: 'mp4', label: l.fileTypeMp4, tip: l.formatMp4Tip },
-                            { value: 'webm', label: 'WebM', tip: l.formatWebmTip },
-                          ]}
-                          onChange={(format) => setOptions({ ...options, format })}
-                        />
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={options.quality === 'high'}
-                          className="vu-switch-row"
-                          onClick={() =>
-                            setOptions({
-                              ...options,
-                              quality: options.quality === 'high' ? 'medium' : 'high',
-                            })
-                          }
-                        >
-                          <span className="vu-switch-text">
-                            <span>{l.extraQuality}</span>
-                            <span className="vu-hint">
-                              {l.extraQualityNote(formatMb(sizeOf(outHeight, 'high')))}
-                            </span>
-                          </span>
-                          <span className="vu-switch" aria-hidden="true">
-                            <span className="vu-switch-knob" />
-                          </span>
-                        </button>
-                        {smallerCodec ? (
+                          <Segmented
+                            label={l.fileType}
+                            value={options.format}
+                            options={[
+                              { value: 'mp4', label: l.fileTypeMp4, tip: l.formatMp4Tip },
+                              { value: 'webm', label: 'WebM', tip: l.formatWebmTip },
+                            ]}
+                            onChange={(format) => setOptions({ ...options, format })}
+                          />
                           <button
                             type="button"
                             role="switch"
-                            aria-checked={smaller}
+                            aria-checked={options.quality === 'high'}
                             className="vu-switch-row"
                             onClick={() =>
                               setOptions({
                                 ...options,
-                                videoCodec: smaller ? 'auto' : smallerCodec,
+                                quality: options.quality === 'high' ? 'medium' : 'high',
                               })
                             }
                           >
                             <span className="vu-switch-text">
-                              <span>
-                                {l.smallerFile}
-                                <span className="vu-tag">{l.newerDevices}</span>
-                              </span>
+                              <span>{l.extraQuality}</span>
                               <span className="vu-hint">
-                                {smallerCodec === 'hevc' ? l.codecHevcTip : l.codecAv1Tip}
+                                {l.extraQualityNote(formatMb(sizeOf(outHeight, 'high')))}
                               </span>
                             </span>
                             <span className="vu-switch" aria-hidden="true">
                               <span className="vu-switch-knob" />
                             </span>
                           </button>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </>
-                ) : kind === 'audio' ? (
-                  <>
-                    <div className="vu-field">
-                      <span className="vu-field-row" id="vu-export-afmt">
-                        {l.format}
-                      </span>
-                      <div
-                        className="vu-export-options"
-                        role="radiogroup"
-                        aria-labelledby="vu-export-afmt"
-                      >
-                        {(['m4a', 'ogg', 'wav'] as const).map((f) => (
-                          <Option
-                            key={f}
-                            group="audio-format"
-                            value={f}
-                            current={audio.format}
-                            title={
-                              f === 'm4a'
-                                ? l.audioFormatM4a
-                                : f === 'ogg'
-                                  ? l.audioFormatOgg
-                                  : l.audioFormatWav
-                            }
-                            detail={
-                              f === 'm4a'
-                                ? l.audioFormatM4aTip
-                                : f === 'ogg'
-                                  ? l.audioFormatOggTip
-                                  : l.audioFormatWavTip
-                            }
-                            disabledReason={
-                              f === 'ogg' && limits && !limits.opus ? l.opusUnavailable : null
-                            }
-                            onPick={(format) => setAudio({ ...audio, format })}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                    {audio.format !== 'wav' ? (
+                          {smallerCodec ? (
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={smaller}
+                              className="vu-switch-row"
+                              onClick={() =>
+                                setOptions({
+                                  ...options,
+                                  videoCodec: smaller ? 'auto' : smallerCodec,
+                                })
+                              }
+                            >
+                              <span className="vu-switch-text">
+                                <span>
+                                  {l.smallerFile}
+                                  <span className="vu-tag">{l.newerDevices}</span>
+                                </span>
+                                <span className="vu-hint">
+                                  {smallerCodec === 'hevc' ? l.codecHevcTip : l.codecAv1Tip}
+                                </span>
+                              </span>
+                              <span className="vu-switch" aria-hidden="true">
+                                <span className="vu-switch-knob" />
+                              </span>
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </>
+                  ) : kind === 'audio' ? (
+                    <>
                       <div className="vu-field">
-                        <span className="vu-field-row" id="vu-export-aq">
-                          {l.quality}
+                        <span className="vu-field-row" id="vu-export-afmt">
+                          {l.format}
                         </span>
                         <div
                           className="vu-export-options"
                           role="radiogroup"
-                          aria-labelledby="vu-export-aq"
+                          aria-labelledby="vu-export-afmt"
                         >
-                          {(['low', 'medium', 'high'] as const).map((q) => (
+                          {(['m4a', 'ogg', 'wav'] as const).map((f) => (
                             <Option
-                              key={q}
-                              group="audio-quality"
-                              value={q}
-                              current={audio.quality}
+                              key={f}
+                              group="audio-format"
+                              value={f}
+                              current={audio.format}
                               title={
-                                q === 'low'
-                                  ? l.qualityLow
-                                  : q === 'medium'
-                                    ? l.qualityMedium
-                                    : l.qualityHigh
+                                f === 'm4a'
+                                  ? l.audioFormatM4a
+                                  : f === 'ogg'
+                                    ? l.audioFormatOgg
+                                    : l.audioFormatWav
                               }
-                              detail={`${exportAudioBitrate(q) / 1000} kb/s`}
-                              onPick={(quality) => setAudio({ ...audio, quality })}
+                              detail={
+                                f === 'm4a'
+                                  ? l.audioFormatM4aTip
+                                  : f === 'ogg'
+                                    ? l.audioFormatOggTip
+                                    : l.audioFormatWavTip
+                              }
+                              disabledReason={
+                                f === 'ogg' && limits && !limits.opus ? l.opusUnavailable : null
+                              }
+                              onPick={(format) => setAudio({ ...audio, format })}
                             />
                           ))}
                         </div>
                       </div>
-                    ) : null}
-                    {lengthField}
-                  </>
-                ) : (
-                  <>
-                    <div className="vu-field">
-                      <p className="vu-export-frame">{l.imageFrameAt(formatClock(frameTime))}</p>
-                      <p className="vu-hint">{l.imagePickHint}</p>
-                    </div>
-                    <div className="vu-field">
-                      <span className="vu-field-row" id="vu-export-ifmt">
-                        {l.format}
-                      </span>
-                      <div
-                        className="vu-export-options"
-                        role="radiogroup"
-                        aria-labelledby="vu-export-ifmt"
-                      >
-                        {(['png', 'jpeg'] as const).map((f) => (
-                          <Option
-                            key={f}
-                            group="image-format"
-                            value={f}
-                            current={imageFormat}
-                            title={f === 'png' ? l.imageFormatPng : l.imageFormatJpeg}
-                            detail={f === 'png' ? l.imageFormatPngTip : l.imageFormatJpegTip}
-                            onPick={setImageFormat}
-                          />
-                        ))}
+                      {audio.format !== 'wav' ? (
+                        <div className="vu-field">
+                          <span className="vu-field-row" id="vu-export-aq">
+                            {l.quality}
+                          </span>
+                          <div
+                            className="vu-export-options"
+                            role="radiogroup"
+                            aria-labelledby="vu-export-aq"
+                          >
+                            {(['low', 'medium', 'high'] as const).map((q) => (
+                              <Option
+                                key={q}
+                                group="audio-quality"
+                                value={q}
+                                current={audio.quality}
+                                title={
+                                  q === 'low'
+                                    ? l.qualityLow
+                                    : q === 'medium'
+                                      ? l.qualityMedium
+                                      : l.qualityHigh
+                                }
+                                detail={`${exportAudioBitrate(q) / 1000} kb/s`}
+                                onPick={(quality) => setAudio({ ...audio, quality })}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                      {lengthField}
+                    </>
+                  ) : (
+                    <>
+                      <div className="vu-field">
+                        <p className="vu-export-frame">{l.imageFrameAt(formatClock(frameTime))}</p>
+                        <p className="vu-hint">{l.imagePickHint}</p>
                       </div>
-                    </div>
-                  </>
-                )}
-                {error ? (
-                  <p className="vu-error" role="alert">
-                    {kind === 'image' ? error : l.exportFailed(error)}
-                  </p>
-                ) : null}
-              </div>
-            )}
+                      <div className="vu-field">
+                        <span className="vu-field-row" id="vu-export-ifmt">
+                          {l.format}
+                        </span>
+                        <div
+                          className="vu-export-options"
+                          role="radiogroup"
+                          aria-labelledby="vu-export-ifmt"
+                        >
+                          {(['png', 'jpeg'] as const).map((f) => (
+                            <Option
+                              key={f}
+                              group="image-format"
+                              value={f}
+                              current={imageFormat}
+                              title={f === 'png' ? l.imageFormatPng : l.imageFormatJpeg}
+                              detail={f === 'png' ? l.imageFormatPngTip : l.imageFormatJpegTip}
+                              onPick={setImageFormat}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                  {error ? (
+                    <p className="vu-error" role="alert">
+                      {kind === 'image' ? error : l.exportFailed(error)}
+                    </p>
+                  ) : null}
+                </div>
+              )}
+            </div>
           </div>
           {done || progress ? null : (
             // What will be made, and the button — closing the settings column (on phones, kept in view).
