@@ -228,7 +228,15 @@ export function getCommand(ctl: EditorController, id: CommandId): Command {
         label: id === 'nextMarker' ? l.nextMarker : l.prevMarker,
         icon: id === 'nextMarker' ? 'next' : 'back',
         shortcut: id === 'nextMarker' ? '.' : ',',
-        disabledReason: target === null ? l.noMarkers : null,
+        // None at all, or just none further this way (at the first / last one).
+        disabledReason:
+          target !== null
+            ? null
+            : !ctl.project.markers?.length
+              ? l.noMarkers
+              : id === 'nextMarker'
+                ? l.noMarkerAfter
+                : l.noMarkerBefore,
         run: () => target !== null && ctl.seek(target),
       };
     }
