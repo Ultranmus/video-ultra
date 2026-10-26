@@ -166,7 +166,7 @@ _Owner, 2026-10-25 — desktop: **captions tested ✓** (Groq, Gemini fallback, 
       length). Alt-drag a video clip → it shows a different part of the video in the same place.
       Alt+Shift-drag the middle clip → it slides between its neighbours. On the phone: select a
       clip → **Fine trim** (slip slider, Move cut ◀ ▶, Slide ◀ ▶). _Checked here:_ protrim-check.
-- [ ] **Markers.** Press **M** to drop a marker (a flag on the ruler); M again on it removes it;
+- [x] **Markers.** Press **M** to drop a marker (a flag on the ruler); M again on it removes it;
       **,** and **.** jump between markers; dragging the playhead or clips snaps to them.
       _Checked here:_ protrim-check.
 - [x] **Smaller files: HEVC / AV1 export.** Export → Video → More settings → **Smaller file**
