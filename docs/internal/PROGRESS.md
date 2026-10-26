@@ -602,3 +602,6 @@ merged and re-verified on main; A (captions) and E (layers) here.
   10-24 — and passes now; plus the owner's case by hand (one video split twice: ⌥-drag the
   handle → 3 → 3.5 s / next shorter / total 10 s; plain drag still trims; tap still opens
   Transitions).
+- Owner: at the last marker "." said "No markers yet" — now "No more markers after this point"
+  ("No markers before this point" for "," at the first); "No markers yet" only when there are
+  none. Checked in the browser (all three messages).
