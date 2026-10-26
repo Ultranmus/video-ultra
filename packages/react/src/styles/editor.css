@@ -3924,19 +3924,39 @@
   /* The preview with what will be made and the button under it; the choices beside them. */
   .vu-export-body {
     display: grid;
+    /* The button closes the settings column (bottom right, where the eye ends up). */
     grid-template-areas:
       'side main'
-      'actions main';
+      'side actions';
     grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr);
-    grid-template-rows: auto 1fr;
+    grid-template-rows: 1fr auto;
     gap: var(--vu-space-4) var(--vu-space-5);
     align-items: start;
+  }
+
+  /* Square and wide videos: an equal column, so the preview can be as tall as the settings. */
+  .vu-export-body[data-wide] {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 
   .vu-export-side {
     display: flex;
     grid-area: side;
     justify-content: center;
+  }
+
+  /* Before export the preview is as tall as the settings column beside it (button included):
+     the cell takes its height from that column, the frame fills it and keeps its shape. */
+  .vu-export-side:has(> .vu-export-poster) {
+    align-self: stretch;
+    align-items: center;
+    min-height: var(--vu-size-export-poster-min);
+    container-type: size;
+  }
+
+  .vu-export-side > .vu-export-poster {
+    width: min(100cqw, 100cqh * var(--vu-export-aspect));
+    max-height: none;
   }
 
   .vu-export-main {
@@ -3947,6 +3967,7 @@
     display: flex;
     flex-direction: column;
     grid-area: actions;
+    align-self: end;
     gap: var(--vu-space-3);
   }
 
@@ -4271,7 +4292,8 @@
 
   /* Phones: one column; the summary and button stay in view at the bottom of the sheet. */
   @container vu (max-width: 767px) {
-    .vu-export-body {
+    .vu-export-body,
+    .vu-export-body[data-wide] {
       grid-template-areas:
         'side'
         'main'
@@ -4290,7 +4312,13 @@
       background: var(--vu-surface-1);
     }
 
+    .vu-export-side:has(> .vu-export-poster) {
+      min-height: 0;
+      container-type: normal;
+    }
+
     .vu-export-poster,
+    .vu-export-side > .vu-export-poster,
     .vu-export-result {
       max-height: var(--vu-size-export-poster-phone);
       width: auto;

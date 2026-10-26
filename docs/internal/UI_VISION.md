@@ -181,7 +181,7 @@ the stage and everything drawn on it don't mirror. Text items in RTL scripts ren
   button (#170). The export dialog has three kinds — Video (Quality: one tile per resolution with
   its file size; Length: whole / part; "More settings", closed by default: frame rate (same as
   the video), file type, Extra quality, Smaller file — no "Made for": the shape is Video
-  settings'; the summary and Export button under the preview, kept in view on phones, #170),
+  settings'; the summary and Export button at the bottom right, under the settings, kept in view on phones, #170),
   Sound only (M4A / Ogg / WAV), Picture (the frame at the playhead, PNG / JPEG). I / O set the
   part from the playhead; the ruler shows it as a band.
 

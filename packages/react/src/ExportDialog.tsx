@@ -126,7 +126,11 @@ function Poster({
   return (
     <div
       className="vu-export-poster"
-      style={{ aspectRatio: String(aspect), ['--vu-export-progress' as string]: progress ?? 1 }}
+      style={{
+        aspectRatio: String(aspect),
+        ['--vu-export-aspect' as string]: aspect,
+        ['--vu-export-progress' as string]: progress ?? 1,
+      }}
       data-busy={progress !== null || undefined}
     >
       <canvas ref={ref} aria-hidden="true" className="vu-export-poster-still" />
@@ -579,7 +583,7 @@ export function ExportDialog(): ReactElement | null {
             <Icon name="close" />
           </button>
         </div>
-        <div className="vu-export-body">
+        <div className="vu-export-body" data-wide={aspect >= 1 || undefined}>
           <div className="vu-export-side">
             {done?.kind === 'video' ? (
               <video
@@ -970,7 +974,7 @@ export function ExportDialog(): ReactElement | null {
             )}
           </div>
           {done || progress ? null : (
-            // What will be made, and the button — under the preview (on phones, kept in view).
+            // What will be made, and the button — closing the settings column (on phones, kept in view).
             <div className="vu-export-actions">
               <div className="vu-export-summary">
                 <span>
