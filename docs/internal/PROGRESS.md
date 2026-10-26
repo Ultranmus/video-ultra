@@ -616,3 +616,8 @@ merged and re-verified on main; A (captions) and E (layers) here.
   stopped (the old text ends with the same sentence as the new). New `scripts/cutoff-check.ts`
   opens each section in turn at the narrowest width (video clip, photo, text, sound, video
   settings) and checks the left panels — all pass.
+- Owner: "Split at scenes doesn't work" on one phone recording — it was right (one continuous
+  shot, no cuts), but "No scene changes found in this clip" didn't say why. Now "No cuts found —
+  this clip is one continuous shot". Also never silent: no analyzer, or the analyzer failing,
+  shows "Couldn't read this video to find its scenes" (both paths returned with no word before).
+  Checked: scenes-cuts.mp4 → 4 scenes; a one-shot clip → the new message.
