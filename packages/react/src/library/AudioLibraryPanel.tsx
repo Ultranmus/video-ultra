@@ -183,7 +183,7 @@ export function AudioLibraryPanel({ library }: { library: AudioLibrary }): React
 
   const categories = library.categories ?? [];
   return (
-    <section className="vu-audiolib" aria-labelledby={headingId}>
+    <section className="vu-audiolib vu-panel-section" aria-labelledby={headingId}>
       <h3 className="vu-audiolib-title" id={headingId}>
         {title}
       </h3>
