@@ -1790,6 +1790,8 @@ export class EditorController {
       selectSound?: boolean;
       /** Videos and photos go before the first clip (in the order given), not at the playhead. */
       atStart?: boolean;
+      /** Sounds go here instead of the playhead (a voiceover: where its recording started). */
+      at?: Time;
     } = {},
   ): Promise<void> {
     const addToTimeline = options.addToTimeline ?? true;
@@ -1845,7 +1847,7 @@ export class EditorController {
             addToLane(d, sticker, ctx.ids);
             selectId = sticker.id;
           } else if (asset.kind === 'audio') {
-            const sound = audioItem(asset, ctx.ids(), this.playhead.time);
+            const sound = audioItem(asset, ctx.ids(), options.at ?? this.playhead.time);
             addToLane(d, sound, ctx.ids);
             if (options.selectSound) selectId = sound.id;
           } else {

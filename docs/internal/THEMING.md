@@ -69,7 +69,8 @@ Video-specific sizes: `--vu-size-topbar` 48px, `--vu-size-rail` 72px, `--vu-size
 `--vu-text-emoji`. Layers & organising (v0.2): `--vu-size-popover` 288px (History),
 `--vu-size-menu` 232px (context menu), `--vu-size-layer-row` 48px, `--vu-size-layer-thumb` 32px;
 `--vu-size-timeline-header` is 100px (room for a row's name and its lock). Sound (v0.2 B):
-`--vu-size-audiolib-play` 36px, `--vu-size-audiolib-row` 52px. Picture tools (v0.2 C):
+`--vu-size-audiolib-play` 36px, `--vu-size-audiolib-row` 52px. Voiceover countdown: `--vu-size-countdown` 112px,
+`--vu-text-countdown` 56px. Picture tools (v0.2 C):
 `--vu-clip-region` (dark #9aa3b8 / light #5d6b8a), `--vu-size-handle-side` 8px,
 `--vu-size-region-swatch` 64px, `--vu-size-key-preset` 28px. Capture & export (v0.2 D):
 `--vu-size-record`, `-record-mark`, `-record-stop`, `-record-ring`, `--vu-size-camera-side`

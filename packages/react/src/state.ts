@@ -165,6 +165,8 @@ export interface UiState {
   readOnly: boolean;
   persistent: boolean | null;
   recording: boolean;
+  /** Voiceover: 3, 2, 1 shown on the video before recording starts; null otherwise. */
+  countdown: number | null;
   /** The camera recorder covers the editor (v0.2 D. Capture & export). */
   cameraOpen: boolean;
   /** Green screen "pick from video": the next tap on the stage picks this item's key colour. */
@@ -207,6 +209,7 @@ export function createUiStore() {
     readOnly: false,
     persistent: null,
     recording: false,
+    countdown: null,
     cameraOpen: false,
     picking: null,
   }));

@@ -2631,6 +2631,43 @@
     box-shadow: var(--vu-shadow-stage);
   }
 
+  /* Voiceover: 3, 2, 1 in a round badge over the video; taps go through. */
+  .vu-countdown {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+  }
+
+  .vu-countdown-number {
+    display: grid;
+    place-items: center;
+    width: var(--vu-size-countdown);
+    height: var(--vu-size-countdown);
+    border-radius: var(--vu-radius-full);
+    background: var(--vu-overlay);
+    color: var(--vu-on-media);
+    font-size: var(--vu-text-countdown);
+    font-weight: var(--vu-weight-bold);
+    font-variant-numeric: tabular-nums;
+    animation: vu-countdown-tick var(--vu-duration-slow) var(--vu-ease-out);
+  }
+
+  @keyframes vu-countdown-tick {
+    from {
+      opacity: 0;
+      transform: scale(1.3);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .vu-countdown-number {
+      animation: none;
+    }
+  }
+
   /* Zoomed in: a pill to go back to the whole frame (and how far in we are). */
   .vu-stage-fit {
     position: absolute;
