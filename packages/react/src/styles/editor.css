@@ -3946,10 +3946,11 @@
   }
 
   /* Before export the preview is as tall as the settings column beside it (button included):
-     the cell takes its height from that column, the frame fills it and keeps its shape. */
+     the cell takes its height from that column, the frame fills it and keeps its shape. Top
+     aligned with the tabs, so with More settings open the extra room is only below it. */
   .vu-export-side:has(> .vu-export-poster) {
     align-self: stretch;
-    align-items: center;
+    align-items: flex-start;
     min-height: var(--vu-size-export-poster-min);
     container-type: size;
   }

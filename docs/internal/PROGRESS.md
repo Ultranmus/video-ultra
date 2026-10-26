@@ -538,3 +538,5 @@ merged and re-verified on main; A (captions) and E (layers) here.
   size on the preview cell; equal columns for square / wide videos; min 320 px). Phones unchanged.
 - Checks: editor-interact (Chrome + WebKit export), a11y-check (export dialog every tab, 0
   violations), typecheck, lint; screenshots 9:16 / 1:1 / 16:9 / phone.
+- Owner: with More settings open the square preview floated mid-column with gaps above and
+  below — the preview now lines up with the tabs at the top; extra room is only below it.
