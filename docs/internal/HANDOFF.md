@@ -326,6 +326,7 @@ pnpm --filter playground dev                    # http://localhost:3200/editor
 node scripts/editor-interact.ts --browsers chrome,webkit,firefox   # 15-step user flow + export
 node scripts/editor-check.ts --sizes phone,tablet,desktop --shots <dir>
 node scripts/editor-recovery.ts                 # reload → same project (Chrome, Firefox)
+node scripts/cutoff-check.ts                    # no cut-off labels (each settings section, left panels)
 node scripts/a11y-check.ts [--theme light]      # axe WCAG 2.2 AA
 node scripts/export-check.ts                    # ffprobe/ffmpeg-verified exports (engine lab)
 node scripts/composite-check.ts                 # golden frames, both backends
