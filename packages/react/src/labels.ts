@@ -979,7 +979,7 @@ export const DEFAULT_LABELS = {
   noMarkers: 'No markers yet — press M to add one at the playhead',
   markerAt: (time: string, label?: string) => (label ? `${label} · ${time}` : `Marker · ${time}`),
   proTrimHint:
-    'Desktop timeline: Alt-drag a cut to move it between two clips · Alt-drag a video to show another part of it · Alt+Shift-drag a clip in the main video to slide it.',
+    'Desktop timeline: ⌥/Alt-drag a cut to move it between two clips · ⌥/Alt-drag a video to show another part of it · ⇧ ⌥/Alt-drag a clip in the main video to slide it.',
   // v0.4 Keyframes
   keyframes: 'Keyframes',
   tipKeyframes: 'Animate it: set a keyframe here, move the playhead, change it',
