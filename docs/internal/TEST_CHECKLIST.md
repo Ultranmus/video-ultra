@@ -6,12 +6,28 @@ Safari) — the rest needs your devices.
 
 Open the branch's Vercel preview (or `pnpm --filter playground dev`), then **`/editor`**.
 
+## 00000. 2026-10-26 — Audio (desktop first)
+
+- [ ] **Music:** Audio panel → music library → search, ▶ preview, **+ Add** → it plays under the
+      video. Select it → Volume, fade in / out.
+- [ ] **Lower under voice:** select the music → Volume / Sound → **Lower under voice** → the
+      music dips when someone talks in the video.
+- [ ] **Clean up noise:** select a clip with room noise → **Clean up noise** / **Clean voice**.
+- [ ] **Extract audio:** select a video → **Extract audio** → its sound becomes its own clip and
+      keeps the fades / effects.
+- [ ] **Record a voiceover:** Audio → record → it lands at the playhead; mute it, unmute it.
+- [ ] **Sound effects (headphones):** see section 3 — Clear voice, Podcast, Phone call, Deep
+      voice, Chipmunk, Bass / Middle / Treble, Pitch; 1.5× speed + **Keep the voice natural**.
+- [ ] **Level meter:** the two thin bars next to the time move while playing, rest when paused.
+- [ ] **Text to speech:** without a voice key you hear the demo voice (soft tones) — expected.
+- [ ] **Export → Sound only** (M4A / Ogg / WAV) → the file sounds like the preview.
+
 ## 0000. 2026-10-25 — export dialog and camera
 
-- [ ] **Export:** Export → Quality tiles (sizes shown), Length, More settings (Same as video,
+- [x] **Export:** Export → Quality tiles (sizes shown), Length, More settings (Same as video,
       file type, Extra quality, Smaller file where offered) → Export video → plays? Phone: the
       Export button stays at the bottom while scrolling.
-- [ ] **Camera:** Media → Record with camera → the round microphone button beside the record
+- [x] **Camera:** Media → Record with camera → the round microphone button beside the record
       button (and switch camera on a phone) — tap it off and on.
 
 ## 000. 2026-10-25 — captions: check marks, names, Hear again, Hinglish
