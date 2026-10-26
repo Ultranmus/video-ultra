@@ -546,3 +546,7 @@ merged and re-verified on main; A (captions) and E (layers) here.
   pinned while scrolling, slides up on open, drag down (a quarter / flick) to close, springs back
   on a short drag, can't be dragged away while exporting. Checked in Chrome + WebKit at phone
   size (short drag, long drag, reopen, during export); a11y-check 0 violations.
+- Owner changed their mind: on phones Export is full screen instead of a draggable sheet (drag
+  code removed). Head pinned at the top, summary + button at the bottom, the preview grows into
+  the spare room (318 px tall on a 390×844 screen, 200 px with More settings open). Chrome +
+  WebKit checked; ✕ closes.
