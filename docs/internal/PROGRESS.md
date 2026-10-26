@@ -621,3 +621,7 @@ merged and re-verified on main; A (captions) and E (layers) here.
   this clip is one continuous shot". Also never silent: no analyzer, or the analyzer failing,
   shows "Couldn't read this video to find its scenes" (both paths returned with no word before).
   Checked: scenes-cuts.mp4 → 4 scenes; a one-shot clip → the new message.
+- Owner: a pinch over the top bar "zoomed the frame lane too" — it was the browser zooming the
+  whole page (only the video and the timeline handle a pinch). Now a pinch inside the editor
+  never zooms the page (#173). Checked: over the top bar / settings blocked, nothing zooms;
+  over the timeline it zooms (60 → 163 px/s); over the video the view zooms.

@@ -1201,3 +1201,10 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       other. Same list as before ("Original", every step by name, the current one marked, later
       ones faded; tap one to go there). The popover's outside-click / Esc closing went with it
       (`historyOpen` removed from the UI state); the panel's ✕ or the clock closes it.
+
+173.  **A pinch inside the editor never zooms the page** (owner, 2026-10-26). A trackpad pinch
+      (⌘ / Ctrl + wheel; Safari's gesture events) over the top bar or a panel zoomed the whole
+      browser page, so the timeline looked zoomed too. Inside `.vu-root` a pinch now only does
+      the editor's own zoom — the video and the timeline handle it first, as before — and
+      elsewhere nothing. Page zoom with the keyboard (⌘ + / ⌘ −) still works for anyone who
+      needs larger text (WCAG resize), and plain scrolling is untouched.
