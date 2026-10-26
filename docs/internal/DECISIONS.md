@@ -80,8 +80,8 @@ reason; when one changes, edit the entry and note the date.
 
 ## Packaging
 
-21. **Packages: `@video-ultra/core` (engine, no React), `@video-ultra/react` (`<VideoEditor />`
-    - headless hooks), `@video-ultra/ai` later** (2026-10-17). Headless hooks let developers build
+21. \*\*Packages: `@video-ultra/core` (engine, no React), `@video-ultra/react` (`<VideoEditor />`
+    - headless hooks), `@video-ultra/ai` later\*\* (2026-10-17). Headless hooks let developers build
       their own UI on the engine. AI is a separate package so the core stays small. Names are free on
       npm; the owner creates the `@video-ultra` org.
 22. **ESM only** (2026-10-17). Bundler (tsup vs tsdown vs Vite library mode) is chosen in Phase 0
@@ -1186,7 +1186,8 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       2026-10-26). Pressing Record voiceover started recording and playback at once, which felt
       sudden. Now the microphone is asked for first (its permission prompt never interrupts the
       count), then 3, 2, 1 shows on the video (Cancel stops it and frees the microphone), then
-      recording and playback start together. A line under the button says so. The clip is placed
+      recording and playback start together (no note under the button — the owner found the panel
+      too wordy; the countdown explains itself). The clip is placed
       where recording started — passed in explicitly (`importFiles(…, { at })`), not read from
       the playhead after the import — so the words line up with the picture they were said over;
       the playhead goes back there and a toast says "Voiceover added at 0:02.0, where you
