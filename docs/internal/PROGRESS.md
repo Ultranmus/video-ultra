@@ -610,3 +610,9 @@ merged and re-verified on main; A (captions) and E (layers) here.
   opening. Now it focuses itself on opening when nothing else on the page has focus (no scroll,
   no ring). Checked Chrome + WebKit ("." with no click jumps to the first marker);
   editor-interact (Chrome, WebKit), a11y-check 0 violations, editor-recovery pass.
+- Owner: Split at scenes choices cut off ("Big chan…", "Nor…", "Small change…"). Now "Cuts:
+  Fewer · Normal · More" and one line under the button. My first check missed it twice: the
+  scan opened every section at once (opening one closes the others) and the dev watcher had
+  stopped (the old text ends with the same sentence as the new). New `scripts/cutoff-check.ts`
+  opens each section in turn at the narrowest width (video clip, photo, text, sound, video
+  settings) and checks the left panels — all pass.
