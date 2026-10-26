@@ -4326,6 +4326,7 @@
 
     .vu-export-actions {
       flex: none;
+      align-self: stretch;
       margin: 0 calc(var(--vu-space-5) * -1);
       padding: var(--vu-space-3) var(--vu-space-5)
         calc(var(--vu-space-3) + env(safe-area-inset-bottom));
