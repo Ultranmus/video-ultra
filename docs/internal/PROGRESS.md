@@ -630,3 +630,5 @@ merged and re-verified on main; A (captions) and E (layers) here.
   much: border 55 % → 42 % white (≈ 4:1), strong border pure white → 55 % (21:1 → ≈ 6:1); light
   50 % / 62 % black — all above WCAG's 3:1 on every surface. a11y-check high contrast dark +
   light: 0 violations.
+- Owner: high contrast borders still too strong at 42 % / 55 % white. Now just above WCAG's 3:1
+  on every surface: dark 36 % / 40 % white, light 44 % / 48 % black.
