@@ -355,6 +355,14 @@
       grid-template-columns: auto 1fr auto;
       padding: 0 var(--vu-space-1);
     }
+
+    /* Every button fits down to a 360 px phone: no divider, the canvas size and Export as words
+       only (Export stays the bold accent button). */
+    .vu-topbar-divider,
+    .vu-ratio-button .vu-icon,
+    .vu-export-button .vu-icon {
+      display: none;
+    }
   }
 
   /* ── rail, panel, inspector ──────────────────────────────────────────── */

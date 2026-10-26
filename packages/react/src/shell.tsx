@@ -166,6 +166,7 @@ export function TopBar({ onClose }: { onClose?: (() => void) | undefined }): Rea
           icon="download"
           label={l.export}
           variant="primary"
+          className="vu-export-button"
           tip={l.tipExport}
           onClick={() => ctl.ui.setState({ exportOpen: true })}
         />
