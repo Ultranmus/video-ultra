@@ -605,3 +605,8 @@ merged and re-verified on main; A (captions) and E (layers) here.
 - Owner: at the last marker "." said "No markers yet" — now "No more markers after this point"
   ("No markers before this point" for "," at the first); "No markers yet" only when there are
   none. Checked in the browser (all three messages).
+- Owner: right after load "," / "." did nothing until a click in the timeline — the editor only
+  hears keys while it has focus (so it never takes a host page's keys), and nothing focused it on
+  opening. Now it focuses itself on opening when nothing else on the page has focus (no scroll,
+  no ring). Checked Chrome + WebKit ("." with no click jumps to the first marker);
+  editor-interact (Chrome, WebKit), a11y-check 0 violations, editor-recovery pass.
