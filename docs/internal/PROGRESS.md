@@ -625,3 +625,8 @@ merged and re-verified on main; A (captions) and E (layers) here.
   whole page (only the video and the timeline handle a pinch). Now a pinch inside the editor
   never zooms the page (#173). Checked: over the top bar / settings blocked, nothing zooms;
   over the timeline it zooms (60 → 163 px/s); over the video the view zooms.
+- Owner's desktop pass: panels keep their place, no cut-off labels, no film strip flicker, shape
+  masks, animated stickers, remove background ✓. High contrast ✓ but its borders stood out too
+  much: border 55 % → 42 % white (≈ 4:1), strong border pure white → 55 % (21:1 → ≈ 6:1); light
+  50 % / 62 % black — all above WCAG's 3:1 on every surface. a11y-check high contrast dark +
+  light: 0 violations.

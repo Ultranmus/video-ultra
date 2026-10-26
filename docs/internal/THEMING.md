@@ -88,7 +88,8 @@ Same keys as image-ultra (`accent`, `accentHover`, `accentContrast`, `accentText
 ## Contrast and density (v0.3)
 
 - `contrast="high"` (or `"auto"`: high when the OS asks for more contrast, `prefers-contrast:
-more`) sets `data-vu-contrast` on `.vu-root`. High contrast redefines the colour tokens only:
+more`) sets `data-vu-contrast` on `.vu-root`. High contrast redefines the colour tokens only (borders ≈ 4:1 and strong borders ≈ 6:1 on
+  every surface — WCAG 1.4.11 asks 3:1; pure white / black borders out-shouted the content):
   pure black / white surfaces, text-muted near full strength, borders at 55–60 % (strong borders
   solid), a brighter accent on dark (`#c879c8`, black text on it) and a deeper one on light
   (`#3a0f3a`), and a thicker focus ring. Works with `theme` dark, light and auto. axe: 0

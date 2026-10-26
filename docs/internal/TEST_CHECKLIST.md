@@ -64,17 +64,17 @@ _Owner, 2026-10-25 — desktop: **captions tested ✓** (Groq, Gemini fallback, 
 - [x] **Align (desktop).** Right-click a title → hover **Align** → the list opens beside the menu
       (left of it near the right edge); click it too — it stays open. _Checked here:_ the list is
       really on top (hit-tested), organize-check.
-- [ ] **Panels keep their own place (desktop).** Scroll Filters down, open Stickers → it starts
+- [x] **Panels keep their own place (desktop).** Scroll Filters down, open Stickers → it starts
       at the top; back to Filters → where you left it.
 - [x] **Type on the stage.** Desktop: double-click a title → type, click away (one undo). Phone:
       tap a title, tap it again → keyboard, type, tap away. Esc / ✕ puts the old text back.
       _Checked here:_ stage-text-check (Chrome + WebKit).
-- [ ] **No cut-off labels (desktop).** Inspector "Extract audio", Transitions "Play preview" /
+- [x] **No cut-off labels (desktop).** Inspector "Extract audio", Transitions "Play preview" /
       "Apply to all cuts", Stickers "Animated", filter "Cross process". _Checked here:_ every
       panel and inspector scanned at 1024 and 1440 px — nothing cut.
 - [ ] **Phone timeline start.** With clips, at 0:00 there's a "+" before the first clip → it adds
       at the start.
-- [ ] **Film strip flicker (desktop).** Didn't reproduce here (Chrome, WebKit, 1×/2× pixels,
+- [x] **Film strip flicker (desktop).** Didn't reproduce here (Chrome, WebKit, 1×/2× pixels,
       clips and video layers). If you still see it: a short screen recording please.
 - [x] ~~**Hindi captions on the iPhone.**~~ Dropped: on-device captions are English only now
       (owner, DECISIONS #162). Make captions on the clip that said "No speech" (open the
@@ -116,7 +116,7 @@ _Owner, 2026-10-25 — desktop: **captions tested ✓** (Groq, Gemini fallback, 
 
 ## 2. v0.3 — Canva tier
 
-- [ ] **Shape masks.** Select a video or photo → **Shape** (inspector section on desktop, tool on
+- [x] **Shape masks.** Select a video or photo → **Shape** (inspector section on desktop, tool on
       the phone toolbar) → pick shapes from the 6 groups (126 shapes). The picture shows only inside
       the shape; **Soft edge** feathers it; **Show outside the shape** inverts it; **No shape**
       removes it. Try it on the main video (black/blur background outside) and on a
@@ -124,10 +124,10 @@ _Owner, 2026-10-25 — desktop: **captions tested ✓** (Groq, Gemini fallback, 
       _Checked here:_ WebGL2 golden frames match the reference maths exactly; shapes-check
       (picker, stage pixels, undo, phone tool, axe, no long tasks). **Not checked here: WebGPU**
       (no GPU in the cloud) — on the Mac run `node scripts/composite-check.ts` once.
-- [ ] **High contrast / touch sizes.** `/editor?contrast=high` and `?contrast=high&theme=light`:
+- [x] **High contrast / touch sizes.** `/editor?contrast=high` and `?contrast=high&theme=light`:
       everything readable, stronger borders and focus rings. `?density=touch` on the Mac: bigger
       handles and controls. _Checked here:_ axe 0 violations in both contrast themes.
-- [ ] **Animated stickers.** Stickers → **Animated** tab (600+ animated emoji): tap a few — they
+- [x] **Animated stickers.** Stickers → **Animated** tab (600+ animated emoji): tap a few — they
       move in the preview and in the exported video. Upload your own GIF as a sticker → it plays
       (before tonight it was still). Upload an `.svg` → crisp sticker. **On the iPhone:** do the
       animated stickers move? (If Safari lacks `ImageDecoder` they stay still — tell me.)
@@ -139,7 +139,7 @@ _Owner, 2026-10-25 — desktop: **captions tested ✓** (Groq, Gemini fallback, 
       Play it — entrances and exits animate. Try the same template on 16:9 and 1:1 too.
       _Checked here:_ every template is valid and grouped (unit test over all 192);
       templates-check (form, your words, group, undo, countdown, phone, axe).
-- [ ] **Remove background (photos).** Add a photo of a person → select it → **Remove background**
+- [x] **Remove background (photos).** Add a photo of a person → select it → **Remove background**
       (inspector on desktop, toolbar on the phone). First time downloads the model (phone 7 MB,
       computer 44 MB). Background disappears; **Restore background** brings it back. Try a pet or
       product photo on the computer too. **On the iPhone:** time it, and does the tab survive?
