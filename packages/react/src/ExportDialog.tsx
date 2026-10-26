@@ -349,10 +349,6 @@ export function ExportDialog(): ReactElement | null {
   const [error, setError] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
-  // On phones the dialog is a bottom sheet: dragging its head down closes it.
-  const sheet = useUi((s) => s.layout === 'phone');
-  const drag = useRef<{ id: number; y: number; t: number; dy: number } | null>(null);
-  const leaving = useRef(false);
 
   useEffect(() => {
     if (!open) return;
@@ -392,62 +388,6 @@ export function ExportDialog(): ReactElement | null {
     if (done) URL.revokeObjectURL(done.url);
     setDone(null);
     ctl.ui.setState({ exportOpen: false });
-  };
-
-  /** Phones: slides the sheet down, then closes it. */
-  const dismiss = () => {
-    const el = dialogRef.current;
-    if (!el || leaving.current) return;
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return close();
-    leaving.current = true;
-    const finish = () => {
-      if (!leaving.current) return;
-      leaving.current = false;
-      el.removeEventListener('transitionend', onEnd);
-      delete el.dataset.leaving;
-      close();
-    };
-    // Only the sheet's own slide counts (child hover transitions bubble up too).
-    const onEnd = (e: TransitionEvent) => {
-      if (e.target === el && e.propertyName === 'transform') finish();
-    };
-    el.addEventListener('transitionend', onEnd);
-    el.dataset.leaving = '';
-    // Safety net if no transition runs (hidden tab, zero duration).
-    setTimeout(finish, 400);
-  };
-
-  // Dragging the head: the sheet follows the finger through inline styles only (no React render
-  // per move); down past a quarter of its height, or a flick, closes it; a short drag springs back.
-  const onDragStart = (e: React.PointerEvent) => {
-    if (!sheet || busy || (e.target as HTMLElement).closest('button')) return;
-    const el = dialogRef.current;
-    if (!el) return;
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId);
-    } catch {
-      // Not capturable (already ended): the drag still works while the finger stays on the head.
-    }
-    drag.current = { id: e.pointerId, y: e.clientY, t: performance.now(), dy: 0 };
-    el.dataset.dragging = '';
-  };
-  const onDragMove = (e: React.PointerEvent) => {
-    const d = drag.current;
-    const el = dialogRef.current;
-    if (!d || d.id !== e.pointerId || !el) return;
-    d.dy = e.clientY - d.y;
-    // Can't go above where it sits; a little give past it.
-    el.style.transform = `translateY(${Math.max(-12, d.dy)}px)`;
-  };
-  const onDragEnd = (e: React.PointerEvent) => {
-    const d = drag.current;
-    const el = dialogRef.current;
-    if (!d || d.id !== e.pointerId || !el) return;
-    drag.current = null;
-    delete el.dataset.dragging;
-    el.style.transform = '';
-    const speed = d.dy / Math.max(1, performance.now() - d.t); // px per ms
-    if (d.dy > el.getBoundingClientRect().height * 0.25 || (d.dy > 24 && speed > 0.5)) dismiss();
   };
 
   const commitRange = (r: ExportRange | null) =>
@@ -628,15 +568,7 @@ export function ExportDialog(): ReactElement | null {
           if (e.key === 'Escape' && !busy) close();
         }}
       >
-        <div
-          className="vu-modal-head"
-          data-grab={sheet || undefined}
-          onPointerDown={onDragStart}
-          onPointerMove={onDragMove}
-          onPointerUp={onDragEnd}
-          onPointerCancel={onDragEnd}
-        >
-          {sheet ? <span className="vu-dock-grab" aria-hidden="true" /> : null}
+        <div className="vu-modal-head">
           <h2 id="vu-export-title" className="vu-modal-title">
             {title}
           </h2>
