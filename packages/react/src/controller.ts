@@ -2555,7 +2555,12 @@ export class EditorController {
   ): Promise<number | null> {
     const l = this.labels;
     const item = findItem(this.project, itemId)?.item;
-    if (!item || item.kind !== 'video' || !this.analyzer) return null;
+    if (!item || item.kind !== 'video') return null;
+    // Never silent: without the analyzer, or when it fails, say the video couldn't be read.
+    if (!this.analyzer) {
+      this.toast(l.scenesFailed, 'error');
+      return null;
+    }
     this.#sceneAbort?.abort();
     const abort = new AbortController();
     this.#sceneAbort = abort;
@@ -2588,6 +2593,9 @@ export class EditorController {
       if (!parts) return null;
       this.toast(l.scenesSplit(parts.length), 'success', { label: l.undo, run: () => this.undo() });
       return parts.length;
+    } catch {
+      if (!abort.signal.aborted) this.toast(l.scenesFailed, 'error');
+      return null;
     } finally {
       if (this.#sceneAbort === abort) {
         this.#sceneAbort = null;

@@ -959,7 +959,7 @@ export const DEFAULT_LABELS = {
   sceneNormal: 'Normal',
   sceneMore: 'More',
   scenesHint: 'Each scene becomes its own clip.',
-  noScenesFound: 'No scene changes found in this clip',
+  noScenesFound: 'No cuts found — this clip is one continuous shot',
   scenesSplit: (parts: number) => `Split into ${parts} scenes`,
   scenesFailed: 'Couldn’t read this video to find its scenes',
   // v0.4 Pro trims and markers
