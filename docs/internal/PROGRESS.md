@@ -578,3 +578,10 @@ merged and re-verified on main; A (captions) and E (layers) here.
 - Owner: Audio panel in sections — Voiceover, Text to speech, In this project, the library —
   each under a heading, set apart by space (owner: not too many dividers; one line, above the
   library). "Uses an online voice service" removed. a11y-check 0 violations.
+
+## 2026-10-26 · History as a panel (DECISIONS #172)
+
+- Owner: History like Layers, no popover. Now a panel (left on desktop / tablet, the sheet on
+  phones), toggled by the clock; Layers and History replace each other. organize-check updated
+  (opens as a panel, Original / last step, the clock closes it) — all passed; a11y-check 0
+  violations; screenshots desktop + phone.

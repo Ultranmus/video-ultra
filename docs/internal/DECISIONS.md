@@ -1194,3 +1194,10 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       started". Also a playback fix: after `pause()` the controller ignores the engine's
       "playing" ticks until the engine has taken the pause in — a stale tick undid a
       pause-then-seek (the playhead jumped forward and showed playing again).
+
+172.  **History is a panel like Layers, not a popover** (owner, 2026-10-26). The clock in the top
+      bar opens it in the left panel on desktop / tablet and in the sheet on phones, the same
+      way Layers opens (`toggleSidePanel('layers' | 'history')`); opening one replaces the
+      other. Same list as before ("Original", every step by name, the current one marked, later
+      ones faded; tap one to go there). The popover's outside-click / Esc closing went with it
+      (`historyOpen` removed from the UI state); the panel's ✕ or the clock closes it.
