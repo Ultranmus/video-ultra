@@ -192,7 +192,7 @@ _Owner, 2026-10-25 — desktop: **captions tested ✓** (Groq, Gemini fallback, 
 - [x] **Level meter (desktop).** Play a video: two thin bars next to the time move with the
       sound, amber near the top, red if it's too loud; they rest when paused. _Checked here:_
       soundfx-check (reads the tone's level, rests at 0).
-- [ ] **Scopes (desktop).** Click empty space (video settings) → open **Scopes** → switch
+- [x] **Scopes (desktop).** Click empty space (video settings) → open **Scopes** → switch
       Wave / RGB / Levels / Colour while you scrub and play: they follow the picture, playback
       stays smooth. Select a clip → Adjust → drag Brightness / Warmth: the scopes move with it.
       Skin tones should sit near the line on Colour. _Checked here:_ scopes-check (colour-bar
