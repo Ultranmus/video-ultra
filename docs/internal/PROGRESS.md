@@ -573,3 +573,5 @@ merged and re-verified on main; A (captions) and E (layers) here.
   Checked with a fake microphone in Chrome (count 3→2 with the video paused, cancel = nothing
   recorded, clip at 2.00 s, playhead back at 2 s and staying), editor-interact Chrome / WebKit /
   Firefox, audio-check, a11y-check 0 violations.
+- Owner: too much text in the Audio panel — the voiceover note removed, "Mute video while
+  recording" (one line), text to speech note "Uses an online voice service" (was two lines).
