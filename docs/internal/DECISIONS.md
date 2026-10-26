@@ -1175,7 +1175,7 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       preview shows it). The summary (size · fps · type · about N MB) and the Export button sit
       at the bottom of the settings column, lined up with the preview's bottom (owner,
       2026-10-26: the button belongs on the right, where the choices end), and the preview is as tall
-      as that column (square and wide videos get an equal column so they can grow); on phones they're a bar kept in view at the bottom of the sheet. The
+      as that column (square and wide videos get an equal column so they can grow); on phones they're a bar kept in view at the bottom of the sheet, and the dialog is a draggable sheet like the editor's (owner, 2026-10-26): grab handle, the head stays in view, drag down past a quarter or flick to close, not while exporting. The
       dialog takes focus itself on opening (no outline on ✕ until Tab). The old "Smaller file"
       quality step is now the Small tile. Camera: the microphone and switch-camera buttons are
       round (52 px) and sit right beside the record button instead of centred in the empty

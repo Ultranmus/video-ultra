@@ -542,3 +542,7 @@ merged and re-verified on main; A (captions) and E (layers) here.
   below — the preview now lines up with the tabs at the top; extra room is only below it.
 - Owner: the export preview showed a frame a third of the way in when the playhead was at the
   start — it now shows the first frame (playhead inside the video: that frame; Part: its start).
+- Owner: on phones the export dialog is a draggable sheet like the editor's — grab handle, head
+  pinned while scrolling, slides up on open, drag down (a quarter / flick) to close, springs back
+  on a short drag, can't be dragged away while exporting. Checked in Chrome + WebKit at phone
+  size (short drag, long drag, reopen, during export); a11y-check 0 violations.
