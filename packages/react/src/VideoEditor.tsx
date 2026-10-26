@@ -324,6 +324,7 @@ function Shell({
   useEffect(() => ctl.setFilePicker(() => inputRef.current?.click()), [ctl]);
 
   useKeyboard(rootRef);
+  useNoPageZoom(rootRef);
   const panelOpen = useUi((s) => s.panel !== null);
 
   if (status === 'unsupported') {
@@ -434,6 +435,30 @@ function Shell({
       <Tooltips root={rootRef} />
     </div>
   );
+}
+
+/**
+ * A pinch (trackpad: ⌘ / Ctrl + wheel; Safari: gesture events) inside the editor never zooms the
+ * whole page: on the video and the timeline it zooms them (their own handlers run first),
+ * elsewhere it does nothing. ⌘ + / ⌘ − still zoom the page.
+ */
+function useNoPageZoom(rootRef: React.RefObject<HTMLDivElement | null>) {
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) e.preventDefault();
+    };
+    const onGesture = (e: Event) => e.preventDefault();
+    root.addEventListener('wheel', onWheel, { passive: false });
+    root.addEventListener('gesturestart', onGesture);
+    root.addEventListener('gesturechange', onGesture);
+    return () => {
+      root.removeEventListener('wheel', onWheel);
+      root.removeEventListener('gesturestart', onGesture);
+      root.removeEventListener('gesturechange', onGesture);
+    };
+  }, [rootRef]);
 }
 
 /** Keyboard shortcuts while focus is inside the editor (not in text fields). */
