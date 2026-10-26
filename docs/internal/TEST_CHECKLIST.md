@@ -19,7 +19,8 @@ Open the branch's Vercel preview (or `pnpm --filter playground dev`), then **`/e
 - [ ] **Sound effects (headphones):** see section 3 — Clear voice, Podcast, Phone call, Deep
       voice, Chipmunk, Bass / Middle / Treble, Pitch; 1.5× speed + **Keep the voice natural**.
 - [ ] **Level meter:** the two thin bars next to the time move while playing, rest when paused.
-- [ ] **Text to speech:** without a voice key you hear the demo voice (soft tones) — expected.
+- [ ] **Text to speech:** type a sentence, pick a voice → **Add voice** → a real voice at the
+      playhead (the playground's `SPEECH_API_KEY` is set). It shows only when a key is set.
 - [ ] **Export → Sound only** (M4A / Ogg / WAV) → the file sounds like the preview.
 
 ## 0000. 2026-10-25 — export dialog and camera
