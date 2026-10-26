@@ -248,6 +248,13 @@
     color: var(--vu-accent-text);
   }
 
+  /* Top bar: every button one height and text size, whatever its look (a host's Share beside
+     Export). */
+  .vu-root .vu-topbar .vu-btn[data-variant] {
+    min-height: var(--vu-size-touch);
+    font-size: var(--vu-text-md);
+  }
+
   .vu-root .vu-btn[data-variant='danger']:hover:not([aria-disabled='true']) {
     color: var(--vu-danger);
   }
