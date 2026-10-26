@@ -4304,7 +4304,7 @@
       display: flex;
       flex: 1;
       flex-direction: column;
-      /* Full width (the desktop grid's \`start\` would shrink them to their content). */
+      /* Full width (the desktop grid's `start` would shrink them to their content). */
       align-items: stretch;
       min-height: 0;
     }
