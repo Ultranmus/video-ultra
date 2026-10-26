@@ -159,6 +159,7 @@ export function TopBar({ onClose }: { onClose?: (() => void) | undefined }): Rea
             {...(b.icon ? { icon: { path: b.icon } } : {})}
             label={b.label}
             variant={b.variant ?? 'secondary'}
+            className="vu-host-button"
             onClick={() => b.onClick(ctl)}
           />
         ))}
