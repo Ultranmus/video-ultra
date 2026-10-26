@@ -393,15 +393,17 @@
     --vu-size-layer-row: 56px;
   }
 
-  /* High contrast (contrast="high", or "auto" when the OS asks for more contrast). */
+  /* High contrast (contrast="high", or "auto" when the OS asks for more contrast). Borders ≈ 4:1
+     and strong borders ≈ 6:1 on every surface (WCAG 1.4.11 asks 3:1) — not pure white / black,
+     which stood out more than the content (owner, 2026-10-26). */
   .vu-root[data-vu-contrast='high'] {
     --vu-bg: #000000;
     --vu-stage: #0a0a0a;
     --vu-surface-1: #000000;
     --vu-surface-2: #0d0d0f;
     --vu-surface-3: #1f1f24;
-    --vu-border: rgba(255, 255, 255, 0.55);
-    --vu-border-strong: #ffffff;
+    --vu-border: rgba(255, 255, 255, 0.42);
+    --vu-border-strong: rgba(255, 255, 255, 0.55);
     --vu-text: #ffffff;
     --vu-text-muted: #e4e4e7;
     --vu-text-subtle: #c4c4cc;
@@ -428,8 +430,8 @@
     --vu-surface-1: #ffffff;
     --vu-surface-2: #f5f5f5;
     --vu-surface-3: #e6e6e6;
-    --vu-border: rgba(0, 0, 0, 0.6);
-    --vu-border-strong: #000000;
+    --vu-border: rgba(0, 0, 0, 0.5);
+    --vu-border-strong: rgba(0, 0, 0, 0.62);
     --vu-text: #000000;
     --vu-text-muted: #1f1f23;
     --vu-text-subtle: #3a3a40;
@@ -457,8 +459,8 @@
       --vu-surface-1: #ffffff;
       --vu-surface-2: #f5f5f5;
       --vu-surface-3: #e6e6e6;
-      --vu-border: rgba(0, 0, 0, 0.6);
-      --vu-border-strong: #000000;
+      --vu-border: rgba(0, 0, 0, 0.5);
+      --vu-border-strong: rgba(0, 0, 0, 0.62);
       --vu-text: #000000;
       --vu-text-muted: #1f1f23;
       --vu-text-subtle: #3a3a40;
@@ -487,8 +489,8 @@
       --vu-surface-1: #000000;
       --vu-surface-2: #0d0d0f;
       --vu-surface-3: #1f1f24;
-      --vu-border: rgba(255, 255, 255, 0.55);
-      --vu-border-strong: #ffffff;
+      --vu-border: rgba(255, 255, 255, 0.42);
+      --vu-border-strong: rgba(255, 255, 255, 0.55);
       --vu-text: #ffffff;
       --vu-text-muted: #e4e4e7;
       --vu-text-subtle: #c4c4cc;
@@ -515,8 +517,8 @@
       --vu-surface-1: #ffffff;
       --vu-surface-2: #f5f5f5;
       --vu-surface-3: #e6e6e6;
-      --vu-border: rgba(0, 0, 0, 0.6);
-      --vu-border-strong: #000000;
+      --vu-border: rgba(0, 0, 0, 0.5);
+      --vu-border-strong: rgba(0, 0, 0, 0.62);
       --vu-text: #000000;
       --vu-text-muted: #1f1f23;
       --vu-text-subtle: #3a3a40;
