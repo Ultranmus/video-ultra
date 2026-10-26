@@ -558,3 +558,11 @@ merged and re-verified on main; A (captions) and E (layers) here.
 - Owner (iPhone frame): empty strip on the right of the phone Export — the middle was shrunk to
   its content (the desktop grid's `align-items: start` in the phone's flex column), so Quality
   wrapped to two rows. Phone layout now stretches to the full width (391 px in the frame).
+
+## 2026-10-26 · Audio test (owner)
+
+- Text to speech: the text box had no border (it used the assistant composer's borderless
+  style) — now the normal bordered box, panel text size. It shows because `SPEECH_API_KEY` is
+  set (the handoff wrongly said the keys were commented out; corrected).
+- Record voiceover plays the video while recording — by design (talk along, the video muted by
+  default); asked the owner whether to add a countdown / a note.

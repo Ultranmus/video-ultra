@@ -5,9 +5,9 @@ Where the last session stopped and what comes next. Update before ending every s
 ## 2026-10-25 end of day — where to pick up
 
 **State:** everything is merged into main locally; **not pushed** since the Vercel fix (the owner
-says when). The dev server runs on :3200. Keys in `apps/playground/.env.local` are **commented
-out** by the owner (`SPEECH_API_KEY`, `CAPTIONS_API_KEY`): the playground runs without
-services — captions on the device (English), assistant offline demo, no Read aloud.
+says when). The dev server runs on :3200. Keys in `apps/playground/.env.local` (`SPEECH_API_KEY`,
+`CAPTIONS_API_KEY`) are **set** (checked 2026-10-26 — an earlier note here said commented out):
+Text to speech, Read aloud and service captions are on.
 `?transcriber=0` shows the editor without the captions package.
 
 **Done today (DECISIONS #159–#170):** assistant (media library, rename, retry, place, history
