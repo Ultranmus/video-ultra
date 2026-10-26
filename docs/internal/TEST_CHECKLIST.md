@@ -174,7 +174,8 @@ _Owner, 2026-10-25 — desktop: **captions tested ✓** (Groq, Gemini fallback, 
       the file plays in Photos / QuickTime? (HEVC should; AV1 needs a new device.) _Checked
       here:_ codecs-check (AV1 in MP4 and WebM, every frame decodes, half the size; HEVC absent
       on Linux with a clear message).
-- [x] **Split at scenes.** Add a video with several shots (any trailer, or a phone video you cut
+- [x] **Split at scenes.** _(Owner 2026-10-26: tested on a one-shot phone clip → "No cuts
+      found"; a video with real cuts still to try.)_ Add a video with several shots (any trailer, or a phone video you cut
       together) → select it → **Split at scenes** (inspector section; phone: toolbar) → each shot
       becomes its own clip; Undo puts it back in one step. Try **Big changes** / **Small changes
       too**. Time it on the iPhone and Android for a 1-minute video, and does Cancel stop it?
