@@ -4304,6 +4304,8 @@
       display: flex;
       flex: 1;
       flex-direction: column;
+      /* Full width (the desktop grid's \`start\` would shrink them to their content). */
+      align-items: stretch;
       min-height: 0;
     }
 
@@ -4326,7 +4328,7 @@
 
     .vu-export-actions {
       flex: none;
-      align-self: stretch;
+      align-self: auto;
       margin: 0 calc(var(--vu-space-5) * -1);
       padding: var(--vu-space-3) var(--vu-space-5)
         calc(var(--vu-space-3) + env(safe-area-inset-bottom));
