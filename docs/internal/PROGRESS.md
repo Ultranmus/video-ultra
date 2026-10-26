@@ -638,3 +638,5 @@ merged and re-verified on main; A (captions) and E (layers) here.
   screen readers), and when a host adds buttons the canvas-size button steps aside on phones
   (the toolbar has Canvas). No overlap at 393 / 360 with or without host buttons; embed-check
   all passed.
+- Owner: the host's Share was shorter than Export (secondary buttons are 32 px). In the top bar
+  every button is now the touch height (40 px) and the same text size, whatever its look.
