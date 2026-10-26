@@ -2,23 +2,34 @@
 
 Where the last session stopped and what comes next. Update before ending every session.
 
-## 2026-10-26 — where to pick up
+## 2026-10-26 end of day — where to pick up
 
 **State:** everything merged into main locally, **not pushed** (the owner says when). Dev server
-on :3200 (`git switch` / merges often stop the tsup watchers — check `dist` is newer than the
-source; restart `pnpm dev` if not). Keys in `apps/playground/.env.local` are **set**.
+on :3200 over **http** (`pnpm dev`). The tsup watchers often stop after a merge or `git switch`:
+before telling the owner a change is live, check `dist` is newer than the source **and** grep
+`dist` for a string only the new code has; restart `pnpm dev` if not. Work happens in
+`../vu-wt-*` worktrees (merged with `--no-ff`) so the running watchers aren't disturbed.
+Keys in `apps/playground/.env.local` are **set**. `caffeinate` was running at the owner's ask.
 
-**Done today (owner-tested ✓ on desktop):** export dialog (button bottom right, preview as tall
-as the settings, first frame; phones full screen with a fixed button bar), camera, Audio
-(sections, voiceover 3-2-1 countdown + placed where recording started, #171), History as a panel
-like Layers (#172), phone top bar fits down to 360 px. Also fixed: a playback race (a stale
-"playing" tick undid pause-then-seek). The "108 ms text-drag task" was the first Play's audio
-start (PERF's accepted task).
+**Desktop: fully tested by the owner ✓** (TEST_CHECKLIST: every desktop item ticked). Fixed today
+along the way: export dialog (button bottom right, preview as tall as the settings, first frame;
+phones full screen, fixed button bar), Audio panel (sections, less text, voiceover 3-2-1
+countdown + placed where recording started, #171), History as a panel like Layers (#172), phone
+top bar fits to 360 px (host buttons icon-only, canvas size steps aside for them), playback race
+(stale "playing" tick after pause), ⌥-drag roll on a cut (broken since 10-24), marker edge
+messages, shortcuts work right after opening, no page zoom from a pinch inside the editor
+(#173), Split at scenes labels + "one continuous shot" message, high contrast borders just above
+3:1, embed demo (media source spacing, Share as tall as Export, Share exports + share sheet).
+New check: `scripts/cutoff-check.ts`.
 
-**Next (owner, desktop):** editing tools — Align in the menu, type on the stage, edit several,
-combine into one clip, copy / paste, grouping with the mouse, keyframes, markers (M), fine trims
-(Alt-drag), split at scenes, scopes, Export → Smaller file. Then the phones (nothing from
-10-24 on has been tried on a phone).
+**Next (owner, tomorrow): the phone pass** (iPhone, then Android) — nothing since 10-24 has been
+tried on a phone. Switch the server to https first: stop `pnpm dev`, run the package watchers
+(`pnpm turbo run dev --parallel --filter='!playground'`) and `pnpm --filter playground
+dev:https`; phones open `https://<Mac LAN IP>:3200/editor` (was 192.168.1.5) and accept the
+local certificate once. List to give the owner: export (full screen, fixed button), top bar +
+History sheet, Audio (sections, voiceover countdown), fine trim tool / markers / split at scenes,
+the 10-24 fixes (typing on the stage, transitions, filters, stickers, templates, captions), and
+the phone-only items (timeline "+", proxies for 4K).
 
 ## 2026-10-25 end of day — where to pick up
 
