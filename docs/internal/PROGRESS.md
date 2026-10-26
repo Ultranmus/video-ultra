@@ -555,3 +555,6 @@ merged and re-verified on main; A (captions) and E (layers) here.
   the button bar are outside it and fixed. Checked with wheel scrolls over the middle and the
   bar in Chrome + WebKit (button stays at 784–832 px); desktop layout unchanged; a11y 0
   violations; editor-interact export ✓ (Chrome, WebKit).
+- Owner (iPhone frame): empty strip on the right of the phone Export — the middle was shrunk to
+  its content (the desktop grid's `align-items: start` in the phone's flex column), so Quality
+  wrapped to two rows. Phone layout now stretches to the full width (391 px in the frame).
