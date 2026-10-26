@@ -61,12 +61,12 @@ _Owner, 2026-10-25 — desktop: **captions tested ✓** (Groq, Gemini fallback, 
 
 ## 0. 2026-10-20 — your list, edit several, Your videos, combined clips (branch `feat/v0.4-finish`)
 
-- [ ] **Align (desktop).** Right-click a title → hover **Align** → the list opens beside the menu
+- [x] **Align (desktop).** Right-click a title → hover **Align** → the list opens beside the menu
       (left of it near the right edge); click it too — it stays open. _Checked here:_ the list is
       really on top (hit-tested), organize-check.
 - [ ] **Panels keep their own place (desktop).** Scroll Filters down, open Stickers → it starts
       at the top; back to Filters → where you left it.
-- [ ] **Type on the stage.** Desktop: double-click a title → type, click away (one undo). Phone:
+- [x] **Type on the stage.** Desktop: double-click a title → type, click away (one undo). Phone:
       tap a title, tap it again → keyboard, type, tap away. Esc / ✕ puts the old text back.
       _Checked here:_ stage-text-check (Chrome + WebKit).
 - [ ] **No cut-off labels (desktop).** Inspector "Extract audio", Transitions "Play preview" /
@@ -81,14 +81,14 @@ _Owner, 2026-10-25 — desktop: **captions tested ✓** (Groq, Gemini fallback, 
       playground over **https**: `pnpm --filter playground dev:https`). Real Hindi under music
       now comes through (DECISIONS #152); if the phone can't read the sound you get a plain
       message saying so. Tell me how many lines it made.
-- [ ] **Edit several at once.** Select two clips (Shift-click / Layers "Select several") →
+- [x] **Edit several at once.** Select two clips (Shift-click / Layers "Select several") →
       Inspector: Speed 2×, Mute, Adjust — all change; Filters panel → a look → both; two titles →
       Opacity, Transitions → an entrance → both. One undo each. Phone: the same tools in the
       multi-selection toolbar. _Checked here:_ multiedit-check.
 - [ ] **Your videos.** Top-left button → Make a copy (you're now in "… (copy)"; "Back to
       original" in the note) → change something → Your videos → open the original: unchanged.
       New video; delete the copy (it asks). _Checked here:_ videos-check (desktop + phone).
-- [ ] **Combine into one clip.** Select two clips and a title → right-click / long-press →
+- [x] **Combine into one clip.** Select two clips and a title → right-click / long-press →
       **Combine into one clip** → one clip. Speed it up, add a filter, a transition — all act on
       it as one. Right-click → **Open combined clip** → the bar over the timeline; change
       something inside → **Back** → the clip shows the change. **Separate** puts the pieces
@@ -105,11 +105,11 @@ _Owner, 2026-10-25 — desktop: **captions tested ✓** (Groq, Gemini fallback, 
       instead of crashing again. _Checked here:_ the Hindi model loads and hears with the new
       download path (84 words); it needs ~1.2 GB while it hears, which may simply be too much for
       the phone. Tell me which of the two happened.
-- [ ] **Grouping with the mouse (desktop).** Add a video, then two texts. Drag a box with the
+- [x] **Grouping with the mouse (desktop).** Add a video, then two texts. Drag a box with the
       mouse starting **on the video** across both texts → both selected (the video doesn't move).
       ⌘G groups them. A plain click on the video still selects it; once selected it drags.
       _Checked here:_ organize-check (7 new checks).
-- [ ] **Copy / paste.** Select one or more elements → ⌘C, move the playhead, ⌘V → copies at the
+- [x] **Copy / paste.** Select one or more elements → ⌘C, move the playhead, ⌘V → copies at the
       playhead (a group stays a group). ⌘X cuts. Right-click / long-press menu has Copy / Cut /
       Paste. Copy a video clip and paste it → it goes into the main video after the clip under
       the playhead. _Checked here:_ unit tests + organize-check.
@@ -153,7 +153,7 @@ _Owner, 2026-10-25 — desktop: **captions tested ✓** (Groq, Gemini fallback, 
 
 ## 3. v0.4 — pro layer
 
-- [ ] **Keyframes.** Add a title. Select it → Keyframes (inspector section; phone: toolbar) →
+- [x] **Keyframes.** Add a title. Select it → Keyframes (inspector section; phone: toolbar) →
       ◆ next to Position at 0 s. Move the playhead to 2 s, drag the title somewhere else → it
       animates between the two (play it, export it). Try size / turn / opacity too (sliders key
       themselves once a ◆ is set). Graph: drag a ◆; tap the bar under two ◆ and pick a curve
@@ -161,7 +161,7 @@ _Owner, 2026-10-25 — desktop: **captions tested ✓** (Groq, Gemini fallback, 
       doesn't jump. Small ◆ marks show on the selected clip in the timeline.
       _Checked here:_ keyframes-check (auto-key by drag, exported positions, curve, undo,
       split) + 9 unit tests.
-- [ ] **Fine trims (desktop timeline).** With 3 clips: hold **Alt (Option)** and drag the trim
+- [ ] **Fine trims (desktop timeline).** With 3 clips: hold **⌥ Option** (Alt on Windows) and drag the trim
       handle at a cut → the cut moves (one clip longer, the next shorter, the video the same
       length). Alt-drag a video clip → it shows a different part of the video in the same place.
       Alt+Shift-drag the middle clip → it slides between its neighbours. On the phone: select a
@@ -169,12 +169,12 @@ _Owner, 2026-10-25 — desktop: **captions tested ✓** (Groq, Gemini fallback, 
 - [ ] **Markers.** Press **M** to drop a marker (a flag on the ruler); M again on it removes it;
       **,** and **.** jump between markers; dragging the playhead or clips snaps to them.
       _Checked here:_ protrim-check.
-- [ ] **Smaller files: HEVC / AV1 export.** Export → Video → More settings → **Smaller file**
+- [x] **Smaller files: HEVC / AV1 export.** Export → Video → More settings → **Smaller file**
       (shown where your device can encode it: HEVC on the Mac / iPhone, else AV1) —
       the file plays in Photos / QuickTime? (HEVC should; AV1 needs a new device.) _Checked
       here:_ codecs-check (AV1 in MP4 and WebM, every frame decodes, half the size; HEVC absent
       on Linux with a clear message).
-- [ ] **Split at scenes.** Add a video with several shots (any trailer, or a phone video you cut
+- [x] **Split at scenes.** Add a video with several shots (any trailer, or a phone video you cut
       together) → select it → **Split at scenes** (inspector section; phone: toolbar) → each shot
       becomes its own clip; Undo puts it back in one step. Try **Big changes** / **Small changes
       too**. Time it on the iPhone and Android for a 1-minute video, and does Cancel stop it?
