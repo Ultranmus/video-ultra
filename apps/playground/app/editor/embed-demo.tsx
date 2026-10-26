@@ -108,6 +108,51 @@ function BrandPanel({ ctl }: { ctl: EditorController }) {
   );
 }
 
+let sharing = false;
+
+/**
+ * What a host's Share might do: render a small MP4 with the editor's own export, then hand it
+ * to the system share sheet (phones), or offer to save it where there's none.
+ */
+async function share(ctl: EditorController): Promise<void> {
+  if (sharing) return;
+  if (ctl.project.tracks.every((t) => t.items.length === 0)) {
+    ctl.toast('Add something to the video first', 'info');
+    return;
+  }
+  sharing = true;
+  ctl.toast('Making a small video to share…', 'info');
+  try {
+    const result = await ctl.exportVideo(
+      { format: 'mp4', height: 480, fps: 30, quality: 'medium' },
+      () => {},
+      new AbortController().signal,
+    );
+    const file = new File([result.blob], `Shared video.${result.extension}`, {
+      type: result.mimeType,
+    });
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], title: 'My video' }).catch(() => {});
+      return;
+    }
+    ctl.toast('Ready to share (demo)', 'success', {
+      label: 'Save',
+      run: () => {
+        const url = URL.createObjectURL(file);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.name;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      },
+    });
+  } catch (error) {
+    ctl.toast(`Couldn't share: ${error instanceof Error ? error.message : String(error)}`, 'error');
+  } finally {
+    sharing = false;
+  }
+}
+
 export const embedDemo: EditorCustomization = {
   hide: ['blur', 'duplicate'],
   railOrder: ['media', 'brand', 'templates'],
@@ -130,6 +175,7 @@ export const embedDemo: EditorCustomization = {
           (n, t) => n + t.items.length,
           0,
         );
+        void share(ctl);
       },
     },
   ],
