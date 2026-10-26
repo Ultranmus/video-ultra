@@ -589,3 +589,16 @@ merged and re-verified on main; A (captions) and E (layers) here.
   (with "Your videos" shown the bar needs ~408 px; it was so before History moved). Phones now
   hide the divider and the icons on the canvas size and Export (words only): no overlap at 393
   or 360 px, every button still 40 px. a11y-check 0 violations.
+
+## 2026-10-26 · Editing tools (owner's desktop pass)
+
+- Owner ✓: Align, type on the stage, grouping with the mouse, copy / paste, edit several,
+  combine, keyframes, split at scenes, Smaller file. Shortcut help says "⌥/Alt-drag" (Mac users
+  have no key named Alt).
+- Bug (owner): ⌥-drag on a cut shortened the video instead of moving the cut. Since 10-24 the
+  handle on a cut also opens a transition (tap), so it went through the tap-or-drag wait, which
+  became a plain trim and dropped ⌥. Now the roll partner is worked out on press and kept
+  (`#rollPartner`). protrim-check failed on main (roll + slide) — it hadn't been re-run since
+  10-24 — and passes now; plus the owner's case by hand (one video split twice: ⌥-drag the
+  handle → 3 → 3.5 s / next shorter / total 10 s; plain drag still trims; tap still opens
+  Transitions).
