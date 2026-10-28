@@ -81,8 +81,12 @@ async function gemini(key: string, body: Record<string, unknown>): Promise<Respo
   }
   if (!audio?.data)
     return failed ?? new Response('The voice service sent no audio', { status: 502 });
-  const rate = Number(/rate=(\d+)/.exec(audio.mimeType ?? '')?.[1]) || 24000;
-  return new Response(new Uint8Array(wav(Buffer.from(audio.data, 'base64'), rate)), {
+  const bytes = Buffer.from(audio.data, 'base64');
+  // Newer models send a whole WAV (with a content-credentials chunk after the sound): keep only
+  // its samples, or that chunk plays as a burst of noise at the end. Older ones send raw PCM.
+  const inner = bytes.toString('latin1', 0, 4) === 'RIFF' ? wavSamples(bytes) : undefined;
+  const rate = inner?.rate ?? (Number(/rate=(\d+)/.exec(audio.mimeType ?? '')?.[1]) || 24000);
+  return new Response(new Uint8Array(wav(inner?.pcm ?? bytes, rate)), {
     headers: { 'content-type': 'audio/wav' },
   });
 }
@@ -94,6 +98,22 @@ const GEMINI_SPEECH_MODELS = [
   'gemini-3.1-flash-tts-preview',
   'gemini-2.5-flash-preview-tts',
 ];
+
+/** The sample rate and sound of a 16-bit mono WAV, skipping every other chunk. */
+function wavSamples(file: Buffer): { pcm: Buffer; rate: number } | undefined {
+  let rate: number | undefined;
+  for (let at = 12; at + 8 <= file.length;) {
+    const id = file.toString('latin1', at, at + 4);
+    const size = file.readUInt32LE(at + 4);
+    if (id === 'fmt ') rate = file.readUInt32LE(at + 12);
+    if (id === 'data') {
+      const pcm = file.subarray(at + 8, Math.min(file.length, at + 8 + size));
+      return rate ? { pcm, rate } : undefined;
+    }
+    at += 8 + size + (size & 1);
+  }
+  return undefined;
+}
 
 /** 16-bit mono PCM → a WAV file. */
 function wav(pcm: Buffer, rate: number): Buffer {
