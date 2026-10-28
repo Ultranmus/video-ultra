@@ -30,7 +30,7 @@ async function gemini(key: string, body: Record<string, unknown>): Promise<Respo
   const text = String(body.input ?? '').slice(0, 4000);
   if (!text.trim()) return new Response('Nothing to say', { status: 400 });
   const voice = GEMINI_VOICES.some((v) => v.id === body.voice) ? String(body.voice) : 'Kore';
-  // No speed setting in this API: the pace is asked for in words.
+  // No speed setting in this API: the pace is asked for in words (2.5 models only).
   const speed = Number(body.speed) || 1;
   const pace =
     speed >= 1.4
@@ -54,7 +54,10 @@ async function gemini(key: string, body: Record<string, unknown>): Promise<Respo
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: `${pace}: ${text}` }] }],
+          // Only the 2.5 models take the pace as words; newer ones read them out loud.
+          contents: [
+            { parts: [{ text: model.startsWith('gemini-2.5') ? `${pace}: ${text}` : text }] },
+          ],
           generationConfig: {
             responseModalities: ['AUDIO'],
             speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },
