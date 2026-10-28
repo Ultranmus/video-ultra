@@ -4,6 +4,10 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 
 ## Open
 
+- [ ] Playground voice (Google): the newer speech models (3.x) read pace words out loud and
+      take no instruction field, so the speed slider does nothing on them; only the 2.5 models
+      still get "Say slowly: …". Fix: time-stretch the answer (keep pitch) or set the placed
+      clip's speed. Found 2026-10-28.
 - [ ] mediabunny's dependency `@types/dom-webcodecs` clashes with TypeScript 6's built-in
       WebCodecs types when an app type-checks with `skipLibCheck: false` (Next.js and Vite default
       to true). Upstream; pack-check uses `skipLibCheck: true`.
