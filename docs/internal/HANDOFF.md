@@ -2,6 +2,13 @@
 
 Where the last session stopped and what comes next. Update before ending every session.
 
+## 2026-10-28 — live playground voice + captions fixed (pushed)
+
+Text to speech and service captions work on https://video-ultra-playground.vercel.app/editor
+(owner checked ✓). Fixes in PROGRESS 2026-10-28. The Google key is free tier: a few voice
+requests per model per day — keep my own live tests to one or two. Open: speed slider does
+nothing on the newer Google voices (BACKLOG). The phone pass (below) is still next.
+
 ## 2026-10-26 end of day — where to pick up
 
 **State:** everything merged into main locally, **not pushed** (the owner says when). Dev server
