@@ -645,3 +645,16 @@ merged and re-verified on main; A (captions) and E (layers) here.
   editor's own `exportVideo`, then the system share sheet (`navigator.share`, phones / Mac
   Chrome), or a "Ready to share (demo)" toast with Save where there's none. Checked: the MP4
   (1.3 MB) reaches the share sheet, export events start → done; embed-check all passed.
+
+## 2026-10-28 · Live playground: text to speech + captions (pushed, owner checked ✓)
+
+- Editor page read the keys once at build (prerendered), so keys added on Vercel later never
+  turned text to speech / service captions on. Now `force-dynamic`.
+- Google's free tier has a small daily allowance per voice model; `gemini-2.5-flash-preview-tts`
+  ran out. The voice route now tries `GEMINI_SPEECH_MODELS` in turn (3.8 flash → 3.8 flash lite
+  → 3.1 → 2.5) on 429 / 5xx / no audio; `SPEECH_MODEL` pins one.
+- Newer models read the pace words ("Say: …") out loud and take no instruction field: they get
+  the text alone (speed on them → BACKLOG).
+- Newer models answer a whole WAV with a C2PA chunk after the sound, which played as noise at
+  the end: only the `data` chunk is kept now.
+- Owner: text to speech works on the live site.
