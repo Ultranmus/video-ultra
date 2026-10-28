@@ -4,8 +4,8 @@ import { GEMINI_VOICES, speechKey, speechProvider } from './config';
  * The playground's text-to-speech endpoint, so the key stays on the server. It takes the
  * editor's OpenAI-style request (`input`, `voice`, `speed`) and either forwards it to an
  * OpenAI-compatible `/audio/speech` service (`SPEECH_URL`, default OpenAI's; `SPEECH_MODEL`,
- * default `tts-1`) or asks Google's Gemini speech model (`SPEECH_MODEL`, default
- * `gemini-2.5-flash-preview-tts`) and answers a WAV. Key: `SPEECH_API_KEY` (falls back to
+ * default `tts-1`) or asks Google's Gemini speech models (`SPEECH_MODEL`, else
+ * `GEMINI_SPEECH_MODELS` in turn) and answers a WAV. Key: `SPEECH_API_KEY` (falls back to
  * `ASSISTANT_API_KEY`); which service: see `speechProvider`. Without a key it answers 501.
  */
 export async function POST(request: Request): Promise<Response> {
@@ -42,34 +42,55 @@ async function gemini(key: string, body: Record<string, unknown>): Promise<Respo
           : speed < 0.95
             ? 'Say a little slower than usual'
             : 'Say';
-  const model = process.env.SPEECH_MODEL ?? 'gemini-2.5-flash-preview-tts';
-  const upstream = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-    {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: `${pace}: ${text}` }] }],
-        generationConfig: {
-          responseModalities: ['AUDIO'],
-          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },
-        },
-      }),
-    },
-  );
-  if (!upstream.ok) return new Response(await upstream.text(), { status: upstream.status });
-  const json = (await upstream.json()) as {
-    candidates?: {
-      content?: { parts?: { inlineData?: { mimeType?: string; data?: string } }[] };
-    }[];
-  };
-  const audio = json.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data)?.inlineData;
-  if (!audio?.data) return new Response('The voice service sent no audio', { status: 502 });
+  // Each model has its own daily free allowance: on a used-up one (429), a busy one or no audio,
+  // the next is tried. `SPEECH_MODEL` pins one.
+  const models = process.env.SPEECH_MODEL ? [process.env.SPEECH_MODEL] : GEMINI_SPEECH_MODELS;
+  let failed: Response | undefined;
+  let audio: { mimeType?: string; data?: string } | undefined;
+  for (const model of models) {
+    const upstream = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `${pace}: ${text}` }] }],
+          generationConfig: {
+            responseModalities: ['AUDIO'],
+            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },
+          },
+        }),
+      },
+    );
+    if (!upstream.ok) {
+      failed = new Response(await upstream.text(), { status: upstream.status });
+      if (upstream.status === 429 || upstream.status >= 500) continue;
+      return failed;
+    }
+    const json = (await upstream.json()) as {
+      candidates?: {
+        content?: { parts?: { inlineData?: { mimeType?: string; data?: string } }[] };
+      }[];
+    };
+    audio = json.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data)?.inlineData;
+    if (audio?.data) break;
+    failed = new Response('The voice service sent no audio', { status: 502 });
+  }
+  if (!audio?.data)
+    return failed ?? new Response('The voice service sent no audio', { status: 502 });
   const rate = Number(/rate=(\d+)/.exec(audio.mimeType ?? '')?.[1]) || 24000;
   return new Response(new Uint8Array(wav(Buffer.from(audio.data, 'base64'), rate)), {
     headers: { 'content-type': 'audio/wav' },
   });
 }
+
+/** Google's speech models, newest first (checked 2026-10-28; each has its own daily allowance). */
+const GEMINI_SPEECH_MODELS = [
+  'gemini-3.8-flash-tts',
+  'gemini-3.8-flash-lite-tts',
+  'gemini-3.1-flash-tts-preview',
+  'gemini-2.5-flash-preview-tts',
+];
 
 /** 16-bit mono PCM → a WAV file. */
 function wav(pcm: Buffer, rate: number): Buffer {
