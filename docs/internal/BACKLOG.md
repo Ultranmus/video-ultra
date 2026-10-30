@@ -4,6 +4,13 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 
 ## Open
 
+- [ ] Phone test (owner, 2026-10-30): once the browser zooms the page in (pinch, or a double
+      tap), it can't be zoomed back out — the page stays stuck zoomed. Not fixed yet, only
+      recorded. Likely cause (to check): most of the editor area has `touch-action: none`
+      (preview, timeline, sheets in `editor.css`), so a pinch-out lands on parts that swallow it
+      and the browser never gets it. Also check the viewport settings in `apps/playground/app/layout.tsx`
+      and whether an input under 16px font makes iOS zoom in on focus.
+
 - [ ] Playground voice (Google): the newer speech models (3.x) read pace words out loud and
       take no instruction field, so the speed slider does nothing on them; only the 2.5 models
       still get "Say slowly: …". Fix: time-stretch the answer (keep pitch) or set the placed
