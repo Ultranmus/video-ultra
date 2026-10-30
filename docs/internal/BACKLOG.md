@@ -125,6 +125,13 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       dragging / lock direction on the first move), and on a cancel after a real sideways drag
       commit the last value instead of reverting. Affects every ruler slider in sheets, not just
       Filters.
+- [ ] Phone test (owner, 2026-10-30), design: Opacity and Blend both work, but each sheet
+      looks too empty — Opacity is a single slider, and Blend is a list of names only, with no
+      preview of what each mode does. Owner's options: combine the small ones (e.g. Opacity +
+      Blend, maybe other one-control tools) into one sheet, or give each a richer view — e.g.
+      Blend as preview tiles showing the selected item blended with each mode. Not done yet,
+      only recorded. Decide against UI_VISION.md (tool bar layout) and record it in
+      DECISIONS.md; previews must be cheap (small, cached, made off the main thread).
 
 - [ ] Playground voice (Google): the newer speech models (3.x) read pace words out loud and
       take no instruction field, so the speed slider does nothing on them; only the 2.5 models
