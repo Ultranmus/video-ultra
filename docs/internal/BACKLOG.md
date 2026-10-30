@@ -31,6 +31,14 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       bar's `layersOpen` (`shell.tsx`) checks only `panel === 'layers' && sheetPanel` and not
       `!tool`. Same for the History button. Fix either side: clear `sheetPanel` when a tool
       opens on phone, or add `!s.tool` to those two checks.
+- [ ] Phone test (owner, 2026-10-30): Media → camera → record a video. On the review screen the
+      "Add as a layer" and "Add to video" buttons are different heights; they should match.
+      Not fixed yet, only recorded. Likely cause (to check): the review bar
+      (`.vu-camera-bar[data-review]`, `editor.css`) is flex but keeps `align-items: center` from
+      the base `.vu-camera-bar` grid rule, so buttons don't stretch to the row's height; on a
+      narrow phone the longer label ("Add as a layer", plus its icon) wraps to two lines and
+      that button grows taller than its neighbour. Fix: `align-items: stretch` on the review
+      bar (and/or keep labels on one line).
 
 - [ ] Playground voice (Google): the newer speech models (3.x) read pace words out loud and
       take no instruction field, so the speed slider does nothing on them; only the 2.5 models
