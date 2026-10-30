@@ -82,6 +82,13 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       preview. Not fixed yet, only recorded. Check the other add actions in sheets (media,
       stickers, text) for the same behaviour, and keep the result selected so it can be edited
       right away.
+- [ ] Phone test (owner, 2026-10-30), feature request: Canvas tab → Color section should offer
+      a transparent background as one of the background colors. (Canvas and Blur tabs were
+      otherwise fine on phone.) Not done yet, only recorded. To think through: the preview
+      shows a checkerboard for transparent; export keeps it only in formats that carry alpha
+      (WebM VP9/AV1 with alpha, PNG/WebP stills, GIF one-bit) — H.264 MP4 has no alpha, so pick
+      a fallback (black) and say so in the export sheet. Must work the same on WebGPU and
+      WebGL2. Record the choice in DECISIONS.md.
 
 - [ ] Playground voice (Google): the newer speech models (3.x) read pace words out loud and
       take no instruction field, so the speed slider does nothing on them; only the 2.5 models
