@@ -54,6 +54,17 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       `repeat(auto-fill, minmax(var(--vu-size-template), 1fr))` with `--vu-size-template: 72px`
       (`tokens.css`), so a ~360–430px sheet fits 4. Fix: a phone container query with a fixed
       2 (or 3) columns, or a larger min size token. Check UI_VISION.md before choosing.
+- [ ] Phone test (owner, 2026-10-30): on-screen keyboard. After picking a template, the keyboard
+      opens and the whole editor shifts up — the top part goes off screen and the text field
+      being edited isn't kept in view, so editing is hard. Same everywhere a text field opens
+      the keyboard. Wanted: the editor stays put, the sheet rises above the keyboard as one
+      whole piece, and the field being edited is always visible. Not fixed yet, only recorded.
+      Likely cause (to check): iOS ignores `interactiveWidget: 'resizes-content'`
+      (`apps/playground/app/layout.tsx`) and pans the whole page up to reveal the focused field;
+      the `visualViewport` handler in `VideoEditor.tsx` sets `--vu-keyboard` / `data-keyboard`
+      but doesn't undo the pan (pin the root to `vv.offsetTop` / `vv.height`, or stop the page
+      scroll), and nothing scrolls the focused field into view inside the sheet. Test on both
+      iPhone Safari and Android Chrome.
 
 - [ ] Playground voice (Google): the newer speech models (3.x) read pace words out loud and
       take no instruction field, so the speed slider does nothing on them; only the 2.5 models
