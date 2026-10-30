@@ -188,6 +188,15 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       keep the preview resizing smooth (drag state local, one commit on release, no React per
       frame), remember the chosen size, keyboard/screen-reader way to change it, reduced
       motion. Record in DECISIONS.md.
+- [ ] Phone test (owner, 2026-10-30): scrolling the timeline lanes up/down isn't as smooth as
+      expected (feels unlike a native list). Not fixed yet, only recorded. Cause (from the
+      code, `timeline/view.ts`): the canvas does its own vertical pan (~line 866) — it follows
+      the finger 1:1 but has no momentum (the fling ~line 1145 only handles horizontal: samples
+      record `x` only), so it stops dead on release; no edge bounce; and the axis locks on the
+      very first move (`Math.abs(dx) >= Math.abs(dy)`, no dead zone), so a slightly sideways
+      start turns into a seek instead. Fix: vertical fling with the same decay, a few px dead
+      zone before locking the axis, maybe a soft edge stop. Measure redraw cost per frame on
+      the iPhone while scrolling (should be a cheap redraw, no React).
 - [ ] Phone test (owner, 2026-10-30), clarity: the owner couldn't tell how fine trim works on a
       sound clip on phone. Desktop explains it with a shortcut (Alt-drag on the timeline);
       phone has no hint at all. Not done yet, only recorded. What exists: the Fine trim tool
