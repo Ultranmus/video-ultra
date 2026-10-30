@@ -56,6 +56,12 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       (`tokens.css`), so a ~360–430px sheet fits 4. Fix: a phone container query with a fixed
       2 (or 3) columns, or a larger min size token. Check UI_VISION.md before choosing.
       Reference the owner liked: the Text tab on phone — 3 per row, big readable text.
+- [ ] Phone test (owner, 2026-10-30): the Filters grid also shows 4 per row on a phone; owner
+      wants 3. Not fixed yet, only recorded. Same cause as the Templates entry above:
+      `.vu-filter-grid` (`editor.css`) is `repeat(auto-fill, minmax(var(--vu-size-filter-tile),
+      1fr))` with `--vu-size-filter-tile: 72px`. Fix both together (a phone column count of 3),
+      and check the other 72px-ish auto-fill grids (stickers, shapes, caption presets, assets)
+      for the same look.
 - [ ] Phone test (owner, 2026-10-30): on-screen keyboard. After picking a template, the keyboard
       opens and the whole editor shifts up — the top part goes off screen and the text field
       being edited isn't kept in view, so editing is hard. Same everywhere a text field opens
