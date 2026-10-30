@@ -160,6 +160,25 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       column with `gap: var(--vu-space-3)` for everything, so the chip group → first slider
       break is the same as slider → slider. Fix: a bigger gap after the chips (a section-gap
       token, matching other sheets), not a raw value.
+- [ ] Phone test (owner, 2026-10-30): tooltips on phone are only ~70–80% of the screen wide, so
+      their text wraps onto several lines. Wanted: full width on phones (with the side gutter).
+      Not fixed yet, only recorded. Cause: `.vu-tooltip` (`editor.css`) has
+      `max-width: var(--vu-size-tooltip)`; add a phone rule (container query on `.vu-root`) that
+      lets it span the editor width minus the gutter.
+- [ ] Phone test (owner, 2026-10-30): Green screen → "Pick from video": the sheet stays open and
+      covers the preview. Wanted: close (or drop) the sheet so the person can tap a colour on
+      the video — the tooltip already tells them to tap — then bring the sheet back after the
+      pick (or on cancel). Not done yet, only recorded.
+- [ ] Phone test (owner, 2026-10-30), bad one: Green screen → pick a colour on the video → the
+      whole video disappears (keyed out entirely), not just the picked colour. Didn't happen on
+      desktop; owner isn't sure if it's this video. Not fixed yet, only recorded. To check:
+      (1) the tap point is wrong on phone — page zoom / keyboard pan (see the zoom entries)
+      shifts the preview, so `Stage.tsx` (~line 522) sends wrong `x/pw, y/ph` to
+      `pickKeyColour` (`controller.ts`) and it picks a colour that matches most of the frame;
+      (2) the engine's `pickColour` readback on the phone's backend (likely WebGL2 on iPhone)
+      returns a wrong value (premultiplied alpha, colour space, or reading an empty/black
+      frame before the picture is drawn); (3) the key tolerance is too wide for that colour.
+      Reproduce with the same video on desktop and phone, log the picked hex on both.
 
 - [ ] Playground voice (Google): the newer speech models (3.x) read pace words out loud and
       take no instruction field, so the speed slider does nothing on them; only the 2.5 models
