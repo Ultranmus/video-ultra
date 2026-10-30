@@ -47,8 +47,8 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       exactly `--vu-space-4`; if the phone sheet's padding differs, the chips shift. The inner
       `.vu-chips-scroll` also adds `padding: space-1` (focus-ring room) with a matching negative
       margin — check that it really cancels inside the bar. The first chip should start on the
-      same line as the section titles and grid below. Owner confirmed it on the Text tab too
-      (its pill bar is shifted inward the same way).
+      same line as the section titles and grid below. Owner confirmed it on the Text and
+      Stickers tabs too (their pill bars are shifted inward the same way).
 - [ ] Phone test (owner, 2026-10-30): the Templates grid shows 4 per row on a phone; the text in
       each template is too small to read or judge. Owner wants 2 or 3 per row on phones. Not
       fixed yet, only recorded. Cause: `.vu-template-grid` (`editor.css`) is
