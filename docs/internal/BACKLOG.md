@@ -10,6 +10,13 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       (preview, timeline, sheets in `editor.css`), so a pinch-out lands on parts that swallow it
       and the browser never gets it. Also check the viewport settings in `apps/playground/app/layout.tsx`
       and whether an input under 16px font makes iOS zoom in on focus.
+- [ ] Phone test (owner, 2026-10-30): in the selection menu, the Align submenu's top option
+      shows the hover color, pressed right up against the Align row with no gap at all. Not
+      fixed yet, only recorded. Likely cause (to check): on phones the submenu opens inline
+      under its item (`.vu-submenu` in the `max-width: 767px` container query in `editor.css`)
+      with `padding: 0` and no top margin, so the highlighted Align row (`aria-expanded`) and
+      the first option touch. The first option also looks hovered because `:hover` sticks after
+      a tap on touch screens (`.vu-menu-item:hover` isn't limited to `@media (hover: hover)`).
 
 - [ ] Playground voice (Google): the newer speech models (3.x) read pace words out loud and
       take no instruction field, so the speed slider does nothing on them; only the 2.5 models
