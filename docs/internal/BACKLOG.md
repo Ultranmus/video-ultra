@@ -132,6 +132,19 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       Blend as preview tiles showing the selected item blended with each mode. Not done yet,
       only recorded. Decide against UI_VISION.md (tool bar layout) and record it in
       DECISIONS.md; previews must be cheap (small, cached, made off the main thread).
+- [ ] Phone test (owner, 2026-10-30): dragging a text on the preview — the selection border
+      moves with the finger but the text itself doesn't keep up (border and text come apart
+      during the drag). (The rest of the Text tab works on phone.) Not fixed yet, only
+      recorded. Likely cause (to check): the box is DOM on the main thread and moves at once,
+      while the text is drawn by the engine worker from `ctl.preview(...)` (`Stage.tsx`), so it
+      lands a frame or more later — or previews get dropped/coalesced on a phone. Measure the
+      box-to-frame lag on the iPhone; options: move the box only when the engine reports the
+      frame drawn, or draw the box in the same pass.
+- [ ] Phone test (owner, 2026-10-30): Rotate, Flip and canvas size (ratio) changes apply as an
+      instant snap, which feels abrupt; owner wants them smooth. Not done yet, only recorded.
+      Idea: a short eased transition (~150–200 ms, `--vu-duration-*` / `--vu-ease-out`) of the
+      item or frame from old to new, animated in the engine (no React per frame), instant
+      under reduced motion. One edit is still committed; the animation is view-only.
 
 - [ ] Playground voice (Google): the newer speech models (3.x) read pace words out loud and
       take no instruction field, so the speed slider does nothing on them; only the 2.5 models
