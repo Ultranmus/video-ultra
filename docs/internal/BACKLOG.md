@@ -179,8 +179,12 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       returns a wrong value (premultiplied alpha, colour space, or reading an empty/black
       frame before the picture is drawn); (3) the key tolerance is too wide for that colour.
       Reproduce with the same video on desktop and phone, log the picked hex on both.
-- [ ] User report (via owner, 2026-10-30): a HEIF/HEIC photo shared from an iPhone to an Android
-      phone can't be picked in the editor on Android. Not fixed yet, only recorded. Two parts
+- [ ] User report (via owner, 2026-10-30): a HEIF photo (`.heif` / `image/heif` — owner: HEIF,
+      not HEIC) shared from an iPhone to an Android phone can't be picked in the editor on
+      Android. Note: `probe.ts` (~line 75) sniffs every HEIF brand, including the generic
+      `mif1`/`msf1`, as `image/heic` and calls it "a HEIC photo" in the error — wrong name for
+      a `.heif`, and a `mif1` file can actually hold AVIF (check the compatible brands before
+      deciding), which Chrome on Android *can* decode. Not fixed yet, only recorded. Two parts
       to check: (1) the picker — the file input's `accept`
       (`'video/*,audio/*,image/*,.mov,.mkv,.heic,.heif,…'`, `VideoEditor.tsx` ~line 153) may
       not let Android's picker select it (some pickers grey files out by extension/MIME; try
