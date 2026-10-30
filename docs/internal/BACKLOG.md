@@ -179,6 +179,15 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       returns a wrong value (premultiplied alpha, colour space, or reading an empty/black
       frame before the picture is drawn); (3) the key tolerance is too wide for that colour.
       Reproduce with the same video on desktop and phone, log the picked hex on both.
+- [ ] Phone test (owner, 2026-10-30), feature request: make the timeline (frame lanes) area on
+      phone resizable like a sheet, with a drag handle and snap points: **minimal** (only the
+      play bar — play button, timecode — so the preview gets the most room), **normal** (today's
+      height), **full** (expanded, many lanes visible). Drag down from normal to collapse to
+      the play bar; drag up to bring it back. Not done yet, only recorded. To think through:
+      fit with UI_VISION.md's phone layout and the bottom tool sheet (which one wins the space),
+      keep the preview resizing smooth (drag state local, one commit on release, no React per
+      frame), remember the chosen size, keyboard/screen-reader way to change it, reduced
+      motion. Record in DECISIONS.md.
 - [ ] Phone test (owner, 2026-10-30), clarity: the owner couldn't tell how fine trim works on a
       sound clip on phone. Desktop explains it with a shortcut (Alt-drag on the timeline);
       phone has no hint at all. Not done yet, only recorded. What exists: the Fine trim tool
