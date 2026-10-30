@@ -145,6 +145,15 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       Idea: a short eased transition (~150–200 ms, `--vu-duration-*` / `--vu-ease-out`) of the
       item or frame from old to new, animated in the engine (no React per frame), instant
       under reduced motion. One edit is still committed; the animation is view-only.
+- [ ] Phone test (owner, 2026-10-30): on the timeline's main (frame) lane, the last clip's
+      right trim/drag handle sits behind the "+" (add media) button at the end, so it's hidden
+      and hard or impossible to grab. Not fixed yet, only recorded. Cause (from the code): the
+      "+" is placed only 8px after the last clip's end (`addButtonRect`,
+      `timeline/geometry.ts`), the touch trim handle is wider than that, and the hit test checks
+      the "+" before the clip's handles (same file, ~line 267), so a touch there adds media
+      instead of trimming; `timeline/view.ts` also draws the "+" over the handle. Fix: when the
+      last clip is selected, push the "+" past the handle (or hide it while trimming) and test
+      handles before the "+".
 
 - [ ] Playground voice (Google): the newer speech models (3.x) read pace words out loud and
       take no instruction field, so the speed slider does nothing on them; only the 2.5 models
