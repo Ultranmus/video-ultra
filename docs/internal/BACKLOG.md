@@ -48,6 +48,12 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       `.vu-chips-scroll` also adds `padding: space-1` (focus-ring room) with a matching negative
       margin — check that it really cancels inside the bar. The first chip should start on the
       same line as the section titles and grid below.
+- [ ] Phone test (owner, 2026-10-30): the Templates grid shows 4 per row on a phone; the text in
+      each template is too small to read or judge. Owner wants 2 or 3 per row on phones. Not
+      fixed yet, only recorded. Cause: `.vu-template-grid` (`editor.css`) is
+      `repeat(auto-fill, minmax(var(--vu-size-template), 1fr))` with `--vu-size-template: 72px`
+      (`tokens.css`), so a ~360–430px sheet fits 4. Fix: a phone container query with a fixed
+      2 (or 3) columns, or a larger min size token. Check UI_VISION.md before choosing.
 
 - [ ] Playground voice (Google): the newer speech models (3.x) read pace words out loud and
       take no instruction field, so the speed slider does nothing on them; only the 2.5 models
