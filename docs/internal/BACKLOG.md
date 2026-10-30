@@ -65,6 +65,14 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       but doesn't undo the pan (pin the root to `vv.offsetTop` / `vv.height`, or stop the page
       scroll), and nothing scrolls the focused field into view inside the sheet. Test on both
       iPhone Safari and Android Chrome.
+- [ ] Phone test (owner, 2026-10-30): tapping any text field to edit also zooms the page in, so
+      the parts beside it get cut off (and then it can't be zoomed back out — see the first
+      phone-test entry above). Owner: no zooming anywhere in the phone view. Not fixed yet, only
+      recorded. Cause: iOS Safari zooms in on focus whenever a field's font is under 16px; our
+      text tokens are 11–13px (`--vu-text-xs/sm/md`, `tokens.css`) and the fields inherit them.
+      Fix: fields at least 16px on phones (a phone token, via the `.vu-root` container query),
+      not a `maximum-scale=1` viewport (that blocks zoom for people who need it, and host apps
+      own the viewport anyway).
 
 - [ ] Playground voice (Google): the newer speech models (3.x) read pace words out loud and
       take no instruction field, so the speed slider does nothing on them; only the 2.5 models
