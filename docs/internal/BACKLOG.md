@@ -39,6 +39,15 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       narrow phone the longer label ("Add as a layer", plus its icon) wraps to two lines and
       that button grows taller than its neighbour. Fix: `align-items: stretch` on the review
       bar (and/or keep labels on one line).
+- [ ] Phone test (owner, 2026-10-30): in any bottom sheet, the horizontal row of tab pills
+      (category chips) sits with extra space on the left/right, so it doesn't line up with the
+      text and options under it — looks off. Not fixed yet, only recorded. Likely cause (to
+      check): the sticky `.vu-browser-bar` (`editor.css`) breaks out with
+      `margin-inline: -space-4` and pads back `space-4`, assuming the sheet's side padding is
+      exactly `--vu-space-4`; if the phone sheet's padding differs, the chips shift. The inner
+      `.vu-chips-scroll` also adds `padding: space-1` (focus-ring room) with a matching negative
+      margin — check that it really cancels inside the bar. The first chip should start on the
+      same line as the section titles and grid below.
 
 - [ ] Playground voice (Google): the newer speech models (3.x) read pace words out loud and
       take no instruction field, so the speed slider does nothing on them; only the 2.5 models
