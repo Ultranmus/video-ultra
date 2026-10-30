@@ -179,6 +179,14 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       returns a wrong value (premultiplied alpha, colour space, or reading an empty/black
       frame before the picture is drawn); (3) the key tolerance is too wide for that colour.
       Reproduce with the same video on desktop and phone, log the picked hex on both.
+- [ ] Phone test (owner, 2026-10-30), clarity: the owner couldn't tell how fine trim works on a
+      sound clip on phone. Desktop explains it with a shortcut (Alt-drag on the timeline);
+      phone has no hint at all. Not done yet, only recorded. What exists: the Fine trim tool
+      (`protrim.tsx`, all devices) — Slip (which part of the sound plays, clip stays put), Roll
+      (move the cut after the clip) and Slide (main video only), a frame per step plus a
+      slider. Needed on phone: a one-line explanation per row (what Slip/Roll do, in plain
+      words) and/or a short first-use hint, translatable; check the tool shows and works for
+      sound clips (Slip needs extra media beyond the trimmed part — say so when there's none).
 - [ ] User report (via owner, 2026-10-30): a HEIF photo (`.heif` / `image/heif` — owner: HEIF,
       not HEIC) shared from an iPhone to an Android phone can't be picked in the editor on
       Android. Note: `probe.ts` (~line 75) sniffs every HEIF brand, including the generic
