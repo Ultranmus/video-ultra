@@ -73,6 +73,12 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       Fix: fields at least 16px on phones (a phone token, via the `.vu-root` container query),
       not a `maximum-scale=1` viewport (that blocks zoom for people who need it, and host apps
       own the viewport anyway).
+- [ ] Phone test (owner, 2026-10-30): Templates → pick one → "Add to video": the sheet stays
+      open, so it's unclear what's left to do there and the added template can't be seen in
+      the frame. Wanted: the sheet closes by itself after adding, showing the template on the
+      preview. Not fixed yet, only recorded. Check the other add actions in sheets (media,
+      stickers, text) for the same behaviour, and keep the result selected so it can be edited
+      right away.
 
 - [ ] Playground voice (Google): the newer speech models (3.x) read pace words out loud and
       take no instruction field, so the speed slider does nothing on them; only the 2.5 models
