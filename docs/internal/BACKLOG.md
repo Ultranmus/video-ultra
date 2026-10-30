@@ -184,7 +184,9 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       Android. Note: `probe.ts` (~line 75) sniffs every HEIF brand, including the generic
       `mif1`/`msf1`, as `image/heic` and calls it "a HEIC photo" in the error — wrong name for
       a `.heif`, and a `mif1` file can actually hold AVIF (check the compatible brands before
-      deciding), which Chrome on Android *can* decode. Not fixed yet, only recorded. Two parts
+      deciding), which Chrome on Android *can* decode. Owner: the same file picks and opens fine
+      on iPhone — expected, since iOS Safari decodes HEIF natively (and its picker may hand it
+      over as JPEG); so the gap is Android-only (picker filtering and/or no HEIF decoder). Not fixed yet, only recorded. Two parts
       to check: (1) the picker — the file input's `accept`
       (`'video/*,audio/*,image/*,.mov,.mkv,.heic,.heif,…'`, `VideoEditor.tsx` ~line 153) may
       not let Android's picker select it (some pickers grey files out by extension/MIME; try
