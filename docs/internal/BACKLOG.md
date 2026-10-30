@@ -17,6 +17,13 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       with `padding: 0` and no top margin, so the highlighted Align row (`aria-expanded`) and
       the first option touch. The first option also looks hovered because `:hover` sticks after
       a tap on touch screens (`.vu-menu-item:hover` isn't limited to `@media (hover: hover)`).
+- [ ] Phone test (owner, 2026-10-30): renaming a layer (double tap on its name in Layers) works,
+      but the name field's border and focus outline sit right on the layer row's border — no
+      space between them, they touch. Not fixed yet, only recorded. Likely cause (to check):
+      `.vu-layer-rename` (`editor.css`) is `--vu-size-choice` tall and stretches to the row's
+      right edge (the row has only `--vu-space-1` right padding and no top/bottom padding),
+      while the selected row draws a 2px inset `--vu-selection` ring and the root
+      `:focus-visible` outline adds more, so field border, outline and row ring overlap.
 
 - [ ] Playground voice (Google): the newer speech models (3.x) read pace words out loud and
       take no instruction field, so the speed slider does nothing on them; only the 2.5 models
