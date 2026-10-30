@@ -89,6 +89,13 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       (WebM VP9/AV1 with alpha, PNG/WebP stills, GIF one-bit) — H.264 MP4 has no alpha, so pick
       a fallback (black) and say so in the export sheet. Must work the same on WebGPU and
       WebGL2. Record the choice in DECISIONS.md.
+- [ ] Phone test (owner, 2026-10-30): selecting a locked item shows its dashed box only on the
+      top and bottom edges, not left and right. Spec (UI_VISION.md: "Locked items show a dashed
+      box without handles") wants all four sides. Not fixed yet, only recorded. Likely cause (to
+      check): the item spans the full frame width, so `.vu-selection-box[data-locked]`'s
+      `outline` (`editor.css`) is drawn outside the box and the stage's overflow clips the left
+      and right sides. Fix: draw the dash inside (`outline-offset` negative, or an inset
+      border) so it shows at the frame edges. Check unlocked full-width selections too.
 
 - [ ] Playground voice (Google): the newer speech models (3.x) read pace words out loud and
       take no instruction field, so the speed slider does nothing on them; only the 2.5 models
