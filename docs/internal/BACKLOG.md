@@ -179,6 +179,17 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       returns a wrong value (premultiplied alpha, colour space, or reading an empty/black
       frame before the picture is drawn); (3) the key tolerance is too wide for that colour.
       Reproduce with the same video on desktop and phone, log the picked hex on both.
+- [ ] User report (via owner, 2026-10-30): a HEIF/HEIC photo shared from an iPhone to an Android
+      phone can't be picked in the editor on Android. Not fixed yet, only recorded. Two parts
+      to check: (1) the picker — the file input's `accept`
+      (`'video/*,audio/*,image/*,.mov,.mkv,.heic,.heif,…'`, `VideoEditor.tsx` ~line 153) may
+      not let Android's picker select it (some pickers grey files out by extension/MIME; try
+      adding `image/heic,image/heif`, test the system picker and Google Photos), and a shared
+      file can arrive with no extension or a generic MIME; (2) decoding — Chrome on Android
+      generally can't decode HEIC, so `probe.ts` (~line 164) would reject it with "this browser
+      can't open yet". Real fix needs a HEIC decoder (lazy-loaded, in a worker, only when a
+      HEIC arrives; measure size/speed first — see the WASM rule in CLAUDE.md). That error
+      message is also hard-coded English, not a translatable label.
 
 - [ ] Playground voice (Google): the newer speech models (3.x) read pace words out loud and
       take no instruction field, so the speed slider does nothing on them; only the 2.5 models
