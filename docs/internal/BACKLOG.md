@@ -74,7 +74,8 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       text tokens are 11–13px (`--vu-text-xs/sm/md`, `tokens.css`) and the fields inherit them.
       Fix: fields at least 16px on phones (a phone token, via the `.vu-root` container query),
       not a `maximum-scale=1` viewport (that blocks zoom for people who need it, and host apps
-      own the viewport anyway).
+      own the viewport anyway). Owner confirmed the same when adding text from the Text tab:
+      it zooms in and the editor isn't in full view while typing.
 - [ ] Phone test (owner, 2026-10-30): Templates → pick one → "Add to video": the sheet stays
       open, so it's unclear what's left to do there and the added template can't be seen in
       the frame. Wanted: the sheet closes by itself after adding, showing the template on the
