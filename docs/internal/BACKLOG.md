@@ -59,9 +59,10 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [ ] Phone test (owner, 2026-10-30): the Filters grid also shows 4 per row on a phone; owner
       wants 3. Not fixed yet, only recorded. Same cause as the Templates entry above:
       `.vu-filter-grid` (`editor.css`) is `repeat(auto-fill, minmax(var(--vu-size-filter-tile),
-      1fr))` with `--vu-size-filter-tile: 72px`. Fix both together (a phone column count of 3),
-      and check the other 72px-ish auto-fill grids (stickers, shapes, caption presets, assets)
-      for the same look.
+      1fr))` with `--vu-size-filter-tile: 72px`. Fix both together (a phone column count of 3).
+      Owner's rule for phone grids: tiles with long text or a picture to judge (templates,
+      filters) → 3 per row; tiles with an emoji or a short word (stickers, emoji) → keep 4,
+      bigger would look oversized. Apply per grid, not one global count.
 - [ ] Phone test (owner, 2026-10-30): on-screen keyboard. After picking a template, the keyboard
       opens and the whole editor shifts up — the top part goes off screen and the text field
       being edited isn't kept in view, so editing is hard. Same everywhere a text field opens
