@@ -154,6 +154,12 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       instead of trimming; `timeline/view.ts` also draws the "+" over the handle. Fix: when the
       last clip is selected, push the "+" past the handle (or hide it while trimming) and test
       handles before the "+".
+- [ ] Phone test (owner, 2026-10-30): Sound effects sheet — too little space between the sound
+      look chips and the "Clean up noise" slider label under them; they feel stuck together.
+      Not fixed yet, only recorded. Cause (from the code): `.vu-soundfx` (`editor.css`) is a
+      column with `gap: var(--vu-space-3)` for everything, so the chip group → first slider
+      break is the same as slider → slider. Fix: a bigger gap after the chips (a section-gap
+      token, matching other sheets), not a raw value.
 
 - [ ] Playground voice (Google): the newer speech models (3.x) read pace words out loud and
       take no instruction field, so the speed slider does nothing on them; only the 2.5 models
