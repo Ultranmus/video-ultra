@@ -108,8 +108,9 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       keep the frame in view above the keyboard, and re-place the overlay on
       `visualViewport` resize/scroll.
 - [ ] Phone test (owner, 2026-10-30): Filters → Intensity slider. Dragging it sideways also
-      scrolls the sheet up/down, the two mix, and then the intensity jumps back to its old
-      value. Not fixed yet, only recorded. Cause (from the code): the ruler slider
+      starts a vertical scroll (owner: not the sheet's list moving up/down inside the sheet —
+      a vertical scroll of the view itself), the two mix, and then the intensity jumps back to
+      its old value. Not fixed yet, only recorded. Cause (from the code): the ruler slider
       (`.vu-ruler`, `editor.css`) has `touch-action: pan-y`, so any slightly diagonal swipe lets
       the browser take the gesture as a vertical scroll; it then fires `pointercancel`, and
       `onPointerCancel` in `controls.tsx` calls `onCancel` and reverts the value. Fix: once the
