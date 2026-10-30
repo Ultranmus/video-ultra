@@ -96,6 +96,17 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       `outline` (`editor.css`) is drawn outside the box and the stage's overflow clips the left
       and right sides. Fix: draw the dash inside (`outline-offset` negative, or an inset
       border) so it shows at the frame edges. Check unlocked full-width selections too.
+- [ ] Phone test (owner, 2026-10-30), bad one: double tap a text on the preview to edit it in
+      place → the page zooms and the keyboard opens, the frame shifts up, and the typing text
+      ends up drawn over the frame in the wrong place (not on top of the text it edits). Not
+      fixed yet, only recorded. Likely cause (to check): the in-place field (`textarea.vu-stage-text`
+      in `Stage.tsx`, an absolutely placed DOM overlay) gets its font size from the text's size
+      × preview scale, often under 16px, so iOS zooms on focus (same cause as the field-zoom
+      entry above); the zoom + keyboard pan move the frame, and the overlay's position isn't
+      re-measured, so it drifts off its text. Fix together with the keyboard and field-zoom
+      entries: no focus zoom (scale the field with a transform instead of a small font size),
+      keep the frame in view above the keyboard, and re-place the overlay on
+      `visualViewport` resize/scroll.
 
 - [ ] Playground voice (Google): the newer speech models (3.x) read pace words out loud and
       take no instruction field, so the speed slider does nothing on them; only the 2.5 models
