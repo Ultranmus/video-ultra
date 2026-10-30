@@ -24,6 +24,13 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       right edge (the row has only `--vu-space-1` right padding and no top/bottom padding),
       while the selected row draws a 2px inset `--vu-selection` ring and the root
       `:focus-visible` outline adds more, so field border, outline and row ring overlap.
+- [ ] Phone test (owner, 2026-10-30): with Layers open, picking Style in the bottom nav opens
+      Style, but the Layers button in the top bar still shows as pressed (selected). Not fixed
+      yet, only recorded. Likely cause (to check): `openTool` (`controller.ts`) sets `tool` but
+      leaves `sheetPanel: true`; the sheet hides the panel because a tool is open, but the top
+      bar's `layersOpen` (`shell.tsx`) checks only `panel === 'layers' && sheetPanel` and not
+      `!tool`. Same for the History button. Fix either side: clear `sheetPanel` when a tool
+      opens on phone, or add `!s.tool` to those two checks.
 
 - [ ] Playground voice (Google): the newer speech models (3.x) read pace words out loud and
       take no instruction field, so the speed slider does nothing on them; only the 2.5 models
