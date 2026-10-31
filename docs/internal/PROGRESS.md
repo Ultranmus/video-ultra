@@ -702,3 +702,10 @@ on the video shrank it, selection border jumping to the top left during touch dr
 full-height sheet, no auto keyboard. Open, need screenshots: filter tiles for emoji / text on
 the iPhone, the "[ ] highlighted region" on the frame lane. Checked in Chromium (iPhone 13
 viewport): grip live resize, templates sheet; lint, types, timeline unit tests.
+
+## 2026-10-31 (3) · Phone test 3 fixes
+
+Owner's third pass: text Edit sheet now covers the whole editor (#183); a tap on the phone ruler
+glides the playhead; a layer being renamed scrolls into view in the Layers list; locked box drawn
+with a border (Safari). Checked in Chromium (iPhone 13 viewport): cover sheet, locked box all
+four sides; lint, types.

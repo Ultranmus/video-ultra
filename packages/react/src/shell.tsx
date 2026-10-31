@@ -866,14 +866,18 @@ function Sheet({ tool, panel }: { tool: ToolId | null; panel: PanelId | null }):
   const ctl = useController();
   const l = useLabels();
   // Templates are pictures to judge and words to type: their sheet opens at full height (no
-  // move when the keyboard comes and goes, nothing to drag up first).
-  const fullFirst = !tool && panel === 'templates';
+  // move when the keyboard comes and goes, nothing to drag up first). Editing a text covers the
+  // whole editor, top bar and tab bar too (owner, 2026-10-31).
+  const cover = tool === 'text-edit';
+  const fullFirst = cover || (!tool && panel === 'templates');
   const [expanded, setExpanded] = useState(fullFirst);
   const shownKey = `${tool}|${panel}`;
   const [lastKey, setLastKey] = useState(shownKey);
   if (lastKey !== shownKey) {
     setLastKey(shownKey);
     if (fullFirst) setExpanded(true);
+    // Leaving the text edit cover for another tool: back to the usual open height.
+    else if (lastKey.startsWith('text-edit|')) setExpanded(false);
   }
   // Green screen "pick from video": the sheet steps down out of the way so the video can be
   // tapped, and comes back once the colour is picked (or picking stops).
@@ -889,15 +893,22 @@ function Sheet({ tool, panel }: { tool: ToolId | null; panel: PanelId | null }):
     const root = sheet?.closest<HTMLElement>('.vu-root');
     if (!sheet || !area || !root) return;
     const measure = () => {
-      const full = area.getBoundingClientRect().bottom - root.getBoundingClientRect().top;
-      sheet.style.setProperty('--vu-sheet-full', `${Math.max(0, Math.round(full))}px`);
+      const r = root.getBoundingClientRect();
+      const a = area.getBoundingClientRect();
+      // Covering: down to the editor's bottom too (over the tab bar).
+      const below = sheet.hasAttribute('data-cover') ? Math.max(0, r.bottom - a.bottom) : 0;
+      sheet.style.setProperty('--vu-sheet-below', `${Math.round(below)}px`);
+      sheet.style.setProperty(
+        '--vu-sheet-full',
+        `${Math.max(0, Math.round(a.bottom + below - r.top))}px`,
+      );
     };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(root);
     ro.observe(area);
     return () => ro.disconnect();
-  }, []);
+  }, [cover]);
   const entry = RAIL.find((r) => r.id === panel);
   const custom = ctl.options.customize?.panels?.find((p) => `custom:${p.id}` === panel);
   const title = tool
@@ -1015,6 +1026,7 @@ function Sheet({ tool, panel }: { tool: ToolId | null; panel: PanelId | null }):
       aria-label={title}
       data-expanded={expanded || undefined}
       data-picking={picking || undefined}
+      data-cover={cover || undefined}
     >
       <div
         className="vu-dock-head"
