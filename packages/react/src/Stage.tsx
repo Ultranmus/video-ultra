@@ -264,11 +264,25 @@ export function Stage(): ReactElement {
       entries.length === 1
         ? entries[0]!.box
         : boundsBox(unionBounds(entries.map((e) => boundsOf(e.box))));
-    const w = box.width * scale + pad * 2;
-    const h = box.height * scale + pad * 2;
+    let w = box.width * scale + pad * 2;
+    let h = box.height * scale + pad * 2;
+    let x = box.cx * scale - w / 2;
+    let y = box.cy * scale - h / 2;
+    // Locked (dashed, no handles): an upright box is kept inside the frame, so an item as wide
+    // or tall as the video (or bigger) still shows all four sides.
+    if (locked && box.rotation % 360 === 0) {
+      const fw = pw * scale;
+      const fh = ph * scale;
+      const left = Math.max(1, x);
+      const top = Math.max(1, y);
+      w = Math.max(0, Math.min(fw - 1, x + w) - left);
+      h = Math.max(0, Math.min(fh - 1, y + h) - top);
+      x = left;
+      y = top;
+    }
     el.style.width = `${w}px`;
     el.style.height = `${h}px`;
-    el.style.transform = `translate(${box.cx * scale - w / 2}px, ${box.cy * scale - h / 2}px) rotate(${box.rotation}deg)`;
+    el.style.transform = `translate(${x}px, ${y}px) rotate(${box.rotation}deg)`;
     // Member outlines (several only), reusing the elements already there.
     const need = entries.length > 1 ? entries.length : 0;
     while (outlines.children.length > need) outlines.lastElementChild!.remove();
@@ -405,7 +419,7 @@ export function Stage(): ReactElement {
       }),
     // placeBox reads refs only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [ctl, pw, ph],
+    [ctl, pw, ph, scale],
   );
 
   // A slider in the side panel previews without committing: the box follows it. The stage's own

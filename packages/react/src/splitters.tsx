@@ -279,14 +279,21 @@ function phoneHeight(root: HTMLElement, size: PhoneTimelineSize): number | null 
 /**
  * Phones: a grip on top of the play bar resizes the timeline — drag it down to leave only the
  * play bar (the video gets the room), up for more lanes; it snaps to minimal / normal / full on
- * release (or a tap steps through them; arrow keys too). While dragging only a transform moves
- * (no layout per move); the size is applied once on release and kept in this browser.
+ * release (or a tap steps through them; arrow keys too). While dragging, the height follows the
+ * finger through one CSS variable (no React render per move); the size is kept in this browser.
  */
 export function PhoneTimelineGrip(): ReactElement {
   const l = useLabels();
   const ref = useRef<HTMLDivElement>(null);
   const size = useRef<PhoneTimelineSize>('normal');
-  const drag = useRef<{ id: number; y: number; dy: number; moved: boolean } | null>(null);
+  const drag = useRef<{
+    id: number;
+    y: number;
+    dy: number;
+    moved: boolean;
+    start: number;
+    max: number;
+  } | null>(null);
   const root = () => ref.current?.closest<HTMLElement>('.vu-root') ?? null;
   const name = (s: PhoneTimelineSize) =>
     s === 'minimal' ? l.timelineMinimal : s === 'full' ? l.timelineFull : l.timelineNormal;
@@ -337,7 +344,6 @@ export function PhoneTimelineGrip(): ReactElement {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const bottom = () => root()?.querySelector<HTMLElement>('.vu-bottom') ?? null;
   const step = (by: number) => {
     const i = PHONE_SIZES.indexOf(size.current);
     apply(PHONE_SIZES[Math.max(0, Math.min(PHONE_SIZES.length - 1, i + by))]!, true);
@@ -358,7 +364,17 @@ export function PhoneTimelineGrip(): ReactElement {
         if (e.button > 0) return;
         e.preventDefault();
         e.currentTarget.setPointerCapture(e.pointerId);
-        drag.current = { id: e.pointerId, y: e.clientY, dy: 0, moved: false };
+        const r = root();
+        const area = r?.querySelector<HTMLElement>('.vu-timeline-area');
+        if (!r || !area) return;
+        drag.current = {
+          id: e.pointerId,
+          y: e.clientY,
+          dy: 0,
+          moved: false,
+          start: area.offsetHeight,
+          max: phoneHeight(r, 'full') ?? area.offsetHeight,
+        };
       }}
       onPointerMove={(e) => {
         const d = drag.current;
@@ -366,21 +382,16 @@ export function PhoneTimelineGrip(): ReactElement {
         d.dy = e.clientY - d.y;
         if (!d.moved && Math.abs(d.dy) < 6) return;
         d.moved = true;
-        // Follow the finger with a transform only (no layout until release).
-        const b = bottom();
-        if (b) {
-          b.dataset.resizing = '';
-          b.style.transform = `translateY(${Math.round(d.dy)}px)`;
-        }
+        const r = root();
+        if (!r) return;
+        // Up grows the lanes, down shrinks them, between the play bar only and "large".
+        const h = Math.max(0, Math.min(d.max, d.start - d.dy));
+        r.style.setProperty('--vu-timeline-phone-h', `${Math.round(h)}px`);
+        r.dataset.timelineSize = h < 1 ? 'minimal' : 'normal';
       }}
       onPointerUp={(e) => {
         const d = drag.current;
         drag.current = null;
-        const b = bottom();
-        if (b) {
-          delete b.dataset.resizing;
-          b.style.transform = '';
-        }
         if (!d || d.id !== e.pointerId) return;
         if (!d.moved) {
           // A tap: normal ↔ the last other size step (minimal from normal, back to normal).
@@ -389,24 +400,19 @@ export function PhoneTimelineGrip(): ReactElement {
         }
         // Where the drag ended picks the size: a clear flick down / up moves one step or two.
         const r = root();
-        const area = r?.querySelector<HTMLElement>('.vu-timeline-area');
-        if (!r || !area) return;
-        const now = area.offsetHeight - d.dy;
+        if (!r) return;
+        const now = Math.max(0, Math.min(d.max, d.start - d.dy));
         const options = PHONE_SIZES.map((s) => ({
           s,
-          h: s === 'normal' ? normalHeight(r) : (phoneHeight(r, s) ?? 0),
+          h: s === 'normal' ? normalHeight(r) : s === 'full' ? d.max : 0,
         }));
         let best = options[0]!;
         for (const o of options) if (Math.abs(o.h - now) < Math.abs(best.h - now)) best = o;
         apply(best.s, true);
       }}
       onPointerCancel={() => {
+        if (drag.current) apply(size.current, false);
         drag.current = null;
-        const b = bottom();
-        if (b) {
-          delete b.dataset.resizing;
-          b.style.transform = '';
-        }
       }}
       onKeyDown={(e) => {
         if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;

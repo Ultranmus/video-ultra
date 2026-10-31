@@ -94,7 +94,9 @@ function TemplateForm({
     let node = ref.current?.parentElement ?? null;
     while (node && node.scrollHeight <= node.clientHeight) node = node.parentElement;
     if (node) node.scrollTop = 0;
-    ref.current?.querySelector('input')?.focus({ preventScroll: true });
+    // Touch screens: no keyboard until the person taps a field (it would cover the preview).
+    if (!matchMedia('(pointer: coarse)').matches)
+      ref.current?.querySelector('input')?.focus({ preventScroll: true });
   }, []);
   return (
     <form

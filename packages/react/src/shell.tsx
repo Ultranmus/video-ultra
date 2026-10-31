@@ -865,7 +865,16 @@ export function Dock(): ReactElement | null {
 function Sheet({ tool, panel }: { tool: ToolId | null; panel: PanelId | null }): ReactElement {
   const ctl = useController();
   const l = useLabels();
-  const [expanded, setExpanded] = useState(false);
+  // Templates are pictures to judge and words to type: their sheet opens at full height (no
+  // move when the keyboard comes and goes, nothing to drag up first).
+  const fullFirst = !tool && panel === 'templates';
+  const [expanded, setExpanded] = useState(fullFirst);
+  const shownKey = `${tool}|${panel}`;
+  const [lastKey, setLastKey] = useState(shownKey);
+  if (lastKey !== shownKey) {
+    setLastKey(shownKey);
+    if (fullFirst) setExpanded(true);
+  }
   // Green screen "pick from video": the sheet steps down out of the way so the video can be
   // tapped, and comes back once the colour is picked (or picking stops).
   const picking = useUi((s) => s.picking !== null);

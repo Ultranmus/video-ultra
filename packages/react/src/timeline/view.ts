@@ -868,6 +868,13 @@ export class TimelineView {
         if (!drag.axis) {
           if (Math.max(Math.abs(dx), Math.abs(dy)) < AXIS_LOCK_PX) return;
           drag.axis = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y';
+          // Start from here: the dead zone's few pixels don't jump in at once.
+          drag.x = p.x;
+          drag.y = p.y;
+          drag.time = this.#ctl.playhead.time;
+          drag.scrollX = this.#scrollX;
+          drag.scrollY = this.#scrollY;
+          return;
         }
         drag.samples.push({ x: p.x, y: p.y, t: performance.now() });
         if (drag.samples.length > 5) drag.samples.shift();
@@ -1585,13 +1592,13 @@ export class TimelineView {
     // "+" add media.
     const last = items[items.length - 1];
     const end = last ? itemEnd(last) : 0;
-    // A selected end clip's trim handle keeps its room: the "+" moves out past it.
+    // Always past where a trim handle goes, so the "+" never moves when a clip is selected.
     const handle = this.#m.trimHandle;
-    const add = addButtonRect(row, scale, end, last && trimId === last.id ? handle : 0);
+    const add = addButtonRect(row, scale, end, handle);
     this.#drawAdd(add);
     // Phones: a "+" before the first clip too, so the start isn't half an empty screen.
     if (this.#phone && items.length > 0) {
-      const first = addStartRect(row, scale, trimId === items[0]!.id ? handle : 0);
+      const first = addStartRect(row, scale, handle);
       if (first.x + first.size > 0) this.#drawAdd(first);
     }
     const cy = add.y + add.size / 2;

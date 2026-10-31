@@ -194,7 +194,7 @@ export function addButtonRect(
   row: Row,
   scale: TimeScale,
   end: Time,
-  /** The last clip is selected: its end trim handle's width, so the "+" sits clear of it. */
+  /** Room for the end clip's trim handle, so the "+" never sits on it. */
   handle = 0,
 ): { x: number; y: number; size: number } {
   const size = Math.min(row.height - 8, 40);
@@ -208,7 +208,7 @@ export function addButtonRect(
 export function addStartRect(
   row: Row,
   scale: TimeScale,
-  /** The first clip is selected: its start trim handle's width, so the "+" sits clear of it. */
+  /** Room for the first clip's trim handle, so the "+" never sits on it. */
   handle = 0,
 ): { x: number; y: number; size: number } {
   const size = Math.min(row.height - 8, 40);
@@ -273,12 +273,11 @@ export function hitTest(
       }
       if (row.track.kind === 'main') {
         const last = items[items.length - 1];
-        const endHandle = selected && selected === last ? m.trimHandle : 0;
-        const add = addButtonRect(row, scale, last ? itemEnd(last) : 0, endHandle);
+        // Always past where the end clip's trim handle goes, so it never moves on selection.
+        const add = addButtonRect(row, scale, last ? itemEnd(last) : 0, m.trimHandle);
         if (x >= add.x && x <= add.x + add.size && y >= add.y && y <= add.y + add.size)
           return { type: 'add', row };
-        const startHandle = selected && at === 0 ? m.trimHandle : 0;
-        const first = startAdd && items.length > 0 ? addStartRect(row, scale, startHandle) : null;
+        const first = startAdd && items.length > 0 ? addStartRect(row, scale, m.trimHandle) : null;
         if (
           first &&
           x >= first.x &&

@@ -690,3 +690,15 @@ viewport — no real phone here). DECISIONS #174–#180.
 - Checks: core 525 + react 24 unit tests pass; templates-check, protrim-check, soundfx-check
   all passed; stage-text-check desktop all passed (phone part: see BACKLOG); editor-check
   phone + desktop load, import and play.
+
+## 2026-10-31 (2) · Phone test 2 fixes
+
+Owner's second iPhone pass of the 10-31 build. Confirmed fixed: layers, opacity & blend,
+sliders, align, camera review buttons, sound effects spacing, tooltips. Fixed now (DECISIONS
+#181–#182, BACKLOG "Phone test 2"): typing broke the layout (keyboard handling redone), typing
+on the video shrank it, selection border jumping to the top left during touch drags / pinches
+(stale scale), locked box sides, grip resizes live without moving the tab bar, lane scroll jump,
+"+" no longer moves, green screen hint full width + clearer grey message, templates 2 a row,
+full-height sheet, no auto keyboard. Open, need screenshots: filter tiles for emoji / text on
+the iPhone, the "[ ] highlighted region" on the frame lane. Checked in Chromium (iPhone 13
+viewport): grip live resize, templates sheet; lint, types, timeline unit tests.
