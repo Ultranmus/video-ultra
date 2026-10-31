@@ -248,9 +248,15 @@ function singleTools(
   const animate: ToolEntry[] = onMain
     ? []
     : [{ key: 'animate', icon: 'sparkle', label: l.animate, tip: l.tipAnimate, tool: 'animate' }];
-  const opacity: ToolEntry[] = onMain
-    ? []
-    : [{ key: 'opacity', icon: 'opacity', label: l.opacity, tip: l.tipOpacity, tool: 'opacity' }];
+  // Opacity and blend share one tool (and sheet); a blurred area has opacity only.
+  const opacityBlend: ToolEntry = {
+    key: 'opacity',
+    icon: 'opacity',
+    label: l.opacityBlend,
+    tip: l.tipOpacity,
+    tool: 'opacity',
+  };
+  const opacity: ToolEntry[] = onMain ? [] : [opacityBlend];
   // v0.2 C. Picture tools
   const greenScreen: ToolEntry = {
     key: 'key',
@@ -306,9 +312,6 @@ function singleTools(
           },
         ]
       : [];
-  const blend: ToolEntry[] = onMain
-    ? []
-    : [{ key: 'blend', icon: 'blend', label: l.blend, tip: l.tipBlend, tool: 'blend' }];
   switch (item.kind) {
     case 'video':
       return [
@@ -354,7 +357,6 @@ function singleTools(
         ...animate,
         ...keyframes,
         ...opacity,
-        ...blend,
         arrange,
         duplicate,
         remove,
@@ -373,7 +375,6 @@ function singleTools(
         ...animate,
         ...keyframes,
         ...opacity,
-        ...blend,
         arrange,
         duplicate,
         remove,
@@ -437,8 +438,7 @@ function singleTools(
         look[1]!,
         { key: 'transform', icon: 'rotate', label: l.rotate, tip: l.tipRotate, tool: 'transform' },
         ...keyframes,
-        { key: 'opacity', icon: 'opacity', label: l.opacity, tip: l.tipOpacity, tool: 'opacity' },
-        ...blend,
+        opacityBlend,
         arrange,
         split,
         duplicate,
@@ -452,8 +452,7 @@ function singleTools(
         look[1]!,
         { key: 'transform', icon: 'rotate', label: l.rotate, tip: l.tipRotate, tool: 'transform' },
         ...keyframes,
-        { key: 'opacity', icon: 'opacity', label: l.opacity, tip: l.tipOpacity, tool: 'opacity' },
-        ...blend,
+        opacityBlend,
         arrange,
         split,
         duplicate,

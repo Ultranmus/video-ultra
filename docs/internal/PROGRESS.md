@@ -658,3 +658,35 @@ merged and re-verified on main; A (captions) and E (layers) here.
 - Newer models answer a whole WAV with a C2PA chunk after the sound, which played as noise at
   the end: only the `data` chunk is kept now.
 - Owner: text to speech works on the live site.
+
+## 2026-10-31 · Phone pass fixes (owner's 10-30 phone test, 27 notes)
+
+Pushed to main for the owner's phone test (cloud session; checked in Chromium with an iPhone 13
+viewport — no real phone here). DECISIONS #174–#180.
+
+- Zoom: text fields ≥ 16 px on touch screens (no iOS focus zoom); the on-stage text field
+  scales instead of a small font; a zoomed page lets pinches through so it zooms back (#174).
+- Keyboard: the editor stays put (root follows iOS's pan), the sheet sits on the keyboard, no
+  taller than the room, the field scrolled into view; typing on the video shrinks the video
+  above the keyboard (#175).
+- Text drag on touch: the selection frame moves when the engine has drawn the move (#176).
+- Green screen: sheet goes down while picking; taps outside the picture don't pick; a colour
+  that would remove > 85 % of the picture is refused — the key ignores brightness, so black /
+  grey picks removed most of it (#177). Checked: green bar removes only green; letterbox tap.
+- Opacity & blend: one phone tool, blend modes as preview tiles (#178).
+- Phone timeline grip: play bar only / normal / large; tap folds it (#179).
+- Sheets: template / sticker / library-media adds close the phone sheet; templates and filters
+  3 a row (#180). Chip rows run edge to edge. Layers / History buttons no longer stay pressed
+  under a tool sheet.
+- Sliders: a sideways first move keeps the browser from scrolling; a cancel after a real drag
+  keeps the value. Timeline: vertical fling + 6 px axis dead zone; the "+" moves past a
+  selected clip's trim handle (unit test).
+- Small: submenu gap + hover only on real pointers, layer rename spacing, camera review buttons
+  same height, locked dashed box on all four sides, Sound effects spacing, phone tooltips wide,
+  Fine trim says what Slip / Move cut / Slide do, Rotate eases (180 ms).
+- HEIF: picker lists HEIC/HEIF types; `mif1` files told apart (AVIF opens); message names HEIF.
+- Not done: transparent background (needs alpha export — owner's choice in BACKLOG), a picture's
+  mirror flip and canvas-size animation, HEIC decoding on Android.
+- Checks: core 525 + react 24 unit tests pass; templates-check, protrim-check, soundfx-check
+  all passed; stage-text-check desktop all passed (phone part: see BACKLOG); editor-check
+  phone + desktop load, import and play.

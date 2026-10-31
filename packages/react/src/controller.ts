@@ -19,6 +19,7 @@ import {
   transformAt,
   applyTemplate,
   type TemplatePreset,
+  type Transform,
   type CopiedItem,
   EditError,
   findItem,
@@ -227,6 +228,11 @@ async function svgToPng(file: File): Promise<File> {
   }
 }
 
+/** Green screen pick: refuse a colour that would remove more than this share of the picture. */
+const PICK_COVERS_MAX = 0.85;
+
+/** How long a quarter turn eases on the video (ms). */
+const TURN_MS = 180;
 export class EditorController {
   readonly editor: Editor;
   readonly ui = createUiStore();
@@ -249,6 +255,7 @@ export class EditorController {
   #previewProject: Project | null = null;
   #previewScheduled = false;
   readonly #previewListeners = new Set<(project: Project | null) => void>();
+  readonly #drawnListeners = new Set<(project: Project) => void>();
   #toastId = 0;
   #autosave: { flush(): Promise<void>; detach(): void } | null = null;
   /** Bumped by stop(); async work from an older start() checks it and backs out. */
@@ -848,7 +855,13 @@ export class EditorController {
       this.#previewScheduled = false;
       const shown = this.#previewProject;
       if (!shown) return;
-      void this.engine?.setProject(shown).catch(() => {});
+      void this.engine
+        ?.setProject(shown)
+        .then(() => {
+          // Only while this preview is still the one shown (not after the drag ended).
+          if (this.#previewProject) for (const fn of this.#drawnListeners) fn(shown);
+        })
+        .catch(() => {});
       for (const fn of this.#previewListeners) fn(shown);
     });
     return this.#previewProject;
@@ -861,6 +874,59 @@ export class EditorController {
   onPreview(fn: (project: Project | null) => void): () => void {
     this.#previewListeners.add(fn);
     return () => this.#previewListeners.delete(fn);
+  }
+
+  #turning: { id: number; finish: () => void } | null = null;
+
+  /**
+   * Turns an item from `from` to `to` (a quarter turn, a mirror-turn) with a short ease on the
+   * video — previews only, view-only — then commits one edit. Reduced motion: at once. A second
+   * turn while one runs finishes the first at once.
+   */
+  turnItem(label: string, itemId: string, time: Time, from: Transform, to: Transform): void {
+    this.#turning?.finish();
+    const reduce =
+      typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const commit = () => this.run(label, (d) => setTransformAt(d, itemId, to, time));
+    if (reduce || from.rotation === to.rotation) {
+      commit();
+      return;
+    }
+    // The short way round (−180…180 wraps).
+    let delta = to.rotation - from.rotation;
+    if (delta > 180) delta -= 360;
+    else if (delta < -180) delta += 360;
+    const start = performance.now();
+    const step = (now: number) => {
+      const k = Math.min(1, (now - start) / TURN_MS);
+      if (k >= 1) {
+        this.#turning = null;
+        commit();
+        return;
+      }
+      const e = 1 - (1 - k) ** 3;
+      const rotation = from.rotation + delta * e;
+      this.preview((d) => setTransformAt(d, itemId, { ...to, rotation }, time));
+      turning.id = requestAnimationFrame(step);
+    };
+    const turning = {
+      id: requestAnimationFrame(step),
+      finish: () => {
+        cancelAnimationFrame(turning.id);
+        this.#turning = null;
+        commit();
+      },
+    };
+    this.#turning = turning;
+  }
+
+  /**
+   * A preview is on screen: the engine has drawn a frame with it (the stage moves its own
+   * selection frame then on touch, so frame and picture move together).
+   */
+  onPreviewDrawn(fn: (project: Project) => void): () => void {
+    this.#drawnListeners.add(fn);
+    return () => this.#drawnListeners.delete(fn);
   }
 
   // ── editing ────────────────────────────────────────────────────────────
@@ -1310,7 +1376,8 @@ export class EditorController {
       });
       return;
     }
-    const open = s.panel === id && s.sheetPanel;
+    // A tool sheet covers the panel: the panel only counts as open when no tool is.
+    const open = s.panel === id && s.sheetPanel && !s.tool;
     this.ui.setState({ panel: id, sheetPanel: !open, tool: null, layersSelecting: false });
   }
 
@@ -1329,7 +1396,12 @@ export class EditorController {
   }
 
   openTool(tool: ToolId | null): void {
-    this.ui.setState({ tool: this.ui.getState().tool === tool ? null : tool });
+    const s = this.ui.getState();
+    const next = s.tool === tool ? null : tool;
+    // Phones: a tool sheet replaces the Layers / History sheet (the top bar stops showing it on).
+    this.ui.setState(
+      s.layout === 'phone' && next ? { tool: next, sheetPanel: false } : { tool: next },
+    );
   }
 
   openPanel(panel: PanelId | null): void {
@@ -1684,6 +1756,7 @@ export class EditorController {
     );
     if (!ids?.length) return;
     this.ui.setState({ selectedId: ids[ids.length - 1]!, selectedIds: ids, tool: null });
+    this.#closeSheetOnPhone();
     // Entrances start invisible: show the template once it's in.
     this.seek(at + Math.min(fromSeconds(1.2), fromSeconds(template.duration / 2)));
     this.toast(this.labels.templateAdded, 'success', {
@@ -1698,7 +1771,18 @@ export class EditorController {
       addToLane(d, item, ctx.ids);
       return item.id;
     });
-    if (id) this.select(id);
+    if (id) {
+      this.select(id);
+      this.#closeSheetOnPhone();
+    }
+  }
+
+  /**
+   * Phones: an add from a sheet (template, text, sticker, media) closes the sheet, so the new item
+   * shows on the video, selected and ready to edit.
+   */
+  #closeSheetOnPhone(): void {
+    if (this.ui.getState().layout === 'phone') this.ui.setState({ sheetPanel: false, tool: null });
   }
 
   // ── media ──────────────────────────────────────────────────────────────
@@ -1907,6 +1991,7 @@ export class EditorController {
         insertMain(d, visualItem(asset, ctx.ids()), under === -1 ? main.length : under + 1);
       }
     });
+    this.#closeSheetOnPhone();
   }
 
   dismissImport(rowId: string): void {
@@ -2027,11 +2112,18 @@ export class EditorController {
     this.ui.setState({ picking: null });
     const engine = this.engine;
     if (!itemId || !engine) return;
-    const color = await engine.pickColour(itemId, this.playhead.time, x, y).catch(() => null);
-    if (!color) {
+    const picked = await engine.pickColour(itemId, this.playhead.time, x, y).catch(() => null);
+    if (!picked) {
       this.toast(l.pickMissed, 'info');
       return;
     }
+    // A colour that would remove (nearly) the whole picture is a missed tap — a grey, black or
+    // white spot, or a frame not drawn yet: keep the old colour and say what to tap.
+    if (picked.covers > PICK_COVERS_MAX) {
+      this.toast(l.pickTooMuch, 'info');
+      return;
+    }
+    const color = picked.color;
     const item = findItem(this.project, itemId)?.item;
     if (!isPicture(item)) return;
     this.run(l.greenScreen, (d) =>

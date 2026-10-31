@@ -8,7 +8,7 @@ import {
   type Item,
 } from '@video-ultra/core';
 import type { ReactElement } from 'react';
-import { useController, useLabels, useProject } from './context';
+import { useController, useLabels, useProject, useUi } from './context';
 import { EditSlider, IconButton } from './controls';
 
 /**
@@ -20,6 +20,7 @@ export function ProTrimTool({ item }: { item: Item }): ReactElement {
   const ctl = useController();
   const l = useLabels();
   const frame = useProject((p) => projectFrame(p));
+  const desktop = useUi((s) => s.layout === 'desktop');
   const neighbours = useProject((p) => {
     const found = findItem(p, item.id);
     if (!found) return { next: false, slide: false };
@@ -33,41 +34,61 @@ export function ProTrimTool({ item }: { item: Item }): ReactElement {
   });
   const asset = 'assetId' in item && item.assetId ? ctl.project.assets[item.assetId] : undefined;
   const media = (item.kind === 'video' || item.kind === 'audio') && asset;
-  const step = (label: string, run: (delta: number) => void) => (
-    <div className="vu-protrim-row">
-      <span>{label}</span>
-      <span className="vu-protrim-steps">
-        <IconButton icon="back" label={l.earlier(label)} onClick={() => run(-frame)} />
-        <IconButton icon="next" label={l.later(label)} onClick={() => run(frame)} />
-      </span>
+  const slipMax =
+    (item.kind === 'video' || item.kind === 'audio') && asset
+      ? Math.max(0, asset.duration - item.duration * item.speed)
+      : 0;
+  // Each control says what it does in plain words (phones have no shortcut hint to learn from).
+  const step = (label: string, explain: string, run: (delta: number) => void) => (
+    <div className="vu-protrim-item">
+      <div className="vu-protrim-row">
+        <span>{label}</span>
+        <span className="vu-protrim-steps">
+          <IconButton icon="back" label={l.earlier(label)} onClick={() => run(-frame)} />
+          <IconButton icon="next" label={l.later(label)} onClick={() => run(frame)} />
+        </span>
+      </div>
+      <p className="vu-hint">{explain}</p>
     </div>
   );
   return (
     <div className="vu-protrim">
-      {media ? (
-        <EditSlider
-          label={l.slipClip}
-          value={item.sourceIn / FLICKS_PER_SECOND}
-          min={0}
-          max={Math.max(0, (asset.duration - item.duration * item.speed) / FLICKS_PER_SECOND)}
-          step={0.01}
-          format={(v) => `${v.toFixed(2)} s`}
-          recipe={(d, v) => {
-            const now = findItem(d, item.id)?.item;
-            if (now && (now.kind === 'video' || now.kind === 'audio'))
-              slipItem(d, item.id, (v * FLICKS_PER_SECOND - now.sourceIn) / now.speed);
-          }}
-          commitLabel={l.slipClip}
-          coalesceKey={`slip:${item.id}`}
-        />
+      {media && slipMax > 0 ? (
+        <div className="vu-protrim-item">
+          <EditSlider
+            label={l.slipClip}
+            value={item.sourceIn / FLICKS_PER_SECOND}
+            min={0}
+            max={slipMax / FLICKS_PER_SECOND}
+            step={0.01}
+            format={(v) => `${v.toFixed(2)} s`}
+            recipe={(d, v) => {
+              const now = findItem(d, item.id)?.item;
+              if (now && (now.kind === 'video' || now.kind === 'audio'))
+                slipItem(d, item.id, (v * FLICKS_PER_SECOND - now.sourceIn) / now.speed);
+            }}
+            commitLabel={l.slipClip}
+            coalesceKey={`slip:${item.id}`}
+          />
+          <p className="vu-hint">{item.kind === 'audio' ? l.slipExplainSound : l.slipExplain}</p>
+        </div>
+      ) : media ? (
+        <p className="vu-hint">{l.slipNoRoom}</p>
       ) : null}
       {neighbours.next
-        ? step(l.rollCut, (delta) => ctl.run(l.rollCut, (d) => rollEdit(d, item.id, delta)))
+        ? step(l.rollCut, l.rollExplain, (delta) =>
+            ctl.run(l.rollCut, (d) => rollEdit(d, item.id, delta)),
+          )
         : null}
       {neighbours.slide
-        ? step(l.slideClip, (delta) => ctl.run(l.slideClip, (d) => slideItem(d, item.id, delta)))
+        ? step(l.slideClip, l.slideExplain, (delta) =>
+            ctl.run(l.slideClip, (d) => slideItem(d, item.id, delta)),
+          )
         : null}
-      <p className="vu-hint">{l.proTrimHint}</p>
+      {!media && !neighbours.next && !neighbours.slide ? (
+        <p className="vu-hint">{l.proTrimNothing}</p>
+      ) : null}
+      {desktop ? <p className="vu-hint">{l.proTrimHint}</p> : null}
     </div>
   );
 }

@@ -55,14 +55,16 @@ in both themes at phone and desktop sizes (`scripts/a11y-check.ts`).
 
 ## Non-colour tokens
 
-Same scale as image-ultra: `--vu-text-xs…xl` (11–16px), `--vu-weight-*`, `--vu-space-1…8`
+Same scale as image-ultra: `--vu-text-xs…xl` (11–16px; text fields on touch screens never go under
+`--vu-text-field-touch` 16px, #174), `--vu-weight-*`, `--vu-space-1…8`
 (4–40px), `--vu-radius-sm/md/lg/full`, `--vu-duration-fast/base/slow`, `--vu-ease`,
 `--vu-size-touch` (40px), `--vu-z-overlay/popover/toast/tooltip` (tooltip on top of everything, popovers included).
 
 Video-specific sizes: `--vu-size-topbar` 48px, `--vu-size-rail` 72px, `--vu-size-panel` 280px,
 `--vu-size-inspector` 280px, `--vu-size-toolbar` 64px, `--vu-size-track` 48px (main track 56px:
 `--vu-size-track-main`), `--vu-size-ruler` 24px, `--vu-size-trim-handle` 12px (touch: 20px),
-`--vu-size-timeline` 248px (phone: `--vu-size-timeline-phone` 184px), `--vu-size-transport` 48px,
+`--vu-size-timeline` 248px (phone: `--vu-size-timeline-phone` 184px, or the size picked with
+the grip: `--vu-timeline-phone-h`, set by the editor), `--vu-size-transport` 48px,
 `--vu-size-sheet` 360px (max), `--vu-size-tool` 56px, `--vu-size-handle` 12px (touch 18px),
 `--vu-size-min-height` 480px, plus control sizes (`--vu-size-choice-lg`, `-preset`,
 `-preset-tile`, `-asset`, `-swatch`, `-slider-track`, `-slider-thumb`, `-toast`, `-modal`) and
@@ -98,3 +100,6 @@ more`) sets `data-vu-contrast` on `.vu-root`. High contrast redefines the colour
   choices 36 px, touch targets 48 px, tracks 52 / 64 px, slider thumbs 24 px, layer rows 56 px),
   also with a mouse. `density="compact"` keeps mouse sizes on touch screens. `auto` (default):
   touch sizes when the primary pointer is coarse.
+
+Blend tiles (#178): `--vu-blend-under` (the colour ramp under the dot) and `--vu-blend-over` (the
+dot).

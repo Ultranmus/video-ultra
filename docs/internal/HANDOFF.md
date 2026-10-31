@@ -2,6 +2,16 @@
 
 Where the last session stopped and what comes next. Update before ending every session.
 
+## 2026-10-31 — phone pass fixes pushed (owner to test on the phones)
+
+The owner's 10-30 phone notes (BACKLOG, 27) are fixed and pushed to main (Vercel deploys it):
+see PROGRESS 2026-10-31 and DECISIONS #174–#180. Done in a cloud session without a real phone:
+**the owner checks them on the iPhone, then Android.** Most worth checking: keyboard (template
+words, Text tab, typing on the video), no zoom anywhere, text drag (frame and text together),
+green screen pick on the same video as before, the timeline grip (tap / drag on the bar's top),
+Opacity & blend tiles, chip rows lining up. Not done: transparent background (owner's choice
+needed, BACKLOG), mirror-flip / canvas-size animation, HEIC on Android.
+
 ## 2026-10-28 — live playground voice + captions fixed (pushed)
 
 Text to speech and service captions work on https://video-ultra-playground.vercel.app/editor

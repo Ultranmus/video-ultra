@@ -333,10 +333,10 @@ export function Stage(): ReactElement {
     const typed = { ...item, text: field.value || ' ' };
     const box = itemBox(typed, ctl.project, pw, ph, measure, ctl.playhead.time);
     if (!box) return;
-    placeTextField(field, typed, box, pw, ph, scale, ctl.playhead.time);
+    const shown = placeTextField(field, typed, box, pw, ph, scale, ctl.playhead.time);
     // The selection frame stays (without handles) and grows with the typing.
-    const w = parseFloat(field.style.width) / (scale || 1);
-    const h = parseFloat(field.style.height) / (scale || 1);
+    const w = shown.width / (scale || 1);
+    const h = shown.height / (scale || 1);
     placeBox([{ item: typed, box: { ...box, width: w, height: h } }], false);
   };
 
@@ -387,6 +387,26 @@ export function Stage(): ReactElement {
   // ── gestures ─────────────────────────────────────────────────────────
 
   const drag = useRef<StageDrag | null>(null);
+  const touchDrag = useRef(false);
+
+  // Touch: the engine draws the dragged item a frame or more after the finger moves (more on a
+  // phone), while the selection frame is ours and could move at once — the two came apart. On
+  // touch the frame moves when the engine says the picture with the move is on screen.
+  useEffect(
+    () =>
+      ctl.onPreviewDrawn((project) => {
+        const d = drag.current;
+        if (!d || !touchDrag.current || editing.current) return;
+        const items = ctl
+          .selectedItems()
+          .map((i) => findItem(project, i.id)?.item)
+          .filter((i): i is Item => !!i);
+        if (items.length > 0) placeBox(boxesAt(project, items, ctl.playhead.time), false);
+      }),
+    // placeBox reads refs only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [ctl, pw, ph],
+  );
 
   // A slider in the side panel previews without committing: the box follows it. The stage's own
   // drags place the box themselves.
@@ -481,7 +501,7 @@ export function Stage(): ReactElement {
         .map((i) => findItem(project, i.id)?.item)
         .filter((i): i is Item => !!i);
       const entries = boxesAt(project, items, ctl.playhead.time);
-      placeBox(entries, false);
+      if (!touchDrag.current) placeBox(entries, false);
     }
   };
 
@@ -499,6 +519,8 @@ export function Stage(): ReactElement {
   const stretched = useRef<{ width: number; height: number; transform: Transform } | null>(null);
 
   const onPointerDown = (e: React.PointerEvent) => {
+    // Touch drags move the selection frame with the drawn picture (see onPreviewDrawn below).
+    if (e.isPrimary) touchDrag.current = e.pointerType !== 'mouse';
     if (scale === 0 || e.button > 0) return;
     // A new gesture (the first finger down, or any mouse press): anything left from an earlier
     // one is stale. iOS can end a touch without telling us (a menu appears under the finger,
@@ -517,8 +539,17 @@ export function Stage(): ReactElement {
       drag.current = null;
     }
     // Green screen "pick from video": this tap picks the colour.
-    if (ctl.ui.getState().picking) {
+    const pickingFor = ctl.ui.getState().picking;
+    if (pickingFor) {
       const p = toCanvas(e);
+      // Only a tap on the picture itself picks (outside it there's only the background — black
+      // would remove nearly every dark or grey part); picking goes on for another tap.
+      const item = findItem(ctl.project, pickingFor)?.item;
+      const box = item ? itemBox(item, ctl.project, pw, ph, measure, ctl.playhead.time) : null;
+      if (!box || !boxContains(box, p.x, p.y)) {
+        ctl.toast(l.pickMissed, 'info');
+        return;
+      }
       void ctl.pickKeyColour(p.x / pw, p.y / ph);
       return;
     }
@@ -819,7 +850,8 @@ export function Stage(): ReactElement {
       stretched.current = next;
       const project = ctl.preview((draft) => updateItem(draft, d.itemId, next));
       const item = project ? findItem(project, d.itemId)?.item : null;
-      if (project && item) placeBox(boxesAt(project, [item], ctl.playhead.time), false);
+      if (project && item && !touchDrag.current)
+        placeBox(boxesAt(project, [item], ctl.playhead.time), false);
       return;
     }
     if (d.type === 'move') {

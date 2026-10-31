@@ -120,7 +120,7 @@ type Drag =
       scrollX: number;
       scrollY: number;
       axis: 'x' | 'y' | null;
-      samples: { x: number; t: number }[];
+      samples: { x: number; y: number; t: number }[];
     }
   | {
       type: 'trim';
@@ -175,6 +175,8 @@ const DRAG_SLOP = 5;
 /** How long lanes take to slide to new places (Layers restack, lanes added or removed). */
 const ROW_SLIDE_MS = 180;
 const TOUCH_SLOP = 8;
+/** Touch pan: how far the finger goes before the pan picks one direction for the gesture. */
+const AXIS_LOCK_PX = 6;
 const FLASH_MS = 700;
 /** Wheel events this close together belong to one gesture (one axis). */
 const WHEEL_GESTURE_MS = 220;
@@ -861,15 +863,19 @@ export class TimelineView {
       case 'pan': {
         const dx = p.x - drag.x;
         const dy = p.y - drag.y;
-        // Lock to one axis for the whole gesture.
-        drag.axis ??= Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y';
+        // Lock to one axis for the whole gesture, once the finger has clearly gone one way (a
+        // slightly sideways start of a vertical scroll mustn't turn into a seek).
+        if (!drag.axis) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) < AXIS_LOCK_PX) return;
+          drag.axis = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y';
+        }
+        drag.samples.push({ x: p.x, y: p.y, t: performance.now() });
+        if (drag.samples.length > 5) drag.samples.shift();
         if (drag.axis === 'y') {
           this.#scrollY = Math.min(this.#maxScrollY(), Math.max(0, drag.scrollY - dy));
           this.invalidate();
           return;
         }
-        drag.samples.push({ x: p.x, t: performance.now() });
-        if (drag.samples.length > 5) drag.samples.shift();
         if (this.#phone) {
           this.#ctl.seek(drag.time - (dx / this.#pps) * FLICKS_PER_SECOND);
         } else {
@@ -961,7 +967,8 @@ export class TimelineView {
         }
         break;
       case 'pan':
-        if (this.#phone && drag.axis === 'x') this.#fling(drag.samples);
+        if (drag.axis === 'y' && this.#touch) this.#flingY(drag.samples);
+        else if (this.#phone && drag.axis === 'x') this.#fling(drag.samples);
         break;
       case 'trim': {
         this.#ghost = null;
@@ -1139,6 +1146,30 @@ export class TimelineView {
     this.#setSnap(null);
     this.#canvas.style.cursor = '';
     if (this.#ghost) this.#cancelPreview();
+  }
+
+  /** Touch: the lanes keep scrolling up/down after a flick, slowing down like a native list. */
+  #flingY(samples: { y: number; t: number }[]): void {
+    if (samples.length < 2) return;
+    const a = samples[0]!;
+    const b = samples[samples.length - 1]!;
+    const dt = b.t - a.t;
+    if (dt <= 0 || performance.now() - b.t > 80) return;
+    let v = (b.y - a.y) / dt; // px per ms, finger direction
+    let last = performance.now();
+    const step = () => {
+      const now = performance.now();
+      const ms = now - last;
+      last = now;
+      v *= Math.pow(0.995, ms);
+      const next = Math.min(this.#maxScrollY(), Math.max(0, this.#scrollY - v * ms));
+      // Stops at the ends and when slow.
+      if (Math.abs(v) < 0.02 || next === this.#scrollY) return;
+      this.#scrollY = next;
+      this.invalidate();
+      this.#momentum = requestAnimationFrame(step);
+    };
+    this.#momentum = requestAnimationFrame(step);
   }
 
   /** Phone: keep scrolling a little after a quick flick. */
@@ -1554,11 +1585,13 @@ export class TimelineView {
     // "+" add media.
     const last = items[items.length - 1];
     const end = last ? itemEnd(last) : 0;
-    const add = addButtonRect(row, scale, end);
+    // A selected end clip's trim handle keeps its room: the "+" moves out past it.
+    const handle = this.#m.trimHandle;
+    const add = addButtonRect(row, scale, end, last && trimId === last.id ? handle : 0);
     this.#drawAdd(add);
     // Phones: a "+" before the first clip too, so the start isn't half an empty screen.
     if (this.#phone && items.length > 0) {
-      const first = addStartRect(row, scale);
+      const first = addStartRect(row, scale, trimId === items[0]!.id ? handle : 0);
       if (first.x + first.size > 0) this.#drawAdd(first);
     }
     const cy = add.y + add.size / 2;

@@ -1208,3 +1208,42 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       the editor's own zoom — the video and the timeline handle it first, as before — and
       elsewhere nothing. Page zoom with the keyboard (⌘ + / ⌘ −) still works for anyone who
       needs larger text (WCAG resize), and plain scrolling is untouched.
+174.  **Phone pass 2026-10-30: no focus zoom, and a zoomed page can always zoom back** (owner).
+      iOS zooms the page when a field under 16 px gets focus; our text sizes are 11–13 px. On
+      touch screens (`pointer: coarse`) every text field is at least `--vu-text-field-touch`
+      (16 px). The on-stage text field keeps its exact look by laying out at 16 px and scaling
+      down with a transform. Not `maximum-scale=1`: that blocks zoom for people who need it, and
+      the host owns the viewport. If the page does get zoomed (accessibility zoom, older host
+      page), `data-page-zoomed` lets pinches through everywhere in the editor (refines #173),
+      so it can be zoomed back out.
+175.  **The on-screen keyboard keeps the editor in place** (owner, 2026-10-30). iOS pans the
+      page to show a focused field and ignores `interactive-widget`. While a field in the
+      editor has focus: the root moves down by the pan (`top`, not a transform, so the fixed
+      tooltip keeps its place), the bottom area rises so the sheet sits right on the keyboard
+      (`--vu-keyboard-lift`), the sheet is no taller than the room left (`--vu-keyboard-room`),
+      and the field is scrolled into view inside it. Typing on the video: the root takes the
+      visible height instead, so the video shrinks to stay above the keyboard and the field
+      stays over its text.
+176.  **A touch drag moves the selection frame with the drawn picture** (owner, 2026-10-30). A
+      paused `setProject` now resolves once a frame drawn with it is on screen (at most
+      150 ms); the controller tells `onPreviewDrawn` listeners, and on touch the stage moves its
+      frame then. Mouse drags keep moving it at once.
+177.  **Green screen: pick only on the picture, refuse a key that removes it all** (owner,
+      2026-10-30). The key works on colour tone (chroma), not brightness, so a grey, black or
+      white pick — the letterbox, a frame not drawn yet, a tap that missed — removed nearly
+      everything. A tap outside the picture says "Tap on the picture itself" and picking goes
+      on; the engine measures how much of the picture a picked colour would remove (`covers`)
+      and over 85 % the old colour stays with a message. While picking, the sheet goes down.
+178.  **Opacity & blend is one phone tool; blend modes are preview tiles** (owner, 2026-10-30).
+      Each alone looked empty. One tool, "Opacity & blend" (the desktop section's name): the
+      opacity slider, then a tile per mode showing a dot mixed over a colour ramp with that mode
+      (the browser's own blending, no engine render). A blurred area keeps "Opacity" alone.
+179.  **Phone timeline height: minimal / normal / full** (owner, 2026-10-30). A grip on top of
+      the play bar: drag up / down (only a transform moves while dragging; the size is applied
+      once on release and snaps to the nearest), tap to fold to the play bar and back, arrow
+      keys step. "Full" leaves the video 160 px. Kept in this browser. A sheet still opens over
+      the same spot, whatever the size.
+180.  **Phone sheets: adds close them; grids for judging go 3 a row** (owner, 2026-10-30). Adding
+      a template, sticker or library media on a phone closes the sheet so the new item shows,
+      selected. (Text still opens its Edit sheet to type.) Templates and filters are 3 to a row
+      on phones; emoji / sticker grids keep 4.

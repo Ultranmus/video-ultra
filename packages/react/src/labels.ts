@@ -17,6 +17,10 @@ export const DEFAULT_LABELS = {
   resizeInspector: 'Resize the settings panel',
   resizeTimeline: 'Resize the timeline',
   resizeTip: 'Drag to resize · double-click to reset',
+  phoneTimelineTip: 'Drag up or down to resize the timeline · tap to hide or show the lanes',
+  timelineMinimal: 'Play bar only',
+  timelineNormal: 'Normal',
+  timelineFull: 'Large',
   // Rail / panels
   media: 'Media',
   text: 'Text',
@@ -741,6 +745,8 @@ export const DEFAULT_LABELS = {
   pickingHint: 'Tap the colour to remove on the video',
   pickCancel: 'Cancel',
   pickMissed: 'Tap on the picture itself to pick its colour',
+  pickTooMuch:
+    'That colour is in almost the whole video — tap the green or blue background behind the person',
   pickedColour: (hex: string) => `Removing ${hex}`,
   keyTolerance: 'Range',
   keyToleranceTip: 'How far from the colour still gets removed',
@@ -970,6 +976,15 @@ export const DEFAULT_LABELS = {
   later: (what: string) => `${what}: a frame later`,
   slipClip: 'Slip',
   slideClip: 'Slide',
+  slipExplain: 'Shows another part of the video — the clip stays where it is and as long',
+  slipExplainSound: 'Plays another part of the sound — the clip stays where it is and as long',
+  slipNoRoom:
+    'Slip: the whole recording is already in the clip. Make the clip shorter first to show another part.',
+  rollExplain:
+    'Moves the cut after this clip: this clip gets longer, the next one shorter, or back',
+  slideExplain: 'Moves this clip between its neighbours: they get shorter or longer to make room',
+  proTrimNothing:
+    'Nothing to fine trim here: put a clip right after this one, or use a video or sound',
   addMarker: 'Add marker',
   tipAddMarker: 'Mark this moment (M); jump between marks with , and .',
   markerAdded: (time: string) => `Marker at ${time}`,

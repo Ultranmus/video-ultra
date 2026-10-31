@@ -256,17 +256,35 @@ export function BlendTool({ item }: { item: Item }): ReactElement | null {
   if (item.kind === 'audio' || item.kind === 'region') return null;
   if (onMain) return <p className="vu-hint">{l.blendMainVideo}</p>;
   const value = ('blend' in item ? item.blend : undefined) ?? 'normal';
+  // Tiles that show what each mode does: a coloured square under a dot mixed with that mode
+  // (the browser's own blending, so it costs nothing to draw).
   return (
-    <Chips
-      label={l.blend}
-      value={value}
-      options={BLENDS.map((mode) => ({
-        value: mode,
-        label: l.blendName(mode),
-        tip: l.blendTip(mode),
-      }))}
-      onChange={(mode) => ctl.run(l.blend, (d) => updateItem(d, item.id, { blend: mode }))}
-    />
+    <div className="vu-field">
+      <span className="vu-field-row">{l.blend}</span>
+      <div className="vu-filter-grid vu-blend-grid" role="radiogroup" aria-label={l.blend}>
+        {BLENDS.map((mode) => (
+          <button
+            key={mode}
+            type="button"
+            role="radio"
+            aria-checked={mode === value}
+            className="vu-filter-tile"
+            data-tooltip={l.blendTip(mode)}
+            onClick={() => {
+              if (mode !== value) ctl.run(l.blend, (d) => updateItem(d, item.id, { blend: mode }));
+            }}
+          >
+            <span className="vu-filter-thumb vu-blend-thumb" data-ready="" aria-hidden="true">
+              <span
+                className="vu-blend-dot"
+                style={{ mixBlendMode: mode === 'add' ? 'plus-lighter' : mode }}
+              />
+            </span>
+            <span className="vu-filter-name">{l.blendName(mode)}</span>
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 

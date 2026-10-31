@@ -245,3 +245,182 @@ export function Splitter({ edge }: { edge: SplitEdge }): ReactElement {
     />
   );
 }
+
+// ── Phone: the timeline's height, in three steps ────────────────────────────────────────
+
+/** Phone timeline sizes: only the play bar, today's height, or most of the screen. */
+export type PhoneTimelineSize = 'minimal' | 'normal' | 'full';
+
+const PHONE_SIZES: readonly PhoneTimelineSize[] = ['minimal', 'normal', 'full'];
+const PHONE_KEY = 'video-ultra:phone-timeline';
+/** "Full" still leaves the video this much room (px). */
+const PHONE_STAGE_MIN = 160;
+
+function readPhoneSize(): PhoneTimelineSize {
+  try {
+    const v = localStorage.getItem(PHONE_KEY);
+    return v === 'minimal' || v === 'full' ? v : 'normal';
+  } catch {
+    return 'normal';
+  }
+}
+
+/** The timeline area's height (px) for a size; null: the layout's own (normal). */
+function phoneHeight(root: HTMLElement, size: PhoneTimelineSize): number | null {
+  if (size === 'normal') return null;
+  if (size === 'minimal') return 0;
+  const area = root.querySelector<HTMLElement>('.vu-timeline-area');
+  const stage = root.querySelector<HTMLElement>('.vu-stage-area');
+  if (!area || !stage) return null;
+  // Grow the timeline by all the video's room above its floor.
+  return Math.max(0, area.offsetHeight + stage.offsetHeight - PHONE_STAGE_MIN);
+}
+
+/**
+ * Phones: a grip on top of the play bar resizes the timeline — drag it down to leave only the
+ * play bar (the video gets the room), up for more lanes; it snaps to minimal / normal / full on
+ * release (or a tap steps through them; arrow keys too). While dragging only a transform moves
+ * (no layout per move); the size is applied once on release and kept in this browser.
+ */
+export function PhoneTimelineGrip(): ReactElement {
+  const l = useLabels();
+  const ref = useRef<HTMLDivElement>(null);
+  const size = useRef<PhoneTimelineSize>('normal');
+  const drag = useRef<{ id: number; y: number; dy: number; moved: boolean } | null>(null);
+  const root = () => ref.current?.closest<HTMLElement>('.vu-root') ?? null;
+  const name = (s: PhoneTimelineSize) =>
+    s === 'minimal' ? l.timelineMinimal : s === 'full' ? l.timelineFull : l.timelineNormal;
+
+  const apply = (next: PhoneTimelineSize, save: boolean) => {
+    const r = root();
+    if (!r) return;
+    size.current = next;
+    // Measure "full" from the normal layout, so it doesn't depend on the size before.
+    r.style.removeProperty('--vu-timeline-phone-h');
+    const h = phoneHeight(r, next);
+    if (h !== null) r.style.setProperty('--vu-timeline-phone-h', `${Math.round(h)}px`);
+    r.dataset.timelineSize = next;
+    const el = ref.current;
+    if (el) {
+      el.setAttribute('aria-valuenow', String(PHONE_SIZES.indexOf(next)));
+      el.setAttribute('aria-valuetext', name(next));
+    }
+    if (save) {
+      try {
+        localStorage.setItem(PHONE_KEY, next);
+      } catch {
+        /* storage blocked: the size just isn't remembered */
+      }
+    }
+  };
+
+  // The kept size on open; "full" follows the screen when it changes (rotation, keyboard).
+  useLayoutEffect(() => {
+    const r = root();
+    if (!r) return;
+    apply(readPhoneSize(), false);
+    let w = r.clientWidth;
+    let h = r.clientHeight;
+    const ro = new ResizeObserver(() => {
+      if (r.clientWidth === w && r.clientHeight === h) return;
+      w = r.clientWidth;
+      h = r.clientHeight;
+      if (size.current === 'full' && !r.hasAttribute('data-keyboard')) apply('full', false);
+    });
+    ro.observe(r);
+    return () => {
+      ro.disconnect();
+      r.style.removeProperty('--vu-timeline-phone-h');
+      delete r.dataset.timelineSize;
+    };
+    // Once, when the grip appears.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const bottom = () => root()?.querySelector<HTMLElement>('.vu-bottom') ?? null;
+  const step = (by: number) => {
+    const i = PHONE_SIZES.indexOf(size.current);
+    apply(PHONE_SIZES[Math.max(0, Math.min(PHONE_SIZES.length - 1, i + by))]!, true);
+  };
+
+  return (
+    <div
+      ref={ref}
+      className="vu-phone-grip"
+      role="slider"
+      tabIndex={0}
+      aria-orientation="vertical"
+      aria-label={l.resizeTimeline}
+      aria-valuemin={0}
+      aria-valuemax={PHONE_SIZES.length - 1}
+      data-tooltip={l.phoneTimelineTip}
+      onPointerDown={(e) => {
+        if (e.button > 0) return;
+        e.preventDefault();
+        e.currentTarget.setPointerCapture(e.pointerId);
+        drag.current = { id: e.pointerId, y: e.clientY, dy: 0, moved: false };
+      }}
+      onPointerMove={(e) => {
+        const d = drag.current;
+        if (!d || d.id !== e.pointerId) return;
+        d.dy = e.clientY - d.y;
+        if (!d.moved && Math.abs(d.dy) < 6) return;
+        d.moved = true;
+        // Follow the finger with a transform only (no layout until release).
+        const b = bottom();
+        if (b) {
+          b.dataset.resizing = '';
+          b.style.transform = `translateY(${Math.round(d.dy)}px)`;
+        }
+      }}
+      onPointerUp={(e) => {
+        const d = drag.current;
+        drag.current = null;
+        const b = bottom();
+        if (b) {
+          delete b.dataset.resizing;
+          b.style.transform = '';
+        }
+        if (!d || d.id !== e.pointerId) return;
+        if (!d.moved) {
+          // A tap: normal ↔ the last other size step (minimal from normal, back to normal).
+          apply(size.current === 'normal' ? 'minimal' : 'normal', true);
+          return;
+        }
+        // Where the drag ended picks the size: a clear flick down / up moves one step or two.
+        const r = root();
+        const area = r?.querySelector<HTMLElement>('.vu-timeline-area');
+        if (!r || !area) return;
+        const now = area.offsetHeight - d.dy;
+        const options = PHONE_SIZES.map((s) => ({
+          s,
+          h: s === 'normal' ? normalHeight(r) : (phoneHeight(r, s) ?? 0),
+        }));
+        let best = options[0]!;
+        for (const o of options) if (Math.abs(o.h - now) < Math.abs(best.h - now)) best = o;
+        apply(best.s, true);
+      }}
+      onPointerCancel={() => {
+        drag.current = null;
+        const b = bottom();
+        if (b) {
+          delete b.dataset.resizing;
+          b.style.transform = '';
+        }
+      }}
+      onKeyDown={(e) => {
+        if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+        e.preventDefault();
+        e.stopPropagation();
+        step(e.key === 'ArrowUp' ? 1 : -1);
+      }}
+    >
+      <span className="vu-phone-grip-bar" aria-hidden="true" />
+    </div>
+  );
+}
+
+/** The phone timeline's normal height (the layout's token). */
+function normalHeight(root: HTMLElement): number {
+  return parseFloat(getComputedStyle(root).getPropertyValue('--vu-size-timeline-phone')) || 184;
+}

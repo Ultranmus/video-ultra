@@ -1,4 +1,4 @@
-import { Splitter, useSavedLayout } from './splitters';
+import { PhoneTimelineGrip, Splitter, useSavedLayout } from './splitters';
 import {
   detectCapabilities,
   type Asset,
@@ -150,7 +150,9 @@ export interface VideoEditorProps {
   style?: CSSProperties | undefined;
 }
 
-const ACCEPT = 'video/*,audio/*,image/*,.mov,.mkv,.heic,.heif,.m4a,.mp3,.wav,.svg';
+// HEIC / HEIF by type too: some Android pickers grey a photo out unless its type is listed.
+const ACCEPT =
+  'video/*,audio/*,image/*,image/heic,image/heif,.mov,.mkv,.heic,.heif,.m4a,.mp3,.wav,.svg';
 
 /**
  * The video editor. Drop it anywhere — it fills its container and picks the phone, tablet or
@@ -240,26 +242,95 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
     return () => controller.setRoot(null);
   }, [controller]);
 
-  // On-screen keyboard (phones): the visible area shrinks and iOS scrolls the page. Keep the
-  // editor one box: --vu-keyboard is how much of the editor the keyboard covers, and the bottom
-  // area moves up by it while a text field is focused.
+  // On-screen keyboard (phones). The visible area shrinks, and iOS also pans the page to show
+  // the field (it ignores `interactive-widget`). Keep the editor one box in the visible area:
+  // - the root moves down by the pan (`top`, not a transform: fixed tooltips keep their place),
+  //   so its top bar stays on screen;
+  // - a field in a sheet: the bottom area rises by --vu-keyboard-lift so the sheet sits on the
+  //   keyboard, the sheet is no taller than the room left (--vu-keyboard-room), and the field is
+  //   scrolled into view inside it;
+  // - the text field on the video: the root takes the visible height, so the video shrinks to
+  //   stay in view above the keyboard and the field (placed in the stage) moves with its text.
+  // Also marks a zoomed-in page (data-page-zoomed), so a pinch can always zoom it back out.
   useEffect(() => {
     const vv = typeof window !== 'undefined' ? window.visualViewport : null;
     const root = rootRef.current;
     if (!vv || !root) return;
+    let shift = 0;
+    let natural = 0; // the root's own height while it is shrunk (0: not shrunk)
+    let frame = 0;
     const update = () => {
+      frame = 0;
+      const zoomed = vv.scale > 1.01;
+      root.toggleAttribute('data-page-zoomed', zoomed);
+      const el = document.activeElement;
+      const field =
+        !zoomed &&
+        el instanceof HTMLElement &&
+        root.contains(el) &&
+        el.matches('input:not([type="range"]), textarea, [contenteditable="true"]')
+          ? el
+          : null;
       const rect = root.getBoundingClientRect();
-      const visibleBottom = vv.offsetTop + vv.height;
-      const covered = Math.max(0, Math.round(rect.bottom - visibleBottom));
-      root.style.setProperty('--vu-keyboard', `${covered}px`);
-      root.toggleAttribute('data-keyboard', covered > 80);
+      const top = rect.top - shift;
+      const height = natural || rect.height;
+      const visTop = vv.offsetTop;
+      const visBottom = vv.offsetTop + vv.height;
+      let nextShift = field ? Math.max(0, Math.round(visTop - top)) : 0;
+      let covered = Math.max(0, Math.round(top + nextShift + height - visBottom));
+      const open = !!field && covered > 80;
+      if (!open) {
+        nextShift = 0;
+        covered = Math.max(0, Math.round(top + height - visBottom));
+      }
+      const onStage = open && field.classList.contains('vu-stage-text');
+      if (onStage) {
+        natural = height;
+        root.style.height = `${height - covered}px`;
+      } else if (natural) {
+        natural = 0;
+        root.style.height = '';
+      }
+      if (nextShift !== shift) {
+        shift = nextShift;
+        root.style.top = shift ? `${shift}px` : '';
+      }
+      const bar = root.querySelector<HTMLElement>('.vu-toolbar');
+      const lift = onStage ? 0 : Math.max(0, covered - (bar?.offsetHeight ?? 0));
+      root.style.setProperty('--vu-keyboard', `${onStage ? 0 : covered}px`);
+      root.style.setProperty('--vu-keyboard-lift', `${lift}px`);
+      root.style.setProperty('--vu-keyboard-room', `${Math.max(0, height - covered)}px`);
+      if (onStage) root.setAttribute('data-keyboard', 'stage');
+      else root.toggleAttribute('data-keyboard', covered > 80);
+      // The field being typed in stays in view inside its sheet.
+      if (open && !onStage) {
+        const scroller = field.closest<HTMLElement>('.vu-dock-body, .vu-panel-body');
+        if (scroller) {
+          const f = field.getBoundingClientRect();
+          const s = scroller.getBoundingClientRect();
+          const room = Math.min(s.bottom, visBottom) - s.top;
+          const pad = 16;
+          if (f.bottom > s.top + room - pad) scroller.scrollTop += f.bottom - (s.top + room - pad);
+          else if (f.top < s.top + pad) scroller.scrollTop -= s.top + pad - f.top;
+        }
+      }
     };
-    vv.addEventListener('resize', update);
-    vv.addEventListener('scroll', update);
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    vv.addEventListener('resize', schedule);
+    vv.addEventListener('scroll', schedule);
+    root.addEventListener('focusin', schedule);
+    root.addEventListener('focusout', schedule);
     update();
     return () => {
-      vv.removeEventListener('resize', update);
-      vv.removeEventListener('scroll', update);
+      cancelAnimationFrame(frame);
+      vv.removeEventListener('resize', schedule);
+      vv.removeEventListener('scroll', schedule);
+      root.removeEventListener('focusin', schedule);
+      root.removeEventListener('focusout', schedule);
+      root.style.top = '';
+      root.style.height = '';
     };
   }, []);
 
@@ -401,6 +472,7 @@ function Shell({
         <PreviewBar />
       ) : (
         <div className="vu-bottom">
+          {phone ? <PhoneTimelineGrip /> : null}
           {phone ? <PhoneTransport /> : <TimelineBar />}
           <div className="vu-timeline-area">
             {status === 'ready' ? <Timeline rootRef={rootRef} /> : <div className="vu-timeline" />}
@@ -449,7 +521,10 @@ function useNoPageZoom(rootRef: React.RefObject<HTMLDivElement | null>) {
     const onWheel = (e: WheelEvent) => {
       if (e.ctrlKey || e.metaKey) e.preventDefault();
     };
-    const onGesture = (e: Event) => e.preventDefault();
+    // Once the page is zoomed in (by the browser, not us), a pinch must get through to undo it.
+    const onGesture = (e: Event) => {
+      if ((window.visualViewport?.scale ?? 1) <= 1.01) e.preventDefault();
+    };
     root.addEventListener('wheel', onWheel, { passive: false });
     root.addEventListener('gesturestart', onGesture);
     root.addEventListener('gesturechange', onGesture);

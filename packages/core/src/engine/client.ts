@@ -28,7 +28,10 @@ let listenSessions = 0;
 /** Drives the engine worker from the main thread. The UI never touches video frames. */
 export interface Engine {
   readonly backend: RenderBackend;
-  /** Replaces the project (cheap: it's JSON). Call after every edit. */
+  /**
+   * Replaces the project (cheap: it's JSON). Call after every edit. While paused it resolves once
+   * a frame drawn with it is on screen (or after ~150 ms at most).
+   */
   setProject(project: Project): Promise<void>;
   /** Gives the engine the bytes of an asset (a `File` from an input, or a Blob). */
   addMedia(assetId: string, blob: Blob): Promise<void>;
@@ -136,8 +139,15 @@ export interface Engine {
   /**
    * The colour (`#rrggbb`) of a picture item — alone, without its green screen — at canvas point
    * `x, y` (fractions) at timeline `time`; null outside the picture. For "pick from video".
+   * `covers`: the share (0…1) of the picture a green screen of that colour would remove at the
+   * item's own range — near 1 means the whole picture would vanish.
    */
-  pickColour(itemId: string, time: Time, x: number, y: number): Promise<string | null>;
+  pickColour(
+    itemId: string,
+    time: Time,
+    x: number,
+    y: number,
+  ): Promise<{ color: string; covers: number } | null>;
   /**
    * Video scopes (histogram, waveform, parade, vectorscope) of the whole picture at `time`,
    * measured on a small render in the worker. For the Scopes view; ask at most a few per second.
@@ -537,7 +547,7 @@ export async function createEngine(
     async pickColour(itemId: string, time: Time, x: number, y: number) {
       const data = await send({ type: 'pick-colour', itemId, time, x, y });
       if (data.type !== 'pick-colour') throw new Error('Unexpected engine response');
-      return data.color;
+      return data.color ? { color: data.color, covers: data.covers } : null;
     },
     async transitionPreview(
       itemId: string,
