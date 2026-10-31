@@ -698,13 +698,13 @@ function TransformTool({ item }: { item: Item }) {
               icon="flip"
               label={l.flipH}
               pressed={tf.flipX}
-              onClick={() => set(l.flipH, { flipX: !tf.flipX })}
+              onClick={() => ctl.flipItem(l.flipH, item.id, time, tf, { ...tf, flipX: !tf.flipX })}
             />
             <IconButton
               icon="flipV"
               label={l.flipV}
               pressed={tf.flipY}
-              onClick={() => set(l.flipV, { flipY: !tf.flipY })}
+              onClick={() => ctl.flipItem(l.flipV, item.id, time, tf, { ...tf, flipY: !tf.flipY })}
             />
           </>
         )}
@@ -1216,13 +1216,39 @@ export function CanvasTool(): ReactElement {
         }
       />
       {background.type === 'color' ? (
-        <ColorField
-          label={l.backgroundColor}
-          value={background.color}
-          recipe={(d, color) => setBackground(d, { type: 'color', color })}
-          commitLabel={l.background}
-          coalesceKey="background-color"
-        />
+        <>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={background.color === 'transparent'}
+            className="vu-switch-row"
+            data-tooltip={l.tipTransparent}
+            onClick={() =>
+              ctl.run(l.background, (d) =>
+                setBackground(d, {
+                  type: 'color',
+                  color: background.color === 'transparent' ? '#000000' : 'transparent',
+                }),
+              )
+            }
+          >
+            <span>{l.transparent}</span>
+            <span className="vu-switch" aria-hidden="true">
+              <span className="vu-switch-knob" />
+            </span>
+          </button>
+          {background.color === 'transparent' ? (
+            <p className="vu-hint">{l.transparentHint}</p>
+          ) : (
+            <ColorField
+              label={l.backgroundColor}
+              value={background.color}
+              recipe={(d, color) => setBackground(d, { type: 'color', color })}
+              commitLabel={l.background}
+              coalesceKey="background-color"
+            />
+          )}
+        </>
       ) : (
         <EditSlider
           label={l.blurAmount}

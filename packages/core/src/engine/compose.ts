@@ -234,6 +234,19 @@ export class Composer {
   };
   private readonly scaleOne: Transform = { ...BACKDROP_TRANSFORM, scale: 1 };
   private solid: OffscreenCanvas | null = null;
+  /**
+   * The editor's preview: a transparent background shows a checkerboard (the picture itself has
+   * no alpha). Exports leave it off (and get black where there's nothing).
+   */
+  showTransparency = false;
+  private checker: OffscreenCanvas | null = null;
+  private readonly checkerDraw: LayerDraw = {
+    source: null as unknown as VideoFrame,
+    geometry: fullCanvasGeometry(),
+    opacity: 1,
+    hdr: false,
+    effects: null,
+  };
   /** Transition overlay (dips, light leaks): one reused draw. */
   private readonly overlay = noOverlay();
   private readonly overlayColour = identityColour();
@@ -414,6 +427,24 @@ export class Composer {
       keyed: null,
       keyedTf: { ...BACKDROP_TRANSFORM },
     });
+  }
+
+  /** A checkerboard as big as the output (made once per size; ~16 px squares). */
+  private checkerSource(width: number, height: number): OffscreenCanvas {
+    const w = Math.max(2, Math.round(width));
+    const h = Math.max(2, Math.round(height));
+    if (!this.checker || this.checker.width !== w || this.checker.height !== h) {
+      this.checker = new OffscreenCanvas(w, h);
+      const ctx = this.checker.getContext('2d')!;
+      const cell = Math.max(8, Math.round(Math.min(w, h) / 24));
+      ctx.fillStyle = '#d4d4d8';
+      ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = '#a1a1aa';
+      for (let y = 0; y < h; y += cell)
+        for (let x = (y / cell) % 2 ? cell : 0; x < w; x += cell * 2)
+          ctx.fillRect(x, y, cell, cell);
+    }
+    return this.checker;
   }
 
   private solidSource(): OffscreenCanvas {
@@ -739,6 +770,10 @@ export class Composer {
         backdrop.amount = bg.amount;
         backdrop.effects = effects;
       }
+    }
+    if (!into && this.showTransparency && isTransparentBackground(project)) {
+      this.checkerDraw.source = this.checkerSource(width, height);
+      draws.unshift(this.checkerDraw);
     }
     const t1 = performance.now();
     this.renderer.render(draws, into ? null : backgroundColor(project), backdrop, into);
@@ -1126,7 +1161,16 @@ function itemAnimation(item: Item): ItemAnimation | undefined {
   return 'animation' in item ? item.animation : undefined;
 }
 
-/** The project's background colour as RGB 0…1 (black under a blurred background). */
+/** Whether the project's background is transparent (`{ type: 'color', color: 'transparent' }`). */
+export function isTransparentBackground(p: Project): boolean {
+  const bg = p.settings.background;
+  return bg.type === 'color' && bg.color === 'transparent';
+}
+
+/**
+ * The project's background colour as RGB 0…1 (black under a blurred background, and for a
+ * transparent one: the video formats here have no alpha).
+ */
 export function backgroundColor(p: Project): [number, number, number] {
   const bg = p.settings.background;
   if (bg.type !== 'color') return [0, 0, 0];

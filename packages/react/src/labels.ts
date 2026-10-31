@@ -17,6 +17,12 @@ export const DEFAULT_LABELS = {
   resizeInspector: 'Resize the settings panel',
   resizeTimeline: 'Resize the timeline',
   resizeTip: 'Drag to resize · double-click to reset',
+  transparent: 'Transparent',
+  exportTransparent:
+    'The background is transparent: the video file shows black there (video files can’t be see-through yet).',
+  tipTransparent: 'No background colour: only what you put on the video shows',
+  transparentHint:
+    'The checkerboard shows where it’s see-through. Video files can’t be see-through yet: there it exports black.',
   phoneTimelineTip: 'Drag up or down to resize the timeline',
   timelineMinimal: 'Play bar only',
   timelineNormal: 'Normal',

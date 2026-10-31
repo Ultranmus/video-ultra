@@ -2,6 +2,12 @@
 
 Where the last session stopped and what comes next. Update before ending every session.
 
+## 2026-10-31 (6) — the open phone items done, owner tests tomorrow
+
+Flip / canvas size animate, Transparent background (preview; files black — next step in
+BACKLOG), HEIF on Android via WebCodecs (#186, #187). Owner tests everything tomorrow (the list
+in chat). Next engine work if wanted: transparent WebM / PNG export.
+
 ## 2026-10-31 (5) — phone test 5 fixes pushed
 
 BACKLOG "Phone test 5", DECISIONS #185. Owner re-tests: tap a text on the video → full-screen

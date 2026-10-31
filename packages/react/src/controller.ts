@@ -101,6 +101,7 @@ import {
   type MediaAnalyzer,
   type ProjectStorage,
   type StoredProjectInfo,
+  heifToJpeg,
 } from '@video-ultra/core/internal';
 import { produce } from 'immer';
 import {
@@ -894,6 +895,45 @@ export class EditorController {
    * video — previews only, view-only — then commits one edit. Reduced motion: at once. A second
    * turn while one runs finishes the first at once.
    */
+  /**
+   * Mirrors an item (`to` has the new flip) with a short ease on the video: it eases a little
+   * smaller, flips at the midpoint, and eases back (the transform has no in-between for a
+   * mirror). Previews only, then one edit; reduced motion: at once.
+   */
+  flipItem(label: string, itemId: string, time: Time, from: Transform, to: Transform): void {
+    this.#turning?.finish();
+    const reduce =
+      typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const commit = () => this.run(label, (d) => setTransformAt(d, itemId, to, time));
+    if (reduce) {
+      commit();
+      return;
+    }
+    const start = performance.now();
+    const step = (now: number) => {
+      const k = Math.min(1, (now - start) / TURN_MS);
+      if (k >= 1) {
+        this.#turning = null;
+        commit();
+        return;
+      }
+      // Down to 80 % and back, a smooth bump; the mirror switches at the smallest point.
+      const dip = 1 - 0.2 * Math.sin(Math.PI * k);
+      const shown = k < 0.5 ? from : to;
+      this.preview((d) => setTransformAt(d, itemId, { ...shown, scale: from.scale * dip }, time));
+      flipping.id = requestAnimationFrame(step);
+    };
+    const flipping = {
+      id: requestAnimationFrame(step),
+      finish: () => {
+        cancelAnimationFrame(flipping.id);
+        this.#turning = null;
+        commit();
+      },
+    };
+    this.#turning = flipping;
+  }
+
   turnItem(label: string, itemId: string, time: Time, from: Transform, to: Transform): void {
     this.#turning?.finish();
     const reduce =
@@ -1938,7 +1978,16 @@ export class EditorController {
           imports: s.imports.map((r) => (r.id === rowId ? { ...r, status: 'error', message } : r)),
         }));
       try {
-        const probe = await this.analyzer!.probe(file, file.name);
+        let probe = await this.analyzer!.probe(file, file.name);
+        // A HEIF / HEIC photo this browser can't open as an image (Android Chrome): its HEVC
+        // picture is decoded with the video decoder and kept as a JPEG instead.
+        if (!probe.ok && probe.code === 'unsupported-image') {
+          const converted = await heifToJpeg(file).catch(() => null);
+          if (converted) {
+            file = converted;
+            probe = await this.analyzer!.probe(file, file.name);
+          }
+        }
         if (!probe.ok) {
           fail(probe.message);
           continue;

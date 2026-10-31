@@ -4,6 +4,14 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 
 ## Open
 
+- [ ] Transparent background in exported files (#186): the preview shows a checkerboard; video
+      files and PNG frames come out black there. Needs an alpha-capable export canvas on both
+      backends (WebGL2 `alpha: true`, WebGPU `alphaMode: 'premultiplied'` with premultiplied
+      output), VideoEncoder `alpha: 'keep'` (VP9 in WebM — mediabunny supports alpha side data),
+      golden-frame tests on both backends, and PNG frames with alpha. MP4 / H.264 stays black.
+- [ ] HEIF on Android (#187): decoded with WebCodecs HEVC; needs the owner's Android check with
+      a real iPhone HEIC (grid of tiles) and a Samsung one. Devices without an HEVC decoder still
+      get the "save it as JPEG" message (a WASM decoder only after measuring, CLAUDE.md).
 - [x] (fixed 2026-10-31) Phone test 5 (owner): a tap near the top of the play bar folded / unfolded
       the timeline (the grip's tap), so the video resized as if the canvas size changed. The grip
       now only resizes on a drag; a tap does nothing.
@@ -186,7 +194,7 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       stickers, text) for the same behaviour, and keep the result selected so it can be edited
       right away.
       Fixed: template, sticker and library-media adds close the phone sheet (#180).
-- [ ] Phone test (owner, 2026-10-30), feature request: Canvas tab → Color section should offer
+- [x] (done 2026-10-31, preview; see the export item) Phone test (owner, 2026-10-30), feature request: Canvas tab → Color section should offer
       a transparent background as one of the background colors. (Canvas and Blur tabs were
       otherwise fine on phone.) Not done yet, only recorded. To think through: the preview
       shows a checkerboard for transparent; export keeps it only in formats that carry alpha
@@ -243,7 +251,7 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       box-to-frame lag on the iPhone; options: move the box only when the engine reports the
       frame drawn, or draw the box in the same pass.
       Fixed (check on the iPhone): on touch the frame moves when the engine has drawn the move (#176).
-- [ ] Phone test (owner, 2026-10-30): Rotate, Flip and canvas size (ratio) changes apply as an
+- [x] (done 2026-10-31) Phone test (owner, 2026-10-30): Rotate, Flip and canvas size (ratio) changes apply as an
       instant snap, which feels abrupt; owner wants them smooth. Not done yet, only recorded.
       Idea: a short eased transition (~150–200 ms, `--vu-duration-*` / `--vu-ease-out`) of the
       item or frame from old to new, animated in the engine (no React per frame), instant
@@ -317,7 +325,7 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       words) and/or a short first-use hint, translatable; check the tool shows and works for
       sound clips (Slip needs extra media beyond the trimmed part — say so when there's none).
       Fixed: a plain-words line under Slip, Move cut and Slide; "nothing to slip" when the whole recording is in use; the desktop shortcut line only on desktop.
-- [ ] User report (via owner, 2026-10-30): a HEIF photo (`.heif` / `image/heif` — owner: HEIF,
+- [x] (done 2026-10-31; check on Android) User report (via owner, 2026-10-30): a HEIF photo (`.heif` / `image/heif` — owner: HEIF,
       not HEIC) shared from an iPhone to an Android phone can't be picked in the editor on
       Android. Note: `probe.ts` (~line 75) sniffs every HEIF brand, including the generic
       `mif1`/`msf1`, as `image/heic` and calls it "a HEIC photo" in the error — wrong name for

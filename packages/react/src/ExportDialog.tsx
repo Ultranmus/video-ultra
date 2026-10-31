@@ -312,6 +312,9 @@ export function ExportDialog(): ReactElement | null {
     range: p.settings.exportRange ?? null,
     sound: hasSound(p),
   }));
+  const seeThrough = useProject(
+    (p) => p.settings.background.type === 'color' && p.settings.background.color === 'transparent',
+  );
   const tier = ctl.caps?.tier ?? 'mid';
   const shortSide = Math.min(width, height);
   const limit = Math.min(maxExportHeight(tier), Math.max(480, shortSide));
@@ -779,6 +782,7 @@ export function ExportDialog(): ReactElement | null {
                         ) : null}
                       </div>
                       {lengthField}
+                      {seeThrough ? <p className="vu-hint">{l.exportTransparent}</p> : null}
                       <button
                         type="button"
                         className="vu-export-more"
