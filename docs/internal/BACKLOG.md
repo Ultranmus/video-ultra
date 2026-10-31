@@ -4,6 +4,22 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 
 ## Open
 
+- [x] (fixed 2026-10-31) Phone test 4 (owner, screenshots): the "[ ] highlighted region" was the
+      export range (in / out points) on the ruler: a band over the whole ruler with brackets. Now
+      a light band along the ruler's foot with a short tick at each end; the times stay readable.
+- [x] (fixed 2026-10-31) Phone test 4: filter tiles for a template title showed "ummer in Lisbon",
+      cut at the sides. The tile sized text from an average letter width; the iPhone's Didot is
+      much wider. Now measured in the text's own font; the tile also drops the title's wrap width,
+      keyframes and group. (Not reproducible without Didot here; check on the iPhone.)
+- [x] (fixed 2026-10-31) Phone test 4: green screen on a pale yellow wall said "grey… can't be
+      removed" / did nothing — the wall's colour is all over a warm video. Now a colour that would
+      remove > 85 % is applied with Range lowered to keep about half the picture, with a message
+      saying so; only grey / white / black are refused.
+- [x] (fixed 2026-10-31) Phone test 4: a several-line message was a pill (round ends) — toasts are
+      now rounded cards.
+- [x] (fixed 2026-10-31) Phone test 4: typing on the video made the video bigger (timeline and tab
+      bar hidden) and text near its bottom went under the keyboard. Now the video keeps its size
+      and place, and slides up under the top bar just enough to keep the text above the keyboard.
 - [x] (fixed 2026-10-31) Phone test 3 (owner): a tap on the timeline jumped the playhead (a drag
       was smooth). On phones a tap on the ruler now glides the playhead there (220 ms, eased;
       instant under reduced motion; a new touch stops it). If the jump was from a tap somewhere
@@ -17,13 +33,13 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [x] (fixed 2026-10-31) Phone test 3 (owner): a locked full-width item still showed only top and
       bottom on the iPhone (Chromium showed all four). The dash is now a border inside the box
       (Safari didn't draw the negative-offset outline's sides), and the box stays inside the frame.
-- [ ] Phone test 2 (owner, 2026-10-31): Filters for an emoji sticker or a text — the preview tiles
+- [x] (fixed 2026-10-31, test 4) Phone test 2 (owner, 2026-10-31): Filters for an emoji sticker or a text — the preview tiles
       show the emoji / text pushed right and cut in half (video and image tiles are fine). Not
       reproduced in the cloud container (Chromium, WebGL2: centred and whole), so likely the
       iPhone's WebGPU path of the looks renderer (`filterPreviews` → `centredForTile`, worker).
       Needs a screenshot from the phone, then a WebGPU check of the text / sticker draw at the
       tile size.
-- [ ] Phone test 2 (owner, 2026-10-31): on the main (frame) lane "some region is highlighted with
+- [x] (fixed 2026-10-31, test 4) Phone test 2 (owner, 2026-10-31): on the main (frame) lane "some region is highlighted with
       [ ] and the accent colour" — not clear which part (a selected clip's trim handles? a drop
       slot?). Needs a screenshot. (The "+" no longer moves when a handle appears — fixed below.)
 - [x] (fixed 2026-10-31) Phone test 2: the timeline grip snapped and the whole bottom area, tab bar

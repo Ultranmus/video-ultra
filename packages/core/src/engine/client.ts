@@ -140,14 +140,15 @@ export interface Engine {
    * The colour (`#rrggbb`) of a picture item — alone, without its green screen — at canvas point
    * `x, y` (fractions) at timeline `time`; null outside the picture. For "pick from video".
    * `covers`: the share (0…1) of the picture a green screen of that colour would remove at the
-   * item's own range — near 1 means the whole picture would vanish.
+   * item's own range — near 1 means the whole picture would vanish. `fitTolerance`: the largest
+   * range (0…1) that removes at most half the picture.
    */
   pickColour(
     itemId: string,
     time: Time,
     x: number,
     y: number,
-  ): Promise<{ color: string; covers: number } | null>;
+  ): Promise<{ color: string; covers: number; fitTolerance: number | null } | null>;
   /**
    * Video scopes (histogram, waveform, parade, vectorscope) of the whole picture at `time`,
    * measured on a small render in the worker. For the Scopes view; ask at most a few per second.
@@ -547,7 +548,9 @@ export async function createEngine(
     async pickColour(itemId: string, time: Time, x: number, y: number) {
       const data = await send({ type: 'pick-colour', itemId, time, x, y });
       if (data.type !== 'pick-colour') throw new Error('Unexpected engine response');
-      return data.color ? { color: data.color, covers: data.covers } : null;
+      return data.color
+        ? { color: data.color, covers: data.covers, fitTolerance: data.fitTolerance }
+        : null;
     },
     async transitionPreview(
       itemId: string,

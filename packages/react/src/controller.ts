@@ -230,6 +230,8 @@ async function svgToPng(file: File): Promise<File> {
 
 /** Green screen pick: refuse a colour that would remove more than this share of the picture. */
 const PICK_COVERS_MAX = 0.85;
+/** …unless the range that keeps half of it is below this (the key would do next to nothing). */
+const PICK_MIN_TOLERANCE = 0.05;
 
 /** How long a quarter turn eases on the video (ms). */
 const TURN_MS = 180;
@@ -2128,16 +2130,26 @@ export class EditorController {
     }
     // A colour that would remove (nearly) the whole picture is a missed tap — a grey, black or
     // white spot, or a frame not drawn yet: keep the old colour and say what to tap.
+    // A colour all over the video (a pale wall in a warm room): the range is lowered so about
+    // half the picture stays, and that's said. Grey / white / black can't be keyed at all.
+    let tolerance: number | null = null;
     if (picked.covers > PICK_COVERS_MAX) {
-      this.toast(isNeutral(picked.color) ? l.pickNeutral : l.pickTooMuch, 'info');
-      return;
+      const fit = picked.fitTolerance;
+      if (isNeutral(picked.color) || fit === null || fit < PICK_MIN_TOLERANCE) {
+        this.toast(isNeutral(picked.color) ? l.pickNeutral : l.pickTooMuch, 'info');
+        return;
+      }
+      tolerance = Math.round(fit * 100) / 100;
     }
     const color = picked.color;
     const item = findItem(this.project, itemId)?.item;
     if (!isPicture(item)) return;
     this.run(l.greenScreen, (d) =>
-      updateItem(d, itemId, { key: { ...(item.key ?? DEFAULT_KEY), color } }),
+      updateItem(d, itemId, {
+        key: { ...(item.key ?? DEFAULT_KEY), color, ...(tolerance !== null ? { tolerance } : {}) },
+      }),
     );
+    if (tolerance !== null) this.toast(l.pickRangeLowered(Math.round(tolerance * 100)), 'info');
     this.#announce(l.pickedColour(color.toUpperCase()));
   }
 

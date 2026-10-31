@@ -709,3 +709,10 @@ Owner's third pass: text Edit sheet now covers the whole editor (#183); a tap on
 glides the playhead; a layer being renamed scrolls into view in the Layers list; locked box drawn
 with a border (Safari). Checked in Chromium (iPhone 13 viewport): cover sheet, locked box all
 four sides; lint, types.
+
+## 2026-10-31 (4) · Phone test 4 fixes (screenshots)
+
+Export range drawn as a thin band; filter tiles measure text in its font (Didot was cut off);
+green screen on a colour all over the video lowers Range instead of refusing; toasts as cards;
+typing on the video keeps its size and slides it up just enough (#184). Checked in Chromium:
+tile text centred (bbox 21–121 of 144), lint, types.
