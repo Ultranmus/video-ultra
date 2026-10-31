@@ -66,6 +66,26 @@
     box-shadow: var(--vu-focus-ring);
   }
 
+  /* Touch screens: text fields are never under 16 px, or iOS zooms the page in when one gets
+     focus (and the editor no longer fits). The on-stage text field scales itself instead. */
+  @media (pointer: coarse) {
+    .vu-root
+      :is(
+        input:not([type='range'], [type='checkbox'], [type='radio'], [type='color'], [type='file']),
+        textarea:not(.vu-stage-text),
+        select
+      ) {
+      font-size: max(var(--vu-text-field-touch), 1em);
+    }
+  }
+
+  /* The page got zoomed in anyway (an accessibility zoom, an older host page): every part of the
+     editor lets a pinch through, so it can always be zoomed back out. (The attribute twice: this
+     must win over every part's own touch-action.) */
+  .vu-root[data-page-zoomed][data-page-zoomed] * {
+    touch-action: pan-x pan-y pinch-zoom;
+  }
+
   .vu-root [hidden] {
     display: none;
   }
@@ -1731,6 +1751,12 @@
     gap: var(--vu-space-2);
   }
 
+  .vu-protrim-item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vu-space-1);
+  }
+
   .vu-protrim-row {
     display: flex;
     align-items: center;
@@ -2282,6 +2308,15 @@
     padding: var(--vu-space-1);
   }
 
+  /* Phones: tiles with a picture or words to judge (templates, filters) go 3 to a row, big
+     enough to read; emoji / sticker grids keep their 4. */
+  @container vu (max-width: 767px) {
+    .vu-template-grid,
+    .vu-filter-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
   .vu-filter-tile,
   .vu-transition-tile {
     display: flex;
@@ -2339,6 +2374,21 @@
 
   .vu-filter-tile:focus-visible .vu-filter-thumb {
     box-shadow: var(--vu-focus-ring);
+  }
+
+  /* Blend tiles: the mode's own mix of a dot over a colour ramp (isolated per tile). */
+  .vu-blend-thumb {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    background: var(--vu-blend-under);
+  }
+
+  .vu-blend-dot {
+    position: absolute;
+    inset: 22%;
+    border-radius: var(--vu-radius-full);
+    background: var(--vu-blend-over);
   }
 
   /* Two lines before it's cut, so names like "Cross process" show whole. */
@@ -3386,8 +3436,50 @@
 
   .vu-timeline-area {
     position: relative;
-    height: var(--vu-size-timeline-phone);
+    /* Phones: the size picked with the grip (splitters.tsx), else the default. */
+    height: var(--vu-timeline-phone-h, var(--vu-size-timeline-phone));
     min-width: 0;
+  }
+
+  /* Only the play bar: the lanes are out of the way (the sheet still opens over this spot). */
+  .vu-root[data-timeline-size='minimal'] .vu-timeline {
+    visibility: hidden;
+  }
+
+  /* Phones: the grip on top of the play bar (drag up / down, tap). Its touch area is larger than
+     the pill it shows. */
+  .vu-phone-grip {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    z-index: 1;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    width: var(--vu-size-touch);
+    height: var(--vu-space-5);
+    padding-top: var(--vu-space-1);
+    transform: translateX(-50%);
+    cursor: ns-resize;
+    touch-action: none;
+    outline: none;
+  }
+
+  .vu-phone-grip-bar {
+    width: var(--vu-size-grab-w);
+    height: var(--vu-size-grab-h);
+    border-radius: var(--vu-radius-full);
+    background: var(--vu-border-strong);
+  }
+
+  .vu-phone-grip:focus-visible .vu-phone-grip-bar {
+    box-shadow: var(--vu-focus-ring);
+  }
+
+  /* While the grip is dragged, the bottom area follows the finger over the video. */
+  .vu-bottom[data-resizing] {
+    z-index: 2;
+    will-change: transform;
   }
 
   .vu-timeline {
@@ -3559,6 +3651,15 @@
     transition: transform var(--vu-duration-sheet) var(--vu-ease-sheet);
   }
 
+  /* Picking a colour on the video: the sheet goes down out of the way (it comes back after). */
+  .vu-root .vu-dock[data-picking] {
+    --vu-sheet-y: var(--vu-sheet-full);
+    visibility: hidden;
+    transition:
+      transform var(--vu-duration-sheet) var(--vu-ease-sheet),
+      visibility 0s linear var(--vu-duration-sheet);
+  }
+
   .vu-dock[data-expanded] {
     --vu-sheet-y: 0px;
     border-radius: 0;
@@ -3676,14 +3777,18 @@
     top: calc(var(--vu-scroll-pad-top) * -1);
     z-index: 2;
     margin-inline: calc(var(--vu-space-4) * -1);
-    padding: var(--vu-space-2) var(--vu-space-4);
+    padding: var(--vu-space-2) 0;
     border-bottom: 1px solid var(--vu-border);
     background: var(--vu-browser-bar-bg);
   }
 
-  /* The chip row fades at its right edge, so a cut-off chip reads as "scroll for more"; the
-     first chip lines up with the content's left edge. */
+  /* The chip row runs edge to edge (chips scroll out at the sheet's edges, not short of them)
+     and fades at its right edge, so a cut-off chip reads as "scroll for more"; its padding puts
+     the first chip on the content's left edge. */
   .vu-browser-bar .vu-chips-scroll {
+    margin: calc(var(--vu-space-1) * -1) 0;
+    padding: var(--vu-space-1) var(--vu-space-4);
+    scroll-padding-inline: var(--vu-space-4);
     mask-image: linear-gradient(to left, transparent, black var(--vu-space-8));
   }
 
@@ -3728,7 +3833,20 @@
 
   /* On-screen keyboard (phones): the bottom area rises above it. */
   .vu-root[data-keyboard] .vu-bottom {
-    transform: translateY(calc(var(--vu-keyboard) * -1));
+    transform: translateY(calc(var(--vu-keyboard-lift, var(--vu-keyboard)) * -1));
+  }
+
+  /* The sheet sits on the keyboard and is never taller than the room above it (less the top
+     bar), expanded or not, so its top and the field being typed in stay on screen. */
+  .vu-root[data-keyboard] .vu-dock {
+    --vu-sheet-y: max(
+      calc(var(--vu-sheet-full) - var(--vu-sheet-open)),
+      calc(var(--vu-sheet-full) - var(--vu-keyboard-room) + var(--vu-size-topbar))
+    );
+  }
+
+  .vu-root[data-keyboard] .vu-dock[data-expanded] {
+    --vu-sheet-y: calc(var(--vu-sheet-full) - var(--vu-keyboard-room) + var(--vu-size-topbar));
   }
 
   .vu-root[data-keyboard] .vu-toolbar {
@@ -3911,6 +4029,13 @@
     white-space: pre-wrap;
     pointer-events: none;
     visibility: hidden;
+  }
+
+  /* Phones: as wide as the editor allows (less the edge gap), so tips don't wrap needlessly. */
+  @container vu (max-width: 767px) {
+    .vu-tooltip {
+      max-width: calc(100cqw - var(--vu-space-2) * 2);
+    }
   }
 
   .vu-tooltip[data-placed] {
@@ -4847,12 +4972,19 @@
     flex: 1;
     min-width: 0;
     min-height: var(--vu-size-choice);
+    /* Clear of the row's own selected ring on every side. */
+    margin: var(--vu-space-1) var(--vu-space-1) var(--vu-space-1) 0;
     padding: 0 var(--vu-space-2);
     border: 1px solid var(--vu-accent);
     border-radius: var(--vu-radius-sm);
     background: var(--vu-bg);
     color: var(--vu-text);
     font: inherit;
+  }
+
+  /* The accent border already shows focus; a second ring would run into the row's ring. */
+  .vu-root .vu-layer-rename:focus-visible {
+    box-shadow: none;
   }
 
   /* Row buttons are compact so the name keeps its room. */
@@ -4931,11 +5063,17 @@
     user-select: none;
   }
 
-  .vu-menu-item:hover,
   .vu-menu-item:focus-visible,
   .vu-menu-item[aria-expanded='true'] {
     outline: none;
     background: var(--vu-surface-2);
+  }
+
+  /* Hover only where there is a real pointer: on touch screens :hover sticks after a tap. */
+  @media (hover: hover) {
+    .vu-menu-item:hover {
+      background: var(--vu-surface-2);
+    }
   }
 
   .vu-menu-item[data-danger] {
@@ -4975,7 +5113,8 @@
     .vu-submenu {
       position: static;
       min-width: 0;
-      margin: 0 0 0 var(--vu-space-5);
+      /* A clear gap under the open item, so its highlight never touches the first option. */
+      margin: var(--vu-space-1) 0 var(--vu-space-1) var(--vu-space-5);
       padding: 0;
       border: 0;
       background: transparent;
@@ -4991,6 +5130,8 @@
   .vu-selection-box[data-locked] {
     box-shadow: none;
     outline: calc(1.5px / var(--vu-stage-zoom, 1)) dashed var(--vu-selection);
+    /* Drawn inside the box: an item as wide as the frame still shows its left and right sides. */
+    outline-offset: calc(-1.5px / var(--vu-stage-zoom, 1));
   }
 
   .vu-selection-box[data-locked] .vu-handle,
@@ -5118,6 +5259,11 @@
     display: flex;
     flex-direction: column;
     gap: var(--vu-space-3);
+  }
+
+  /* The look chips are their own group: more room before the sliders under them. */
+  .vu-soundfx > :first-child:has(.vu-chip) {
+    margin-bottom: var(--vu-space-3);
   }
 
   /* Lower under voice: a switch row, then the amount when on. */
@@ -5418,6 +5564,8 @@
   .vu-camera-bar[data-review] {
     display: flex;
     flex-wrap: wrap;
+    /* Buttons in a row share its height, even when one label wraps. */
+    align-items: stretch;
     justify-content: flex-end;
     gap: var(--vu-space-2);
     border-top: 1px solid var(--vu-border);

@@ -54,7 +54,10 @@ Breakpoints are **container queries on `.vu-root`** (the editor may live in a mo
 Tool controls open in the **dock**: the same box as the timeline area (it covers the timeline, not
 the video), with the tool's name and a ✓ Done button, never a second floating panel and never a
 modal. While a text field has the on-screen keyboard, the bottom area rises above it (the editor
-stays one box; the page never scrolls). Minimum usable size: 320 × 480.
+stays one box; the page never scrolls): the top bar stays on screen, the sheet sits on the keyboard
+and keeps the field in view; typing on the video shrinks the video to stay above it (#175). A grip
+on top of the transport resizes the timeline: play bar only / normal / large (#179). Text fields
+are never under 16 px on touch screens (no focus zoom, #174). Minimum usable size: 320 × 480.
 
 ### Tablet (768–1023px)
 
@@ -173,8 +176,9 @@ the stage and everything drawn on it don't mirror. Text items in RTL scripts ren
   ▶ preview, licence line, + Add).
 - **Picture tools:** Green screen is an inspector section and a phone tool (switch, green / blue,
   Pick from video with a hint pill on the stage, Range, Edge softness, Clean edges). LUT looks
-  sit at the top of the Filters panel. Blend chips live in "Opacity & blend" / "Appearance"
-  (desktop) and a "Blend" phone tool. Blur is a rail entry and panel (box / oval × blur /
+  sit at the top of the Filters panel. Blend modes live in "Opacity & blend" / "Appearance"
+  (desktop) and the "Opacity & blend" phone tool — one sheet, opacity then a preview tile per
+  mode (#178). Blur is a rail entry and panel (box / oval × blur /
   pixelate); a blurred area stretches from side handles when it's larger than 88 px on screen.
 - **Capture & export:** "Record with camera" in the Media panel opens a recorder over the whole
   editor (preview, switch camera, mic, record / stop with a clock, then Add to video / Add as a

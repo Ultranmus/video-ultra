@@ -47,8 +47,12 @@ export function TopBar({ onClose }: { onClose?: (() => void) | undefined }): Rea
   const readOnly = useUi((s) => s.readOnly);
   const layout = useUi((s) => s.layout);
   const videosOpen = useUi((s) => s.videosOpen);
-  const layersOpen = useUi((s) => s.panel === 'layers' && (s.layout !== 'phone' || s.sheetPanel));
-  const historyOpen = useUi((s) => s.panel === 'history' && (s.layout !== 'phone' || s.sheetPanel));
+  const layersOpen = useUi(
+    (s) => s.panel === 'layers' && (s.layout !== 'phone' || (s.sheetPanel && !s.tool)),
+  );
+  const historyOpen = useUi(
+    (s) => s.panel === 'history' && (s.layout !== 'phone' || (s.sheetPanel && !s.tool)),
+  );
   const ratio = ratioOf(width, height);
   return (
     <header className="vu-topbar">
@@ -801,6 +805,7 @@ type TitleKey =
   | 'arrange'
   | 'greenScreen'
   | 'blend'
+  | 'opacityBlend'
   | 'blurArea'
   | 'shape'
   | 'removeBackground'
@@ -821,7 +826,7 @@ const TOOL_TITLE: Record<ToolId, TitleKey> = {
   transition: 'transition',
   'text-edit': 'edit',
   'text-style': 'style',
-  opacity: 'opacity',
+  opacity: 'opacityBlend',
   duration: 'duration',
   canvas: 'canvas',
   'add-text': 'text',
@@ -831,7 +836,7 @@ const TOOL_TITLE: Record<ToolId, TitleKey> = {
   animate: 'animate',
   arrange: 'arrange',
   key: 'greenScreen',
-  blend: 'blend',
+  blend: 'opacityBlend',
   region: 'blurArea',
   mask: 'shape',
   cutout: 'removeBackground',
@@ -861,6 +866,9 @@ function Sheet({ tool, panel }: { tool: ToolId | null; panel: PanelId | null }):
   const ctl = useController();
   const l = useLabels();
   const [expanded, setExpanded] = useState(false);
+  // Green screen "pick from video": the sheet steps down out of the way so the video can be
+  // tapped, and comes back once the colour is picked (or picking stops).
+  const picking = useUi((s) => s.picking !== null);
   const ref = useRef<HTMLElement>(null);
   const drag = useRef<{ id: number; y: number; t: number; base: number; dy: number } | null>(null);
   const leaving = useRef(false);
@@ -992,7 +1000,13 @@ function Sheet({ tool, panel }: { tool: ToolId | null; panel: PanelId | null }):
   };
 
   return (
-    <section ref={ref} className="vu-dock" aria-label={title} data-expanded={expanded || undefined}>
+    <section
+      ref={ref}
+      className="vu-dock"
+      aria-label={title}
+      data-expanded={expanded || undefined}
+      data-picking={picking || undefined}
+    >
       <div
         className="vu-dock-head"
         onPointerDown={onDown}

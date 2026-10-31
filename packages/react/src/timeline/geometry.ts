@@ -194,18 +194,25 @@ export function addButtonRect(
   row: Row,
   scale: TimeScale,
   end: Time,
+  /** The last clip is selected: its end trim handle's width, so the "+" sits clear of it. */
+  handle = 0,
 ): { x: number; y: number; size: number } {
   const size = Math.min(row.height - 8, 40);
-  return { x: timeToX(scale, end) + 8, y: row.top + (row.height - size) / 2, size };
+  return { x: timeToX(scale, end) + 8 + handle, y: row.top + (row.height - size) / 2, size };
 }
 
 /**
  * The "+" before the first clip (phones: their playhead sits mid-screen, so at the start the
  * left half would otherwise be empty). Adds media at the start.
  */
-export function addStartRect(row: Row, scale: TimeScale): { x: number; y: number; size: number } {
+export function addStartRect(
+  row: Row,
+  scale: TimeScale,
+  /** The first clip is selected: its start trim handle's width, so the "+" sits clear of it. */
+  handle = 0,
+): { x: number; y: number; size: number } {
   const size = Math.min(row.height - 8, 40);
-  return { x: timeToX(scale, 0) - 8 - size, y: row.top + (row.height - size) / 2, size };
+  return { x: timeToX(scale, 0) - 8 - handle - size, y: row.top + (row.height - size) / 2, size };
 }
 
 /**
@@ -266,10 +273,12 @@ export function hitTest(
       }
       if (row.track.kind === 'main') {
         const last = items[items.length - 1];
-        const add = addButtonRect(row, scale, last ? itemEnd(last) : 0);
+        const endHandle = selected && selected === last ? m.trimHandle : 0;
+        const add = addButtonRect(row, scale, last ? itemEnd(last) : 0, endHandle);
         if (x >= add.x && x <= add.x + add.size && y >= add.y && y <= add.y + add.size)
           return { type: 'add', row };
-        const first = startAdd && items.length > 0 ? addStartRect(row, scale) : null;
+        const startHandle = selected && at === 0 ? m.trimHandle : 0;
+        const first = startAdd && items.length > 0 ? addStartRect(row, scale, startHandle) : null;
         if (
           first &&
           x >= first.x &&

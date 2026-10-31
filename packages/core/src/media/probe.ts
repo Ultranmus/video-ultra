@@ -73,12 +73,36 @@ const IMAGE_SIGNATURES: [RegExp | ((b: Uint8Array) => boolean), string][] = [
   [(b) => ascii(b, 0, 4) === 'GIF8', 'image/gif'],
   [(b) => ascii(b, 4, 4) === 'ftyp' && /^(avif|avis)$/.test(ascii(b, 8, 4)), 'image/avif'],
   [
-    (b) =>
-      ascii(b, 4, 4) === 'ftyp' &&
-      /^(heic|heix|heim|heis|hevc|hevx|mif1|msf1)$/.test(ascii(b, 8, 4)),
+    (b) => ascii(b, 4, 4) === 'ftyp' && /^(heic|heix|heim|heis|hevc|hevx)$/.test(ascii(b, 8, 4)),
     'image/heic',
   ],
+  // The generic image-file brands: what's inside is told by the compatible brands — an AVIF
+  // (which browsers can open), a HEIC, or another HEIF.
+  [
+    (b) =>
+      ascii(b, 4, 4) === 'ftyp' &&
+      /^(mif1|msf1)$/.test(ascii(b, 8, 4)) &&
+      compatibleBrands(b).some((brand) => brand === 'avif' || brand === 'avis'),
+    'image/avif',
+  ],
+  [
+    (b) =>
+      ascii(b, 4, 4) === 'ftyp' &&
+      /^(mif1|msf1)$/.test(ascii(b, 8, 4)) &&
+      compatibleBrands(b).some((brand) => /^(heic|heix|heim|heis|hevc|hevx)$/.test(brand)),
+    'image/heic',
+  ],
+  [(b) => ascii(b, 4, 4) === 'ftyp' && /^(mif1|msf1)$/.test(ascii(b, 8, 4)), 'image/heif'],
 ];
+
+/** The `ftyp` box's compatible brands (as far as `bytes` reaches). */
+function compatibleBrands(bytes: Uint8Array): string[] {
+  const size = ((bytes[0]! << 24) | (bytes[1]! << 16) | (bytes[2]! << 8) | bytes[3]!) >>> 0;
+  const end = Math.min(size, bytes.length);
+  const brands: string[] = [];
+  for (let i = 16; i + 4 <= end; i += 4) brands.push(ascii(bytes, i, 4));
+  return brands;
+}
 
 function ascii(bytes: Uint8Array, start: number, length: number): string {
   return String.fromCharCode(...bytes.subarray(start, start + length));
@@ -124,7 +148,8 @@ export async function probeMedia(
   if (file.size === 0)
     return { ok: false, code: 'empty', message: `"${name}" is empty (0 bytes).` };
 
-  const head = new Uint8Array(await file.slice(0, 32).arrayBuffer());
+  // 64 bytes: room for an image file's compatible brands (HEIF / AVIF).
+  const head = new Uint8Array(await file.slice(0, 64).arrayBuffer());
   const imageType = sniffImage(head);
   if (imageType) return probeImage(file, name, imageType);
 
@@ -161,11 +186,12 @@ async function probeImage(file: Blob, name: string, mimeType: string): Promise<P
     bitmap.close();
     return { ok: true, media, warnings: [] };
   } catch {
-    if (mimeType === 'image/heic') {
+    if (mimeType === 'image/heic' || mimeType === 'image/heif') {
+      const kind = mimeType === 'image/heic' ? 'HEIC' : 'HEIF';
       return {
         ok: false,
         code: 'unsupported-image',
-        message: `"${name}" is a HEIC photo, which this browser can't open yet. Export it as JPEG (iPhone: Settings → Camera → Formats → Most Compatible) and try again.`,
+        message: `"${name}" is a ${kind} photo, which this browser can't open yet. Save or share it as JPEG first (Photos / Gallery app → share or export as JPEG; iPhone camera: Settings → Camera → Formats → Most Compatible) and try again.`,
       };
     }
     return { ok: false, code: 'damaged', message: `"${name}" looks damaged and can't be opened.` };

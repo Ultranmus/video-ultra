@@ -58,6 +58,9 @@
     --vu-swatch-hue-1: #ff4d6d;
     --vu-swatch-hue-2: #5b8cff;
     --vu-swatch-hue-3: #8fd16a;
+    /* Blend tiles: what's under (a colour ramp) and the layer on top (a dot). */
+    --vu-blend-under: linear-gradient(135deg, #f2b33d 0%, #e0457b 50%, #3a7bd5 100%);
+    --vu-blend-over: #7fd6c2;
 
     /* Typography */
     --vu-font-family: inherit;
@@ -68,6 +71,8 @@
     --vu-text-md: 13px;
     --vu-text-lg: 14px;
     --vu-text-xl: 16px;
+    /* Text fields on touch screens: iOS zooms the page in on focus below this size. */
+    --vu-text-field-touch: 16px;
     --vu-weight-regular: 400;
     --vu-weight-medium: 500;
     --vu-weight-semibold: 600;

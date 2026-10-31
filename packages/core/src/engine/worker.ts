@@ -350,6 +350,40 @@ let wakeRefine: (() => void) | null = null;
 /** The paused-preview loop while it runs — play() waits for it so two renders never overlap. */
 let pausedLoop: Promise<void> | null = null;
 
+// "Drawn" for project updates while paused: each update gets a number, and its request answers
+// once a frame drawn with it (or a newer one) is on screen — so the editor can move things it
+// draws itself (the selection frame) in step with the picture.
+let projectGen = 0;
+let drawnGen = 0;
+let drawnWaiters: { gen: number; resolve: () => void }[] = [];
+/** A paused update answers within this long even if no frame came (it never holds a drag). */
+const DRAWN_WAIT_MS = 150;
+
+function frameDrawn(gen: number): void {
+  if (gen <= drawnGen) return;
+  drawnGen = gen;
+  if (drawnWaiters.length === 0) return;
+  const still: typeof drawnWaiters = [];
+  for (const w of drawnWaiters) {
+    if (w.gen <= gen) w.resolve();
+    else still.push(w);
+  }
+  drawnWaiters = still;
+}
+
+function whenDrawn(gen: number): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, DRAWN_WAIT_MS);
+    drawnWaiters.push({
+      gen,
+      resolve: () => {
+        clearTimeout(timer);
+        resolve();
+      },
+    });
+  });
+}
+
 /** Seek while paused: latest request wins; draws as soon as frames are ready. */
 function showAt(t: Time): Promise<void> {
   wantedTime = t;
@@ -368,6 +402,7 @@ async function pausedPreview(): Promise<void> {
     while (wantedTime !== null && !playing && !exportJob) {
       const next = wantedTime;
       wantedTime = null;
+      const gen = projectGen;
       // Progressive: show what's ready almost at once, then redraw when the exact frames arrive —
       // unless the user has moved on (a newer seek is waiting).
       releaseIdle(next);
@@ -377,6 +412,7 @@ async function pausedPreview(): Promise<void> {
           return [];
         },
       );
+      frameDrawn(gen);
       for (
         let attempt = 0;
         pendingRequests.length > 0 && wantedTime === null && attempt < 3;
@@ -901,7 +937,7 @@ async function pickColour(
 ): Promise<EngineResponseData> {
   if (!project) throw new Error('No project');
   const found = findItem(project, request.itemId);
-  const none = { type: 'pick-colour' as const, color: null };
+  const none = { type: 'pick-colour' as const, color: null, covers: 0 };
   if (!found || !('crop' in found.item)) return none;
   if (request.x < 0 || request.x > 1 || request.y < 0 || request.y > 1) return none;
   const { width: pw, height: ph } = project.settings;
@@ -931,31 +967,59 @@ async function pickColour(
   );
   await l.composer.render(mini, t, width, height, null);
   const bitmap = l.canvas.transferToImageBitmap();
-  const read = new OffscreenCanvas(5, 5);
+  // The whole small frame (≤ 480 px wide, read once per pick): the tapped 5 × 5 spot, and how much
+  // of the picture a key of that colour would remove.
+  const read = new OffscreenCanvas(width, height);
   const ctx = read.getContext('2d', { willReadFrequently: true })!;
-  const x = Math.round(request.x * width);
-  const y = Math.round(request.y * height);
-  ctx.drawImage(bitmap, x - 2, y - 2, 5, 5, 0, 0, 5, 5);
+  ctx.drawImage(bitmap, 0, 0);
   bitmap.close();
   looksDone();
-  const data = ctx.getImageData(0, 0, 5, 5).data;
+  const all = ctx.getImageData(0, 0, width, height).data;
+  const x = Math.round(request.x * width);
+  const y = Math.round(request.y * height);
   let r = 0;
   let g = 0;
   let b = 0;
   let n = 0;
-  for (let i = 0; i < data.length; i += 4) {
-    if (data[i + 3] === 0) continue;
-    r += data[i]!;
-    g += data[i + 1]!;
-    b += data[i + 2]!;
-    n++;
+  for (let py = Math.max(0, y - 2); py <= Math.min(height - 1, y + 2); py++) {
+    for (let px = Math.max(0, x - 2); px <= Math.min(width - 1, x + 2); px++) {
+      const i = (py * width + px) * 4;
+      if (all[i + 3] === 0) continue;
+      r += all[i]!;
+      g += all[i + 1]!;
+      b += all[i + 2]!;
+      n++;
+    }
   }
   if (n === 0) return none;
-  const hex = (v: number) =>
-    Math.round(v / n)
-      .toString(16)
-      .padStart(2, '0');
-  return { type: 'pick-colour', color: `#${hex(r)}${hex(g)}${hex(b)}` };
+  r /= n;
+  g /= n;
+  b /= n;
+  // The key works on colour tone (chroma), not brightness: picking a grey, black or white spot
+  // (or a frame that wasn't drawn yet) would remove nearly every pixel. Measure it.
+  // Same chroma as the shader (and chromaOf), on 0…255 values: distances scale by 255.
+  const kb = -0.1146 * r - 0.3854 * g + 0.5 * b;
+  const kr = 0.5 * r - 0.4542 * g - 0.0458 * b;
+  const tolerance = 'key' in item && item.key ? item.key.tolerance : 0.4;
+  const removed = (0.02 + 0.4 * Math.max(0, Math.min(1, tolerance))) * 255;
+  let inside = 0;
+  let gone = 0;
+  for (let i = 0; i < all.length; i += 16) {
+    if (all[i + 3] === 0) continue;
+    inside++;
+    const pr = all[i]!;
+    const pg = all[i + 1]!;
+    const pb = all[i + 2]!;
+    const db = -0.1146 * pr - 0.3854 * pg + 0.5 * pb - kb;
+    const dr = 0.5 * pr - 0.4542 * pg - 0.0458 * pb - kr;
+    if (db * db + dr * dr < removed * removed) gone++;
+  }
+  const hex = (v: number) => Math.round(v).toString(16).padStart(2, '0');
+  return {
+    type: 'pick-colour',
+    color: `#${hex(r)}${hex(g)}${hex(b)}`,
+    covers: inside ? gone / inside : 0,
+  };
 }
 
 /**
@@ -1138,11 +1202,16 @@ async function handle(
       composer.cheapEffects = tier === 'low';
       return { type: 'init', backend: renderer.backend };
     }
-    case 'project':
+    case 'project': {
       project = request.project;
       pruneSources();
-      if (!playing) void showAt(playheadAt);
+      if (playing || exportJob) return { type: 'ok' };
+      const gen = ++projectGen;
+      const drawn = whenDrawn(gen);
+      void showAt(playheadAt);
+      await drawn;
       return { type: 'ok' };
+    }
     case 'media': {
       const asset = project?.assets[request.assetId];
       if (asset?.kind === 'image') loadImage(request.assetId, request.blob, asset.mimeType);

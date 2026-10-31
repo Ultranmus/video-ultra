@@ -147,6 +147,41 @@ export function Ruler({
     last: number;
   } | null>(null);
   const [dragging, setDragging] = useState(false);
+  // Touch: the ruler allows vertical scrolling (pan-y) so a sheet still scrolls over it, but a
+  // gesture that starts sideways is ours — the first touch move decides, and a sideways one
+  // stops the browser from also scrolling (which used to cancel the drag and undo the value).
+  const rulerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = rulerRef.current;
+    if (!el) return;
+    let x = 0;
+    let y = 0;
+    let axis: 'x' | 'y' | null = null;
+    const onStart = (e: TouchEvent) => {
+      const t = e.touches[0];
+      if (!t || e.touches.length > 1) return;
+      x = t.clientX;
+      y = t.clientY;
+      axis = null;
+    };
+    const onMove = (e: TouchEvent) => {
+      const t = e.touches[0];
+      if (!t || e.touches.length > 1) return;
+      if (!axis) {
+        const dx = Math.abs(t.clientX - x);
+        const dy = Math.abs(t.clientY - y);
+        if (dx < 2 && dy < 2) return;
+        axis = dx >= dy ? 'x' : 'y';
+      }
+      if (axis === 'x' && e.cancelable) e.preventDefault();
+    };
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchmove', onMove, { passive: false });
+    return () => {
+      el.removeEventListener('touchstart', onStart);
+      el.removeEventListener('touchmove', onMove);
+    };
+  }, []);
   const tick = niceTick(max - min);
   const pxPerUnit = TICK_PX / tick;
   const clamp = (v: number) => Math.min(max, Math.max(min, Math.round(v / step) * step));
@@ -173,6 +208,7 @@ export function Ruler({
 
   return (
     <div
+      ref={rulerRef}
       className="vu-ruler"
       data-compact={compact || undefined}
       role="slider"
@@ -212,9 +248,12 @@ export function Ruler({
         if (d.moved) onChange(d.last, true);
       }}
       onPointerCancel={() => {
+        const d = drag.current;
         drag.current = null;
         setDragging(false);
-        onCancel?.();
+        // The browser took the gesture over after a real sideways drag: keep where it got to.
+        if (d?.moved) onChange(d.last, true);
+        else onCancel?.();
       }}
       onDoubleClick={() => {
         if (defaultValue !== undefined) onChange(defaultValue, true);

@@ -14,6 +14,10 @@ describe('sniffImage', () => {
     expect(sniffImage(bytes('GIF89a'))).toBe('image/gif');
     expect(sniffImage(bytes(0, 0, 0, 0x18, 'ftypheic', 0, 0, 0, 0))).toBe('image/heic');
     expect(sniffImage(bytes(0, 0, 0, 0x18, 'ftypavif'))).toBe('image/avif');
+    // Generic image-file brand: the compatible brands tell what's inside.
+    expect(sniffImage(bytes(0, 0, 0, 0x18, 'ftypmif1', 0, 0, 0, 0, 'mif1avif'))).toBe('image/avif');
+    expect(sniffImage(bytes(0, 0, 0, 0x18, 'ftypmif1', 0, 0, 0, 0, 'mif1heic'))).toBe('image/heic');
+    expect(sniffImage(bytes(0, 0, 0, 0x14, 'ftypmif1', 0, 0, 0, 0, 'mif1'))).toBe('image/heif');
   });
 
   it('does not mistake videos for images', () => {

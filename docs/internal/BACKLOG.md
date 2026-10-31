@@ -4,6 +4,257 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 
 ## Open
 
+- [ ] Checks in the cloud container (2026-10-31): `stage-text-check`'s phone part needs WebKit,
+      which isn't installed there; run in Chromium, the tap that opens the field also moves the
+      caret into the word ("HeSalello"), same before and after the 10-31 changes. Check on the real
+      iPhone that typing on the video goes on at the end of the text.
+- [x] (fixed 2026-10-31) Phone test (owner, 2026-10-30): once the browser zooms the page in (pinch, or a double
+      tap), it can't be zoomed back out — the page stays stuck zoomed. Not fixed yet, only
+      recorded. Likely cause (to check): most of the editor area has `touch-action: none`
+      (preview, timeline, sheets in `editor.css`), so a pinch-out lands on parts that swallow it
+      and the browser never gets it. Also check the viewport settings in `apps/playground/app/layout.tsx`
+      and whether an input under 16px font makes iOS zoom in on focus.
+      Fixed: no focus zoom (16 px fields on touch), pinch gets through once zoomed (#174).
+- [x] (fixed 2026-10-31) Phone test (owner, 2026-10-30): in the selection menu, the Align submenu's top option
+      shows the hover color, pressed right up against the Align row with no gap at all. Not
+      fixed yet, only recorded. Likely cause (to check): on phones the submenu opens inline
+      under its item (`.vu-submenu` in the `max-width: 767px` container query in `editor.css`)
+      with `padding: 0` and no top margin, so the highlighted Align row (`aria-expanded`) and
+      the first option touch. The first option also looks hovered because `:hover` sticks after
+      a tap on touch screens (`.vu-menu-item:hover` isn't limited to `@media (hover: hover)`).
+      Fixed: gap under the open item; hover only on real pointers.
+- [x] (fixed 2026-10-31) Phone test (owner, 2026-10-30): renaming a layer (double tap on its name in Layers) works,
+      but the name field's border and focus outline sit right on the layer row's border — no
+      space between them, they touch. Not fixed yet, only recorded. Likely cause (to check):
+      `.vu-layer-rename` (`editor.css`) is `--vu-size-choice` tall and stretches to the row's
+      right edge (the row has only `--vu-space-1` right padding and no top/bottom padding),
+      while the selected row draws a 2px inset `--vu-selection` ring and the root
+      `:focus-visible` outline adds more, so field border, outline and row ring overlap.
+      Fixed: the field sits inside the row with room; no second focus ring.
+- [x] (fixed 2026-10-31) Phone test (owner, 2026-10-30): with Layers open, picking Style in the bottom nav opens
+      Style, but the Layers button in the top bar still shows as pressed (selected). Not fixed
+      yet, only recorded. Likely cause (to check): `openTool` (`controller.ts`) sets `tool` but
+      leaves `sheetPanel: true`; the sheet hides the panel because a tool is open, but the top
+      bar's `layersOpen` (`shell.tsx`) checks only `panel === 'layers' && sheetPanel` and not
+      `!tool`. Same for the History button. Fix either side: clear `sheetPanel` when a tool
+      opens on phone, or add `!s.tool` to those two checks.
+      Fixed: a tool sheet replaces the Layers / History sheet; the buttons check `!tool`.
+- [x] (fixed 2026-10-31) Phone test (owner, 2026-10-30): Media → camera → record a video. On the review screen the
+      "Add as a layer" and "Add to video" buttons are different heights; they should match.
+      Not fixed yet, only recorded. Likely cause (to check): the review bar
+      (`.vu-camera-bar[data-review]`, `editor.css`) is flex but keeps `align-items: center` from
+      the base `.vu-camera-bar` grid rule, so buttons don't stretch to the row's height; on a
+      narrow phone the longer label ("Add as a layer", plus its icon) wraps to two lines and
+      that button grows taller than its neighbour. Fix: `align-items: stretch` on the review
+      bar (and/or keep labels on one line).
+      Fixed: `align-items: stretch` on the review bar.
+- [x] (fixed 2026-10-31) Phone test (owner, 2026-10-30): in any bottom sheet, the horizontal row of tab pills
+      (category chips) sits with extra space on the left/right, so it doesn't line up with the
+      text and options under it — looks off. Not fixed yet, only recorded. Likely cause (to
+      check): the sticky `.vu-browser-bar` (`editor.css`) breaks out with
+      `margin-inline: -space-4` and pads back `space-4`, assuming the sheet's side padding is
+      exactly `--vu-space-4`; if the phone sheet's padding differs, the chips shift. The inner
+      `.vu-chips-scroll` also adds `padding: space-1` (focus-ring room) with a matching negative
+      margin — check that it really cancels inside the bar. The first chip should start on the
+      same line as the section titles and grid below. Owner confirmed it on the Text and
+      Stickers tabs too (their pill bars are shifted inward the same way).
+      Fixed (check on the iPhone): the chip row runs edge to edge, its padding puts the first chip on the content line.
+- [x] (fixed 2026-10-31) Phone test (owner, 2026-10-30): the Templates grid shows 4 per row on a phone; the text in
+      each template is too small to read or judge. Owner wants 2 or 3 per row on phones. Not
+      fixed yet, only recorded. Cause: `.vu-template-grid` (`editor.css`) is
+      `repeat(auto-fill, minmax(var(--vu-size-template), 1fr))` with `--vu-size-template: 72px`
+      (`tokens.css`), so a ~360–430px sheet fits 4. Fix: a phone container query with a fixed
+      2 (or 3) columns, or a larger min size token. Check UI_VISION.md before choosing.
+      Reference the owner liked: the Text tab on phone — 3 per row, big readable text.
+      Fixed: 3 per row on phones (#180).
+- [x] (fixed 2026-10-31) Phone test (owner, 2026-10-30): the Filters grid also shows 4 per row on a phone; owner
+      wants 3. Not fixed yet, only recorded. Same cause as the Templates entry above:
+      `.vu-filter-grid` (`editor.css`) is
+      `repeat(auto-fill, minmax(var(--vu-size-filter-tile), 1fr))` with
+      `--vu-size-filter-tile: 72px`. Fix both together (a phone column count of 3).
+      Owner's rule for phone grids: tiles with long text or a picture to judge (templates,
+      filters) → 3 per row; tiles with an emoji or a short word (stickers, emoji) → keep 4,
+      bigger would look oversized. Apply per grid, not one global count.
+      Fixed: 3 per row on phones; emoji / stickers keep 4 (#180).
+- [x] (fixed 2026-10-31) Phone test (owner, 2026-10-30): on-screen keyboard. After picking a template, the keyboard
+      opens and the whole editor shifts up — the top part goes off screen and the text field
+      being edited isn't kept in view, so editing is hard. Same everywhere a text field opens
+      the keyboard. Wanted: the editor stays put, the sheet rises above the keyboard as one
+      whole piece, and the field being edited is always visible. Not fixed yet, only recorded.
+      Likely cause (to check): iOS ignores `interactiveWidget: 'resizes-content'`
+      (`apps/playground/app/layout.tsx`) and pans the whole page up to reveal the focused field;
+      the `visualViewport` handler in `VideoEditor.tsx` sets `--vu-keyboard` / `data-keyboard`
+      but doesn't undo the pan (pin the root to `vv.offsetTop` / `vv.height`, or stop the page
+      scroll), and nothing scrolls the focused field into view inside the sheet. Test on both
+      iPhone Safari and Android Chrome.
+      Fixed (check on iPhone + Android): #175.
+- [x] (fixed 2026-10-31) Phone test (owner, 2026-10-30): tapping any text field to edit also zooms the page in, so
+      the parts beside it get cut off (and then it can't be zoomed back out — see the first
+      phone-test entry above). Owner: no zooming anywhere in the phone view. Not fixed yet, only
+      recorded. Cause: iOS Safari zooms in on focus whenever a field's font is under 16px; our
+      text tokens are 11–13px (`--vu-text-xs/sm/md`, `tokens.css`) and the fields inherit them.
+      Fix: fields at least 16px on phones (a phone token, via the `.vu-root` container query),
+      not a `maximum-scale=1` viewport (that blocks zoom for people who need it, and host apps
+      own the viewport anyway). Owner confirmed the same when adding text from the Text tab:
+      it zooms in and the editor isn't in full view while typing.
+      Fixed: #174.
+- [x] (fixed 2026-10-31) Phone test (owner, 2026-10-30): Templates → pick one → "Add to video": the sheet stays
+      open, so it's unclear what's left to do there and the added template can't be seen in
+      the frame. Wanted: the sheet closes by itself after adding, showing the template on the
+      preview. Not fixed yet, only recorded. Check the other add actions in sheets (media,
+      stickers, text) for the same behaviour, and keep the result selected so it can be edited
+      right away.
+      Fixed: template, sticker and library-media adds close the phone sheet (#180).
+- [ ] Phone test (owner, 2026-10-30), feature request: Canvas tab → Color section should offer
+      a transparent background as one of the background colors. (Canvas and Blur tabs were
+      otherwise fine on phone.) Not done yet, only recorded. To think through: the preview
+      shows a checkerboard for transparent; export keeps it only in formats that carry alpha
+      (WebM VP9/AV1 with alpha, PNG/WebP stills, GIF one-bit) — H.264 MP4 has no alpha, so pick
+      a fallback (black) and say so in the export sheet. Must work the same on WebGPU and
+      WebGL2. Record the choice in DECISIONS.md.
+      Not done 2026-10-31: needs transparent-video export first (#144 left it out). Owner to choose: MP4 (no alpha) falls back to black with a note, and transparent only in WebM (VP9 alpha) / PNG stills?
+- [x] (fixed 2026-10-31) Phone test (owner, 2026-10-30): selecting a locked item shows its dashed box only on the
+      top and bottom edges, not left and right. Spec (UI_VISION.md: "Locked items show a dashed
+      box without handles") wants all four sides. Not fixed yet, only recorded. Likely cause (to
+      check): the item spans the full frame width, so `.vu-selection-box[data-locked]`'s
+      `outline` (`editor.css`) is drawn outside the box and the stage's overflow clips the left
+      and right sides. Fix: draw the dash inside (`outline-offset` negative, or an inset
+      border) so it shows at the frame edges. Check unlocked full-width selections too.
+      Fixed: the dash is drawn inside the box.
+- [x] (fixed 2026-10-31) Phone test (owner, 2026-10-30), bad one: double tap a text on the preview to edit it in
+      place → the page zooms and the keyboard opens, the frame shifts up, and the typing text
+      ends up drawn over the frame in the wrong place (not on top of the text it edits). Not
+      fixed yet, only recorded. Likely cause (to check): the in-place field (`textarea.vu-stage-text`
+      in `Stage.tsx`, an absolutely placed DOM overlay) gets its font size from the text's size
+      × preview scale, often under 16px, so iOS zooms on focus (same cause as the field-zoom
+      entry above); the zoom + keyboard pan move the frame, and the overlay's position isn't
+      re-measured, so it drifts off its text. Fix together with the keyboard and field-zoom
+      entries: no focus zoom (scale the field with a transform instead of a small font size),
+      keep the frame in view above the keyboard, and re-place the overlay on
+      `visualViewport` resize/scroll.
+      Fixed (check on the iPhone): field scales instead of a small font; the video shrinks above the keyboard (#174, #175).
+- [x] (fixed 2026-10-31) Phone test (owner, 2026-10-30): Filters → Intensity slider. Dragging it sideways also
+      starts a vertical scroll (owner: not the sheet's list moving up/down inside the sheet —
+      a vertical scroll of the view itself), the two mix, and then the intensity jumps back to
+      its old value. Not fixed yet, only recorded. Cause (from the code): the ruler slider
+      (`.vu-ruler`, `editor.css`) has `touch-action: pan-y`, so any slightly diagonal swipe lets
+      the browser take the gesture as a vertical scroll; it then fires `pointercancel`, and
+      `onPointerCancel` in `controls.tsx` calls `onCancel` and reverts the value. Fix: once the
+      drag has moved sideways (`d.moved`), keep it (e.g. `touch-action: none` on the ruler while
+      dragging / lock direction on the first move), and on a cancel after a real sideways drag
+      commit the last value instead of reverting. Affects every ruler slider in sheets, not just
+      Filters.
+      Fixed: a sideways first move stops the browser's scroll; a cancel after a real drag keeps the value (every ruler slider).
+- [x] (fixed 2026-10-31) Phone test (owner, 2026-10-30), design: Opacity and Blend both work, but each sheet
+      looks too empty — Opacity is a single slider, and Blend is a list of names only, with no
+      preview of what each mode does. Owner's options: combine the small ones (e.g. Opacity +
+      Blend, maybe other one-control tools) into one sheet, or give each a richer view — e.g.
+      Blend as preview tiles showing the selected item blended with each mode. Not done yet,
+      only recorded. Decide against UI_VISION.md (tool bar layout) and record it in
+      DECISIONS.md; previews must be cheap (small, cached, made off the main thread).
+      Done: one "Opacity & blend" tool with preview tiles (#178).
+- [x] (fixed 2026-10-31) Phone test (owner, 2026-10-30): dragging a text on the preview — the selection border
+      moves with the finger but the text itself doesn't keep up (border and text come apart
+      during the drag). (The rest of the Text tab works on phone.) Not fixed yet, only
+      recorded. Likely cause (to check): the box is DOM on the main thread and moves at once,
+      while the text is drawn by the engine worker from `ctl.preview(...)` (`Stage.tsx`), so it
+      lands a frame or more later — or previews get dropped/coalesced on a phone. Measure the
+      box-to-frame lag on the iPhone; options: move the box only when the engine reports the
+      frame drawn, or draw the box in the same pass.
+      Fixed (check on the iPhone): on touch the frame moves when the engine has drawn the move (#176).
+- [ ] Phone test (owner, 2026-10-30): Rotate, Flip and canvas size (ratio) changes apply as an
+      instant snap, which feels abrupt; owner wants them smooth. Not done yet, only recorded.
+      Idea: a short eased transition (~150–200 ms, `--vu-duration-*` / `--vu-ease-out`) of the
+      item or frame from old to new, animated in the engine (no React per frame), instant
+      under reduced motion. One edit is still committed; the animation is view-only.
+      Partly done 2026-10-31: Rotate (quarter turn) and a blurred area's flips now ease over 180 ms (instant under reduced motion), one edit. Still open: a picture's mirror flip (the transform has no in-between for a mirror) and the canvas size change.
+- [x] (fixed 2026-10-31) Phone test (owner, 2026-10-30): on the timeline's main (frame) lane, the last clip's
+      right trim/drag handle sits behind the "+" (add media) button at the end, so it's hidden
+      and hard or impossible to grab. Not fixed yet, only recorded. Cause (from the code): the
+      "+" is placed only 8px after the last clip's end (`addButtonRect`,
+      `timeline/geometry.ts`), the touch trim handle is wider than that, and the hit test checks
+      the "+" before the clip's handles (same file, ~line 267), so a touch there adds media
+      instead of trimming; `timeline/view.ts` also draws the "+" over the handle. Fix: when the
+      last clip is selected, push the "+" past the handle (or hide it while trimming) and test
+      handles before the "+".
+      Fixed: the "+" moves past a selected end (or start) clip's handle, drawn and hit-tested; unit test.
+- [x] (fixed 2026-10-31) Phone test (owner, 2026-10-30): Sound effects sheet — too little space between the sound
+      look chips and the "Clean up noise" slider label under them; they feel stuck together.
+      Not fixed yet, only recorded. Cause (from the code): `.vu-soundfx` (`editor.css`) is a
+      column with `gap: var(--vu-space-3)` for everything, so the chip group → first slider
+      break is the same as slider → slider. Fix: a bigger gap after the chips (a section-gap
+      token, matching other sheets), not a raw value.
+      Fixed: more room after the chips.
+- [x] (fixed 2026-10-31) Phone test (owner, 2026-10-30): tooltips on phone are only ~70–80% of the screen wide, so
+      their text wraps onto several lines. Wanted: full width on phones (with the side gutter).
+      Not fixed yet, only recorded. Cause: `.vu-tooltip` (`editor.css`) has
+      `max-width: var(--vu-size-tooltip)`; add a phone rule (container query on `.vu-root`) that
+      lets it span the editor width minus the gutter.
+      Fixed: as wide as the editor less the edge gap on phones.
+- [x] (fixed 2026-10-31) Phone test (owner, 2026-10-30): Green screen → "Pick from video": the sheet stays open and
+      covers the preview. Wanted: close (or drop) the sheet so the person can tap a colour on
+      the video — the tooltip already tells them to tap — then bring the sheet back after the
+      pick (or on cancel). Not done yet, only recorded.
+      Fixed: the sheet goes down while picking, back after (#177).
+- [x] (fixed 2026-10-31) Phone test (owner, 2026-10-30), bad one: Green screen → pick a colour on the video → the
+      whole video disappears (keyed out entirely), not just the picked colour. Didn't happen on
+      desktop; owner isn't sure if it's this video. Not fixed yet, only recorded. To check:
+      (1) the tap point is wrong on phone — page zoom / keyboard pan (see the zoom entries)
+      shifts the preview, so `Stage.tsx` (~line 522) sends wrong `x/pw, y/ph` to
+      `pickKeyColour` (`controller.ts`) and it picks a colour that matches most of the frame;
+      (2) the engine's `pickColour` readback on the phone's backend (likely WebGL2 on iPhone)
+      returns a wrong value (premultiplied alpha, colour space, or reading an empty/black
+      frame before the picture is drawn); (3) the key tolerance is too wide for that colour.
+      Reproduce with the same video on desktop and phone, log the picked hex on both.
+      Fixed (check with the same video): taps outside the picture don't pick; a colour that would remove > 85 % is refused (#177). Cause: the key ignores brightness, so a black / grey pick removed most of the picture.
+- [x] (fixed 2026-10-31) Phone test (owner, 2026-10-30), feature request: make the timeline (frame lanes) area on
+      phone resizable like a sheet, with a drag handle and snap points: **minimal** (only the
+      play bar — play button, timecode — so the preview gets the most room), **normal** (today's
+      height), **full** (expanded, many lanes visible). Drag down from normal to collapse to
+      the play bar; drag up to bring it back. Not done yet, only recorded. To think through:
+      fit with UI_VISION.md's phone layout and the bottom tool sheet (which one wins the space),
+      keep the preview resizing smooth (drag state local, one commit on release, no React per
+      frame), remember the chosen size, keyboard/screen-reader way to change it, reduced
+      motion. Record in DECISIONS.md.
+      Done: grip on the play bar, minimal / normal / large (#179).
+- [x] (fixed 2026-10-31) Phone test (owner, 2026-10-30): scrolling the timeline lanes up/down isn't as smooth as
+      expected (feels unlike a native list). Not fixed yet, only recorded. Cause (from the
+      code, `timeline/view.ts`): the canvas does its own vertical pan (~line 866) — it follows
+      the finger 1:1 but has no momentum (the fling ~line 1145 only handles horizontal: samples
+      record `x` only), so it stops dead on release; no edge bounce; and the axis locks on the
+      very first move (`Math.abs(dx) >= Math.abs(dy)`, no dead zone), so a slightly sideways
+      start turns into a seek instead. Fix: vertical fling with the same decay, a few px dead
+      zone before locking the axis, maybe a soft edge stop. Measure redraw cost per frame on
+      the iPhone while scrolling (should be a cheap redraw, no React).
+      Fixed: vertical fling with the same decay, 6 px before the axis locks.
+- [x] (fixed 2026-10-31) Phone test (owner, 2026-10-30), clarity: the owner couldn't tell how fine trim works on a
+      sound clip on phone. Desktop explains it with a shortcut (Alt-drag on the timeline);
+      phone has no hint at all. Not done yet, only recorded. What exists: the Fine trim tool
+      (`protrim.tsx`, all devices) — Slip (which part of the sound plays, clip stays put), Roll
+      (move the cut after the clip) and Slide (main video only), a frame per step plus a
+      slider. Needed on phone: a one-line explanation per row (what Slip/Roll do, in plain
+      words) and/or a short first-use hint, translatable; check the tool shows and works for
+      sound clips (Slip needs extra media beyond the trimmed part — say so when there's none).
+      Fixed: a plain-words line under Slip, Move cut and Slide; "nothing to slip" when the whole recording is in use; the desktop shortcut line only on desktop.
+- [ ] User report (via owner, 2026-10-30): a HEIF photo (`.heif` / `image/heif` — owner: HEIF,
+      not HEIC) shared from an iPhone to an Android phone can't be picked in the editor on
+      Android. Note: `probe.ts` (~line 75) sniffs every HEIF brand, including the generic
+      `mif1`/`msf1`, as `image/heic` and calls it "a HEIC photo" in the error — wrong name for
+      a `.heif`, and a `mif1` file can actually hold AVIF (check the compatible brands before
+      deciding), which Chrome on Android _can_ decode. Owner: the same file picks and opens fine
+      on iPhone — expected, since iOS Safari decodes HEIF natively (and its picker may hand it
+      over as JPEG); so the gap is Android-only (picker filtering and/or no HEIF decoder). Not fixed yet, only recorded. Two parts
+      to check: (1) the picker — the file input's `accept`
+      (`'video/*,audio/*,image/*,.mov,.mkv,.heic,.heif,…'`, `VideoEditor.tsx` ~line 153) may
+      not let Android's picker select it (some pickers grey files out by extension/MIME; try
+      adding `image/heic,image/heif`, test the system picker and Google Photos), and a shared
+      file can arrive with no extension or a generic MIME; (2) decoding — Chrome on Android
+      generally can't decode HEIC, so `probe.ts` (~line 164) would reject it with "this browser
+      can't open yet". Real fix needs a HEIC decoder (lazy-loaded, in a worker, only when a
+      HEIC arrives; measure size/speed first — see the WASM rule in CLAUDE.md). That error
+      message is also hard-coded English, not a translatable label.
+      Partly done 2026-10-31: the picker lists `image/heic,image/heif`; `mif1`/`msf1` files are told apart by their compatible brands (AVIF → opens, HEIC, else HEIF) and the message names HEIF vs HEIC with how to save it as JPEG. Still open: decoding HEIC/HEIF on Android Chrome (needs a decoder; measure first) and the message isn't translatable yet.
+
 - [ ] Playground voice (Google): the newer speech models (3.x) read pace words out loud and
       take no instruction field, so the speed slider does nothing on them; only the 2.5 models
       still get "Say slowly: …". Fix: time-stretch the answer (keep pitch) or set the placed

@@ -116,6 +116,19 @@ describe('timeline geometry', () => {
     expect(hitTest(rows, m, scale, 200 - 8 - 20, y, null, true, false).type).not.toBe('add');
   });
 
+  it('the "+" after the last clip moves clear of its selected end handle', () => {
+    const p = project();
+    const rows = layoutRows(p, m);
+    const scale = { pps: 100, x0: 0 };
+    const y = rows[0]!.top + m.mainTrack / 2;
+    // The video ends at 5 s (500 px): the "+" starts 8 px after it.
+    expect(hitTest(rows, m, scale, 510, y, null, true).type).toBe('add');
+    // The last clip selected: right after its end is its trim handle, the "+" sits past it.
+    const handle = hitTest(rows, m, scale, 510, y, 'c2', true);
+    expect(handle.type === 'trim' && handle.edge).toBe('end');
+    expect(hitTest(rows, m, scale, 500 + 8 + m.trimHandle + 4, y, 'c2', true).type).toBe('add');
+  });
+
   it('groups rows: main video, picture layers, text, then sound', () => {
     const p = project();
     const lane = (id: string, kind: 'overlay' | 'text' | 'audio') =>

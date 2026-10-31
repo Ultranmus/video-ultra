@@ -155,14 +155,19 @@ function ItemTool({ tool, item }: { tool: ToolId; item: Item }): ReactElement | 
       return <TextEditTool item={item} />;
     case 'text-style':
       return <TextStyleTool item={item} />;
+    // Opacity & blend: one sheet (each alone looked empty on a phone).
     case 'opacity':
-      return <OpacityTool item={item} />;
+    case 'blend':
+      return (
+        <>
+          <OpacityTool item={item} />
+          <BlendTool item={item} />
+        </>
+      );
     case 'duration':
       return <DurationTool item={item} />;
     case 'key':
       return <GreenScreenTool item={item} />;
-    case 'blend':
-      return <BlendTool item={item} />;
     case 'region':
       return <RegionTool item={item} />;
     case 'mask':
@@ -653,6 +658,9 @@ function TransformTool({ item }: { item: Item }) {
   if (!tf) return null;
   const set = (label: string, patch: Partial<Transform>) =>
     ctl.run(label, (d) => setTransformAt(d, item.id, { ...tf, ...patch }, time));
+  // A turn eases into place on the video (one edit, like `set`).
+  const turn = (label: string, rotation: number) =>
+    ctl.turnItem(label, item.id, time, tf, { ...tf, rotation });
   const baseScale = item.kind === 'sticker' ? 0.3 : 1;
   const moved =
     tf.x !== 0.5 ||
@@ -668,10 +676,8 @@ function TransformTool({ item }: { item: Item }) {
           icon="rotate"
           label={l.rotate90}
           onClick={() =>
-            set(l.rotate, {
-              // A quarter turn from where it is now (45° → 135°), kept in −180…180.
-              rotation: ((((tf.rotation + 90 + 180) % 360) + 360) % 360) - 180,
-            })
+            // A quarter turn from where it is now (45° → 135°), kept in −180…180.
+            turn(l.rotate, ((((tf.rotation + 90 + 180) % 360) + 360) % 360) - 180)
           }
         />
         {item.kind === 'region' ? (
@@ -683,7 +689,7 @@ function TransformTool({ item }: { item: Item }) {
               icon={id === 'flipH' ? 'flip' : 'flipV'}
               label={l[id]}
               disabledReason={tf.rotation % 90 === 0 ? l.flipSameRegion : null}
-              onClick={() => set(l[id], { rotation: -tf.rotation || 0 })}
+              onClick={() => turn(l[id], -tf.rotation || 0)}
             />
           ))
         ) : (
