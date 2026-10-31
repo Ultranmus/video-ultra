@@ -279,7 +279,7 @@ function phoneHeight(root: HTMLElement, size: PhoneTimelineSize): number | null 
 /**
  * Phones: a grip on top of the play bar resizes the timeline — drag it down to leave only the
  * play bar (the video gets the room), up for more lanes; it snaps to minimal / normal / full on
- * release (or a tap steps through them; arrow keys too). While dragging, the height follows the
+ * release (arrow keys step through them). While dragging, the height follows the
  * finger through one CSS variable (no React render per move); the size is kept in this browser.
  */
 export function PhoneTimelineGrip(): ReactElement {
@@ -393,11 +393,9 @@ export function PhoneTimelineGrip(): ReactElement {
         const d = drag.current;
         drag.current = null;
         if (!d || d.id !== e.pointerId) return;
-        if (!d.moved) {
-          // A tap: normal ↔ the last other size step (minimal from normal, back to normal).
-          apply(size.current === 'normal' ? 'minimal' : 'normal', true);
-          return;
-        }
+        // A tap does nothing: only a drag resizes (a stray tap near the play bar resized the
+        // video; owner, 2026-10-31). The keyboard steps through the sizes.
+        if (!d.moved) return;
         // Where the drag ended picks the size: a clear flick down / up moves one step or two.
         const r = root();
         if (!r) return;

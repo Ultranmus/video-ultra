@@ -3843,7 +3843,8 @@
 
   /* The sheet sits on the keyboard and is never taller than the room above it (less the top
      bar), expanded or not, so its top and the field being typed in stay on screen. */
-  .vu-root[data-keyboard] .vu-dock {
+  /* (Full-height sheets — Templates, the text Edit cover — keep their height; see below.) */
+  .vu-root[data-keyboard] .vu-dock:not([data-expanded]) {
     --vu-sheet-y: max(
       calc(var(--vu-sheet-full) - var(--vu-sheet-open)),
       calc(var(--vu-sheet-full) - var(--vu-keyboard-room) + var(--vu-size-topbar))

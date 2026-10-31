@@ -161,7 +161,8 @@ the stage and everything drawn on it don't mirror. Text items in RTL scripts ren
   Back. Its film strip shows the pictures inside it.
 - **Typing on the stage** (#151): double-click a text (mouse) or tap a selected text (touch) →
   a field over it, styled like the text, dashed accent outline; click away or ⌘/Ctrl+Enter keeps
-  it, Esc puts the old text back.
+  it, Esc puts the old text back. Phones: a tap on a selected text opens the full-screen Edit sheet
+  instead (#185).
 - **Arrange** (phone tool; desktop inspector section): Order (forward, backward, front, back),
   Align (6; several also distribute), Lock, Hide. Several selected on desktop: the inspector
   becomes the Group / Selection view (Group or Ungroup, Arrange, Duplicate, Delete).

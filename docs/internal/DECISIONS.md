@@ -1270,3 +1270,8 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       grey / white / black are still refused (refines #177). Export range on the ruler: a thin
       band at its foot. Filter tiles size a text by measuring it in its own font. Toasts are
       rounded cards.
+185.  **Phones edit a text in the full-screen Edit sheet** (owner, 2026-10-31). A tap on a selected
+      text on the video opens the Edit sheet (covering the editor) instead of a field on the
+      video; desktop and tablet keep typing on the video (#151). The phone timeline grip only
+      resizes on a drag (a tap did, by accident). A locked item's dashed box is its upright
+      bounds inside the frame, whatever its turn.

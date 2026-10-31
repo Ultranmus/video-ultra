@@ -230,60 +230,24 @@ if (only !== 'desktop') {
   await page.touchscreen.tap(p.x, p.y);
   check('phone: first tap selects', !(await field(page).isVisible()));
   await page.waitForTimeout(400);
+  // Phones: a tap on the selected text opens the full-screen Edit sheet (DECISIONS #185), not a
+  // field on the video (the keyboard would cover a text low in the frame).
+  const sheet = page.locator('.vu-dock[data-cover]');
   await page.touchscreen.tap(p.x, p.y);
-  await page.waitForTimeout(200);
-  check('phone: a tap on the selected text opens the field', await field(page).isVisible());
+  await page.waitForTimeout(1000); // the sheet slides in
+  check('phone: a tap on the selected text opens the Edit sheet', await sheet.isVisible());
+  check('phone: …and no field on the video', !(await field(page).isVisible()));
+  await snap(page, 'p1-edit-sheet');
+  const box = await sheet.boundingBox();
+  const view = page.viewportSize()!;
   check(
-    'phone: the field has the focus (keyboard)',
-    await page.evaluate(() => document.activeElement?.classList.contains('vu-stage-text') ?? false),
+    'phone: the Edit sheet covers the whole editor',
+    !!box && box.y <= 1 && box.height >= view.height - 2,
+    JSON.stringify(box),
   );
-  await page.keyboard.type('Sale');
-  await snap(page, 'p1-typing');
-  await page.locator('.vu-stage-text').evaluate((el) => (el as HTMLElement).blur());
+  await sheet.locator('textarea').fill('HelloSale');
   await page.waitForTimeout(300);
-  check(
-    'phone: typing goes on at the end; leaving commits',
-    (await textOf(page, id)) === 'HelloSale',
-  );
-  // A real finger moves a few pixels during a tap: still a tap, not a drag.
-  await page.waitForTimeout(400);
-  const before = await page.evaluate((itemId) => {
-    for (const t of (window as any).vuEditor.project.tracks)
-      for (const i of t.items) if (i.id === itemId) return i.transform.x as number;
-    return null;
-  }, id);
-  await page.evaluate(
-    ({ x, y }) => {
-      const stage = document.querySelector('.vu-stage')!;
-      const ev = (type: string, dx: number) =>
-        stage.dispatchEvent(
-          new PointerEvent(type, {
-            bubbles: true,
-            pointerId: 7,
-            pointerType: 'touch',
-            isPrimary: true,
-            clientX: x + dx,
-            clientY: y + dx,
-          }),
-        );
-      ev('pointerdown', 0);
-      ev('pointermove', 3);
-      ev('pointermove', 5);
-      ev('pointerup', 5);
-    },
-    { x: p.x, y: p.y },
-  );
-  await page.waitForTimeout(200);
-  check('phone: a tap that wobbles 5 px still opens the field', await field(page).isVisible());
-  check(
-    "phone: …and doesn't move the text",
-    (await page.evaluate((itemId) => {
-      for (const t of (window as any).vuEditor.project.tracks)
-        for (const i of t.items) if (i.id === itemId) return i.transform.x as number;
-      return null;
-    }, id)) === before,
-  );
-  await page.locator('.vu-stage-text').evaluate((el) => (el as HTMLElement).blur());
+  check('phone: typing in the sheet changes the text', (await textOf(page, id)) === 'HelloSale');
   check('no page errors (phone)', errors.length === 0, errors.join(' | '));
   await browser.close();
 }
