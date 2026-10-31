@@ -1263,3 +1263,10 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       opens at full height and also over the top bar and tab bar (`.vu-dock[data-cover]`); other
       tools keep the usual sheet. A tap on the phone ruler glides the playhead (220 ms) instead
       of jumping.
+184.  **Phone test 4** (owner, 2026-10-31). Typing on the video: the video keeps its size; it slides
+      up (`--vu-stage-lift`) only as far as needed to keep the text above the keyboard (replaces
+      hiding the bottom area, #181). Green screen: a colour all over the video gets a lower Range
+      (the worker finds the range that removes about half the picture) instead of a refusal;
+      grey / white / black are still refused (refines #177). Export range on the ruler: a thin
+      band at its foot. Filter tiles size a text by measuring it in its own font. Toasts are
+      rounded cards.

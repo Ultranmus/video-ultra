@@ -248,14 +248,14 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
   //   when the editor fills the window — a host page that scrolls keeps its scrolling);
   // - a field in a sheet: the bottom area rises by --vu-keyboard-lift so the sheet sits on the
   //   keyboard, no taller than the room left (--vu-keyboard-room), the field scrolled into view;
-  // - the text field on the video: the editor takes the visible height and the bottom area
-  //   steps aside (data-keyboard="stage"), so the video stays as big as it can above the keyboard.
+  // - the text field on the video: the video keeps its size and place; if the keyboard would
+  //   cover the text, the video slides up just enough to show it (--vu-stage-lift).
   // Also marks a zoomed-in page (data-page-zoomed), so a pinch can always zoom it back out.
   useEffect(() => {
     const vv = typeof window !== 'undefined' ? window.visualViewport : null;
     const root = rootRef.current;
     if (!vv || !root) return;
-    let natural = 0; // the root's own height while it is shrunk (0: not shrunk)
+    let stageLift = 0;
     let frame = 0;
     let keepScroll: number | null = null; // the page's scroll before a field took focus
     const typingField = (): HTMLElement | null => {
@@ -272,22 +272,25 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
       root.toggleAttribute('data-page-zoomed', zoomed);
       const field = zoomed ? null : typingField();
       const rect = root.getBoundingClientRect();
-      const height = natural || rect.height;
+      const height = rect.height;
       const visBottom = vv.offsetTop + vv.height;
       const covered = Math.max(0, Math.round(rect.top + height - visBottom));
       const open = !!field && covered > 80;
       const onStage = open && field.classList.contains('vu-stage-text');
+      // Typing on the video: lift it just enough that the text sits above the keyboard.
+      let lift = 0;
       if (onStage) {
-        natural = height;
-        root.style.height = `${Math.max(0, height - covered)}px`;
-      } else if (natural) {
-        natural = 0;
-        root.style.height = '';
+        const f = field.getBoundingClientRect();
+        lift = Math.max(0, Math.round(f.bottom + stageLift + 16 - visBottom));
+      }
+      if (lift !== stageLift) {
+        stageLift = lift;
+        root.style.setProperty('--vu-stage-lift', `${lift}px`);
       }
       const bar = root.querySelector<HTMLElement>('.vu-toolbar');
-      const lift = onStage ? 0 : Math.max(0, covered - (bar?.offsetHeight ?? 0));
+      const bottomLift = onStage ? 0 : Math.max(0, covered - (bar?.offsetHeight ?? 0));
       root.style.setProperty('--vu-keyboard', `${onStage ? 0 : covered}px`);
-      root.style.setProperty('--vu-keyboard-lift', `${lift}px`);
+      root.style.setProperty('--vu-keyboard-lift', `${bottomLift}px`);
       root.style.setProperty('--vu-keyboard-room', `${Math.max(0, height - covered)}px`);
       if (onStage) root.setAttribute('data-keyboard', 'stage');
       else root.toggleAttribute('data-keyboard', open);
@@ -344,7 +347,7 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
       window.removeEventListener('scroll', onScroll);
       root.removeEventListener('focusin', onFocusIn);
       root.removeEventListener('focusout', onFocusOut);
-      root.style.height = '';
+      root.style.removeProperty('--vu-stage-lift');
     };
   }, []);
 

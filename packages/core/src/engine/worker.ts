@@ -23,6 +23,7 @@ import { DecoderPool } from './frames';
 import { QualityGovernor } from './quality';
 import type { EngineMessage, EngineRequest, EngineResponseData, EngineStats } from './protocol';
 import { upcomingVideo } from './timeline';
+import { textFont } from './text';
 import { parseCubeLut } from '../effects/lut';
 import { computeScopes, SCOPE_MAX_SIDE } from '../effects/scopes';
 
@@ -814,6 +815,13 @@ function looksDone(): void {
   }, 5000);
 }
 
+let measureCanvas: OffscreenCanvasRenderingContext2D | null | undefined;
+/** A small 2D context for measuring text (made once, lazily). */
+function measureCtx(): OffscreenCanvasRenderingContext2D | null {
+  if (measureCanvas === undefined) measureCanvas = new OffscreenCanvas(8, 8).getContext('2d');
+  return measureCanvas;
+}
+
 /**
  * A lane item placed for a picker tile: centred, upright, opaque, and sized to the tile —
  * pictures fill most of it, stickers about 70%, and text so its longest line fills most of the
@@ -831,16 +839,35 @@ function centredForTile(
   else if (item.kind === 'sticker') scale = 0.7;
   else if (item.kind === 'text') {
     const lines = item.text.split('\n');
-    const longest = Math.max(1, ...lines.map((line) => line.length));
-    const spacing = 0.56 + Math.max(0, item.style.letterSpacing);
+    // Measured in the text's own font (a wide face like Didot is far wider than an average
+    // guess, and was cut off at the tile's sides); 100 px probe, scaled to fit.
+    const probe = measureCtx();
+    let widest = 0;
+    if (probe) {
+      probe.font = textFont(item.style, 100);
+      for (const line of lines) {
+        const w = probe.measureText(line).width + item.style.letterSpacing * 100 * line.length;
+        widest = Math.max(widest, w);
+      }
+    }
+    if (!(widest > 0)) {
+      const longest = Math.max(1, ...lines.map((line) => line.length));
+      widest = longest * (56 + Math.max(0, item.style.letterSpacing) * 100);
+    }
     const fontPx = Math.min(
       (height * 0.45) / Math.max(1, lines.length),
-      (width * 0.85) / (longest * spacing),
+      (width * 0.82 * 100) / widest,
     );
     scale = fontPx / (item.style.size * height);
   }
+  // Alone in the tile: no wrap width from the video's layout (a wrap width made for the full
+  // frame put a title off-centre and small), no keyframes moving it elsewhere.
+  const alone = { ...item } as Record<string, unknown>;
+  delete alone.maxWidth;
+  delete alone.keyframes;
+  delete alone.groupId;
   return {
-    ...item,
+    ...alone,
     transform: { ...item.transform, x: 0.5, y: 0.5, rotation: 0, opacity: 1, scale },
     animation,
   } as Item;
@@ -932,12 +959,15 @@ async function scopes(
 let scopeCanvas: OffscreenCanvas | null = null;
 let scopeContext: OffscreenCanvasRenderingContext2D | null = null;
 
+/** Green screen pick: a range that removes more than this share of the picture is lowered. */
+const PICK_FIT_SHARE = 0.5;
+
 async function pickColour(
   request: Extract<EngineRequest, { type: 'pick-colour' }>,
 ): Promise<EngineResponseData> {
   if (!project) throw new Error('No project');
   const found = findItem(project, request.itemId);
-  const none = { type: 'pick-colour' as const, color: null, covers: 0 };
+  const none = { type: 'pick-colour' as const, color: null, covers: 0, fitTolerance: null };
   if (!found || !('crop' in found.item)) return none;
   if (request.x < 0 || request.x > 1 || request.y < 0 || request.y > 1) return none;
   const { width: pw, height: ph } = project.settings;
@@ -1002,22 +1032,34 @@ async function pickColour(
   const kr = 0.5 * r - 0.4542 * g - 0.0458 * b;
   const tolerance = 'key' in item && item.key ? item.key.tolerance : 0.4;
   const removed = (0.02 + 0.4 * Math.max(0, Math.min(1, tolerance))) * 255;
+  // Each sampled pixel's chroma distance to the pick (one pass, once per pick, in the worker).
+  const dists = new Float32Array(Math.ceil(all.length / 16));
   let inside = 0;
   let gone = 0;
   for (let i = 0; i < all.length; i += 16) {
     if (all[i + 3] === 0) continue;
-    inside++;
     const pr = all[i]!;
     const pg = all[i + 1]!;
     const pb = all[i + 2]!;
     const db = -0.1146 * pr - 0.3854 * pg + 0.5 * pb - kb;
     const dr = 0.5 * pr - 0.4542 * pg - 0.0458 * pb - kr;
-    if (db * db + dr * dr < removed * removed) gone++;
+    const dist = Math.sqrt(db * db + dr * dr);
+    dists[inside++] = dist;
+    if (dist < removed) gone++;
+  }
+  // The largest range that removes at most half the picture (a pick in a busy video: the key
+  // still works, on less). Distances are on 0…255 values; range r removes up to 0.02 + 0.4 r.
+  let fitTolerance: number | null = null;
+  if (inside > 0) {
+    const sorted = dists.subarray(0, inside).sort();
+    const share = sorted[Math.floor(inside * PICK_FIT_SHARE)]! / 255;
+    fitTolerance = Math.max(0, Math.min(1, (share - 0.02) / 0.4));
   }
   const hex = (v: number) => Math.round(v).toString(16).padStart(2, '0');
   return {
     type: 'pick-colour',
     color: `#${hex(r)}${hex(g)}${hex(b)}`,
+    fitTolerance,
     covers: inside ? gone / inside : 0,
   };
 }

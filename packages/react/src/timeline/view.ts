@@ -2389,18 +2389,18 @@ export class TimelineView {
     const x0 = Math.max(m.header, Math.round(timeToX(scale, range.start)));
     const x1 = Math.min(this.#width, Math.round(timeToX(scale, range.end)));
     if (x1 <= x0) return;
+    // A light band along the ruler's foot (not the whole ruler: the times stay easy to read),
+    // with a short tick up at each end.
+    const band = 3;
     ctx.fillStyle = this.#c.accentSoft;
-    ctx.fillRect(x0, 0, x1 - x0, m.ruler);
+    ctx.fillRect(x0, m.ruler - band, x1 - x0, band);
     ctx.fillStyle = this.#c.selection;
-    for (const [x, dir] of [
-      [Math.round(timeToX(scale, range.start)), 1],
-      [Math.round(timeToX(scale, range.end)), -1],
-    ] as const) {
+    for (const x of [
+      Math.round(timeToX(scale, range.start)),
+      Math.round(timeToX(scale, range.end)),
+    ]) {
       if (x < m.header - 1 || x > this.#width + 1) continue;
-      const edge = dir === 1 ? x : x - 2;
-      ctx.fillRect(edge, 0, 2, m.ruler);
-      ctx.fillRect(dir === 1 ? x : x - 6, 0, 6, 2);
-      ctx.fillRect(dir === 1 ? x : x - 6, m.ruler - 2, 6, 2);
+      ctx.fillRect(x - 1, m.ruler - 8, 2, 8);
     }
   }
 

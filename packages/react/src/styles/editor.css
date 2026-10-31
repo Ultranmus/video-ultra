@@ -3864,9 +3864,15 @@
     visibility: hidden;
   }
 
-  /* Typing on the video: the timeline and tab bar step aside, the video keeps the room. */
-  .vu-root[data-keyboard='stage'] .vu-bottom {
-    display: none;
+  /* Typing on the video: it keeps its size; it slides up (under the top bar) just enough that
+     the text being typed sits above the keyboard. */
+  .vu-root[data-keyboard='stage'] .vu-stage-area {
+    transform: translateY(calc(var(--vu-stage-lift, 0px) * -1));
+  }
+
+  .vu-root[data-keyboard='stage'] .vu-topbar {
+    position: relative;
+    z-index: 1;
   }
 
   /* The tab bar: a solid bar (the sheet slides underneath it); only the row of tools inside
@@ -3972,7 +3978,8 @@
     min-height: var(--vu-size-touch);
     padding: var(--vu-space-1) var(--vu-space-1) var(--vu-space-1) var(--vu-space-3);
     border: 1px solid var(--vu-border);
-    border-radius: var(--vu-radius-full);
+    /* Rounded corners, not a pill: a message of several lines stays a tidy card. */
+    border-radius: var(--vu-radius-lg);
     background: var(--vu-surface-3);
     box-shadow: var(--vu-shadow-popover);
     font-size: var(--vu-text-sm);

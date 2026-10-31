@@ -2,6 +2,11 @@
 
 Where the last session stopped and what comes next. Update before ending every session.
 
+## 2026-10-31 (4) — phone test 4 fixes pushed
+
+Screenshot fixes pushed (BACKLOG "Phone test 4", DECISIONS #184). Owner re-tests: typing on the
+video, green screen on the yellow wall, filter tiles for template text, the ruler band.
+
 ## 2026-10-31 (3) — phone test 3 fixes pushed
 
 Text Edit sheet covers everything, ruler tap glides, layer rename scrolls into view, locked box

@@ -175,7 +175,7 @@ export type EngineResponseData =
   | { type: 'transition-preview'; bitmaps: ImageBitmap[] }
   | { type: 'item-preview'; bitmaps: ImageBitmap[] }
   | { type: 'lut-check'; size: number; title: string | null }
-  | { type: 'pick-colour'; color: string | null; covers: number }
+  | { type: 'pick-colour'; color: string | null; covers: number; fitTolerance: number | null }
   | { type: 'scopes'; scopes: ScopeData };
 
 /** Unsolicited events from the worker. */
