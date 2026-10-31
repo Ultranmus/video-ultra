@@ -2,6 +2,11 @@
 
 Where the last session stopped and what comes next. Update before ending every session.
 
+## 2026-10-31 (5) — phone test 5 fixes pushed
+
+BACKLOG "Phone test 5", DECISIONS #185. Owner re-tests: tap a text on the video → full-screen
+Edit sheet stays full with the keyboard; timeline area taps don't resize the video; locked box.
+
 ## 2026-10-31 (4) — phone test 4 fixes pushed
 
 Screenshot fixes pushed (BACKLOG "Phone test 4", DECISIONS #184). Owner re-tests: typing on the

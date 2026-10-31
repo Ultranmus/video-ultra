@@ -4,6 +4,18 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 
 ## Open
 
+- [x] (fixed 2026-10-31) Phone test 5 (owner): a tap near the top of the play bar folded / unfolded
+      the timeline (the grip's tap), so the video resized as if the canvas size changed. The grip
+      now only resizes on a drag; a tap does nothing.
+- [x] (fixed 2026-10-31) Phone test 5: the full-screen Edit sheet went back to partial once the
+      keyboard opened (the keyboard's sheet cap also hit full-height sheets). Full-height sheets
+      now keep their height with the keyboard up.
+- [x] (fixed 2026-10-31) Phone test 5: a text low on the video was hidden by the keyboard when
+      edited there. On phones a tap on the selected text now opens the full-screen Edit sheet
+      instead of typing on the video (#185); stage-text-check updated.
+- [x] (fixed 2026-10-31) Phone test 5: a turned locked item showed stray diagonal dashed lines (its
+      turned box ran out of the frame). A locked item now shows its upright bounds, inside the
+      frame.
 - [x] (fixed 2026-10-31) Phone test 4 (owner, screenshots): the "[ ] highlighted region" was the
       export range (in / out points) on the ruler: a band over the whole ruler with brackets. Now
       a light band along the ruler's foot with a short tick at each end; the times stay readable.

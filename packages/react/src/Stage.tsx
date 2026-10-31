@@ -270,7 +270,17 @@ export function Stage(): ReactElement {
     let y = box.cy * scale - h / 2;
     // Locked (dashed, no handles): an upright box is kept inside the frame, so an item as wide
     // or tall as the video (or bigger) still shows all four sides.
-    if (locked && box.rotation % 360 === 0) {
+    let rotation = box.rotation;
+    if (locked) {
+      // Turned: its upright bounds (a locked item only needs to show where it is).
+      if (box.rotation % 360 !== 0) {
+        const b = boundsOf(box);
+        w = (b.right - b.left) * scale + pad * 2;
+        h = (b.bottom - b.top) * scale + pad * 2;
+        x = b.left * scale - pad;
+        y = b.top * scale - pad;
+        rotation = 0;
+      }
       const fw = pw * scale;
       const fh = ph * scale;
       const left = Math.max(1, x);
@@ -282,7 +292,7 @@ export function Stage(): ReactElement {
     }
     el.style.width = `${w}px`;
     el.style.height = `${h}px`;
-    el.style.transform = `translate(${x}px, ${y}px) rotate(${box.rotation}deg)`;
+    el.style.transform = `translate(${x}px, ${y}px) rotate(${rotation}deg)`;
     // Member outlines (several only), reusing the elements already there.
     const need = entries.length > 1 ? entries.length : 0;
     while (outlines.children.length > need) outlines.lastElementChild!.remove();
@@ -362,6 +372,13 @@ export function Stage(): ReactElement {
     if (!field || item?.kind !== 'text' || isLockedIn(ctl.project, id)) return;
     if (caption?.items.some((i) => i.id === id)) return;
     if (ctl.ui.getState().playing) ctl.pause();
+    // Phones: the full-screen Edit sheet instead of typing on the video (the keyboard would
+    // cover a text low in the video; owner, 2026-10-31).
+    if (ctl.ui.getState().layout === 'phone') {
+      if (ctl.ui.getState().selectedId !== id) ctl.select(id);
+      if (ctl.ui.getState().tool !== 'text-edit') ctl.openTool('text-edit');
+      return;
+    }
     editing.current = { id, original: item.text };
     field.value = item.text;
     field.hidden = false;

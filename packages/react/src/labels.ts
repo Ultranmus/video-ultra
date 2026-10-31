@@ -17,7 +17,7 @@ export const DEFAULT_LABELS = {
   resizeInspector: 'Resize the settings panel',
   resizeTimeline: 'Resize the timeline',
   resizeTip: 'Drag to resize · double-click to reset',
-  phoneTimelineTip: 'Drag up or down to resize the timeline · tap to hide or show the lanes',
+  phoneTimelineTip: 'Drag up or down to resize the timeline',
   timelineMinimal: 'Play bar only',
   timelineNormal: 'Normal',
   timelineFull: 'Large',

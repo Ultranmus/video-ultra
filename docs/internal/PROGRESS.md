@@ -716,3 +716,10 @@ Export range drawn as a thin band; filter tiles measure text in its font (Didot 
 green screen on a colour all over the video lowers Range instead of refusing; toasts as cards;
 typing on the video keeps its size and slides it up just enough (#184). Checked in Chromium:
 tile text centred (bbox 21–121 of 144), lint, types.
+
+## 2026-10-31 (5) · Phone test 5 fixes
+
+Grip tap no longer resizes; full-height sheets keep their height with the keyboard; phones edit
+a text in the full-screen Edit sheet (#185); locked box upright inside the frame. stage-text-check
+phone part rewritten for the sheet and passing (Chromium, iPhone 13 viewport); desktop part all
+passed.
