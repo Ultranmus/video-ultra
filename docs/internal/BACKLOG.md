@@ -4,6 +4,46 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 
 ## Open
 
+- [ ] Phone test 2 (owner, 2026-10-31): Filters for an emoji sticker or a text — the preview tiles
+      show the emoji / text pushed right and cut in half (video and image tiles are fine). Not
+      reproduced in the cloud container (Chromium, WebGL2: centred and whole), so likely the
+      iPhone's WebGPU path of the looks renderer (`filterPreviews` → `centredForTile`, worker).
+      Needs a screenshot from the phone, then a WebGPU check of the text / sticker draw at the
+      tile size.
+- [ ] Phone test 2 (owner, 2026-10-31): on the main (frame) lane "some region is highlighted with
+      [ ] and the accent colour" — not clear which part (a selected clip's trim handles? a drop
+      slot?). Needs a screenshot. (The "+" no longer moves when a handle appears — fixed below.)
+- [x] (fixed 2026-10-31) Phone test 2: the timeline grip snapped and the whole bottom area, tab bar
+      included, moved with the finger. Now the timeline's height follows the finger live (one CSS
+      variable, like the desktop splitter) and settles on the nearest size on release.
+- [x] (fixed 2026-10-31) Phone test 2: timeline lanes jumped a few px when a scroll started (the
+      axis dead zone's distance came in at once). The pan now starts from where the axis locks.
+- [x] (fixed 2026-10-31) Phone test 2: the "+" after the last clip moved when the clip was selected
+      (to clear its trim handle). It now always sits past the handle's room; unit test.
+- [x] (fixed 2026-10-31) Phone test 2, bad one: typing (e.g. renaming a layer, or text on the
+      video) broke the layout — top bar in the middle, black above, sheet under it. Cause: the
+      editor followed iOS's page pan with `top`, which fed back into itself. Now the page scroll
+      iOS makes is undone while a field in the editor has focus (when the editor fills the
+      window), and the editor never moves; the sheet rises above the keyboard (#175).
+- [x] (fixed 2026-10-31) Phone test 2: typing on the video shrank the video and pushed the frame
+      lane up. Now the timeline and tab bar step aside while typing on the video, so the video
+      keeps the room above the keyboard (#175).
+- [x] (fixed 2026-10-31) Phone test 2: during a pinch / resize / drag on the video the selection
+      border jumped to the top left, empty, and came back on release. Cause: the touch "frame
+      drawn" listener (#176) kept the stage scale from mount (0). It now follows the scale.
+- [x] (fixed 2026-10-31) Phone test 2: the green screen "tap the colour" hint was still a narrow
+      pill. On phones it spans the stage like a toast.
+- [x] (fixed 2026-10-31) Phone test 2: picking grey said "tap the green or blue background", which
+      read as wrong. A grey / white / black pick now explains why it can't be removed; another
+      colour that covers nearly all says so without naming green / blue.
+- [x] (fixed 2026-10-31) Phone test 2: templates 3 to a row still too small → 2 on phones; the
+      Templates sheet opens at full height; the form doesn't open the keyboard by itself on touch;
+      a full-height sheet doesn't move when the keyboard comes or goes (its list gets room to
+      scroll above it) — no more snap when scrolling closes the keyboard (#180, #175).
+- [x] (fixed 2026-10-31) Phone test 2: a locked item still had no left / right border. The dash
+      was moved inside, but the box is 6 px larger than the item, so for a full-width item the
+      sides were still outside the frame. A locked upright box is now kept inside the frame.
+
 - [ ] Checks in the cloud container (2026-10-31): `stage-text-check`'s phone part needs WebKit,
       which isn't installed there; run in Chromium, the tap that opens the field also moves the
       caret into the word ("HeSalello"), same before and after the 10-31 changes. Check on the real

@@ -233,6 +233,15 @@ const PICK_COVERS_MAX = 0.85;
 
 /** How long a quarter turn eases on the video (ms). */
 const TURN_MS = 180;
+
+/** A grey, white or black (`#rrggbb`): almost no colour to key on. */
+function isNeutral(hex: string): boolean {
+  const n = parseInt(hex.slice(1), 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  return Math.max(r, g, b) - Math.min(r, g, b) < 40;
+}
 export class EditorController {
   readonly editor: Editor;
   readonly ui = createUiStore();
@@ -2120,7 +2129,7 @@ export class EditorController {
     // A colour that would remove (nearly) the whole picture is a missed tap — a grey, black or
     // white spot, or a frame not drawn yet: keep the old colour and say what to tap.
     if (picked.covers > PICK_COVERS_MAX) {
-      this.toast(l.pickTooMuch, 'info');
+      this.toast(isNeutral(picked.color) ? l.pickNeutral : l.pickTooMuch, 'info');
       return;
     }
     const color = picked.color;

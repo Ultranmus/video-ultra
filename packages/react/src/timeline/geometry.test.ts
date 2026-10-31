@@ -110,23 +110,27 @@ describe('timeline geometry', () => {
     // The playhead mid-screen at 0 s: time 0 sits 200 px in.
     const scale = { pps: 100, x0: 200 };
     const y = rows[0]!.top + m.mainTrack / 2;
-    const hit = hitTest(rows, m, scale, 200 - 8 - 20, y, null, true, true);
+    const hit = hitTest(rows, m, scale, 200 - 8 - m.trimHandle - 20, y, null, true, true);
     expect(hit.type === 'add' && hit.atStart).toBe(true);
     // Not on desktop, and nothing there to the left without the flag.
-    expect(hitTest(rows, m, scale, 200 - 8 - 20, y, null, true, false).type).not.toBe('add');
+    expect(
+      hitTest(rows, m, scale, 200 - 8 - m.trimHandle - 20, y, null, true, false).type,
+    ).not.toBe('add');
   });
 
-  it('the "+" after the last clip moves clear of its selected end handle', () => {
+  it('the "+" after the last clip sits clear of its trim handle, selected or not', () => {
     const p = project();
     const rows = layoutRows(p, m);
     const scale = { pps: 100, x0: 0 };
     const y = rows[0]!.top + m.mainTrack / 2;
-    // The video ends at 5 s (500 px): the "+" starts 8 px after it.
-    expect(hitTest(rows, m, scale, 510, y, null, true).type).toBe('add');
-    // The last clip selected: right after its end is its trim handle, the "+" sits past it.
+    // The video ends at 5 s (500 px): the "+" starts past the handle's room, in the same place
+    // whether the last clip is selected or not.
+    const plus = 500 + 8 + m.trimHandle + 4;
+    expect(hitTest(rows, m, scale, plus, y, null, true).type).toBe('add');
+    expect(hitTest(rows, m, scale, plus, y, 'c2', true).type).toBe('add');
+    // Right after the selected clip's end is its trim handle.
     const handle = hitTest(rows, m, scale, 510, y, 'c2', true);
     expect(handle.type === 'trim' && handle.edge).toBe('end');
-    expect(hitTest(rows, m, scale, 500 + 8 + m.trimHandle + 4, y, 'c2', true).type).toBe('add');
   });
 
   it('groups rows: main video, picture layers, text, then sound', () => {

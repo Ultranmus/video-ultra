@@ -2308,12 +2308,16 @@
     padding: var(--vu-space-1);
   }
 
-  /* Phones: tiles with a picture or words to judge (templates, filters) go 3 to a row, big
-     enough to read; emoji / sticker grids keep their 4. */
+  /* Phones: filters go 3 to a row and templates 2, big enough to judge; emoji / sticker grids
+     keep their 4. */
   @container vu (max-width: 767px) {
-    .vu-template-grid,
     .vu-filter-grid {
       grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    /* Templates carry words to read: 2 to a row (owner, 2026-10-31). */
+    .vu-template-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 
@@ -3476,12 +3480,6 @@
     box-shadow: var(--vu-focus-ring);
   }
 
-  /* While the grip is dragged, the bottom area follows the finger over the video. */
-  .vu-bottom[data-resizing] {
-    z-index: 2;
-    will-change: transform;
-  }
-
   .vu-timeline {
     position: absolute;
     inset: 0;
@@ -3845,12 +3843,23 @@
     );
   }
 
-  .vu-root[data-keyboard] .vu-dock[data-expanded] {
-    --vu-sheet-y: calc(var(--vu-sheet-full) - var(--vu-keyboard-room) + var(--vu-size-topbar));
+  /* A full-height sheet doesn't move for the keyboard at all (nothing jumps as it comes and
+     goes): its list just gets room to scroll above the keyboard. */
+  .vu-root[data-keyboard]:has(.vu-dock[data-expanded]) .vu-bottom {
+    transform: none;
+  }
+
+  .vu-root[data-keyboard] .vu-dock[data-expanded] .vu-dock-body {
+    padding-bottom: calc(var(--vu-keyboard) + var(--vu-space-4));
   }
 
   .vu-root[data-keyboard] .vu-toolbar {
     visibility: hidden;
+  }
+
+  /* Typing on the video: the timeline and tab bar step aside, the video keeps the room. */
+  .vu-root[data-keyboard='stage'] .vu-bottom {
+    display: none;
   }
 
   /* The tab bar: a solid bar (the sheet slides underneath it); only the row of tools inside
@@ -5825,6 +5834,21 @@
     font-weight: var(--vu-weight-medium);
     transform: translateX(-50%);
     cursor: default;
+  }
+
+  /* Phones: the hint spans the stage (less the gutter) on one or two lines, like a toast. */
+  @container vu (max-width: 767px) {
+    .vu-stage-pick {
+      right: var(--vu-space-3);
+      left: var(--vu-space-3);
+      display: flex;
+      justify-content: space-between;
+      max-width: none;
+      padding: var(--vu-space-2) var(--vu-space-4);
+      border-radius: var(--vu-radius-lg);
+      font-size: var(--vu-text-sm);
+      transform: none;
+    }
   }
 
   .vu-root .vu-stage-pick .vu-text-button {

@@ -1247,3 +1247,15 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       a template, sticker or library media on a phone closes the sheet so the new item shows,
       selected. (Text still opens its Edit sheet to type.) Templates and filters are 3 to a row
       on phones; emoji / sticker grids keep 4.
+181.  **Keyboard, take two: undo the page scroll, never move the editor** (owner, 2026-10-31;
+      replaces the `top` shift in #175, which fed back into iOS's pan and put the top bar
+      mid-screen). While a field in the editor has focus and the editor fills the window, a page
+      scroll the browser makes is scrolled back. Sheets rise above the keyboard as before; a
+      full-height sheet doesn't move at all (its list gets bottom room). Typing on the video:
+      the editor takes the visible height and the timeline + tab bar step aside
+      (`data-keyboard="stage"`).
+182.  **Phone timeline grip resizes live** (owner, 2026-10-31; refines #179). The height follows
+      the finger through `--vu-timeline-phone-h` (like the desktop splitter), then settles on
+      minimal / normal / large. The "+" after the last clip always leaves the trim handle's room.
+      Templates: 2 to a row on phones, the sheet opens at full height, no keyboard until a field
+      is tapped (refines #180).

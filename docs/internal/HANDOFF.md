@@ -2,6 +2,14 @@
 
 Where the last session stopped and what comes next. Update before ending every session.
 
+## 2026-10-31 (2) — phone test 2 fixes pushed
+
+Owner's second iPhone pass: most things confirmed; the rest fixed and pushed (PROGRESS
+2026-10-31 (2), DECISIONS #181–#182). Next: owner re-tests the list given in chat (keyboard in
+every place, typing on the video, drags / pinches on the video, locked box, grip, templates,
+green screen pick on a grey). Waiting on two screenshots: filter tiles for emoji / text, and the
+"[ ] highlighted region" on the frame lane (BACKLOG).
+
 ## 2026-10-31 — phone pass fixes pushed (owner to test on the phones)
 
 The owner's 10-30 phone notes (BACKLOG, 27) are fixed and pushed to main (Vercel deploys it):

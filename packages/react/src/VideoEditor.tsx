@@ -242,58 +242,47 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
     return () => controller.setRoot(null);
   }, [controller]);
 
-  // On-screen keyboard (phones). The visible area shrinks, and iOS also pans the page to show
-  // the field (it ignores `interactive-widget`). Keep the editor one box in the visible area:
-  // - the root moves down by the pan (`top`, not a transform: fixed tooltips keep their place),
-  //   so its top bar stays on screen;
+  // On-screen keyboard (phones). The visible area shrinks, and iOS also scrolls the page to show
+  // the field (it ignores `interactive-widget`). Keep the editor one box, where it is:
+  // - while a field in the editor has focus, a page scroll the browser makes is undone (only
+  //   when the editor fills the window — a host page that scrolls keeps its scrolling);
   // - a field in a sheet: the bottom area rises by --vu-keyboard-lift so the sheet sits on the
-  //   keyboard, the sheet is no taller than the room left (--vu-keyboard-room), and the field is
-  //   scrolled into view inside it;
-  // - the text field on the video: the root takes the visible height, so the video shrinks to
-  //   stay in view above the keyboard and the field (placed in the stage) moves with its text.
+  //   keyboard, no taller than the room left (--vu-keyboard-room), the field scrolled into view;
+  // - the text field on the video: the editor takes the visible height and the bottom area
+  //   steps aside (data-keyboard="stage"), so the video stays as big as it can above the keyboard.
   // Also marks a zoomed-in page (data-page-zoomed), so a pinch can always zoom it back out.
   useEffect(() => {
     const vv = typeof window !== 'undefined' ? window.visualViewport : null;
     const root = rootRef.current;
     if (!vv || !root) return;
-    let shift = 0;
     let natural = 0; // the root's own height while it is shrunk (0: not shrunk)
     let frame = 0;
+    let keepScroll: number | null = null; // the page's scroll before a field took focus
+    const typingField = (): HTMLElement | null => {
+      const el = document.activeElement;
+      return el instanceof HTMLElement &&
+        root.contains(el) &&
+        el.matches('input:not([type="range"]), textarea, [contenteditable="true"]')
+        ? el
+        : null;
+    };
     const update = () => {
       frame = 0;
       const zoomed = vv.scale > 1.01;
       root.toggleAttribute('data-page-zoomed', zoomed);
-      const el = document.activeElement;
-      const field =
-        !zoomed &&
-        el instanceof HTMLElement &&
-        root.contains(el) &&
-        el.matches('input:not([type="range"]), textarea, [contenteditable="true"]')
-          ? el
-          : null;
+      const field = zoomed ? null : typingField();
       const rect = root.getBoundingClientRect();
-      const top = rect.top - shift;
       const height = natural || rect.height;
-      const visTop = vv.offsetTop;
       const visBottom = vv.offsetTop + vv.height;
-      let nextShift = field ? Math.max(0, Math.round(visTop - top)) : 0;
-      let covered = Math.max(0, Math.round(top + nextShift + height - visBottom));
+      const covered = Math.max(0, Math.round(rect.top + height - visBottom));
       const open = !!field && covered > 80;
-      if (!open) {
-        nextShift = 0;
-        covered = Math.max(0, Math.round(top + height - visBottom));
-      }
       const onStage = open && field.classList.contains('vu-stage-text');
       if (onStage) {
         natural = height;
-        root.style.height = `${height - covered}px`;
+        root.style.height = `${Math.max(0, height - covered)}px`;
       } else if (natural) {
         natural = 0;
         root.style.height = '';
-      }
-      if (nextShift !== shift) {
-        shift = nextShift;
-        root.style.top = shift ? `${shift}px` : '';
       }
       const bar = root.querySelector<HTMLElement>('.vu-toolbar');
       const lift = onStage ? 0 : Math.max(0, covered - (bar?.offsetHeight ?? 0));
@@ -301,35 +290,53 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
       root.style.setProperty('--vu-keyboard-lift', `${lift}px`);
       root.style.setProperty('--vu-keyboard-room', `${Math.max(0, height - covered)}px`);
       if (onStage) root.setAttribute('data-keyboard', 'stage');
-      else root.toggleAttribute('data-keyboard', covered > 80);
+      else root.toggleAttribute('data-keyboard', open);
       // The field being typed in stays in view inside its sheet.
       if (open && !onStage) {
         const scroller = field.closest<HTMLElement>('.vu-dock-body, .vu-panel-body');
         if (scroller) {
           const f = field.getBoundingClientRect();
-          const s = scroller.getBoundingClientRect();
-          const room = Math.min(s.bottom, visBottom) - s.top;
+          const sr = scroller.getBoundingClientRect();
+          const bottom = Math.min(sr.bottom, visBottom);
           const pad = 16;
-          if (f.bottom > s.top + room - pad) scroller.scrollTop += f.bottom - (s.top + room - pad);
-          else if (f.top < s.top + pad) scroller.scrollTop -= s.top + pad - f.top;
+          if (f.bottom > bottom - pad) scroller.scrollTop += f.bottom - (bottom - pad);
+          else if (f.top < sr.top + pad) scroller.scrollTop -= sr.top + pad - f.top;
         }
       }
     };
     const schedule = () => {
       if (!frame) frame = requestAnimationFrame(update);
     };
+    // The editor fills the window: the page itself has nothing to scroll to.
+    const fillsWindow = () => root.offsetHeight >= window.innerHeight * 0.9;
+    const onFocusIn = () => {
+      if (keepScroll === null && typingField() && fillsWindow()) keepScroll = window.scrollY;
+      schedule();
+    };
+    const onFocusOut = () => {
+      // Focus may be moving to another field: decide once it has landed.
+      requestAnimationFrame(() => {
+        if (!typingField()) keepScroll = null;
+        schedule();
+      });
+    };
+    const onScroll = () => {
+      if (keepScroll !== null && typingField() && Math.abs(window.scrollY - keepScroll) > 1)
+        window.scrollTo(window.scrollX, keepScroll);
+    };
     vv.addEventListener('resize', schedule);
     vv.addEventListener('scroll', schedule);
-    root.addEventListener('focusin', schedule);
-    root.addEventListener('focusout', schedule);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    root.addEventListener('focusin', onFocusIn);
+    root.addEventListener('focusout', onFocusOut);
     update();
     return () => {
       cancelAnimationFrame(frame);
       vv.removeEventListener('resize', schedule);
       vv.removeEventListener('scroll', schedule);
-      root.removeEventListener('focusin', schedule);
-      root.removeEventListener('focusout', schedule);
-      root.style.top = '';
+      window.removeEventListener('scroll', onScroll);
+      root.removeEventListener('focusin', onFocusIn);
+      root.removeEventListener('focusout', onFocusOut);
       root.style.height = '';
     };
   }, []);

@@ -746,7 +746,9 @@ export const DEFAULT_LABELS = {
   pickCancel: 'Cancel',
   pickMissed: 'Tap on the picture itself to pick its colour',
   pickTooMuch:
-    'That colour is in almost the whole video — tap the green or blue background behind the person',
+    'That colour is in almost the whole video, so removing it would remove the video too. Tap the plain background you want gone.',
+  pickNeutral:
+    'Grey, white and black can’t be removed: the green screen works on colour, and nearly every part of a video has some grey in it. It works best on a green or blue background.',
   pickedColour: (hex: string) => `Removing ${hex}`,
   keyTolerance: 'Range',
   keyToleranceTip: 'How far from the colour still gets removed',
