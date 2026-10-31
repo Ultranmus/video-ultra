@@ -70,6 +70,7 @@ export {
 } from './render/layout';
 export type { GeometryMove } from './render/layout';
 export { probeMedia, assetFromProbe, sniffImage, unsupportedVideoMessage } from './media/probe';
+export { decodeHeif, heifToJpeg, hevcCodec, readHeif, type HeifPicture } from './media/heif';
 export type {
   ProbeResult,
   ProbedMedia,

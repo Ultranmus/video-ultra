@@ -1275,3 +1275,14 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       video; desktop and tablet keep typing on the video (#151). The phone timeline grip only
       resizes on a drag (a tap did, by accident). A locked item's dashed box is its upright
       bounds inside the frame, whatever its turn.
+186.  **Transparent background, preview first** (owner, 2026-10-31). Canvas → Colour has a
+      "Transparent" switch (`{ type: 'color', color: 'transparent' }`, no schema change). The
+      preview composer draws a checkerboard under it (`Composer.showTransparency`); exports and
+      other renders get black there, and the Canvas tool and export dialog say so. Transparent
+      files (WebM VP9 alpha, PNG) are the next step (BACKLOG). Flip eases (a small dip, the
+      mirror switches at the midpoint; one edit); a canvas size change eases the frame from its
+      old size (`scale` property, so the view zoom's transform is untouched).
+187.  **HEIF / HEIC without a library** (owner, 2026-10-31). Where the browser can't open a HEIF
+      photo as an image (Android Chrome), import reads its container (`media/heif.ts`: primary
+      item, grid tiles, `hvcC`, size, turn, mirror), decodes the HEVC tiles with WebCodecs, and
+      keeps the photo as a JPEG. No WASM; devices without HEVC decoding keep the message.

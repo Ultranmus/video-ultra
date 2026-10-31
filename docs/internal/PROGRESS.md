@@ -723,3 +723,11 @@ Grip tap no longer resizes; full-height sheets keep their height with the keyboa
 a text in the full-screen Edit sheet (#185); locked box upright inside the frame. stage-text-check
 phone part rewritten for the sheet and passing (Chromium, iPhone 13 viewport); desktop part all
 passed.
+
+## 2026-10-31 (6) · The open phone items
+
+Flip eases; canvas size change eases; Transparent background in preview with checkerboard
+(files black, said in the Canvas tool and export dialog) (#186); HEIF / HEIC decoded with
+WebCodecs at import on browsers that can't open it, kept as JPEG (#187; 4 unit tests with
+built HEIF files: single picture, grid, codec string). Checked in Chromium: checkerboard,
+canvas size ease (scale 0.75 → 1 over ~200 ms). Core 529 + react 24 tests pass.

@@ -1239,6 +1239,7 @@ async function handle(
       }
       renderer ??= createWebGL2Renderer(canvas);
       composer = new Composer(renderer, pool, previewMedia, false, RASTER_BUDGET[tier]);
+      composer.showTransparency = true;
       // Old export files left by closed pages: tidy once, after startup work is done.
       setTimeout(() => void cleanStaleExports(), 5000);
       composer.cheapEffects = tier === 'low';

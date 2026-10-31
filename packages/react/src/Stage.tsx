@@ -146,6 +146,33 @@ export function Stage(): ReactElement {
   const status = useUi((s) => s.status);
   const empty = useProject((p) => p.tracks.every((t) => t.items.length === 0));
 
+  // Canvas size changed (9:16 → 1:1…): the frame eases from its old size to the new one (the
+  // `scale` property, so the view zoom's transform is untouched), instead of jumping.
+  const lastFrame = useRef<{ w: number; h: number; pw: number; ph: number } | null>(null);
+  useLayoutEffect(() => {
+    const el = frameRef.current;
+    const was = lastFrame.current;
+    // The frame's size arrives a render after the canvas size: compare size changes only.
+    if (was && was.w === frame.w && was.h === frame.h) return;
+    lastFrame.current = { w: frame.w, h: frame.h, pw, ph };
+    if (!el || !was || was.w === 0 || frame.w === 0) return;
+    // Only a canvas size change (not the stage itself resizing: panels, rotation, keyboard).
+    if (was.pw === pw && was.ph === ph) return;
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    el.style.transition = 'none';
+    el.style.scale = `${was.w / frame.w} ${was.h / frame.h}`;
+    void el.offsetWidth; // start from the old size
+    el.style.transition = 'scale var(--vu-duration-base) var(--vu-ease-out)';
+    el.style.scale = '1 1';
+    const done = () => {
+      el.style.transition = '';
+      el.style.scale = '';
+    };
+    el.addEventListener('transitionend', done, { once: true });
+    const timer = setTimeout(done, 600);
+    return () => clearTimeout(timer);
+  }, [frame.w, frame.h, pw, ph]);
+
   // Fit the project's aspect ratio inside the stage.
   useLayoutEffect(() => {
     const stage = stageRef.current!;

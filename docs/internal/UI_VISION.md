@@ -177,7 +177,7 @@ the stage and everything drawn on it don't mirror. Text items in RTL scripts ren
   ▶ preview, licence line, + Add).
 - **Picture tools:** Green screen is an inspector section and a phone tool (switch, green / blue,
   Pick from video with a hint pill on the stage, Range, Edge softness, Clean edges). LUT looks
-  sit at the top of the Filters panel. Blend modes live in "Opacity & blend" / "Appearance"
+  sit at the top of the Filters panel. Canvas → Colour has a Transparent switch (checkerboard in the preview, #186). Blend modes live in "Opacity & blend" / "Appearance"
   (desktop) and the "Opacity & blend" phone tool — one sheet, opacity then a preview tile per
   mode (#178). Blur is a rail entry and panel (box / oval × blur /
   pixelate); a blurred area stretches from side handles when it's larger than 88 px on screen.
