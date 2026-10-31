@@ -293,8 +293,15 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
       else root.toggleAttribute('data-keyboard', open);
       // The field being typed in stays in view inside its sheet.
       if (open && !onStage) {
-        const scroller = field.closest<HTMLElement>('.vu-dock-body, .vu-panel-body');
-        if (scroller) {
+        // The box that really scrolls it (a sheet, or a list inside one, like Layers).
+        let scroller = field.parentElement;
+        while (scroller && scroller !== root) {
+          const oy = getComputedStyle(scroller).overflowY;
+          if ((oy === 'auto' || oy === 'scroll') && scroller.scrollHeight > scroller.clientHeight)
+            break;
+          scroller = scroller.parentElement;
+        }
+        if (scroller && scroller !== root) {
           const f = field.getBoundingClientRect();
           const sr = scroller.getBoundingClientRect();
           const bottom = Math.min(sr.bottom, visBottom);

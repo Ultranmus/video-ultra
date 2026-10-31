@@ -1259,3 +1259,7 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       minimal / normal / large. The "+" after the last clip always leaves the trim handle's room.
       Templates: 2 to a row on phones, the sheet opens at full height, no keyboard until a field
       is tapped (refines #180).
+183.  **Editing a text covers the whole editor on phones** (owner, 2026-10-31). The Edit tool's sheet
+      opens at full height and also over the top bar and tab bar (`.vu-dock[data-cover]`); other
+      tools keep the usual sheet. A tap on the phone ruler glides the playhead (220 ms) instead
+      of jumping.

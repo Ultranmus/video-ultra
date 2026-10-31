@@ -3649,6 +3649,13 @@
     transition: transform var(--vu-duration-sheet) var(--vu-ease-sheet);
   }
 
+  /* Covering (editing a text): the whole editor, top bar and tab bar included. */
+  .vu-dock[data-cover] {
+    bottom: calc(var(--vu-sheet-below, 0px) * -1);
+    z-index: var(--vu-z-popover);
+    border-radius: 0;
+  }
+
   /* Picking a colour on the video: the sheet goes down out of the way (it comes back after). */
   .vu-root .vu-dock[data-picking] {
     --vu-sheet-y: var(--vu-sheet-full);
@@ -5137,10 +5144,11 @@
   }
 
   .vu-selection-box[data-locked] {
+    box-sizing: border-box;
+    /* A border, inside the box (Safari doesn't draw a negative-offset outline's sides reliably):
+       with the box kept inside the frame (Stage.tsx), all four sides always show. */
+    border: calc(1.5px / var(--vu-stage-zoom, 1)) dashed var(--vu-selection);
     box-shadow: none;
-    outline: calc(1.5px / var(--vu-stage-zoom, 1)) dashed var(--vu-selection);
-    /* Drawn inside the box: an item as wide as the frame still shows its left and right sides. */
-    outline-offset: calc(-1.5px / var(--vu-stage-zoom, 1));
   }
 
   .vu-selection-box[data-locked] .vu-handle,

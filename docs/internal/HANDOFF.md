@@ -2,6 +2,12 @@
 
 Where the last session stopped and what comes next. Update before ending every session.
 
+## 2026-10-31 (3) — phone test 3 fixes pushed
+
+Text Edit sheet covers everything, ruler tap glides, layer rename scrolls into view, locked box
+border (BACKLOG "Phone test 3", DECISIONS #183). Owner re-tests these, then the remaining list
+from test 2. Still waiting on screenshots: filter tiles for emoji / text, the "[ ]" region.
+
 ## 2026-10-31 (2) — phone test 2 fixes pushed
 
 Owner's second iPhone pass: most things confirmed; the rest fixed and pushed (PROGRESS

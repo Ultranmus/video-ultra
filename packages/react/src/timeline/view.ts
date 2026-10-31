@@ -177,6 +177,8 @@ const ROW_SLIDE_MS = 180;
 const TOUCH_SLOP = 8;
 /** Touch pan: how far the finger goes before the pan picks one direction for the gesture. */
 const AXIS_LOCK_PX = 6;
+/** Phone: how long a tap on the ruler takes to glide the playhead there (ms). */
+const GLIDE_MS = 220;
 const FLASH_MS = 700;
 /** Wheel events this close together belong to one gesture (one axis). */
 const WHEEL_GESTURE_MS = 220;
@@ -965,7 +967,7 @@ export class TimelineView {
       case 'pending':
         if (drag.timer) clearTimeout(drag.timer);
         if (drag.hit.type === 'row' || drag.hit.type === 'empty') this.#ctl.select(null);
-        if (drag.hit.type === 'ruler' && this.#phone) this.#ctl.seek(drag.hit.time);
+        if (drag.hit.type === 'ruler' && this.#phone) this.#glideTo(drag.hit.time);
         if (drag.hit.type === 'add') this.#hooks.onAddMedia(!!drag.hit.atStart);
         if (drag.hit.type === 'trim' && drag.hit.transition) {
           this.#ctl.select(drag.hit.transition.id);
@@ -1153,6 +1155,29 @@ export class TimelineView {
     this.#setSnap(null);
     this.#canvas.style.cursor = '';
     if (this.#ghost) this.#cancelPreview();
+  }
+
+  /**
+   * Phone: a tap on the ruler glides the playhead there (the strip slides under it, eased) rather
+   * than jumping; a new touch stops it where it is.
+   */
+  #glideTo(target: Time): void {
+    cancelAnimationFrame(this.#momentum);
+    const from = this.#ctl.playhead.time;
+    if (from === target) return;
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) {
+      this.#ctl.seek(target);
+      return;
+    }
+    const start = performance.now();
+    const step = (now: number) => {
+      const k = Math.min(1, (now - start) / GLIDE_MS);
+      const e = 1 - (1 - k) ** 3;
+      this.#ctl.seek(Math.round(from + (target - from) * e));
+      if (k < 1) this.#momentum = requestAnimationFrame(step);
+    };
+    this.#momentum = requestAnimationFrame(step);
   }
 
   /** Touch: the lanes keep scrolling up/down after a flick, slowing down like a native list. */

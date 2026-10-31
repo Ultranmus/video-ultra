@@ -4,6 +4,19 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 
 ## Open
 
+- [x] (fixed 2026-10-31) Phone test 3 (owner): a tap on the timeline jumped the playhead (a drag
+      was smooth). On phones a tap on the ruler now glides the playhead there (220 ms, eased;
+      instant under reduced motion; a new touch stops it). If the jump was from a tap somewhere
+      else on the lanes, the owner says where.
+- [x] (fixed 2026-10-31) Phone test 3 (owner): the text Edit sheet was partial; the owner wants it
+      to cover everything. It now covers the whole editor, top bar and tab bar included
+      (`data-cover`), and the next tool opens at the usual height (#183).
+- [x] (fixed 2026-10-31) Phone test 3 (owner): renaming a layer low in the Layers list — the row
+      stayed under the keyboard. The field is now scrolled into view in the box that really
+      scrolls it (the Layers list), not only the sheet body.
+- [x] (fixed 2026-10-31) Phone test 3 (owner): a locked full-width item still showed only top and
+      bottom on the iPhone (Chromium showed all four). The dash is now a border inside the box
+      (Safari didn't draw the negative-offset outline's sides), and the box stays inside the frame.
 - [ ] Phone test 2 (owner, 2026-10-31): Filters for an emoji sticker or a text — the preview tiles
       show the emoji / text pushed right and cut in half (video and image tiles are fine). Not
       reproduced in the cloud container (Chromium, WebGL2: centred and whole), so likely the
