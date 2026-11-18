@@ -237,14 +237,24 @@ const PICK_MIN_TOLERANCE = 0.05;
 /** How long a quarter turn eases on the video (ms). */
 const TURN_MS = 180;
 
-/** A grey, white or black (`#rrggbb`): almost no colour to key on. */
+/**
+ * A grey, white or black (`#rrggbb`): almost no colour to key on. Measured as the key does — its
+ * colour tone (chroma, same weights as the shader), on 0…255 — so a dull warm wall (#91836f, a
+ * dim room's beige) still counts as a colour (owner, 2026-11-18: it was called grey, because the
+ * old test, channels within 40 of each other, caught most low-light colours).
+ */
 function isNeutral(hex: string): boolean {
   const n = parseInt(hex.slice(1), 16);
   const r = (n >> 16) & 255;
   const g = (n >> 8) & 255;
   const b = n & 255;
-  return Math.max(r, g, b) - Math.min(r, g, b) < 40;
+  const cb = -0.1146 * r - 0.3854 * g + 0.5 * b;
+  const cr = 0.5 * r - 0.4542 * g - 0.0458 * b;
+  return Math.hypot(cb, cr) < NEUTRAL_CHROMA;
 }
+/** Below this chroma (0…255) a pick is grey / white / black: camera noise, not a colour. */
+const NEUTRAL_CHROMA = 6;
+
 export class EditorController {
   readonly editor: Editor;
   readonly ui = createUiStore();

@@ -1295,3 +1295,9 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       `--vu-ease`; replaces the non-uniform `scale` from the top-left in #186, which stretched the
       picture and moved the frame at once). The stage canvas uses `object-fit: contain`, so its
       last picture keeps its shape until the engine draws at the new size.
+189.  **Green screen "grey" is measured as colour tone** (owner, 2026-11-18; refines #184). A pick
+      is grey / white / black only when its chroma (the key's own measure, 0…255) is under 6;
+      a dull warm wall in a dim room (#91836f, chroma ~13) is a colour and gets the lowered
+      Range. The pick renders its small frame on black and on white and leaves out the pixels
+      that differ (background around the clip), so bars don't count as picture in the tapped
+      spot, in "removes the whole video" or in the half-the-picture Range.

@@ -29,6 +29,14 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       (most of it in the first 100 ms of 200), and the old picture was stretched to the new shape
       until the engine drew again. Now the frame morphs centred (uniform scale + clip, 320 ms) and
       the canvas keeps its picture's shape (`object-fit: contain`) until the new frame arrives.
+- [x] (fixed 2026-11-18, #189) Phone (owner, iPhone screenshot): green screen "Pick from video"
+      on the warm wall said "Grey, white and black can't be removed". The wall in a dim room is
+      a dull beige (#91836f): the old grey test (channels within 40 of each other) called it
+      grey. Now grey means almost no colour tone (chroma < 6, as the shader measures it), so
+      the wall goes the "Range lowered" way (#184). Also the pick no longer counts the
+      background around the clip (bars) as black picture.
+- [ ] `scripts/picture-check.ts`: the blend step still looks for an "Appearance → Screen" chip;
+      blend is now tiles (10-31). Update the step (the green screen / LUT / Blur parts pass).
 - [ ] Transparent background in exported files (#186): the preview shows a checkerboard; video
       files and PNG frames come out black there. Needs an alpha-capable export canvas on both
       backends (WebGL2 `alpha: true`, WebGPU `alphaMode: 'premultiplied'` with premultiplied

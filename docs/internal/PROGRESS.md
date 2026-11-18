@@ -746,3 +746,7 @@ canvas size ease (scale 0.75 → 1 over ~200 ms). Core 529 + react 24 tests pass
   checks the chosen part, not the whole video; recording / voiceover names use a fixed
   `14.05.09` stamp (voiceover name translatable); Layers shows a combined clip with the combine
   icon and names it for screen readers. Five items found already done and ticked.
+- Green screen pick (owner's iPhone screenshot): a dull beige wall was refused as grey. Grey is
+  now chroma < 6 (as the shader measures it); the pick leaves the background around the clip out
+  of its numbers (#189). Checked on a clip made from the screenshot: the wall is removed with
+  Range 12 % and the "colour is all over the video" message.
