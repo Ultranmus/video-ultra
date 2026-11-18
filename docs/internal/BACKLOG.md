@@ -16,6 +16,11 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       Edit sheet does. Only `tool === 'text-edit'` sets `data-cover` (`shell.tsx`); the Layers
       sheet needs the same cover while a name is being typed (and back to its usual height
       after).
+- [ ] Phone (owner, iPhone screenshot 2026-11-18): in the item's menu (long-press / ⋯), Align
+      shows a right arrow (`arrowRight`), but on phones its submenu opens inline below it
+      (`organize.tsx`, `submenu && phone`). The arrow points the wrong way: on phones use a
+      chevron that points down when closed and turns up (or rotates) when open; keep the
+      right arrow for the desktop side flyout.
 - [ ] Transparent background in exported files (#186): the preview shows a checkerboard; video
       files and PNG frames come out black there. Needs an alpha-capable export canvas on both
       backends (WebGL2 `alpha: true`, WebGPU `alphaMode: 'premultiplied'` with premultiplied
