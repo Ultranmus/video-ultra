@@ -10,6 +10,12 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       intent, `editor.css`) while the width is `92cqi`. On narrow `.vu-root` (container query)
       centre it in the editor with equal side gutters, like the other popovers; keep the
       left-hanging placement on wide layouts.
+- [ ] Phone (owner, iPhone screenshots 2026-11-18): renaming a layer in the Layers sheet opens
+      it full height with the keyboard, but the editor's top bar (videos, undo / redo, history,
+      layers, ratio, Export) stays visible above it. It should cover everything like the text
+      Edit sheet does. Only `tool === 'text-edit'` sets `data-cover` (`shell.tsx`); the Layers
+      sheet needs the same cover while a name is being typed (and back to its usual height
+      after).
 - [ ] Transparent background in exported files (#186): the preview shows a checkerboard; video
       files and PNG frames come out black there. Needs an alpha-capable export canvas on both
       backends (WebGL2 `alpha: true`, WebGPU `alphaMode: 'premultiplied'` with premultiplied
