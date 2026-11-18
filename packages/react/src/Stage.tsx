@@ -146,9 +146,14 @@ export function Stage(): ReactElement {
   const status = useUi((s) => s.status);
   const empty = useProject((p) => p.tracks.every((t) => t.items.length === 0));
 
-  // Canvas size changed (9:16 → 1:1…): the frame eases from its old size to the new one (the
-  // `scale` property, so the view zoom's transform is untouched), instead of jumping.
+  // Canvas size changed (9:16 → 1:1…): the frame morphs from its old box to the new one, centred
+  // where it is, without stretching the picture (owner, 2026-11-18: it grew from its corner and the
+  // old picture stretched, then snapped). The frame is laid out at the new size at once; it's
+  // scaled uniformly (the `scale` / `translate` properties, so the view zoom's transform is
+  // untouched) and clipped to the old box's shape, then both ease to the new box.
   const lastFrame = useRef<{ w: number; h: number; pw: number; ph: number } | null>(null);
+  const morph = useRef<Animation | null>(null);
+  useEffect(() => () => morph.current?.cancel(), []);
   useLayoutEffect(() => {
     const el = frameRef.current;
     const was = lastFrame.current;
@@ -159,18 +164,32 @@ export function Stage(): ReactElement {
     // Only a canvas size change (not the stage itself resizing: panels, rotation, keyboard).
     if (was.pw === pw && was.ph === ph) return;
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    el.style.transition = 'none';
-    el.style.scale = `${was.w / frame.w} ${was.h / frame.h}`;
-    void el.offsetWidth; // start from the old size
-    el.style.transition = 'scale var(--vu-duration-base) var(--vu-ease-out)';
-    el.style.scale = '1 1';
-    const done = () => {
-      el.style.transition = '';
-      el.style.scale = '';
-    };
-    el.addEventListener('transitionend', done, { once: true });
-    const timer = setTimeout(done, 600);
-    return () => clearTimeout(timer);
+    if (typeof el.animate !== 'function') return;
+    const w = frame.w;
+    const h = frame.h;
+    // Uniform scale that makes the new frame cover the old box; the clip trims it to that box.
+    const k = Math.max(was.w / w, was.h / h);
+    const ix = Math.max(0, (w - was.w / k) / 2);
+    const iy = Math.max(0, (h - was.h / k) / 2);
+    const style = getComputedStyle(el);
+    const token = style.getPropertyValue('--vu-duration-slow').trim(); // "320ms" or "0.32s"
+    const ms = parseFloat(token) * (token.endsWith('ms') ? 1 : 1000) || 320;
+    const easing = style.getPropertyValue('--vu-ease').trim() || 'ease-out';
+    // (A second fit right after — the stage settling — must not cut it short: it runs to its
+    // end, which is the frame's own box whatever its size.)
+    morph.current?.cancel();
+    morph.current = el.animate(
+      [
+        {
+          scale: `${k}`,
+          // Scaling from the top-left (the zoom's origin): move it so the centre stays put.
+          translate: `${(w * (1 - k)) / 2}px ${(h * (1 - k)) / 2}px`,
+          clipPath: `inset(${iy}px ${ix}px)`,
+        },
+        { scale: '1', translate: '0px 0px', clipPath: 'inset(0px 0px)' },
+      ],
+      { duration: ms, easing },
+    );
   }, [frame.w, frame.h, pw, ph]);
 
   // Fit the project's aspect ratio inside the stage.

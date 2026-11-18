@@ -1,5 +1,6 @@
 import {
   fps as toFps,
+  itemEnd,
   exportLimits,
   exportSize,
   exportBitrate,
@@ -21,6 +22,7 @@ import {
   type Project,
   type Time,
 } from '@video-ultra/core';
+import { captionTrack } from '@video-ultra/core/internal';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { useController, useLabels, useProject, useUi } from './context';
 import { Segmented } from './controls';
@@ -73,8 +75,11 @@ function formatMb(mb: number): string {
       : `${Math.round(mb)} MB`;
 }
 
-/** Some clip that plays sound (what a sound-only export needs). */
+/** Some clip that plays sound inside the part being exported (what a sound-only export needs). */
 function hasSound(p: Project): boolean {
+  const span = resolveExportRange(p.settings.exportRange, projectDuration(p));
+  if (!span) return false;
+  const { start, end } = span;
   return p.tracks.some(
     (t) =>
       !t.muted &&
@@ -82,7 +87,9 @@ function hasSound(p: Project): boolean {
         (i) =>
           (i.kind === 'audio' || (i.kind === 'video' && p.assets[i.assetId]?.hasAudio)) &&
           !i.muted &&
-          i.volume > 0,
+          i.volume > 0 &&
+          i.start < end &&
+          itemEnd(i) > start,
       ),
   );
 }
@@ -312,6 +319,8 @@ export function ExportDialog(): ReactElement | null {
     range: p.settings.exportRange ?? null,
     sound: hasSound(p),
   }));
+  // Captions: their subtitle file is offered next to the video once it's made.
+  const captions = useProject((p) => !!captionTrack(p)?.items.some((i) => i.kind === 'text'));
   const seeThrough = useProject(
     (p) => p.settings.background.type === 'color' && p.settings.background.color === 'transparent',
   );
@@ -685,6 +694,19 @@ export function ExportDialog(): ReactElement | null {
                     >
                       <Icon name="share" />
                       <span>{l.share}</span>
+                    </button>
+                  ) : null}
+                  {done.kind === 'video' && captions ? (
+                    <button
+                      type="button"
+                      className="vu-btn vu-wide"
+                      data-variant="secondary"
+                      data-layout="row"
+                      data-tooltip={l.downloadCaptionsTip}
+                      onClick={() => ctl.downloadSubtitles('srt')}
+                    >
+                      <Icon name="download" />
+                      <span>{l.downloadCaptionsSrt}</span>
                     </button>
                   ) : null}
                   <button

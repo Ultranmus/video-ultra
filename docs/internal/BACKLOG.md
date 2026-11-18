@@ -4,23 +4,31 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 
 ## Open
 
-- [ ] Phone (owner, iPhone screenshot 2026-11-18): the "Your videos" popover looks left-aligned
+- [x] (fixed 2026-11-18: the phone rule now also overrides the desktop `left: 0`) Phone (owner,
+      iPhone screenshot 2026-11-18): the "Your videos" popover looks left-aligned
       on a phone — it hangs from the top bar's start, so its left edge sits at the button's edge
       and the right gap is much wider. `.vu-videos-anchor .vu-popover` sets `left: 0` (desktop
       intent, `editor.css`) while the width is `92cqi`. On narrow `.vu-root` (container query)
       centre it in the editor with equal side gutters, like the other popovers; keep the
       left-hanging placement on wide layouts.
-- [ ] Phone (owner, iPhone screenshots 2026-11-18): renaming a layer in the Layers sheet opens
+- [x] (fixed 2026-11-18: typing in any sheet covers the editor above the keyboard, #188) Phone
+      (owner, iPhone screenshots 2026-11-18): renaming a layer in the Layers sheet opens
       it full height with the keyboard, but the editor's top bar (videos, undo / redo, history,
       layers, ratio, Export) stays visible above it. It should cover everything like the text
       Edit sheet does. Only `tool === 'text-edit'` sets `data-cover` (`shell.tsx`); the Layers
       sheet needs the same cover while a name is being typed (and back to its usual height
       after).
-- [ ] Phone (owner, iPhone screenshot 2026-11-18): in the item's menu (long-press / ⋯), Align
+- [x] (fixed 2026-11-18: phones show a chevron that turns over) Phone (owner, iPhone screenshot
+      2026-11-18): in the item's menu (long-press / ⋯), Align
       shows a right arrow (`arrowRight`), but on phones its submenu opens inline below it
       (`organize.tsx`, `submenu && phone`). The arrow points the wrong way: on phones use a
       chevron that points down when closed and turns up (or rotates) when open; keep the
       right arrow for the desktop side flyout.
+- [x] (fixed 2026-11-18, #188) Owner: a canvas size change (9:16 → 16:9…) "ends with a clamp, not
+      an animation". Measured: the frame jumped to its new place and grew from its top-left corner
+      (most of it in the first 100 ms of 200), and the old picture was stretched to the new shape
+      until the engine drew again. Now the frame morphs centred (uniform scale + clip, 320 ms) and
+      the canvas keeps its picture's shape (`object-fit: contain`) until the new frame arrives.
 - [ ] Transparent background in exported files (#186): the preview shows a checkerboard; video
       files and PNG frames come out black there. Needs an alpha-capable export canvas on both
       backends (WebGL2 `alpha: true`, WebGPU `alphaMode: 'premultiplied'` with premultiplied
@@ -378,7 +386,8 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [ ] Combined clips (#155): Separate re-makes lanes at the end of their kind (a title can come
       back above a sticker it was under); keep their old row order.
 - [ ] Combined clips: no waveform on the timeline for a combined clip with sound (mix its inside
-      in the analyzer, cached), and Layers / Media show it as a video.
+      in the analyzer, cached), and Media shows it as a video. (Layers fixed 2026-11-18: combine
+      icon and "Combined clip" for screen readers.)
 - [ ] Combined clips: the inside is drawn at the output size; zoomed past 1× (scale > 1) it's
       upscaled — draw it at the zoomed size (capped) when that matters.
 - [ ] Combined clips on a budget phone: measure a combined clip over the main video (two
@@ -407,19 +416,20 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [ ] Captions: the on-device model could be the English-only Whisper builds (`*.en`: same size,
       a little more accurate on English) — needs timestamped ONNX builds and a captions-bench
       run first.
-- [ ] (v0.2 A) Export dialog: offer the .srt next to the video download (today: Captions panel).
+- [x] (fixed 2026-11-18) (v0.2 A) Export dialog: offer the .srt next to the video download
+      (today: Captions panel). "Captions (.srt)" shows under Download when the video has captions.
 
 - [ ] (v0.2 B) A ducking badge on timeline clips; optional look-ahead or a "listen to" choice so
       short sound effects don't dip music; default ducking on for library music (owner's call);
       show asset credits to the host at export.
 - [ ] (v0.2 C) LUT chips have no previews, no delete / rename; a LUT import with nothing selected
-      applies to nothing; "Apply to all clips" copies the filter only, not the LUT. Blend modes on
+      applies to nothing. ("Apply to all clips" copies the LUT too — checked 2026-11-18.) Blend modes on
       a 3D-turn animation copy only the flat bounding box — confirm with a golden frame. Region
       items have no entrance / exit animations. Green screen not measured on budget phones.
 - [ ] (v0.2 D) Each frame capture creates a renderer (WebKit warns "too many WebGL contexts" in
-      export-check) — reuse one. Camera can't switch while recording; recording name uses the
-      locale time format; the range bar has no film strip; sound-only export is offered for a
-      silent part (the engine then refuses clearly).
+      export-check) — reuse one. Camera can't switch while recording; the range bar has no film
+      strip. (Fixed 2026-11-18: recording / voiceover names use a fixed `14.05.09` stamp; sound
+      only is offered only when something sounds inside the chosen part.)
 - [ ] WebKit logs "WebKitBlobResource error 1" console messages in editor-interact (not failures).
 
 - [x] (done 2026-10-19, #134) Copy / paste elements (⌘C / ⌘V, with a paste at the playhead) — image-ultra has it; not in
@@ -561,13 +571,13 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [ ] Real-iPhone check of the second UI pass: keyboard lift (visualViewport) while editing text,
       long-press reorder without Safari's callout, dock heights, Preview mode.
 - [x] (done 2026-10-19, #114) Stage view pinch-zoom (nothing selected) — still not built.
-- [ ] Inspector: "Appearance" buttons stack one per row in a narrow inspector; consider an icon
+- [x] (done — icon row `vu-icon-row`, checked 2026-11-18) Inspector: "Appearance" buttons stack one per row in a narrow inspector; consider an icon
       row (rotate / flip H / flip V) like image-ultra's adjust bar.
 - [x] (fixed 2026-10-19) Ruler labels under the playhead capsule are hidden; a nicer approach would fade them.
 - [ ] Real-device pass of the effects library: iPhone (WebGPU) and a low-end Android (WebGL2):
       play the blur family (spin-blur, motion-blur, zoom-blur), the 3D family and a typewriter
       title; watch late frames and preview-quality drops. Tune `cheapEffects` / tap counts.
-- [ ] The UI asks `filterPreviews` for every filter id (now 115 + none): ask per visible
+- [x] (done — per category when it scrolls near the view, checked 2026-11-18) The UI asks `filterPreviews` for every filter id (now 115 + none): ask per visible
       category / scroll position instead (each tile is one render + a bitmap).
 - [ ] Owner's "Zoom zoomed my stickers" didn't reproduce in core at HEAD (golden check proves
       lanes are untouched); get a screen recording if it persists.
@@ -580,7 +590,7 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [ ] Glow loop is a pulsing light mix, not a halo outside the item's box.
 - [ ] Spin blur computes cos/sin per tap (heaviest family): rotate incrementally if a device
       shows it.
-- [ ] `TransitionPreset.ease` is a new required field (the preset's default curve) — the UI may
+- [x] (done — the ease picker shows `preset.ease`, checked 2026-11-18) `TransitionPreset.ease` is a new required field (the preset's default curve) — the UI may
       show it as the default in an ease picker.
 - [ ] Owner reported a transition "zoom" affecting stickers too; not reproduced in the engine
       (golden check proves lanes are untouched across 30 families). Ask for a screen recording if
@@ -595,7 +605,7 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       SRT / WebVTT import + export with frame-exact timing and burn-in (ties into v0.4 AI
       captions); scopes — waveform, RGB parade, histogram, vectorscope (_scopes done 2026-10-19,
       DECISIONS #147_).
-- [ ] Animation tiles: text previews use the item's own size — very long text can be tiny in the
+- [x] (done — `centredForTile` fits text to the tile, checked 2026-11-18) Animation tiles: text previews use the item's own size — very long text can be tiny in the
       tile; consider fitting text to the tile in `itemPreview`.
 - [ ] Transition still (A | B) and flip-books are re-fetched when the panel reopens; cache per
       cut signature across opens if it shows on low-tier phones.

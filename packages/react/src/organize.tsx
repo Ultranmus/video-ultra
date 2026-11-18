@@ -364,7 +364,7 @@ function LayerRow({
           type="button"
           className="vu-layer-main"
           aria-pressed={selected}
-          aria-label={`${kindLabel(l, item.kind, true)}: ${shown}${locked ? `, ${l.lockedState}` : ''}${hidden ? `, ${l.hiddenState}` : ''}`}
+          aria-label={`${ctl.isCombined(item) ? l.combinedKind : kindLabel(l, item.kind, true)}: ${shown}${locked ? `, ${l.lockedState}` : ''}${hidden ? `, ${l.hiddenState}` : ''}`}
           data-tooltip={l.renameTipLayer}
           onClick={(e) => onPick(e.shiftKey || e.metaKey || e.ctrlKey)}
           onDoubleClick={() => setRenaming(true)}
@@ -438,7 +438,9 @@ function LayerThumb({ item }: { item: Item }): ReactElement {
       : 'sourceIn' in item
         ? item.sourceIn / FLICKS_PER_SECOND
         : 0;
-  const picture = !!asset && asset.kind !== 'audio';
+  // A combined clip has no file to take a frame from: it shows the combine icon.
+  const combined = asset?.kind === 'compound';
+  const picture = !!asset && asset.kind !== 'audio' && !combined;
   // Only rows scrolled near the view decode a frame; on a fresh load, once the file is back.
   const [near, setNear] = useState(false);
   const thumbRef = useNearView<HTMLSpanElement>(() => setNear(true));
@@ -470,7 +472,11 @@ function LayerThumb({ item }: { item: Item }): ReactElement {
   }, [ctl, assetId, at, picture, near]);
   return (
     <span ref={thumbRef} className="vu-layer-thumb" data-kind={item.kind} aria-hidden="true">
-      {picture ? <canvas ref={canvasRef} /> : <Icon name={KIND_ICON[item.kind]} size={16} />}
+      {picture ? (
+        <canvas ref={canvasRef} />
+      ) : (
+        <Icon name={combined ? 'combine' : KIND_ICON[item.kind]} size={16} />
+      )}
     </span>
   );
 }
@@ -676,7 +682,14 @@ function MenuPanel({ x, y }: { x: number; y: number }): ReactElement {
                   >
                     <Icon name="alignToCenter" size={16} />
                     <span className="vu-menu-label">{l.align}</span>
-                    <Icon name="arrowRight" size={14} />
+                    {/* Phones open it inline below (a chevron that turns over), desktop beside. */}
+                    {phone ? (
+                      <span className="vu-menu-chevron" data-open={submenu || undefined}>
+                        <Icon name="chevronDown" size={14} />
+                      </span>
+                    ) : (
+                      <Icon name="arrowRight" size={14} />
+                    )}
                   </div>
                   {submenu && phone ? subPanel : null}
                 </div>

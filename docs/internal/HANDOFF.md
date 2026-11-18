@@ -2,6 +2,14 @@
 
 Where the last session stopped and what comes next. Update before ending every session.
 
+## 2026-11-18 — owner's iPhone screenshots fixed (branch `claude/mobile-popup-alignment-l6akr1`)
+
+Your videos popover centred, typing in a sheet covers the top bar, Align chevron, canvas size
+morph (DECISIONS #188), plus small backlog items (PROGRESS 2026-11-18). Owner checks on the
+iPhone: Your videos, rename a layer, long-press menu → Align, switch 9:16 ↔ 16:9 ↔ 1:1.
+Backlog candidates left for later: Separate keeps the old lane order (combined clips), playground
+test flags (DECISIONS #92), transition stills cache.
+
 ## 2026-10-31 (6) — the open phone items done, owner tests tomorrow
 
 Flip / canvas size animate, Transparent background (preview; files black — next step in

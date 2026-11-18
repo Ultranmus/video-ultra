@@ -10,7 +10,7 @@ import {
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { useController, useLabels, useProject, useUi } from './context';
 import { useNearView } from './browse';
-import { formatClock } from './format';
+import { fileTimeStamp, formatClock } from './format';
 import { Icon } from './icons';
 import { textItem } from './items';
 import type { PanelId } from './state';
@@ -454,7 +454,7 @@ function Voiceover() {
       const mime = rec.mimeType || type || 'audio/webm';
       const file = new File(
         chunks,
-        `Voiceover ${new Date().toLocaleTimeString()}.${mime.includes('mp4') ? 'm4a' : 'webm'}`,
+        `${l.voiceoverName(fileTimeStamp())}.${mime.includes('mp4') ? 'm4a' : 'webm'}`,
         { type: mime },
       );
       // Where recording started, so the words line up with the picture they were said over; the

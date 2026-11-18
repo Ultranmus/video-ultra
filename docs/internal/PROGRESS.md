@@ -731,3 +731,18 @@ Flip eases; canvas size change eases; Transparent background in preview with che
 WebCodecs at import on browsers that can't open it, kept as JPEG (#187; 4 unit tests with
 built HEIF files: single picture, grid, codec string). Checked in Chromium: checkerboard,
 canvas size ease (scale 0.75 → 1 over ~200 ms). Core 529 + react 24 tests pass.
+
+## 2026-11-18 · Phone screenshots: popover, rename cover, Align chevron, canvas size morph
+
+- "Your videos" on phones: centred with equal gutters (a desktop `left: 0` rule outranked the
+  phone rule).
+- Typing in a sheet (Layers rename and others) covers the editor above the keyboard, top bar
+  included (#188).
+- Item menu on phones: Align shows a chevron that turns over (it opens inline below), not a
+  right arrow.
+- Canvas size change: the frame morphs centred without stretching the picture (#188). Measured
+  in Chromium at iPhone size before / after (frame box per animation frame).
+- Backlog sweep: export dialog offers "Captions (.srt)" after a video export; sound-only export
+  checks the chosen part, not the whole video; recording / voiceover names use a fixed
+  `14.05.09` stamp (voiceover name translatable); Layers shows a combined clip with the combine
+  icon and names it for screen readers. Five items found already done and ticked.
