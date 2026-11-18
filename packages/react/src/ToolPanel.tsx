@@ -22,7 +22,7 @@ import {
   type VideoItem,
 } from '@video-ultra/core';
 import { getCommand } from './commands';
-import { useState, type ReactElement } from 'react';
+import { useRef, useState, type ReactElement } from 'react';
 import { useController, useLabels, useProject, useUi } from './context';
 import { Button, ColorField, EditSlider, IconButton, Section, Segmented } from './controls';
 import { Icon } from './icons';
@@ -803,15 +803,27 @@ function DurationTool({ item }: { item: Item }) {
 function TextEditTool({ item, autoFocus = true }: { item: Item; autoFocus?: boolean }) {
   const ctl = useController();
   const l = useLabels();
+  // Opened to edit: the caret goes after the last letter (adding to a text is the usual edit),
+  // not before the first (owner, 2026-11-18). Only that first focus — a tap later puts it where
+  // it lands.
+  const placed = useRef(!autoFocus);
   if (item.kind !== 'text') return null;
   return (
     <textarea
-      className="vu-textarea"
+      className="vu-textarea vu-text-edit-field"
       aria-label={l.text}
       placeholder={l.textPlaceholder}
       value={item.text}
-      rows={2}
+      rows={3}
       autoFocus={autoFocus}
+      onFocus={(e) => {
+        if (placed.current) return;
+        placed.current = true;
+        const field = e.currentTarget;
+        const end = field.value.length;
+        field.setSelectionRange(end, end);
+        field.scrollTop = field.scrollHeight;
+      }}
       onChange={(e) => {
         const value = e.currentTarget.value;
         // Typing coalesces into one undo step per pause.

@@ -113,6 +113,8 @@ interface View {
 }
 const MAX_ZOOM = 5;
 const LONG_PRESS_MS = 500;
+/** A press on the text field this soon after it opened is a double-click's second press. */
+const DOUBLE_PRESS_MS = 500;
 
 export function Stage(): ReactElement {
   const ctl = useController();
@@ -410,8 +412,9 @@ export function Stage(): ReactElement {
     placeBox([{ item: typed, box: { ...box, width: w, height: h } }], false);
   };
 
-  /** `selectAll`: a mouse replaces the text; a finger types on at the end (keyboard up). */
-  const startTyping = (id: string, selectAll: boolean) => {
+  /** Opens the field on a text, the caret after its last letter (mouse or finger; owner,
+   * 2026-11-18 — a mouse used to select it all). */
+  const startTyping = (id: string) => {
     const field = fieldRef.current;
     const item = findItem(ctl.project, id)?.item;
     const caption = ctl.project.tracks.find((t) => t.kind === 'caption');
@@ -432,7 +435,8 @@ export function Stage(): ReactElement {
     layoutField();
     field.focus({ preventScroll: true });
     const end = field.value.length;
-    field.setSelectionRange(selectAll ? 0 : end, end);
+    field.setSelectionRange(end, end);
+    openedAt.current = performance.now();
     ctl.preview((d) => {
       const found = findItem(d, id);
       if (found) found.item.hidden = true;
@@ -499,7 +503,9 @@ export function Stage(): ReactElement {
     // placeBox / boxesAt read refs only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ctl, selected, lockedKey, pw, ph, scale, previewMode]);
-  const tapToType = useRef<{ id: string; mouse: boolean } | null>(null);
+  const tapToType = useRef<{ id: string } | null>(null);
+  /** When the text field last opened (performance.now()). */
+  const openedAt = useRef(0);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const longPress = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number } | null>(
     null,
@@ -738,8 +744,7 @@ export function Stage(): ReactElement {
     const additive = e.shiftKey || e.metaKey || e.ctrlKey;
     // A click or tap on the one selected text types into it (checked on release, if it didn't
     // become a drag).
-    tapToType.current =
-      inside && !additive && only?.kind === 'text' ? { id: only.id, mouse: !touch } : null;
+    tapToType.current = inside && !additive && only?.kind === 'text' ? { id: only.id } : null;
     // The main video fills the frame, so with a mouse a drag that starts on it (while it isn't
     // selected) draws a selection rectangle; a click still selects it.
     const onMain =
@@ -1034,7 +1039,7 @@ export function Stage(): ReactElement {
     if (cancelled || !next) {
       ctl.preview(null);
       if (!cancelled && !next && d.type === 'move' && !d.moved && typeInto)
-        startTyping(typeInto.id, typeInto.mouse);
+        startTyping(typeInto.id);
       return;
     }
     const label =
@@ -1132,7 +1137,7 @@ export function Stage(): ReactElement {
         if (!hit) return;
         // Double-click a group member to pick just that one; a text then types.
         if (ctl.ui.getState().selectedIds.length >= 2) ctl.select(hit.id, { only: true });
-        if (hit.kind === 'text') startTyping(hit.id, true);
+        if (hit.kind === 'text') startTyping(hit.id);
       }}
       onContextMenu={(e) => {
         e.preventDefault();
@@ -1194,6 +1199,12 @@ export function Stage(): ReactElement {
           rows={1}
           spellCheck
           onPointerDown={(e) => e.stopPropagation()}
+          // The first click of a double-click already opens the field (a click on the selected
+          // text): its second press lands on the field and would move the caret (or pick a
+          // word) where it falls. Just after opening, it's ignored: the caret stays at the end.
+          onMouseDown={(e) => {
+            if (performance.now() - openedAt.current < DOUBLE_PRESS_MS) e.preventDefault();
+          }}
           onDoubleClick={(e) => e.stopPropagation()}
           onContextMenu={(e) => e.stopPropagation()}
           onInput={layoutField}

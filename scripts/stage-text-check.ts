@@ -118,14 +118,16 @@ if (only !== 'phone') {
   await page.mouse.dblclick(p.x, p.y);
   check('double-click opens the field', await field(page).isVisible());
   check(
-    'the field has the focus, text selected',
+    'the field has the focus, caret after the last letter',
     await page.evaluate(() => {
       const f = document.activeElement as HTMLTextAreaElement;
-      return f?.classList.contains('vu-stage-text') && f.selectionEnd - f.selectionStart === 5;
+      return (
+        f?.classList.contains('vu-stage-text') && f.selectionStart === 5 && f.selectionEnd === 5
+      );
     }),
   );
   await snap(page, 'd1-open');
-  await page.keyboard.type('Big sale today');
+  await page.keyboard.type(' big sale today');
   check('typing writes nothing to the project', (await textOf(page, id)) === 'Hello');
   await page.keyboard.press('Enter');
   await page.keyboard.type('50% off');
@@ -136,7 +138,7 @@ if (only !== 'phone') {
   const frame = (await page.locator('.vu-stage-frame').boundingBox())!;
   await page.mouse.click(frame.x + 10, frame.y + frame.height - 10);
   await page.waitForTimeout(300);
-  check('closing commits the text', (await textOf(page, id)) === 'Big sale today\n50% off');
+  check('closing commits the text', (await textOf(page, id)) === 'Hello big sale today\n50% off');
   check('the field is gone', !(await field(page).isVisible()));
   await snap(page, 'd3-committed');
   await page.keyboard.press(`${mod}+z`);
@@ -176,7 +178,7 @@ if (only !== 'phone') {
   await page.keyboard.type('nope');
   await page.keyboard.press('Escape');
   await page.waitForTimeout(200);
-  check('Esc keeps the old text', (await textOf(page, id)) === 'Big sale today\n50% off');
+  check('Esc keeps the old text', (await textOf(page, id)) === 'Hello big sale today\n50% off');
   check('Esc closes the field', !(await field(page).isVisible()));
   // Shortcuts don't fire while typing: Delete / Backspace edits text, not the element.
   await page.mouse.dblclick(p.x, p.y);
@@ -185,7 +187,13 @@ if (only !== 'phone') {
   await page.keyboard.type('Hi');
   await page.keyboard.press(`${mod}+Enter`);
   await page.waitForTimeout(200);
-  check('⌘/Ctrl+Enter commits', (await textOf(page, id)) === 'Hi');
+  // The caret opens at the end: Backspace took the last letter, then 'Hi' went on.
+  const committed = await textOf(page, id);
+  check(
+    '⌘/Ctrl+Enter commits',
+    committed === 'Hello big sale today\n50% ofHi',
+    JSON.stringify(committed),
+  );
 
   // A wrapping text (templates give their titles a wrap width): the field hugs the drawn lines,
   // like the selection frame does, not the whole wrap width.

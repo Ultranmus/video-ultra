@@ -7,7 +7,7 @@ Where the last session stopped and what comes next. Update before ending every s
 Your videos popover centred, typing in a sheet covers the top bar, Align chevron, canvas size
 morph (DECISIONS #188), plus small backlog items (PROGRESS 2026-11-18). Owner checks on the
 iPhone: Your videos, rename a layer, long-press menu → Align, switch 9:16 ↔ 16:9 ↔ 1:1, green screen pick on the
-warm wall (#189).
+warm wall (#189), edit a text (caret at the end, taller box, #190).
 Backlog candidates left for later: Separate keeps the old lane order (combined clips), playground
 test flags (DECISIONS #92), transition stills cache.
 

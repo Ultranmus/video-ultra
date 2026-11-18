@@ -35,6 +35,10 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       grey. Now grey means almost no colour tone (chroma < 6, as the shader measures it), so
       the wall goes the "Range lowered" way (#184). Also the pick no longer counts the
       background around the clip (bars) as black picture.
+- [x] (fixed 2026-11-18, #190) Owner: editing a text, the caret started at the beginning (the
+      Edit sheet; on the video a double-click's second press moved it where it landed, and a
+      mouse double-click selected everything). It now always opens after the last letter; the
+      Edit sheet's box is a little taller (about 3 lines).
 - [ ] `scripts/picture-check.ts`: the blend step still looks for an "Appearance → Screen" chip;
       blend is now tiles (10-31). Update the step (the green screen / LUT / Blur parts pass).
 - [ ] Transparent background in exported files (#186): the preview shows a checkerboard; video

@@ -750,3 +750,6 @@ canvas size ease (scale 0.75 → 1 over ~200 ms). Core 529 + react 24 tests pass
   now chroma < 6 (as the shader measures it); the pick leaves the background around the clip out
   of its numbers (#189). Checked on a clip made from the screenshot: the wall is removed with
   Range 12 % and the "colour is all over the video" message.
+- Text editing: the caret opens at the end everywhere (#190); a double-click's second press no
+  longer moves it; the Edit sheet's field is a little taller. stage-text-check updated (desktop
+  part passes).

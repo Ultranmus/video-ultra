@@ -1144,6 +1144,11 @@
     resize: vertical;
   }
 
+  /* A text's own words (Edit sheet, inspector): a little more room than two lines. */
+  .vu-textarea.vu-text-edit-field {
+    min-height: calc(var(--vu-size-touch) * 2.4);
+  }
+
   .vu-textarea:focus {
     outline: none;
     border-color: var(--vu-accent);

@@ -1301,3 +1301,8 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       Range. The pick renders its small frame on black and on white and leaves out the pixels
       that differ (background around the clip), so bars don't count as picture in the tapped
       spot, in "removes the whole video" or in the half-the-picture Range.
+190.  **Editing a text opens with the caret at the end** (owner, 2026-11-18; changes #151's "a mouse
+      selects all"). On the video (double-click or a click on the selected text) and in the Edit
+      sheet / inspector field, the caret starts after the last letter. A press on the stage field
+      within 500 ms of it opening (a double-click's second press) is ignored, so it can't move
+      the caret. The Edit field is about 3 lines tall.
