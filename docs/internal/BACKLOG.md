@@ -4,6 +4,12 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 
 ## Open
 
+- [ ] Phone (owner, iPhone screenshot 2026-11-18): the "Your videos" popover looks left-aligned
+      on a phone — it hangs from the top bar's start, so its left edge sits at the button's edge
+      and the right gap is much wider. `.vu-videos-anchor .vu-popover` sets `left: 0` (desktop
+      intent, `editor.css`) while the width is `92cqi`. On narrow `.vu-root` (container query)
+      centre it in the editor with equal side gutters, like the other popovers; keep the
+      left-hanging placement on wide layouts.
 - [ ] Transparent background in exported files (#186): the preview shows a checkerboard; video
       files and PNG frames come out black there. Needs an alpha-capable export canvas on both
       backends (WebGL2 `alpha: true`, WebGPU `alphaMode: 'premultiplied'` with premultiplied
