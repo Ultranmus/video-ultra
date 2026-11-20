@@ -31,6 +31,12 @@ const STRIPS = [
   'avc-rotated.mp4',
   ...(process.argv.includes('--private') && existsSync(join(media, IPHONE_4K)) ? [IPHONE_4K] : []),
 ];
+/** Keyframes in each strip file (ffprobe): a keyframe strip decodes each one once, at most. */
+const KEYFRAMES: Record<string, number> = {
+  'avc-4k30.mp4': 3,
+  'hevc-1080p30.mp4': 2,
+  'avc-rotated.mp4': 2,
+};
 /** Expected max peak per file: ffmpeg volumedetect max_volume (−21.3 / −20.8 / −18.0 dBFS). */
 const WAVES: Record<string, number> = {
   'music-3min.mp3': 0.086,
@@ -110,6 +116,12 @@ for (const name of names) {
       check(r.stats.peakJobs <= r.stats.jobBudget, `${file}: decode budget exceeded`);
       check(r.stats.cacheHits >= 20, `${file}: second strip not served from the cache`);
       check(r.stats.watchdogResets === 0, `${file}: watchdog fired`);
+      const keys = KEYFRAMES[file];
+      if (mode === 'keyframe' && keys !== undefined)
+        check(
+          r.stats.framesDecoded <= keys,
+          `${file}: ${r.stats.framesDecoded} decodes for ${keys} keyframes (one per keyframe)`,
+        );
       if (file === 'avc-rotated.mp4')
         check(r.height > 0 && r.width < r.height, 'rotated video thumbnail not portrait');
     }
