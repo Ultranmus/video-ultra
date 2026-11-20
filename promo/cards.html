@@ -1,6 +1,6 @@
 <!doctype html>
 <!--
-  The promo video's cards (title, code outro, end), recorded by promo/record.ts at 1920×1080.
+  The promo video's cards (title, code outro, end), recorded by promo/record.ts on a 1470×956 screen at 2×.
   Open with ?card=title|code|end&d=<seconds>; the motion starts when the page gets the "go"
   class (the recorder adds it once it is capturing) and fades out at the end of d.
 -->
@@ -27,8 +27,8 @@
       }
       html,
       body {
-        width: 1920px;
-        height: 1080px;
+        width: 1470px;
+        height: 956px;
         overflow: hidden;
         background: var(--bg);
         color: var(--text);
@@ -50,7 +50,7 @@
         position: absolute;
         width: 900px;
         height: 900px;
-        left: 510px;
+        left: calc(50% - 450px);
         top: -260px;
         border-radius: 50%;
         background: radial-gradient(circle, rgba(213, 144, 213, 0.12), transparent 65%);
@@ -84,6 +84,77 @@
         to {
           transform: translateY(60px) scale(1.12);
         }
+      }
+      /* The poster: everything shown at once, no motion. */
+      .still .stage,
+      .still .rise {
+        opacity: 1;
+        transform: none;
+        animation: none;
+      }
+      .cover {
+        display: grid;
+        grid-template-columns: 520px 900px;
+        align-items: center;
+        gap: 72px;
+      }
+      .cover .col {
+        align-items: flex-start;
+        text-align: left;
+      }
+      .cover .word {
+        font-size: 88px;
+      }
+      .cover .brand img {
+        width: 104px;
+        height: 104px;
+      }
+      .cover .headline {
+        margin-top: 36px;
+        font-size: 58px;
+      }
+      .cover .sub {
+        font-size: 30px;
+      }
+      .reel {
+        position: relative;
+        border-radius: 26px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        box-shadow:
+          0 50px 120px -30px rgba(0, 0, 0, 0.85),
+          0 0 0 1px rgba(213, 144, 213, 0.12);
+      }
+      .reel img {
+        display: block;
+        width: 900px;
+        height: 506px;
+        object-fit: cover;
+      }
+      .play {
+        position: absolute;
+        left: 32px;
+        bottom: 32px;
+        width: 88px;
+        height: 88px;
+        border-radius: 50%;
+        background: rgba(11, 11, 13, 0.55);
+        backdrop-filter: blur(10px);
+        border: 2px solid rgba(255, 255, 255, 0.5);
+      }
+      .play::after {
+        content: '';
+        position: absolute;
+        left: 34px;
+        top: 26px;
+        border-left: 28px solid #fff;
+        border-top: 17px solid transparent;
+        border-bottom: 17px solid transparent;
+      }
+      /* Laid out in 1920-wide units, shown on a 1470 × 956 screen (recorded at 2×). */
+      #card {
+        position: relative;
+        zoom: 0.86;
       }
       .rise {
         opacity: 0;
@@ -174,7 +245,8 @@
       .panel {
         border: 1px solid var(--border);
         border-radius: 28px;
-        background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 40%), var(--panel);
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 40%), var(--panel);
         box-shadow: 0 40px 120px -40px rgba(0, 0, 0, 0.8);
         overflow: hidden;
       }
@@ -264,13 +336,33 @@
           <div class="word">Video<span>Ultra</span></div>
         </div>
         <div class="tags rise" style="--at: 0.45s">Free and open source · <b>MIT</b></div>
-        <div class="sub rise" style="--at: 0.75s">Docs, playground and demo at the VideoUltra site</div>
+        <div class="sub rise" style="--at: 0.75s">
+          Docs, playground and demo at the VideoUltra site
+        </div>
+      </div>
+    </template>
+    <template id="cover">
+      <div class="cover">
+        <div class="col">
+          <div class="brand rise">
+            <img src="../apps/playground/public/brand/mark-dark.svg" alt="" />
+            <div class="word">Video<span>Ultra</span></div>
+          </div>
+          <div class="headline rise">Make videos right inside your app.</div>
+          <div class="sub rise">A free video editor for React and Next.js</div>
+        </div>
+        <div class="reel rise">
+          <img id="reel" alt="" />
+          <div class="play"></div>
+        </div>
       </div>
     </template>
     <script>
       const params = new URLSearchParams(location.search);
       const tpl = document.getElementById(params.get('card') || 'title');
       document.getElementById('card').append(tpl.content.cloneNode(true));
+      const reel = document.getElementById('reel');
+      if (reel) reel.src = params.get('reel') || '';
       document.documentElement.style.setProperty('--d', `${Number(params.get('d') || 4)}s`);
     </script>
   </body>
