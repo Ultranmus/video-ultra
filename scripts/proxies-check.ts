@@ -169,8 +169,13 @@ const routing = await page.evaluate(async () => {
   };
   const real = lumaMean(await c.engine.scopes(705_600_000));
   await c.engine.setProxy(assetId, fake);
-  await new Promise((r) => setTimeout(r, 500));
-  const preview = lumaMean(await c.engine.scopes(705_600_000));
+  // The switch takes a moment (the copy is opened and decoded): a fixed 500 ms wait sometimes
+  // read the original's frame again (luma 130 vs 128 on a busy Mac). Wait for it, up to 5 s.
+  let preview = real;
+  for (let i = 0; i < 20 && Math.abs(preview - real) <= 20; i++) {
+    await new Promise((r) => setTimeout(r, 250));
+    preview = lumaMean(await c.engine.scopes(705_600_000));
+  }
   const res = await c.exportVideo(
     {
       format: 'mp4',
