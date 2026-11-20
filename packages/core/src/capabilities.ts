@@ -1,45 +1,5 @@
-// Plain WebCodecs checks (no media library) keep this module tiny: it runs on the main thread.
-const CODEC = {
-  avc1080: 'avc1.640028', // H.264 High, level 4.0
-  avc4k: 'avc1.640033', // H.264 High, level 5.1
-  hevc: 'hvc1.1.6.L120.90', // HEVC Main, level 4.0
-  vp9: 'vp09.00.40.08',
-  av1: 'av01.0.08M.08',
-} as const;
-
-async function decodes(codec: string, width: number, height: number): Promise<boolean> {
-  return (
-    (await VideoDecoder.isConfigSupported({ codec, codedWidth: width, codedHeight: height }))
-      .supported === true
-  );
-}
-
-async function encodes(codec: string, width: number, height: number): Promise<boolean> {
-  return (
-    (
-      await VideoEncoder.isConfigSupported({
-        codec,
-        width,
-        height,
-        bitrate: 8_000_000,
-        framerate: 30,
-      })
-    ).supported === true
-  );
-}
-
-async function encodesAudio(codec: string): Promise<boolean> {
-  return (
-    (
-      await AudioEncoder.isConfigSupported({
-        codec,
-        sampleRate: 48000,
-        numberOfChannels: 2,
-        bitrate: 128_000,
-      })
-    ).supported === true
-  );
-}
+// Plain WebCodecs checks (no media library) keep this module tiny; they run in a small worker.
+import { probeCodecsOffMain } from './codec-probe';
 
 /** Performance tier of the current device. Sets preview resolution, export limits and cache sizes. */
 export type DeviceTier = 'high' | 'mid' | 'low';
@@ -91,6 +51,8 @@ export async function detectCapabilities(): Promise<Capabilities> {
     video: typeof VideoDecoder !== 'undefined' && typeof VideoEncoder !== 'undefined',
     audio: typeof AudioDecoder !== 'undefined' && typeof AudioEncoder !== 'undefined',
   };
+  // Codec checks start first, in their worker, while the GPU is asked about below.
+  const probing = probeCodecsOffMain();
   const offscreenCanvas =
     typeof OffscreenCanvas !== 'undefined' &&
     typeof HTMLCanvasElement !== 'undefined' &&
@@ -127,38 +89,7 @@ export async function detectCapabilities(): Promise<Capabilities> {
     webgl2 = false;
   }
 
-  const safe = async (check: () => Promise<boolean>): Promise<boolean> => {
-    if (!webcodecs.video) return false;
-    try {
-      return await check();
-    } catch {
-      return false;
-    }
-  };
-  // Each check does 8–15 ms of synchronous work in Chrome before it goes async: start them one
-  // task apart (still running at the same time) so they never add up to one long main-thread
-  // task (PERF: none over 50 ms).
-  const yieldTask = () => new Promise<void>((r) => setTimeout(r, 0));
-  const checks: (() => Promise<boolean>)[] = [
-    () => safe(() => decodes(CODEC.avc1080, 1920, 1080)),
-    () => safe(() => decodes(CODEC.hevc, 1920, 1080)),
-    () => safe(() => decodes(CODEC.vp9, 1920, 1080)),
-    () => safe(() => decodes(CODEC.av1, 1920, 1080)),
-    () => safe(() => encodes(CODEC.avc1080, 1920, 1080)),
-    () => safe(() => encodes(CODEC.avc4k, 3840, 2160)),
-    () => safe(() => encodes(CODEC.vp9, 1920, 1080)),
-    () => safe(() => (webcodecs.audio ? encodesAudio('mp4a.40.2') : Promise.resolve(false))),
-    () => safe(() => (webcodecs.audio ? encodesAudio('opus') : Promise.resolve(false))),
-  ];
-  const running: Promise<boolean>[] = [];
-  for (const check of checks) {
-    running.push(check());
-    await yieldTask();
-  }
-  const results = await Promise.all(running);
-  const [avc, hevc, vp9, av1, avc1080, avc4k, vp9Enc, aac, opus] = checks.map(
-    (_, i) => results[i] === true,
-  ) as [boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean];
+  const { decode, encode } = await probing;
 
   const opfs = typeof nav.storage?.getDirectory === 'function';
   const fileSystemAccess =
@@ -178,8 +109,8 @@ export async function detectCapabilities(): Promise<Capabilities> {
     offscreenCanvas,
     opfs,
     fileSystemAccess,
-    decode: { avc, hevc, vp9, av1 },
-    encode: { avc1080, avc4k, vp9: vp9Enc, aac, opus },
+    decode,
+    encode,
     deviceMemoryGb,
     cores,
     mobile,
@@ -193,7 +124,7 @@ export async function detectCapabilities(): Promise<Capabilities> {
         /iPhone|iPad|iPod/.test(nav.userAgent) ||
         (/Macintosh/.test(nav.userAgent) && nav.maxTouchPoints > 1),
     }),
-    supported: webcodecs.video && offscreenCanvas && (webgpu || webgl2) && avc,
+    supported: webcodecs.video && offscreenCanvas && (webgpu || webgl2) && decode.avc,
   };
 }
 

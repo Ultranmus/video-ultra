@@ -54,15 +54,31 @@ for (const name of browsers) {
       if (m.type() === 'error') errors.push(`console: ${m.text()}`);
     });
     await page.addInitScript(() => {
-      (window as unknown as { longTasks: number[] }).longTasks = [];
+      const w = window as unknown as {
+        longTasks: { start: number; ms: number }[];
+        audioStarts: { start: number; end: number }[];
+      };
+      w.longTasks = [];
+      w.audioStarts = [];
       try {
         new PerformanceObserver((list) => {
           for (const e of list.getEntries())
-            (window as unknown as { longTasks: number[] }).longTasks.push(Math.round(e.duration));
+            w.longTasks.push({ start: e.startTime, ms: Math.round(e.duration) });
         }).observe({ type: 'longtask', buffered: true });
       } catch {
         /* not supported */
       }
+      // The first AudioContext starts the browser's audio service (~120 ms in Chrome, on the main
+      // thread, unavoidable): the one accepted long task (PERF.md "Startup main-thread tasks").
+      const Native = window.AudioContext;
+      if (Native)
+        window.AudioContext = class extends Native {
+          constructor(options?: AudioContextOptions) {
+            const start = performance.now();
+            super(options);
+            w.audioStarts.push({ start, end: performance.now() });
+          }
+        };
     });
     const tag = `${name}-${size}`;
     const t0 = Date.now();
@@ -100,14 +116,27 @@ for (const name of browsers) {
     await page.locator('.vu-play').click();
     await shot(page, `${tag}-4-played`);
     const timecode = await page.locator('.vu-timecode').innerText();
-    const longTasks = await page.evaluate(
-      () => (window as unknown as { longTasks: number[] }).longTasks,
-    );
+    const { audio, other } = await page.evaluate(() => {
+      const w = window as unknown as {
+        longTasks: { start: number; ms: number }[];
+        audioStarts: { start: number; end: number }[];
+      };
+      const isAudio = (t: { start: number; ms: number }) =>
+        w.audioStarts.some((a) => a.start < t.start + t.ms && a.end > t.start);
+      return {
+        audio: w.longTasks.filter(isAudio).map((t) => t.ms),
+        other: w.longTasks.filter((t) => !isAudio(t)).map((t) => t.ms),
+      };
+    });
     const clips = await page.locator('[role="option"]').count();
 
     console.log(
-      `${tag}: ready ${ready} ms · clips ${clips} · timecode ${timecode.replace(/\s+/g, ' ')} · long tasks ${JSON.stringify(longTasks)}`,
+      `${tag}: ready ${ready} ms · clips ${clips} · timecode ${timecode.replace(/\s+/g, ' ')} · long tasks ${JSON.stringify(other)} (+ audio service start ${JSON.stringify(audio)}, accepted)`,
     );
+    if (other.length) {
+      failed = true;
+      console.log(`  main-thread tasks over 50 ms (PERF.md: none): ${other.join(', ')} ms`);
+    }
     if (importErrors.length) console.log(`  import errors: ${importErrors.join(' | ')}`);
     if (errors.length) {
       failed = true;
