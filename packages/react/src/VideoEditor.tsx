@@ -12,7 +12,14 @@ import {
   type AudioExportResult,
   type FrameImage,
 } from '@video-ultra/core';
-import { useEffect, useRef, useState, type CSSProperties, type ReactElement } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactElement,
+} from 'react';
 import { ControllerContext, useController, useLabels, useUi } from './context';
 import { EditorController } from './controller';
 import type { EditorCustomization, EditorEvent } from './embed';
@@ -428,16 +435,27 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
   // Desktop panel sizes the person dragged, kept in this browser.
   useSavedLayout(rootRef);
 
-  // Layout from the editor's own width.
-  useEffect(() => {
+  // Layout from the editor's own width: set before the first paint, then on resizes a frame
+  // later — switching layout changes the editor's own size, which inside the observer's callback
+  // is a "ResizeObserver loop" (seen on phones, where the first layout was desktop).
+  useLayoutEffect(() => {
     const root = rootRef.current!;
-    const ro = new ResizeObserver(() => {
+    const apply = () => {
       const w = root.clientWidth;
       const layout: LayoutMode = w < 768 ? 'phone' : w < 1024 ? 'tablet' : 'desktop';
       controller.setLayout(layout);
+    };
+    apply();
+    let frame = 0;
+    const ro = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(apply);
     });
     ro.observe(root);
-    return () => ro.disconnect();
+    return () => {
+      cancelAnimationFrame(frame);
+      ro.disconnect();
+    };
   }, [controller]);
 
   const theme = props.theme ?? 'dark';
