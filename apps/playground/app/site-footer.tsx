@@ -79,7 +79,7 @@ export function SiteFooter() {
         ))}
       </div>
       <div className="site-footer-bottom">
-        <p>© 2026 VideoUltra contributors · MIT licensed</p>
+        <p>© 2026 VideoUltra · MIT licensed</p>
         <p>
           A sibling of <a href="https://imageultra.ashvattech.com">ImageUltra</a>, the image editor
         </p>
