@@ -333,7 +333,7 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
     // again, the field only partly in view (owner, 2026-11-20).
     const placeHigh = (field: HTMLElement) => {
       const sheet = field.closest<HTMLElement>('.vu-dock[data-expanded]');
-      root.toggleAttribute('data-sheet-typing', !!sheet);
+      root.removeAttribute('data-sheet-typing');
       if (!sheet || !matchMedia('(pointer: coarse)').matches) return;
       let scroller = field.parentElement;
       while (scroller && scroller !== sheet) {
@@ -341,7 +341,10 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
         if (oy === 'auto' || oy === 'scroll') break;
         scroller = scroller.parentElement;
       }
+      // Only a field in a scrolling list gets room below it; one pinned at the panel's foot
+      // (the Assistant's box) would just be pushed up, leaving a gap (owner, 2026-11-21).
       if (!scroller || scroller === sheet) return;
+      root.setAttribute('data-sheet-typing', '');
       const r = root.getBoundingClientRect();
       // A phone keyboard (with its bar and Safari's address bar above it) takes a little over
       // the lower half of the screen; high enough that the next field shows too.

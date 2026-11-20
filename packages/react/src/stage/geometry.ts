@@ -1,5 +1,5 @@
 import { itemEnd, transformAt, type Item, type Project, type Time } from '@video-ultra/core';
-import { measureTextBox, type MeasureText } from '@video-ultra/core/internal';
+import { measureTextBox, textWrapPx, type MeasureText } from '@video-ultra/core/internal';
 
 /** A layer's box on the canvas, in canvas pixels: centre, size, clockwise rotation (degrees). */
 export interface Box {
@@ -39,7 +39,10 @@ export function itemBox(
       (t) => t.kind === 'caption' && t.items.some((i) => i.id === item.id),
     );
     const size = measureTextBox(item, canvasW, canvasH, measure, caption);
-    return box(size.width, size.height);
+    // A wrap width set: the box is that wide (not just the wrapped lines), so dragging its side
+    // starts from it — outward too — and nothing jumps on release (owner, 2026-11-21).
+    const wrap = caption ? null : textWrapPx(item, canvasW);
+    return box(Math.max(size.width, wrap ?? 0), size.height);
   }
   if (item.kind === 'sticker' && item.emoji !== null) {
     const side = Math.min(canvasW, canvasH) * tf.scale;

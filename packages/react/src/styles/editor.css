@@ -3885,6 +3885,13 @@
     padding-bottom: calc(var(--vu-keyboard) + var(--vu-space-4));
   }
 
+  /* Touch screens: Safari's address bar floats over the page just above the keyboard. */
+  @media (pointer: coarse) {
+    .vu-root[data-keyboard] .vu-dock[data-expanded] .vu-dock-body {
+      padding-bottom: calc(var(--vu-keyboard) + var(--vu-size-touch) + var(--vu-space-2));
+    }
+  }
+
   /* A field in a full-height sheet took focus (VideoEditor.tsx): room below it from the start, so
      it can be scrolled up out of the keyboard's way before the keyboard comes. */
   .vu-root[data-sheet-typing] .vu-dock[data-expanded] .vu-dock-body {
