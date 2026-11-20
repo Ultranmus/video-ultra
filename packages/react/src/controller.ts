@@ -2182,7 +2182,11 @@ export class EditorController {
     this.ui.setState({ picking: null });
     const engine = this.engine;
     if (!itemId || !engine) return;
-    const picked = await engine.pickColour(itemId, this.playhead.time, x, y).catch(() => null);
+    const pick = () => engine.pickColour(itemId, this.playhead.time, x, y).catch(() => null);
+    let picked = await pick();
+    // A pick that would remove (nearly) everything may be a frame drawn black: once more, the
+    // way a second tap used to work (owner, 2026-11-20).
+    if (picked && picked.covers > PICK_COVERS_MAX) picked = (await pick()) ?? picked;
     if (!picked) {
       this.toast(l.pickMissed, 'info');
       return;

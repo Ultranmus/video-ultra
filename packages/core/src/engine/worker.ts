@@ -1013,6 +1013,15 @@ async function pickColour(
     bitmap.close();
     return ctx.getImageData(0, 0, width, height).data;
   };
+  // A fresh draw can come back black — before the frame is decoded, or a renderer's first draw
+  // (iPhone WebGPU, BACKLOG) — and black reads as "grey can't be removed" until a second or third
+  // tap (owner, 2026-11-20). Draw once to warm up, then until nothing is still decoding.
+  for (let tries = 0; tries < 4; tries++) {
+    const drawn = await l.composer.render(mini, t, width, height, null);
+    l.canvas.transferToImageBitmap().close();
+    if (tries > 0 && drawn.pending.length === 0 && !drawn.late) break;
+    await Promise.allSettled(drawn.pending);
+  }
   const all = await frameOn(mini);
   const white = await frameOn(on('#ffffff'));
   looksDone();
