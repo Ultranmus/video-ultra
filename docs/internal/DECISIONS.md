@@ -1326,3 +1326,13 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       template preview at the same moment (`data-sheet-typing` on the root). iOS then has nothing
       to shift, so the sheet no longer seems to open again; the keyboard code only adds a small
       scroll if a keyboard is taller than expected. Half-open sheets keep rising with the keyboard.
+195.  **Sheet fields get focus without iOS's scroll** (owner, 2026-11-20; replaces the guess in
+      #194). Measured on the iPhone with a temporary log: iOS scrolls the page to any field it
+      focuses — up to the keyboard's height, and again on every switch, even for a field already
+      in view — and undoing that scroll was the sheet "opening again". A tap on a text field in
+      a sheet is now handled by the editor: `focus({ preventScroll: true })`, on the finger's lift
+      for the first field and on touch when the keyboard is already up (Safari switches on touch;
+      waiting for the lift felt slow); the tap's default is prevented so Safari can't scroll. The
+      layer rename focuses the same way. Placement is then ours alone: the field in the top 30 %
+      on focus, kept 64 px above the keyboard on touch screens (Safari's address bar floats there).
+      Fields and labels take `touch-action: manipulation`.

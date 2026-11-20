@@ -11,6 +11,16 @@ warm wall (#189), edit a text (caret at the end, taller box, #190).
 Backlog candidates left for later: Separate keeps the old lane order (combined clips), playground
 test flags (DECISIONS #92), transition stills cache.
 
+## 2026-11-20 (3) — sheet focus fixed and checked on the iPhone; waiting for the owner's push
+
+Owner confirmed on the iPhone (local https build): template fields and Layers rename don't jump,
+switching is fast, green screen first tap works. Merged to main locally; push on the owner's
+word. Local phone testing: https://<Mac LAN IP>:3200/editor — run the package watchers and
+`next dev --port 3200 --hostname 0.0.0.0 --experimental-https --experimental-https-key
+certificates/localhost-key.pem --experimental-https-cert certificates/localhost.pem` in
+apps/playground (certificate for 192.168.1.2; remake with mkcert if the IP changes). Next:
+transparent background export (#186).
+
 ## 2026-11-20 (2) — green screen first tap + sheet typing; owner re-tests once pushed
 
 Owner confirmed the locked outline ✓. Re-test on the iPhone: green screen first tap on the
