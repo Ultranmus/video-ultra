@@ -1305,7 +1305,7 @@ export interface CaptionInput {
   end: Time;
   text: string;
   words?: CaptionWord[];
-  /** The speech was hard to hear: marked to check (DECISIONS #167). */
+  /** The speech was hard to hear: marked to check. */
   unsure?: boolean;
 }
 
@@ -1398,7 +1398,7 @@ export interface CaptionLookPatch {
   scale?: number;
 }
 
-/** Restyles all captions (they share one look, DECISIONS #125). */
+/** Restyles all captions (they share one look). */
 export function setCaptionLook(project: Project, patch: CaptionLookPatch): void {
   const track = captionTrack(project);
   if (!track) throw new EditError('not-found', 'There are no captions');
@@ -1437,7 +1437,7 @@ export function setCaptionText(project: Project, itemId: string, text: string): 
   delete item.unsure;
 }
 
-/** Marks a caption as checked: the "check this" mark goes (DECISIONS #167). */
+/** Marks a caption as checked: the "check this" mark goes. */
 export function markCaptionChecked(project: Project, itemId: string): void {
   const { item } = editable(project, itemId);
   if (item.kind !== 'text') throw new EditError('invalid', 'Only captions are checked');

@@ -186,7 +186,7 @@ export interface AudioTrackSource {
 const MAX_NESTING = 4;
 
 /**
- * Reads a combined clip's sound (DECISIONS #155): its inside mixed by a mixer of its own at the
+ * Reads a combined clip's sound: its inside mixed by a mixer of its own at the
  * clip's source time, resampled (linear) for the clip's speed — like a video's sound, so the
  * outer mixer adds volume, fades, crossfades, effects and ducking the same way.
  */

@@ -12,7 +12,7 @@ export interface TranscriptWord {
   end: number;
   /**
    * How sure the recogniser is of this word, 0…1 (optional). Captions whose words average under
-   * 0.6 are marked to check (DECISIONS #167).
+   * 0.6 are marked to check.
    */
   confidence?: number;
 }

@@ -5,7 +5,7 @@ export type ThemeMode = 'dark' | 'light' | 'auto';
 
 /**
  * Typed shortcuts for the most common CSS variables. Anything else can be overridden in CSS:
- * `.vu-root { --vu-surface-1: #000; }` — see docs/internal/THEMING.md for the full token list.
+ * `.vu-root { --vu-surface-1: #000; }` — see the Theming docs for every token.
  */
 export interface ThemeOverrides {
   accent?: string;

@@ -1,0 +1,375 @@
+/* API reference pages (/docs/api, /docs/api/<package>). Site tokens (--s-*) only. */
+
+.api-crumb {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+
+.site .api-crumb a {
+  color: var(--s-muted);
+  text-decoration: none;
+}
+
+.site .api-crumb a:hover {
+  color: var(--s-text);
+}
+
+.site .api-crumb a::after {
+  content: ' /' / '';
+}
+
+.docs-main .api-title {
+  font-family: var(--s-mono);
+  font-size: 32px;
+  letter-spacing: -0.03em;
+  overflow-wrap: anywhere;
+}
+
+/* Search */
+.api-search {
+  margin: 28px 0 8px;
+}
+
+.api-search-label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.api-search-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--s-border-strong);
+  border-radius: var(--s-radius);
+  background: var(--s-bg-soft);
+  color: var(--s-muted);
+}
+
+.api-search-box:focus-within {
+  border-color: var(--s-accent-text);
+  box-shadow: 0 0 0 3px var(--s-accent-soft);
+}
+
+.api-search-box svg {
+  flex: none;
+}
+
+.api-search-box input {
+  flex: 1;
+  min-width: 0;
+  min-height: 46px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--s-text);
+  font: inherit;
+  font-size: 16px;
+}
+
+.api-search-box input:focus-visible {
+  outline: none;
+}
+
+.api-search-box input::placeholder {
+  color: var(--s-muted);
+}
+
+.api-search-status {
+  min-height: 1.6em;
+  margin: 8px 0 0;
+  color: var(--s-muted);
+  font-size: 14px;
+}
+
+.api-search-status:empty {
+  min-height: 0;
+  margin: 0;
+}
+
+.api-results {
+  display: grid;
+  gap: 2px;
+  margin: 8px 0 0;
+  padding: 6px;
+  border: 1px solid var(--s-border);
+  border-radius: var(--s-radius);
+  background: var(--s-bg-soft);
+  list-style: none;
+}
+
+.site .api-results a {
+  display: block;
+  padding: 8px 12px;
+  border-radius: var(--s-radius-small);
+  color: var(--s-text);
+  text-decoration: none;
+}
+
+.site .api-results a:hover,
+.site .api-results a:focus-visible {
+  background: var(--s-surface);
+}
+
+.site .api-results a:focus-visible {
+  outline-offset: -2px;
+}
+
+.api-results-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+.docs-main .api-results-head code {
+  padding: 0;
+  background: none;
+  color: var(--s-accent-text);
+  font-size: 15px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.api-results-pkg {
+  color: var(--s-muted);
+  font-family: var(--s-mono);
+  font-size: 12.5px;
+}
+
+.api-results-summary {
+  display: block;
+  margin-top: 2px;
+  color: var(--s-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Package cards */
+.api-cards {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+
+.docs-main .api-cards strong code {
+  padding: 0;
+  background: none;
+  font-size: 15px;
+}
+
+.api-cards span {
+  display: block;
+}
+
+.docs-cards .api-cards-count {
+  margin-top: 10px;
+  color: var(--s-accent-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Kind tag (function, type, …) */
+.api-tag {
+  display: inline-block;
+  padding: 1px 8px;
+  border: 1px solid var(--s-border);
+  border-radius: 999px;
+  color: var(--s-muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.6;
+}
+
+/* Index: every export of the package, grouped by kind */
+.api-index {
+  margin: 28px 0 0;
+  padding: 4px 20px 20px;
+  border: 1px solid var(--s-border);
+  border-radius: var(--s-radius);
+  background: var(--s-bg-soft);
+}
+
+.docs-main .api-index-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 18px 0 8px;
+  color: var(--s-muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.api-count {
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--s-surface-2);
+  color: var(--s-muted);
+  font-size: 11.5px;
+  letter-spacing: 0;
+}
+
+.api-index ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.api-index li {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+}
+
+.site .api-index a {
+  display: inline-block;
+  max-width: 100%;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-family: var(--s-mono);
+  font-size: 13.5px;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.site .api-index a:hover {
+  background: var(--s-accent-soft);
+}
+
+.api-from {
+  margin-left: -2px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--s-surface-2);
+  color: var(--s-muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.api-hint {
+  color: var(--s-muted);
+  font-size: 14px;
+}
+
+.api-hint .api-from {
+  margin-left: 0;
+}
+
+/* Each export */
+.docs-main .api-group > h2 {
+  margin-top: 64px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--s-border);
+}
+
+.api-item {
+  padding: 28px 0 8px;
+}
+
+.api-item + .api-item {
+  border-top: 1px solid var(--s-border);
+}
+
+.api-item-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.docs-main .api-item h3 {
+  margin: 0;
+  min-width: 0;
+  font-size: 19px;
+  overflow-wrap: anywhere;
+}
+
+.docs-main .api-item h3 code {
+  padding: 0;
+  background: none;
+  font-size: inherit;
+  font-weight: 650;
+}
+
+/* The name links to itself; a # shows beside it on hover / focus. */
+.site .api-item h3 a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.site .api-item h3 a::after {
+  content: '#' / '';
+  margin-left: 8px;
+  color: var(--s-muted);
+  font-family: var(--s-mono);
+  font-weight: 600;
+  opacity: 0;
+}
+
+.site .api-item:hover h3 a::after,
+.site .api-item h3 a:focus-visible::after {
+  opacity: 1;
+}
+
+.site .api-item h3 a:hover::after {
+  color: var(--s-accent-text);
+}
+
+.api-item:target h3 code {
+  color: var(--s-accent-text);
+}
+
+.api-doc {
+  margin-top: 8px;
+}
+
+.api-doc p,
+.api-doc ul {
+  margin: 8px 0;
+}
+
+.api-doc ul {
+  padding-left: 22px;
+}
+
+.api-decl {
+  margin-top: 14px;
+}
+
+/* Code keeps its lines (the playground's global `pre` wraps): long ones scroll in the box. */
+.api .s-code pre {
+  font-size: 13px;
+  white-space: pre;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .site .api-item h3 a::after,
+  .site .api-results a,
+  .site .api-index a {
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease,
+      opacity 0.15s ease;
+  }
+}
+
+@media (max-width: 860px) {
+  .docs-main .api-title {
+    font-size: 24px;
+  }
+
+  .api-index {
+    padding: 2px 12px 14px;
+  }
+
+  .api .s-code pre {
+    padding: 12px 14px;
+    font-size: 12.5px;
+  }
+}

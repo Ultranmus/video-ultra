@@ -136,7 +136,7 @@ import { measureText } from './stage/measure';
 import { spread } from './fanout';
 
 /** Options the `<VideoEditor />` passes to its controller. */
-/** Choices for auto captions (DECISIONS #167). */
+/** Choices for auto captions. */
 export interface CaptionOptions {
   /** Names and words that may be said, for transcribers that take them. */
   vocabulary?: readonly string[];
@@ -387,7 +387,7 @@ export class EditorController {
   readonly #views = new WeakMap<Project, { assetId: string; view: Project }>();
 
   /**
-   * `project` as the editor shows it (DECISIONS #155): with a combined clip open, a project whose
+   * `project` as the editor shows it: with a combined clip open, a project whose
    * tracks are its inside, drawn at its size (no markers or export range — those are the whole
    * video's). Cached per project object, so selectors stay stable.
    */

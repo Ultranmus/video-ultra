@@ -20,9 +20,9 @@ import '@video-ultra/react/styles.css';
 <VideoEditor onSave={(project) => save(project)} onExport={({ blob }) => upload(blob)} />
 `}</Code>
       <p>
-        <Link href="/editor">Try the demo</Link> ·{' '}
+        <Link href="/editor">Open the editor</Link> · <Link href="/playground">Playground</Link> ·{' '}
         <Link href="/docs/getting-started">Get started</Link> ·{' '}
-        <a href="/api/index.html">API reference</a>
+        <Link href="/docs/api">API reference</Link>
       </p>
 
       <h2>What people can do with it</h2>

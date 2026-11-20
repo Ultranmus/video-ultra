@@ -8,7 +8,7 @@ import {
   type LabSession,
   type MediaInfo,
 } from '@video-ultra/core/internal';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 interface ManifestEntry {
   file: string;
@@ -17,14 +17,36 @@ interface ManifestEntry {
 }
 
 type Rows = [string, string][];
+
+/** One headline number of a result card (for reading at a glance; the rows hold everything). */
+interface Metric {
+  label: string;
+  value: string;
+  unit?: string;
+  /** Shown under the value when there is no target. */
+  note?: string;
+  /** The target, in words ("under 100 ms"). */
+  target?: string;
+  pass?: boolean;
+}
+
 interface ResultBlock {
   title: string;
   rows: Rows;
+  /** Display only: left out of the report file. */
+  metrics?: Metric[];
 }
 
 const fmtDist = (d: Distribution) =>
   `avg ${d.avg} · p50 ${d.p50} · p95 ${d.p95} · max ${d.max} (n=${d.count})`;
 const yesNo = (v: boolean) => (v ? 'yes' : 'no');
+
+interface MainThreadResult {
+  rows: Rows;
+  /** Long tasks over 50 ms, or `null` where the browser can't observe them. */
+  longTasks: number | null;
+  gapsOver50: number;
+}
 
 /** Watches the main thread while a test runs: long tasks (Chrome) and rAF gaps (every browser). */
 function startMainThreadMonitor() {
@@ -54,20 +76,45 @@ function startMainThreadMonitor() {
     if (running) requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);
-  return (): Rows => {
+  return (): MainThreadResult => {
     running = false;
     observer?.disconnect();
-    return [
-      [
-        'Main thread: long tasks > 50 ms',
-        observer
-          ? `${longTasks} (max ${Math.round(maxLongTask)} ms)`
-          : 'not measurable in this browser',
+    return {
+      rows: [
+        [
+          'Main thread: long tasks > 50 ms',
+          observer
+            ? `${longTasks} (max ${Math.round(maxLongTask)} ms)`
+            : 'not measurable in this browser',
+        ],
+        ['Main thread: frame gaps > 50 ms', `${gapsOver50} (max gap ${Math.round(maxGap)} ms)`],
+        ['Main thread: JS heap', heap()],
       ],
-      ['Main thread: frame gaps > 50 ms', `${gapsOver50} (max gap ${Math.round(maxGap)} ms)`],
-      ['Main thread: JS heap', heap()],
-    ];
+      longTasks: observer ? longTasks : null,
+      gapsOver50,
+    };
   };
+}
+
+/** The main-thread headline: long tasks where the browser reports them, frame gaps elsewhere. */
+function mainThreadMetric(main: MainThreadResult): Metric {
+  return main.longTasks !== null
+    ? {
+        label: 'Main-thread long tasks',
+        value: String(main.longTasks),
+        target: '0',
+        pass: main.longTasks === 0,
+      }
+    : {
+        label: 'Frame gaps over 50 ms',
+        value: String(main.gapsOver50),
+        target: '0',
+        pass: main.gapsOver50 === 0,
+      };
+}
+
+function openFramesMetric(open: number): Metric {
+  return { label: 'Video frames left open', value: String(open), target: '0', pass: open === 0 };
 }
 
 function heap(): string {
@@ -93,11 +140,195 @@ function playSeconds(): number {
   return Number.isFinite(value) && value > 0 ? value : 10;
 }
 
+/** The URL query doesn't change while the bench is open. */
+const noSubscribe = () => () => {};
+
 /** `?decoders=2` runs the scrub test with a low-tier decoder budget. */
 function scrubDecoders(): number | undefined {
   if (typeof window === 'undefined') return undefined;
   const value = Number(new URLSearchParams(window.location.search).get('decoders'));
   return Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
+interface Verdict {
+  kind: 'good' | 'warn' | 'bad';
+  title: string;
+  detail: string;
+}
+
+/** A one-line answer to "can I edit video here?", from the detected capabilities. */
+function verdictFor(c: Capabilities): Verdict {
+  const renderer = c.webgpu ? 'WebGPU' : 'WebGL2';
+  if (!c.supported) {
+    const missing = [
+      !c.webcodecs.video && 'WebCodecs video',
+      !c.offscreenCanvas && 'OffscreenCanvas',
+      !c.webgpu && !c.webgl2 && 'WebGPU or WebGL2',
+      !c.decode.avc && 'H.264 decoding',
+    ].filter((m): m is string => Boolean(m));
+    return {
+      kind: 'bad',
+      title: 'Not supported in this browser',
+      detail: `It lacks ${missing.join(', ')}. Try the latest Chrome, Edge, Safari or Firefox.`,
+    };
+  }
+  if (c.encode.avc4k) {
+    return {
+      kind: 'good',
+      title: 'Ready for 1080p editing, and 4K too',
+      detail: `Plays, edits and exports H.264 video up to 4K here, drawn with ${renderer}.`,
+    };
+  }
+  if (c.encode.avc1080) {
+    return {
+      kind: 'good',
+      title: 'Ready for 1080p editing',
+      detail: `Plays, edits and exports H.264 video up to 1080p here, drawn with ${renderer}. 4K export isn't available.`,
+    };
+  }
+  if (c.encode.vp9) {
+    return {
+      kind: 'warn',
+      title: 'Ready to edit; exports as WebM',
+      detail: `There is no H.264 encoder here, so exports use VP9 (WebM). Drawn with ${renderer}.`,
+    };
+  }
+  return {
+    kind: 'warn',
+    title: 'Ready to edit, but not to export',
+    detail: 'This browser has no video encoder VideoUltra can use, so exporting won’t work here.',
+  };
+}
+
+type CapValue = boolean | string;
+
+/** The capability tables, grouped. Each is a real table (scripts/bench.ts reads them as text). */
+function capGroups(c: Capabilities): { title: string; rows: [string, CapValue][] }[] {
+  return [
+    {
+      title: 'Device',
+      rows: [
+        ['Supported', c.supported],
+        ['Performance tier', c.tier],
+        [
+          'Device',
+          `${c.mobile ? 'mobile' : 'desktop'}, ${c.cores} cores, ${c.deviceMemoryGb ?? '?'} GB RAM`,
+        ],
+        ['GPU', c.gpu ?? 'not exposed'],
+      ],
+    },
+    {
+      title: 'Drawing',
+      rows: [
+        ['WebGPU', c.webgpu],
+        ['WebGL2', c.webgl2],
+        ['OffscreenCanvas', c.offscreenCanvas],
+      ],
+    },
+    {
+      title: 'Playing (decode)',
+      rows: [
+        ['WebCodecs video', c.webcodecs.video],
+        ['WebCodecs audio', c.webcodecs.audio],
+        ['H.264', c.decode.avc],
+        ['HEVC', c.decode.hevc],
+        ['VP9', c.decode.vp9],
+        ['AV1', c.decode.av1],
+      ],
+    },
+    {
+      title: 'Exporting (encode)',
+      rows: [
+        ['H.264 1080p', c.encode.avc1080],
+        ['H.264 4K', c.encode.avc4k],
+        ['VP9', c.encode.vp9],
+        ['AAC audio', c.encode.aac],
+        ['Opus audio', c.encode.opus],
+      ],
+    },
+    {
+      title: 'Storage and security',
+      rows: [
+        ['OPFS (disk space for exports)', c.opfs],
+        ['File System Access', c.fileSystemAccess],
+        ['Secure context', window.isSecureContext],
+      ],
+    },
+  ];
+}
+
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+      <path
+        d="M3.5 8.5l3 3 6-7"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function CrossIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+      <path
+        d="M4.5 4.5l7 7m0-7l-7 7"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function WarnIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+      <path
+        d="M8 2.5l6 11H2z M8 6.5v3 M8 11.5v.01"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** A yes / no (or pass / fail) badge: icon and word, never colour alone. */
+function Badge({ ok, yes = 'Yes', no = 'No' }: { ok: boolean; yes?: string; no?: string }) {
+  return (
+    <span className={`bench-badge ${ok ? 'is-good' : 'is-bad'}`}>
+      {ok ? <CheckIcon /> : <CrossIcon />}
+      {ok ? yes : no}
+    </span>
+  );
+}
+
+function MetricCard({ metric }: { metric: Metric }) {
+  return (
+    <div className="bench-metric">
+      <span className="bench-metric-label">{metric.label}</span>
+      <span className="bench-metric-value">
+        {metric.value}
+        {metric.unit && <span className="bench-metric-unit"> {metric.unit}</span>}
+      </span>
+      {metric.target !== undefined ? (
+        <span className="bench-metric-target">
+          {metric.pass !== undefined && <Badge ok={metric.pass} yes="Pass" no="Fail" />}
+          <span>Target: {metric.target}</span>
+        </span>
+      ) : (
+        metric.note && <span className="bench-metric-target">{metric.note}</span>
+      )}
+    </div>
+  );
 }
 
 export function Bench() {
@@ -118,6 +349,8 @@ export function Bench() {
   const [copied, setCopied] = useState(false);
   const [hdrFile, setHdrFile] = useState<File | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
+  // `?play=` for the labels: 10 on the server and in the first client render, then the real value.
+  const playLabel = useSyncExternalStore(noSubscribe, playSeconds, () => 10);
 
   useEffect(() => {
     detectCapabilities().then(setCaps, (e: unknown) => setCapsError(String(e)));
@@ -174,6 +407,9 @@ export function Bench() {
   }, [backend]);
 
   const addResult = useCallback((block: ResultBlock) => setResults((r) => [...r, block]), []);
+
+  /** Pass / fail lines follow PERF.md: high-tier targets on a high-tier device, low-tier ones elsewhere. */
+  const highTier = caps?.tier === 'high';
 
   async function getFile(): Promise<File> {
     if (upload) return upload;
@@ -233,6 +469,32 @@ export function Bench() {
               : 'none',
           ],
         ],
+        metrics: [
+          { label: 'Time to open', value: String(ms), unit: 'ms', note: loaded.container },
+          {
+            label: 'Video',
+            value: v ? `${v.displayWidth}×${v.displayHeight}` : 'none',
+            note: v
+              ? `${v.codec ?? '?'} · ${v.fps ?? '?'} fps${v.hdr ? ' · HDR' : ''}`
+              : 'audio only',
+          },
+          {
+            label: 'Length',
+            value: loaded.durationS.toFixed(1),
+            unit: 's',
+            note: `${(loaded.sizeBytes / 1048576).toFixed(1)} MB`,
+          },
+          ...(v
+            ? [
+                {
+                  label: 'Video decodes here',
+                  value: v.canDecode ? 'Yes' : 'No',
+                  target: 'yes',
+                  pass: v.canDecode,
+                },
+              ]
+            : []),
+        ],
       });
       return loaded;
     });
@@ -257,7 +519,18 @@ export function Bench() {
         ['Frame interval (ms)', fmtDist(r.intervalMs)],
         ['Open frames: max / after', `${r.maxOpenFrames} / ${r.openFramesAfter}`],
         ['Main thread: JS heap before', heapBefore],
-        ...main,
+        ...main.rows,
+      ],
+      metrics: [
+        {
+          label: 'Frames per second',
+          value: String(r.effectiveFps),
+          unit: 'fps',
+          note: `${r.presented} frames over ${r.seconds} s`,
+        },
+        { label: 'Dropped frames', value: String(r.dropped), target: '0', pass: r.dropped === 0 },
+        mainThreadMetric(main),
+        openFramesMetric(r.openFramesAfter),
       ],
     });
   }
@@ -270,6 +543,7 @@ export function Bench() {
     );
     const main = stop();
     if (!r) return;
+    const settleTarget = highTier ? 100 : 250;
     addResult({
       title: `Scrub · ${r.backend}`,
       rows: [
@@ -289,7 +563,28 @@ export function Bench() {
             : '-',
         ],
         ['Open frames after', String(r.openFramesAfter)],
-        ...main,
+        ...main.rows,
+      ],
+      metrics: [
+        {
+          label: 'Jump to a frame (median)',
+          value: String(r.latencyMs.p50),
+          unit: 'ms',
+          note: `slowest ${r.latencyMs.max} ms, ${r.latencyMs.count} jumps`,
+        },
+        ...(r.drag
+          ? [
+              {
+                label: 'Frame after a drag stops',
+                value: String(r.drag.settleMs),
+                unit: 'ms',
+                target: `under ${settleTarget} ms`,
+                pass: r.drag.settleMs < settleTarget,
+              },
+            ]
+          : []),
+        mainThreadMetric(main),
+        openFramesMetric(r.openFramesAfter),
       ],
     });
   }
@@ -310,6 +605,8 @@ export function Bench() {
       if (old) URL.revokeObjectURL(old);
       return URL.createObjectURL(file);
     });
+    // PERF.md: faster than real time on high-tier devices, at most 2× real time elsewhere.
+    const speedTarget = highTier ? 1 : 0.5;
     addResult({
       title: `Export · ${container} · ${r.backend}`,
       rows: [
@@ -329,7 +626,23 @@ export function Bench() {
         ],
         ['Time', `${r.wallMs} ms → ${r.realtimeFactor}× real time`],
         ['Open frames after', String(r.openFramesAfter)],
-        ...main,
+        ...main.rows,
+      ],
+      metrics: [
+        {
+          label: 'Export speed',
+          value: `${r.realtimeFactor}×`,
+          unit: 'real time',
+          target: highTier ? 'faster than real time' : 'at least 0.5×',
+          pass: highTier ? r.realtimeFactor > speedTarget : r.realtimeFactor >= speedTarget,
+        },
+        {
+          label: 'Output',
+          value: `${r.width}×${r.height}`,
+          note: `${r.videoCodec}${r.audioCodec ? ` + ${r.audioCodec}` : ''} · ${(r.sizeBytes / 1048576).toFixed(1)} MB`,
+        },
+        mainThreadMetric(main),
+        openFramesMetric(r.openFramesAfter),
       ],
     });
   }
@@ -413,7 +726,8 @@ export function Bench() {
   /** The report as a file: Markdown for reading + the raw results as JSON, for AirDrop/download. */
   function reportFile(): File {
     const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
-    const body = `${report()}\n\n<!-- raw results -->\n\n\`\`\`json\n${JSON.stringify({ capabilities: caps, results }, null, 2)}\n\`\`\`\n`;
+    const raw = results.map(({ title, rows }) => ({ title, rows }));
+    const body = `${report()}\n\n<!-- raw results -->\n\n\`\`\`json\n${JSON.stringify({ capabilities: caps, results: raw }, null, 2)}\n\`\`\`\n`;
     return new File([body], `video-ultra-bench-${stamp}.md`, { type: 'text/markdown' });
   }
 
@@ -447,185 +761,279 @@ export function Bench() {
     }
   }
 
-  const capRows: Rows = caps
-    ? [
-        ['Supported', yesNo(caps.supported)],
-        ['Tier', caps.tier],
-        ['WebGPU / WebGL2', `${yesNo(caps.webgpu)} / ${yesNo(caps.webgl2)}`],
-        [
-          'WebCodecs video / audio',
-          `${yesNo(caps.webcodecs.video)} / ${yesNo(caps.webcodecs.audio)}`,
-        ],
-        [
-          'Decode H.264 / HEVC / VP9 / AV1',
-          [caps.decode.avc, caps.decode.hevc, caps.decode.vp9, caps.decode.av1]
-            .map(yesNo)
-            .join(' / '),
-        ],
-        [
-          'Encode H.264 1080p / 4K / VP9',
-          [caps.encode.avc1080, caps.encode.avc4k, caps.encode.vp9].map(yesNo).join(' / '),
-        ],
-        ['Encode AAC / Opus', `${yesNo(caps.encode.aac)} / ${yesNo(caps.encode.opus)}`],
-        [
-          'OffscreenCanvas / OPFS / File System Access',
-          [caps.offscreenCanvas, caps.opfs, caps.fileSystemAccess].map(yesNo).join(' / '),
-        ],
-        [
-          'Device',
-          `${caps.mobile ? 'mobile' : 'desktop'}, ${caps.cores} cores, ${caps.deviceMemoryGb ?? '?'} GB RAM`,
-        ],
-        ['GPU', caps.gpu ?? 'not exposed'],
-        ['Secure context', yesNo(window.isSecureContext)],
-      ]
-    : [];
-
   const ready = Boolean(session) && !busy;
+  const verdict = caps ? verdictFor(caps) : null;
 
   return (
-    <main className="page">
-      <h1>Bench</h1>
-
-      <h2>This device</h2>
-      {capsError && <p className="error">{capsError}</p>}
-      {!caps && !capsError && <p className="status">Detecting…</p>}
-      {caps && (
-        <table>
-          <tbody>
-            {capRows.map(([k, v]) => (
-              <tr key={k}>
-                <th>{k}</th>
-                <td className={v === 'no' ? 'no' : v === 'yes' ? 'yes' : undefined}>{v}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-
-      <h2>Test</h2>
-      <div className="row">
-        <label>
-          Renderer{' '}
-          <select
-            value={backend}
-            onChange={(e) => setBackend(e.target.value as BackendChoice)}
-            disabled={busy}
-          >
-            <option value="auto">Auto (WebGPU → WebGL2)</option>
-            <option value="webgpu">WebGPU only</option>
-            <option value="webgl2">WebGL2 only</option>
-          </select>
-        </label>
-        <select
-          value={selected}
-          onChange={(e) => {
-            setSelected(e.target.value);
-            setUpload(null);
-          }}
-          disabled={busy || manifest.length === 0}
-        >
-          {manifest.length === 0 && <option value="">No test media — run `pnpm media`</option>}
-          {manifest
-            .filter((m) => m.kind === 'video' || m.kind === 'broken')
-            .map((m) => (
-              <option key={m.file} value={m.file}>
-                {m.label}
-              </option>
-            ))}
-        </select>
-        <input
-          type="file"
-          accept="video/*"
-          onChange={(e) => setUpload(e.target.files?.[0] ?? null)}
-          disabled={busy}
-        />
-      </div>
-      <div className="row">
-        <button className="primary" onClick={runAll} disabled={!ready}>
-          Run all
-        </button>
-        <button onClick={load} disabled={!ready}>
-          Load
-        </button>
-        <button onClick={play} disabled={!ready || !info}>
-          Play {playSeconds()} s
-        </button>
-        <button onClick={scrub} disabled={!ready || !info}>
-          Scrub ×30
-        </button>
-        <button onClick={() => exportVideo('mp4')} disabled={!ready || !info}>
-          Export MP4
-        </button>
-        <button onClick={() => exportVideo('webm')} disabled={!ready || !info}>
-          Export WebM
-        </button>
-        <button onClick={hdrCheck} disabled={!ready || !info?.video?.hdr}>
-          HDR check
-        </button>
-        {hdrFile && (
-          <>
-            {typeof navigator !== 'undefined' && navigator.canShare?.({ files: [hdrFile] }) && (
-              <button className="primary" onClick={shareHdrFile}>
-                Share (AirDrop)
-              </button>
-            )}
-            <button onClick={downloadHdrFile}>Download HDR check</button>
-          </>
-        )}
-        <button onClick={() => session?.cancel()} disabled={!busy}>
-          Cancel
-        </button>
-      </div>
-      <p className="status">
-        {status} {progress !== null && <progress value={progress} max={1} />}
-      </p>
-      {error && <p className="error">{error}</p>}
-
-      <div className="stage" ref={stageRef} />
-
-      {exportUrl && (
-        <>
-          <h2>Last export</h2>
-          <video src={exportUrl} controls playsInline />
-          <p>
-            <a href={exportUrl} download="video-ultra-export">
-              Download
-            </a>
-          </p>
-        </>
-      )}
-
-      {results.length > 0 && (
-        <>
-          <h2>Results</h2>
-          <div className="row">
-            {typeof navigator !== 'undefined' && typeof navigator.share === 'function' && (
-              <button className="primary" onClick={shareReport}>
-                Share report (AirDrop)
-              </button>
-            )}
-            <button onClick={() => downloadFile(reportFile())}>Download report</button>
-            <button onClick={copyReport}>{copied ? 'Copied' : 'Copy report (Markdown)'}</button>
-            <button onClick={() => setResults([])}>Clear</button>
+    <>
+      <section className="bench-card bench-device" aria-labelledby="bench-device-title">
+        <h2 id="bench-device-title">This device</h2>
+        {capsError && <p className="error">{capsError}</p>}
+        {!caps && !capsError && <p className="bench-muted">Checking what this browser can do…</p>}
+        {verdict && (
+          <div className={`bench-verdict is-${verdict.kind}`}>
+            <span className="bench-verdict-icon" aria-hidden="true">
+              {verdict.kind === 'good' ? (
+                <CheckIcon />
+              ) : verdict.kind === 'bad' ? (
+                <CrossIcon />
+              ) : (
+                <WarnIcon />
+              )}
+            </span>
+            <div>
+              <p className="bench-verdict-title">{verdict.title}</p>
+              <p className="bench-verdict-detail">{verdict.detail}</p>
+            </div>
           </div>
-          {results.map((block, i) => (
-            <div key={i}>
-              <h2>{block.title}</h2>
-              <table>
+        )}
+        {caps && (
+          <div className="bench-caps">
+            {capGroups(caps).map((group) => (
+              <table key={group.title}>
+                <caption>{group.title}</caption>
                 <tbody>
-                  {block.rows.map(([k, v]) => (
+                  {group.rows.map(([k, v]) => (
                     <tr key={k}>
-                      <th>{k}</th>
-                      <td>{v}</td>
+                      <th scope="row">{k}</th>
+                      <td>{typeof v === 'boolean' ? <Badge ok={v} /> : v}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="bench-card bench-test" aria-labelledby="bench-test-title">
+        <div className="bench-controls">
+          <h2 id="bench-test-title">Run a test</h2>
+          <p className="bench-muted">
+            Pick a sample video or your own, then press Run all. It opens the video, plays{' '}
+            {playLabel} s, jumps to 30 places and exports 5 s as MP4.
+          </p>
+
+          <div className="bench-fields">
+            <label className="bench-field">
+              <span>Renderer</span>
+              <select
+                value={backend}
+                onChange={(e) => setBackend(e.target.value as BackendChoice)}
+                disabled={busy}
+              >
+                <option value="auto">Auto (WebGPU → WebGL2)</option>
+                <option value="webgpu">WebGPU only</option>
+                <option value="webgl2">WebGL2 only</option>
+              </select>
+            </label>
+            <label className="bench-field">
+              <span>Sample video</span>
+              <select
+                value={selected}
+                onChange={(e) => {
+                  setSelected(e.target.value);
+                  setUpload(null);
+                }}
+                disabled={busy || manifest.length === 0}
+              >
+                {manifest.length === 0 && (
+                  <option value="">No test media — run `pnpm media`</option>
+                )}
+                {manifest
+                  .filter((m) => m.kind === 'video' || m.kind === 'broken')
+                  .map((m) => (
+                    <option key={m.file} value={m.file}>
+                      {m.label}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <div className="bench-field">
+              <span id="bench-own-label">Or your own video</span>
+              <label className={`s-btn s-btn-quiet s-btn-small bench-file${busy ? ' is-off' : ''}`}>
+                <input
+                  className="site-sr"
+                  type="file"
+                  accept="video/*"
+                  aria-describedby="bench-own-label"
+                  onChange={(e) => setUpload(e.target.files?.[0] ?? null)}
+                  disabled={busy}
+                />
+                <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+                  <path
+                    d="M8 10.5V2.5m0 0L5 5.5m3-3l3 3M2.5 10v2.5a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V10"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <span className="bench-file-name">{upload ? upload.name : 'Choose a file'}</span>
+              </label>
             </div>
-          ))}
-          <pre>{report()}</pre>
-        </>
+          </div>
+
+          <div className="bench-actions">
+            <button className="s-btn bench-run" onClick={runAll} disabled={!ready}>
+              Run all
+            </button>
+            <button
+              className="s-btn s-btn-quiet bench-cancel"
+              onClick={() => session?.cancel()}
+              disabled={!busy}
+            >
+              Cancel
+            </button>
+          </div>
+
+          <div className="bench-steps" role="group" aria-labelledby="bench-steps-label">
+            <span id="bench-steps-label" className="bench-steps-label">
+              One step at a time
+            </span>
+            <div className="bench-steps-buttons">
+              <button className="s-btn s-btn-quiet s-btn-small" onClick={load} disabled={!ready}>
+                Load
+              </button>
+              <button
+                className="s-btn s-btn-quiet s-btn-small"
+                onClick={play}
+                disabled={!ready || !info}
+              >
+                Play {playLabel} s
+              </button>
+              <button
+                className="s-btn s-btn-quiet s-btn-small"
+                onClick={scrub}
+                disabled={!ready || !info}
+              >
+                Scrub ×30
+              </button>
+              <button
+                className="s-btn s-btn-quiet s-btn-small"
+                onClick={() => exportVideo('mp4')}
+                disabled={!ready || !info}
+              >
+                Export MP4
+              </button>
+              <button
+                className="s-btn s-btn-quiet s-btn-small"
+                onClick={() => exportVideo('webm')}
+                disabled={!ready || !info}
+              >
+                Export WebM
+              </button>
+              <button
+                className="s-btn s-btn-quiet s-btn-small"
+                onClick={hdrCheck}
+                disabled={!ready || !info?.video?.hdr}
+              >
+                HDR check
+              </button>
+            </div>
+            {hdrFile && (
+              <div className="bench-steps-buttons">
+                {typeof navigator !== 'undefined' && navigator.canShare?.({ files: [hdrFile] }) && (
+                  <button className="s-btn s-btn-small" onClick={shareHdrFile}>
+                    Share (AirDrop)
+                  </button>
+                )}
+                <button className="s-btn s-btn-quiet s-btn-small" onClick={downloadHdrFile}>
+                  Download HDR check
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="bench-status" role="status" aria-live="polite">
+            {busy && <span className="bench-spinner" aria-hidden="true" />}
+            <span>{status}</span>
+            {progress !== null && (
+              <progress value={progress} max={1} aria-label="Export progress" />
+            )}
+          </div>
+          {error && (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          )}
+        </div>
+
+        <div className="bench-stage" ref={stageRef} role="img" aria-label="Engine preview" />
+      </section>
+
+      {exportUrl && (
+        <section className="bench-card bench-export" aria-labelledby="bench-export-title">
+          <div className="bench-section-head">
+            <h2 id="bench-export-title">Last export</h2>
+            <a
+              className="s-btn s-btn-quiet s-btn-small"
+              href={exportUrl}
+              download="video-ultra-export"
+            >
+              Download
+            </a>
+          </div>
+          <video src={exportUrl} controls playsInline />
+        </section>
       )}
-    </main>
+
+      {results.length > 0 && (
+        <section className="bench-results" aria-labelledby="bench-results-title">
+          <div className="bench-section-head">
+            <h2 id="bench-results-title">Results</h2>
+            <div className="bench-steps-buttons">
+              {typeof navigator !== 'undefined' && typeof navigator.share === 'function' && (
+                <button className="s-btn s-btn-small" onClick={shareReport}>
+                  Share report (AirDrop)
+                </button>
+              )}
+              <button
+                className="s-btn s-btn-quiet s-btn-small"
+                onClick={() => downloadFile(reportFile())}
+              >
+                Download report
+              </button>
+              <button className="s-btn s-btn-quiet s-btn-small" onClick={copyReport}>
+                {copied ? 'Copied' : 'Copy report (Markdown)'}
+              </button>
+              <button className="s-btn s-btn-quiet s-btn-small" onClick={() => setResults([])}>
+                Clear
+              </button>
+            </div>
+          </div>
+          {results.map((block, i) => (
+            <article key={i} className="bench-card bench-result">
+              <h3>{block.title}</h3>
+              {block.metrics && block.metrics.length > 0 && (
+                <div className="bench-metrics">
+                  {block.metrics.map((m) => (
+                    <MetricCard key={m.label} metric={m} />
+                  ))}
+                </div>
+              )}
+              <details className="bench-details" open={!block.metrics}>
+                <summary>All measurements</summary>
+                <table>
+                  <tbody>
+                    {block.rows.map(([k, v]) => (
+                      <tr key={k}>
+                        <th scope="row">{k}</th>
+                        <td>{v}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </details>
+            </article>
+          ))}
+          <details className="bench-card bench-details bench-report">
+            <summary>Full report (Markdown)</summary>
+            <pre>{report()}</pre>
+          </details>
+        </section>
+      )}
+    </>
   );
 }

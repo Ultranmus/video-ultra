@@ -1,26 +1,56 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { PAGES } from './nav';
+import { usePathname, useRouter } from 'next/navigation';
+import { GROUPS } from './nav';
 
-/** The docs' page list; the current page is marked (and, on phones, a picker). */
+/** The docs' pages in groups, the current one marked; on phones, a page picker instead. */
 export function DocsNav() {
   const path = usePathname();
+  const router = useRouter();
+  // API pages (/docs/api/react…) mark "API reference".
+  const active = (href: string) =>
+    path === href || (href === '/docs/api' && path.startsWith('/docs/api/'));
+  const current = GROUPS.flatMap((g) => g.pages).find((p) => active(p.href));
   return (
-    <nav className="docs-nav" aria-label="Docs">
-      <ul>
-        {PAGES.map((p) => (
-          <li key={p.href}>
-            <Link href={p.href} aria-current={path === p.href ? 'page' : undefined}>
-              {p.title}
-            </Link>
-          </li>
+    <>
+      <nav className="docs-nav" aria-label="Docs">
+        {GROUPS.map((g) => (
+          <div key={g.title}>
+            <p className="docs-nav-title">{g.title}</p>
+            <ul>
+              {g.pages.map((p) => (
+                <li key={p.href}>
+                  <Link href={p.href} aria-current={active(p.href) ? 'page' : undefined}>
+                    {p.title}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
         ))}
-        <li>
-          <a href="/api/index.html">API reference</a>
-        </li>
-      </ul>
-    </nav>
+      </nav>
+      <div className="docs-nav-pick">
+        <label className="site-sr" htmlFor="docs-pick">
+          Docs page
+        </label>
+        <select
+          id="docs-pick"
+          value={current?.href ?? ''}
+          onChange={(e) => router.push(e.target.value)}
+        >
+          {current ? null : <option value="">Choose a page</option>}
+          {GROUPS.map((g) => (
+            <optgroup key={g.title} label={g.title}>
+              {g.pages.map((p) => (
+                <option key={p.href} value={p.href}>
+                  {p.title}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+      </div>
+    </>
   );
 }

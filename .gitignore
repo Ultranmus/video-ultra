@@ -24,9 +24,13 @@ apps/examples/vite/public/media
 # Check screenshots written to the repo root by mistake
 /*.png
 
-# Generated API reference (pnpm docs:api)
-apps/playground/public/api
+# Generated API reference data (pnpm docs:api)
+apps/playground/app/docs/api/api.json
 
 # Local secrets (API keys) — never committed
 .env*.local
 .env
+
+# Promo video: downloaded stock clips and work files (sources in promo/CREDITS.md)
+promo/clips/
+promo/work/

@@ -12,9 +12,9 @@ export default tseslint.config(
       '**/out/**',
       '**/.snippets/**',
       '**/next-env.d.ts',
+      'promo/work/**',
+      'promo/clips/**',
       '**/node_modules/**',
-      // Generated API reference (pnpm docs:api).
-      'apps/playground/public/api/**',
     ],
   },
   js.configs.recommended,

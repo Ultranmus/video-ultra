@@ -306,7 +306,7 @@ export class Composer {
   cheapEffects = false;
   private destroyed = false;
   /**
-   * Combined clips (DECISIONS #155): per timeline item playing one, a composer for its inside
+   * Combined clips: per timeline item playing one, a composer for its inside
    * (its own decode positions) and the render target it draws into.
    */
   private readonly children = new Map<

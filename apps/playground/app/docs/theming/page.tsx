@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Code, PageNav } from '../parts';
+import { Code, PageNav, TryIt } from '../parts';
 
 export const metadata: Metadata = { title: 'Theming' };
 
@@ -7,6 +7,10 @@ export default function Theming() {
   return (
     <article>
       <h1>Theming</h1>
+      <p className="docs-lead">
+        Dark, light or the device&apos;s choice, your colours, corners and font. Try every option
+        live in the playground and copy the result.
+      </p>
       <Code lang="tsx">{`
 <VideoEditor
   theme="auto" // 'dark' (default), 'light', or follow the OS
@@ -15,6 +19,7 @@ export default function Theming() {
   density="auto" // thumb-sized controls on touch screens
 />
 `}</Code>
+      <TryIt href="/playground?tab=theme">Try themes in the playground</TryIt>
       <p>
         <code>themeOverrides</code> covers the common tokens: <code>accent</code>,{' '}
         <code>accentHover</code>, <code>accentContrast</code>, <code>accentText</code>,{' '}

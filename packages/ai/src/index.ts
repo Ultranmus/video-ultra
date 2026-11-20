@@ -79,7 +79,7 @@ const MODELS: Record<
 /**
  * The model for this device: `objects` (any subject, cleaner edges; +0.7 GB while it works) on
  * computers, `people` (+0.26 GB) on phones and tablets (a touch screen as the main pointer) and
- * wherever the device says it has under 4 GB (PERF.md "Background removal"). Browser APIs are
+ * wherever the device says it has under 4 GB. Browser APIs are
  * read here, never at import time (SSR safe).
  */
 export function chooseBackgroundModel(model: BackgroundModel | 'auto' = 'auto'): BackgroundModel {

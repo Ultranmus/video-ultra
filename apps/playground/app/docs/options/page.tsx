@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { PageNav } from '../parts';
 
 export const metadata: Metadata = { title: 'All options' };
@@ -112,7 +113,7 @@ export default function Options() {
       <h1>All options</h1>
       <p className="docs-lead">
         Props of <code>&lt;VideoEditor /&gt;</code>. Every one is documented in its type too — see
-        the <a href="/api/index.html">API reference</a>.
+        the <Link href="/docs/api">API reference</Link>.
       </p>
       <table tabIndex={0} className="docs-props">
         <thead>

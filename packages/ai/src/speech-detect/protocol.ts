@@ -1,4 +1,4 @@
-/** Messages between the speech detector and its worker (DECISIONS #167). */
+/** Messages between the speech detector and its worker. */
 
 export type ToWorker =
   | {

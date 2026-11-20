@@ -147,7 +147,7 @@ const LANGUAGE = 'en';
 const ENGLISH_ONLY = 'On-device captions hear English only.';
 
 /**
- * Picks the model and runtime for this device (DECISIONS #120, #162): `base` on WebAssembly,
+ * Picks the model and runtime for this device: `base` on WebAssembly,
  * `tiny` where the device says it's short of memory. Under 4 GB of memory or 4 cores it isn't
  * offered on the device (a host transcriber can still be used). Browser APIs are read here,
  * never at import time (SSR safe).

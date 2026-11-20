@@ -124,7 +124,7 @@ export interface UiState {
    */
   selectedIds: readonly string[];
   /**
-   * Combined clips opened for editing, outermost first (DECISIONS #155): the timeline, stage and
+   * Combined clips opened for editing, outermost first: the timeline, stage and
    * inspector show the innermost one's inside. `outerTime`: the playhead before it opened.
    */
   inside: readonly { assetId: string; itemId: string; name: string; outerTime: number }[];

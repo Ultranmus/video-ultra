@@ -6,7 +6,7 @@ import { captionsService, speechSetup } from '../api/speech/config';
 export const dynamic = 'force-dynamic';
 
 /**
- * The editor, full screen (editor-client.tsx). Here on the server: whether text to speech has a
+ * The plain editor, full screen (editor-client.tsx). Here on the server: whether text to speech has a
  * voice service (and its voices), so the editor never offers it when it can't speak, and
  * whether captions have a service (else English on the device).
  */

@@ -90,7 +90,8 @@ async function runOne(page: Page, file: string, backend: string): Promise<string
     writeFileSync(join(saveDir, name), Buffer.from(base64, 'base64'));
   }
   const errors = await page.locator('.error').allInnerTexts();
-  const caps = await page.locator('table').first().innerText();
+  // The capability tables, one per group (Device, Drawing, Playing, …).
+  const caps = (await page.locator('.bench-caps table').allInnerTexts()).join('\n');
   return [
     errors.length ? `ERRORS: ${errors.join(' | ')}` : '',
     '#### Capabilities',

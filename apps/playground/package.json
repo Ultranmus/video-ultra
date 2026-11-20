@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev --port 3200",
     "dev:https": "next dev --port 3200 --experimental-https",
+    "prebuild": "node ../../scripts/api-reference.ts",
     "build": "next build",
     "start": "next start --port 3200",
     "typecheck": "tsc --noEmit"
@@ -18,7 +19,8 @@
     "mediabunny": "^1.61.6",
     "next": "^16.4.6",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "shiki": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

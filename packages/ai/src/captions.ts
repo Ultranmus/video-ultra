@@ -38,7 +38,7 @@ export interface CaptionsEndpointOptions {
 }
 
 /**
- * What your endpoint answers for one piece of sound (DECISIONS #164, #167). It receives a
+ * What your endpoint answers for one piece of sound. It receives a
  * `POST` to `<endpoint>?language=<code>` (an ISO 639-1 code; `hi-Latn` for Hinglish — Hindi in
  * Latin letters, as people type it; or `auto` to detect) whose body is
  * the sound: 32-bit float samples, little-endian, 16 kHz, mono, at most 31 s
@@ -65,7 +65,7 @@ export interface CaptionsEndpointReply {
 }
 
 /**
- * A {@link Transcriber} for your own captions endpoint (DECISIONS #164, #167): any speech
+ * A {@link Transcriber} for your own captions endpoint: any speech
  * service, any language, with the key on your server. Sends the sound in pieces of up to 30 s,
  * cut where it's quietest (no word cut in two; silent pieces aren't sent), up to three at once
  * (one while the service is busy), and turns the replies into timed words: words said in the

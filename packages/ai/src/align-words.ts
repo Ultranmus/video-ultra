@@ -1,7 +1,7 @@
 import type { TranscriptWord } from '@video-ultra/core';
 
 /**
- * Times words from the sound they were heard in (DECISIONS #163), for a speech service that
+ * Times words from the sound they were heard in, for a speech service that
  * gives the words but no usable times (Gemini's drift by seconds over 30 s). The voice is where
  * the sound is loud enough (20 ms frames, gaps under 200 ms filled); words share it by length
  * (a digit counts as a few letters: "15" is said "fifteen"). A phrase end (punctuation) is
@@ -145,7 +145,7 @@ export function voicedShare(voice: Uint8Array): number {
 }
 
 /**
- * Where to end a piece of about `max` s (DECISIONS #167): the middle of the quietest 300 ms
+ * Where to end a piece of about `max` s: the middle of the quietest 300 ms
  * between `min` and `max` s, so no word is cut in two. In samples.
  */
 export function quietestCut(audio: Float32Array, min: number, max: number): number {

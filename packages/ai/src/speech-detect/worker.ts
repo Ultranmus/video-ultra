@@ -5,7 +5,7 @@ import { speechFrames } from './frames';
 import type { FromWorker, ToWorker } from './protocol';
 
 /**
- * Speech detection in its own worker (DECISIONS #167): Silero VAD, 32 ms windows of 16 kHz
+ * Speech detection in its own worker: Silero VAD, 32 ms windows of 16 kHz
  * sound (with the 64 samples before each as context) → the chance someone speaks → 20 ms frames
  * of speech. Measured ~0.1 s per 22 s of sound on one core. One worker per captions job.
  */

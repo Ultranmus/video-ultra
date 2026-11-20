@@ -1,0 +1,277 @@
+<!doctype html>
+<!--
+  The promo video's cards (title, code outro, end), recorded by promo/record.ts at 1920×1080.
+  Open with ?card=title|code|end&d=<seconds>; the motion starts when the page gets the "go"
+  class (the recorder adds it once it is capturing) and fades out at the end of d.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>VideoUltra promo card</title>
+    <style>
+      :root {
+        --bg: #0b0b0d;
+        --text: #f4f4f5;
+        --muted: #a1a1aa;
+        --accent: #d590d5;
+        --accent-deep: #9c479c;
+        --panel: #121216;
+        --border: rgba(255, 255, 255, 0.1);
+        --d: 4s;
+        --sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--sans);
+        -webkit-font-smoothing: antialiased;
+      }
+      .stage {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background:
+          radial-gradient(70rem 36rem at 50% 18%, rgba(213, 144, 213, 0.16), transparent 70%),
+          radial-gradient(50rem 30rem at 50% 115%, rgba(156, 71, 156, 0.12), transparent 70%),
+          var(--bg);
+        opacity: 0;
+      }
+      .glow {
+        position: absolute;
+        width: 900px;
+        height: 900px;
+        left: 510px;
+        top: -260px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(213, 144, 213, 0.12), transparent 65%);
+        filter: blur(20px);
+      }
+      .go .stage {
+        animation:
+          in 0.6s ease-out forwards,
+          out 0.5s ease-in calc(var(--d) - 0.5s) forwards;
+      }
+      .go .glow {
+        animation: drift var(--d) ease-in-out forwards;
+      }
+      @keyframes in {
+        to {
+          opacity: 1;
+        }
+      }
+      @keyframes out {
+        from {
+          opacity: 1;
+        }
+        to {
+          opacity: 0;
+        }
+      }
+      @keyframes drift {
+        from {
+          transform: translateY(0) scale(1);
+        }
+        to {
+          transform: translateY(60px) scale(1.12);
+        }
+      }
+      .rise {
+        opacity: 0;
+        transform: translateY(18px) scale(0.98);
+      }
+      .go .rise {
+        animation: rise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+        animation-delay: var(--at, 0s);
+      }
+      @keyframes rise {
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 28px;
+      }
+      .brand img {
+        width: 132px;
+        height: 132px;
+      }
+      .word {
+        font-size: 104px;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+      }
+      .word span {
+        color: var(--accent);
+      }
+      .col {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+      }
+      .headline {
+        margin-top: 56px;
+        font-size: 60px;
+        font-weight: 650;
+        letter-spacing: -0.02em;
+        line-height: 1.15;
+      }
+      .sub {
+        margin-top: 22px;
+        font-size: 34px;
+        color: var(--muted);
+      }
+      .small .brand img {
+        width: 104px;
+        height: 104px;
+      }
+      .small .word {
+        font-size: 84px;
+      }
+      .tags {
+        margin-top: 48px;
+        font-size: 44px;
+        font-weight: 600;
+      }
+      .tags b {
+        color: var(--accent);
+        font-weight: 700;
+      }
+      /* code card */
+      .code-col {
+        position: relative;
+        width: 1360px;
+        display: flex;
+        flex-direction: column;
+        gap: 36px;
+      }
+      .code-head {
+        display: flex;
+        align-items: center;
+        gap: 22px;
+        font-size: 52px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+      .code-head img {
+        width: 72px;
+        height: 72px;
+      }
+      .panel {
+        border: 1px solid var(--border);
+        border-radius: 28px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 40%), var(--panel);
+        box-shadow: 0 40px 120px -40px rgba(0, 0, 0, 0.8);
+        overflow: hidden;
+      }
+      .panel-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 20px 30px;
+        border-bottom: 1px solid var(--border);
+        color: var(--muted);
+        font: 500 26px var(--mono);
+      }
+      pre {
+        padding: 38px 44px 44px;
+        font: 500 38px/1.6 var(--mono);
+        color: var(--text);
+        white-space: pre;
+      }
+      .k {
+        color: #e4a3e4;
+      }
+      .s {
+        color: #a6dba0;
+      }
+      .t {
+        color: #8fc8ff;
+      }
+      .a {
+        color: #ffd28a;
+      }
+      .p {
+        color: #9b9ba6;
+      }
+      .install {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        align-self: flex-start;
+        padding: 22px 34px;
+        border-radius: 999px;
+        border: 1px solid rgba(213, 144, 213, 0.35);
+        background: rgba(213, 144, 213, 0.1);
+        font: 600 38px var(--mono);
+      }
+      .install .dollar {
+        color: var(--accent);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="stage">
+      <div class="glow"></div>
+      <div id="card"></div>
+    </div>
+    <template id="title">
+      <div class="col">
+        <div class="brand rise" style="--at: 0.15s">
+          <img src="../apps/playground/public/brand/mark-dark.svg" alt="" />
+          <div class="word">Video<span>Ultra</span></div>
+        </div>
+        <div class="headline rise" style="--at: 0.55s">Make videos right inside your app.</div>
+        <div class="sub rise" style="--at: 0.85s">A free video editor for React and Next.js</div>
+      </div>
+    </template>
+    <template id="code">
+      <div class="code-col">
+        <div class="code-head rise" style="--at: 0.1s">
+          <img src="../apps/playground/public/brand/mark-dark.svg" alt="" />
+          Add it to your app
+        </div>
+        <div class="panel rise" style="--at: 0.35s">
+          <div class="panel-bar">app/editor/page.tsx</div>
+          <pre><span class="k">import</span> <span class="p">{</span> <span class="t">VideoEditor</span> <span class="p">}</span> <span class="k">from</span> <span class="s">'@video-ultra/react'</span><span class="p">;</span>
+<span class="k">import</span> <span class="s">'@video-ultra/react/styles.css'</span><span class="p">;</span>
+
+<span class="p">&lt;</span><span class="t">VideoEditor</span> <span class="a">onExport</span><span class="p">={({</span> blob <span class="p">}) =&gt;</span> upload<span class="p">(</span>blob<span class="p">)}</span> <span class="p">/&gt;</span></pre>
+        </div>
+        <div class="install rise" style="--at: 1.4s">
+          <span class="dollar">$</span> npm install @video-ultra/react
+        </div>
+      </div>
+    </template>
+    <template id="end">
+      <div class="col small">
+        <div class="brand rise" style="--at: 0.1s">
+          <img src="../apps/playground/public/brand/mark-dark.svg" alt="" />
+          <div class="word">Video<span>Ultra</span></div>
+        </div>
+        <div class="tags rise" style="--at: 0.45s">Free and open source · <b>MIT</b></div>
+        <div class="sub rise" style="--at: 0.75s">Docs, playground and demo at the VideoUltra site</div>
+      </div>
+    </template>
+    <script>
+      const params = new URLSearchParams(location.search);
+      const tpl = document.getElementById(params.get('card') || 'title');
+      document.getElementById('card').append(tpl.content.cloneNode(true));
+      document.documentElement.style.setProperty('--d', `${Number(params.get('d') || 4)}s`);
+    </script>
+  </body>
+</html>

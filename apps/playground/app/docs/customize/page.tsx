@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Code, PageNav } from '../parts';
+import { Code, PageNav, TryIt } from '../parts';
 
 export const metadata: Metadata = { title: 'Customising the editor' };
 
@@ -7,6 +7,11 @@ export default function Customize() {
   return (
     <article>
       <h1>Customising the editor</h1>
+      <p className="docs-lead">
+        Hide the tools your users don&apos;t need, add your own panels, buttons and media sources,
+        and change any word.
+      </p>
+      <TryIt href="/playground?tab=tools">Turn tools on and off in the playground</TryIt>
       <Code lang="tsx">{`
 <VideoEditor
   customize={{

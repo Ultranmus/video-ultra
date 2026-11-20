@@ -21,7 +21,7 @@ export interface SpeechDetector {
 }
 
 /**
- * A speech detector running in a worker (DECISIONS #167): Silero VAD (MIT, 0.64 MB, downloaded
+ * A speech detector running in a worker: Silero VAD (MIT, 0.64 MB, downloaded
  * once and cached). Measured: speech found 98–100 % with music or fan noise as loud as the voice
  * (judging by loudness found 0–14 %), music or noise alone never taken for speech; ~0.1 s per
  * 22 s of sound. `createCaptionsEndpoint` uses one by default.

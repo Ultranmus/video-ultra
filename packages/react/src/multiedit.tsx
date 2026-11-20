@@ -101,7 +101,7 @@ export function AllSelected({
 
 /**
  * Inside a combined clip, in place of what's for the whole video only (captions, canvas size):
- * says so, with the way back out (DECISIONS #155). Null on the timeline itself.
+ * says so, with the way back out. Null on the timeline itself.
  */
 export function WholeVideoOnly({ message }: { message: string }): ReactElement | null {
   const ctl = useController();

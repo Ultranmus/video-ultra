@@ -16,6 +16,11 @@ const config: NextConfig = {
   allowedDevOrigins: [...lanAddresses, '*.local', '*.trycloudflare.com'],
   // Captions lab with ?isolated: cross-origin isolation, only so the memory breakdown API
   // (measureUserAgentSpecificMemory) works there. The editor itself never needs it (CLAUDE.md).
+  // The old generated API pages (/api/index.html, /api/functions/x.html…) moved into the docs.
+  // Only *.html paths: /api/assistant, /api/captions and /api/speech are route handlers.
+  async redirects() {
+    return [{ source: '/api/:path(.*\\.html)', destination: '/docs/api', permanent: true }];
+  },
   async headers() {
     return [
       {

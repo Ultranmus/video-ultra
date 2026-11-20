@@ -27,7 +27,7 @@ export interface GroupedCaption {
   end: Time;
   text: string;
   words: CaptionWord[];
-  /** Its words were heard with little confidence: worth checking (DECISIONS #167). */
+  /** Its words were heard with little confidence: worth checking. */
   unsure?: boolean;
 }
 

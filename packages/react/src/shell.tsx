@@ -573,7 +573,7 @@ export function Timeline({
 }
 
 /**
- * While a combined clip is open (DECISIONS #155): where you are (the clips it sits in) and the way
+ * While a combined clip is open: where you are (the clips it sits in) and the way
  * back out. Over the timeline, on every layout.
  */
 function InsideBar(): ReactElement | null {

@@ -10,4 +10,6 @@ test-media/private
 packages/core/src/render/shaders/generated.ts
 packages/core/src/render/hdr-calibration.ts
 packages/react/src/library/emoji.generated.ts
-apps/playground/public/api
+apps/playground/app/docs/api/api.json
+promo/work
+promo/clips
