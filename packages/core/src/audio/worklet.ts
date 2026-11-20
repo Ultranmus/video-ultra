@@ -41,7 +41,12 @@ class VideoUltraPlayer extends AudioWorkletProcessor {
 
   constructor() {
     super();
-    this.port.onmessage = (event: MessageEvent<{ type: 'port'; port: MessagePort }>) => {
+    this.port.onmessage = (
+      event: MessageEvent<{ type: 'port'; port: MessagePort } | { type: 'flush' }>,
+    ) => {
+      // Pause / seek straight from the page: silent at once, even while the engine worker is busy
+      // (its own flush came late on phones — the sound ran on after the picture stopped).
+      if (event.data.type === 'flush') return this.onData({ type: 'flush' });
       if (event.data.type !== 'port') return;
       this.data = event.data.port;
       this.data.onmessage = (e: MessageEvent<DataMessage>) => this.onData(e.data);

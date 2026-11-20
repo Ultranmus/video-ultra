@@ -4605,8 +4605,10 @@
         'side'
         'main';
       grid-template-columns: minmax(0, 1fr);
-      /* The screen's spare room goes to the preview. */
-      grid-template-rows: minmax(var(--vu-size-export-poster-phone), 1fr) auto;
+      /* The preview keeps one size: growing into the spare room made it change with every
+         choice (the text under it grew or shrank) and push the choices around (owner,
+         2026-11-21). */
+      grid-template-rows: var(--vu-size-export-poster-phone) auto;
       gap: var(--vu-space-4);
       min-height: 0;
       margin: 0 calc(var(--vu-space-5) * -1);
