@@ -1521,3 +1521,17 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       and phones. `updateItem` takes `maxWidth` (clamped 0.05…1, `null` removes). Golden frames
       `pic-text-nowrap` / `pic-text-wrap` check the wrap on WebGPU and WebGL2
       (`scripts/composite-check.ts`).
+215.  **Brand: the comet mark, and the names VideoUltra / ImageUltra** (2026-11-21; owner chose
+      after twelve rounds of drawings). The mark is a plum ball with three flowing streams
+      trailing left and two round-ended channels cut into it — speed and motion, no letters. One
+      smooth gradient, no lines inside the ball. Each product has its own round badge at the
+      bottom right, cut out of the ball by a thin gap: a play triangle for VideoUltra, a photo
+      (sun and hills) for ImageUltra. The two small flame flicks are left out at 32 px and
+      below (the "small" cut), where they blur. Display names are written **VideoUltra** and
+      **ImageUltra** ("Ultra" in plum in the wordmark); npm names are unchanged
+      (`@video-ultra/*`). `scripts/brand.ts` draws everything from one set of paths: `brand/
+      <product>/` (mark on light / dark, full and small, app icon, favicon, 512 px and Apple
+      icons, the 1200 × 630 social card) and the playground's `icon.svg`, `apple-icon.png`,
+      `opengraph-image.png` and `public/brand/`. Rejected along the way: letters in a square
+      (any "u"/"U" drawn as a letter), geometric badges, a rotated (upright-U) comet, and
+      simplified passes that lost the flowing streams.

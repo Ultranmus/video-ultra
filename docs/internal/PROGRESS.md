@@ -790,3 +790,15 @@ canvas size ease (scale 0.75 → 1 over ~200 ms). Core 529 + react 24 tests pass
   without a password, so one was made with the existing mkcert CA for the Mac's LAN address
   (`apps/playground/certificates/`, kept out of git via `.git/info/exclude`).
 - Checks: `pnpm verify` green; stage-text-check 23 pass + the known WebKit ResizeObserver message.
+
+## 2026-11-21 · Day 7 · 5.4 prep — brand: logo, icons, social card
+
+- Owner chose the family logo (DECISIONS #215) after twelve rounds of drawings: the plum comet
+  ball with a play badge (VideoUltra) or photo badge (ImageUltra); names VideoUltra / ImageUltra.
+- `scripts/brand.ts` writes the SVG marks (light / dark, full / small), app icons, favicon,
+  512 px and Apple icons and the social cards for both products into `brand/`, and the
+  playground's favicon, Apple icon, social image and `public/brand/` marks.
+- Docs header: the mark (light / dark by colour scheme) + "VideoUltra". Checked in Chromium on
+  desktop (dark, light) and iPhone 13 size; favicon, Apple icon and `og:image` are served.
+- Not done yet: the rest of the site's text still says "video-ultra" (waiting on the owner:
+  rename display text only, or more); landing page; ImageUltra's files copied into its repo.

@@ -15,7 +15,13 @@ export default function DocsLayout({ children }: { children: ReactNode }) {
     <div className="docs">
       <header className="docs-top">
         <Link href="/docs" className="docs-brand">
-          video-ultra
+          <picture>
+            <source srcSet="/brand/mark-dark.svg" media="(prefers-color-scheme: dark)" />
+            <img src="/brand/mark-light.svg" alt="" width={28} height={28} />
+          </picture>
+          <span>
+            Video<span className="docs-brand-ultra">Ultra</span>
+          </span>
         </Link>
         <nav className="docs-top-links" aria-label="Site">
           <Link href="/editor">Demo</Link>

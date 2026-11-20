@@ -56,9 +56,22 @@ body:has(.docs) {
 }
 
 .docs-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   color: var(--d-text) !important;
   font-weight: 700;
+  font-size: 17px;
+  letter-spacing: -0.01em;
   text-decoration: none;
+}
+
+.docs-brand img {
+  display: block;
+}
+
+.docs-brand-ultra {
+  color: var(--d-accent);
 }
 
 .docs-top-links {
