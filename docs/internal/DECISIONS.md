@@ -1306,3 +1306,12 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       sheet / inspector field, the caret starts after the last letter. A press on the stage field
       within 500 ms of it opening (a double-click's second press) is ignored, so it can't move
       the caret. The Edit field is about 3 lines tall.
+191.  **A locked item's outline follows its tilt** (owner, 2026-11-20; changes #185's upright box).
+      The outline is the item's own turned box (plus the usual 6 px of air), trimmed to the frame
+      so it is always closed: where the item runs off the video, the cut sides lie along the
+      video's edge. Drawn as an SVG polygon, not a dashed CSS border — Safari dropped the left and
+      right sides of the thin dashed border (the owner saw only top and bottom on the iPhone).
+192.  **Typing a template's words: a smaller preview** (owner, 2026-11-20). With the keyboard up
+      the template preview is 120 px tall instead of 260 px, so the word fields sit high in the
+      full-height sheet, above the keyboard, and the words still show in the preview. No height
+      animation: the keyboard code measures the field's place in the same frame.

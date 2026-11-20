@@ -11,6 +11,12 @@ warm wall (#189), edit a text (caret at the end, taller box, #190).
 Backlog candidates left for later: Separate keeps the old lane order (combined clips), playground
 test flags (DECISIONS #92), transition stills cache.
 
+## 2026-11-20 — locked outline + template keyboard pushed; owner re-tests
+
+Owner re-tests on the live site: locked item (phone + desktop, turned and big), template words
+with the keyboard, Layers rename at the bottom, green screen on the yellow wall (#189 is live
+now). Next after that: transparent background in exported files (#186, BACKLOG).
+
 ## 2026-10-31 (6) — the open phone items done, owner tests tomorrow
 
 Flip / canvas size animate, Transparent background (preview; files black — next step in
