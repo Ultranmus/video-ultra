@@ -21,6 +21,14 @@ export interface FileStore {
    * leaves the file as it was before it.
    */
   appendBlob(path: string, blob: Blob): Promise<void>;
+  /**
+   * Downloads `url` into the file and resolves with its size. OPFS streams the response to disk
+   * piece by piece in the storage worker (constant memory; the server needn't support range
+   * requests); memory keeps the browser's own Blob of the response. A failed or aborted download
+   * leaves no file and re-throws (HTTP errors → `NotFoundError`, no room → {@link StorageFullError},
+   * abort → `AbortError`).
+   */
+  download(path: string, url: string, signal?: AbortSignal): Promise<number>;
   /** Removes a file or a whole folder. Missing paths are fine. */
   remove(path: string): Promise<void>;
   /** Names directly inside `dir` (files and folders); `[]` if it doesn't exist. */
@@ -43,6 +51,13 @@ export function isQuotaError(error: unknown): boolean {
     'name' in error &&
     (error.name === 'QuotaExceededError' || error.name === 'StorageFullError')
   );
+}
+
+/** The error a download rejects with when the server answers with an HTTP error. */
+export function httpError(status: number, url: string): Error {
+  const error = new Error(`Could not download ${url} (HTTP ${status}).`);
+  error.name = 'NotFoundError';
+  return error;
 }
 
 /** The `AbortError` our cancellable operations reject with. */
@@ -109,6 +124,17 @@ export class MemoryFileStore implements FileStore {
     } else {
       this.files.set(key, { parts: [blob], lastModified: this.touch() });
     }
+  }
+
+  async download(path: string, url: string, signal?: AbortSignal): Promise<number> {
+    if (signal?.aborted) throw abortError();
+    // No disk here (Safari Private Browsing, some webviews): the response's Blob is the browser's
+    // (large ones are file-backed in Chromium), never copied into the JS heap.
+    const response = await fetch(url, signal ? { signal } : undefined);
+    if (!response.ok) throw httpError(response.status, url);
+    const blob = await response.blob();
+    this.files.set(normalize(path), { parts: [blob], lastModified: this.touch() });
+    return blob.size;
   }
 
   async remove(path: string): Promise<void> {

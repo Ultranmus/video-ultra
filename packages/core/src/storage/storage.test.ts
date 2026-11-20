@@ -63,10 +63,28 @@ class CrashingStore implements FileStore {
     if (this.crashed) throw new Error('crashed');
     return this.inner.appendBlob(path, blob);
   }
+  async download(path: string, url: string) {
+    if (this.crashed) throw new Error('crashed');
+    return this.inner.download(path, url);
+  }
   async remove(path: string) {
     if (this.crashed) throw new Error('crashed');
     return this.inner.remove(path);
   }
+}
+
+/** A fetch double: serves `bodies` by url, counts requests. */
+function fakeFetch(bodies: Record<string, Uint8Array<ArrayBuffer> | number>) {
+  const calls: string[] = [];
+  const fn = async (input: RequestInfo | URL) => {
+    const url = String(input);
+    calls.push(url);
+    const body = bodies[url];
+    if (body === undefined) return new Response(null, { status: 404 });
+    if (typeof body === 'number') return new Response(null, { status: body });
+    return new Response(new Blob([body]), { status: 200 });
+  };
+  return { calls, fn: fn as typeof fetch };
 }
 
 function edit(editor: Editor, n: number): void {
@@ -304,6 +322,112 @@ describe('project storage', () => {
     expect(await storage.listProjects()).toEqual([]);
     expect(await files.read('media/vidA')).toBeNull();
     expect(await storage.getWaveform('vidA')).toBeNull();
+  });
+
+  it('downloads a url source once and reads it from storage after', async () => {
+    const original = globalThis.fetch;
+    const net = fakeFetch({ 'https://x/a.mp4': new Uint8Array(1234) });
+    globalThis.fetch = net.fn;
+    try {
+      const files = new MemoryFileStore();
+      const storage = createProjectStorageOn(files);
+      const project = startProject();
+      const asset: Asset = {
+        ...project.assets.vidA!,
+        size: 1234,
+        source: { type: 'url', url: 'https://x/a.mp4' },
+      };
+      // Two callers at once share one download.
+      const [a, b] = await Promise.all([storage.getMedia(asset), storage.getMedia(asset)]);
+      expect(a?.size).toBe(1234);
+      expect(b?.size).toBe(1234);
+      expect(net.calls).toHaveLength(1);
+      expect(await storage.getMedia(asset)).not.toBeNull();
+      expect(net.calls).toHaveLength(1);
+      expect(await storage.mediaAccess(asset)).toBe('ok');
+      // The finished-download marker isn't swept as media of its own.
+      expect(await storage.sweepMedia(0)).toBe(1); // media/vidA: no saved project uses it
+      expect(await files.read('media/vidA.url')).toBeNull();
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
+  it('downloads again when the url changes or the download never finished', async () => {
+    const original = globalThis.fetch;
+    const net = fakeFetch({
+      'https://x/a.mp4': new Uint8Array(10),
+      'https://x/b.mp4': new Uint8Array(20),
+    });
+    globalThis.fetch = net.fn;
+    try {
+      const files = new MemoryFileStore();
+      const storage = createProjectStorageOn(files);
+      const asset: Asset = {
+        ...startProject().assets.vidA!,
+        size: 10,
+        source: { type: 'url', url: 'https://x/a.mp4' },
+      };
+      expect((await storage.getMedia(asset))?.size).toBe(10);
+      const moved: Asset = { ...asset, source: { type: 'url', url: 'https://x/b.mp4' } };
+      expect((await storage.getMedia(moved))?.size).toBe(20);
+      expect(net.calls).toEqual(['https://x/a.mp4', 'https://x/b.mp4']);
+      // A tab killed mid-download: bytes but no marker → fetched again.
+      await files.remove('media/vidA.url');
+      expect((await storage.getMedia(moved))?.size).toBe(20);
+      expect(net.calls).toHaveLength(3);
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
+  it('a url the server refuses gives null, keeps nothing and reports missing', async () => {
+    const original = globalThis.fetch;
+    const net = fakeFetch({ 'https://x/gone.mp4': 404 });
+    globalThis.fetch = net.fn;
+    try {
+      const files = new MemoryFileStore();
+      const storage = createProjectStorageOn(files);
+      const asset: Asset = {
+        ...startProject().assets.vidA!,
+        source: { type: 'url', url: 'https://x/gone.mp4' },
+      };
+      expect(await storage.getMedia(asset)).toBeNull();
+      expect(await files.read('media/vidA')).toBeNull();
+      expect(await files.read('media/vidA.url')).toBeNull();
+      expect(await storage.mediaAccess(asset)).toBe('missing');
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
+  it('a kept file handle: asks again when its permission lapsed, missing when the file is gone', async () => {
+    const storage = createProjectStorageOn(new MemoryFileStore());
+    let permission: PermissionState = 'prompt';
+    let exists = true;
+    const handle = {
+      kind: 'file',
+      name: 'clip.mp4',
+      queryPermission: async () => permission,
+      requestPermission: async () => permission,
+      getFile: async () => {
+        if (!exists) throw Object.assign(new Error('gone'), { name: 'NotFoundError' });
+        return new File([new Uint8Array(5)], 'clip.mp4');
+      },
+    } as unknown as FileSystemFileHandle;
+    const source = await storage.putMediaHandle('vidA', handle);
+    const asset: Asset = { ...startProject().assets.vidA!, size: 5, source };
+    expect(await storage.getMedia(asset)).toBeNull(); // outside a tap the browser says no
+    expect(await storage.mediaAccess(asset)).toBe('ask');
+    permission = 'granted';
+    expect((await storage.getMedia(asset))?.size).toBe(5);
+    expect(await storage.mediaAccess(asset)).toBe('ok');
+    exists = false;
+    expect(await storage.mediaAccess(asset)).toBe('missing');
+    permission = 'denied';
+    expect(await storage.mediaAccess(asset)).toBe('missing');
+    await storage.deleteMedia('vidA');
+    expect(await storage.mediaAccess(asset)).toBe('missing');
   });
 
   it('handles a 500-item project', async () => {

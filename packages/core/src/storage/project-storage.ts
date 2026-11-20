@@ -89,6 +89,9 @@ export interface MediaRecordingWriter {
   discard(): Promise<void>;
 }
 
+/** What {@link ProjectStorage.mediaAccess} reports. */
+export type MediaAccess = 'ok' | 'ask' | 'missing';
+
 /** Local storage for media and projects. Created with {@link createProjectStorage}. */
 export interface ProjectStorage extends WaveformCache {
   readonly kind: 'opfs' | 'memory';
@@ -115,10 +118,19 @@ export interface ProjectStorage extends WaveformCache {
    */
   putMediaHandle(assetId: string, handle: FileSystemFileHandle): Promise<Asset['source']>;
   /**
-   * Gets the bytes for an asset (OPFS File, or fetch for url sources, or a stored
-   * FileSystemFileHandle where supported). null if missing (or a handle's permission is refused).
+   * Gets the bytes for an asset (OPFS File; a `url` source is downloaded into storage once,
+   * streamed to disk, and read from there after; or a stored FileSystemFileHandle where
+   * supported). null if missing, if a url can't be fetched, or if a handle's permission isn't
+   * granted — see {@link ProjectStorage.mediaAccess} to ask again inside a tap.
    */
   getMedia(asset: Asset): Promise<Blob | null>;
+  /**
+   * Why an asset's bytes can't be read, after {@link ProjectStorage.getMedia} gave `null`:
+   * `'ask'` — a kept file handle needs the person's OK again (browsers ask only inside a tap:
+   * call `getMedia` from the tap's handler); `'missing'` — the file is gone, unreachable, or access
+   * was refused (pick the file again); `'ok'` — it can be read now.
+   */
+  mediaAccess(asset: Asset): Promise<MediaAccess>;
   /** Removes an asset's stored bytes, handle and cached waveform. */
   deleteMedia(assetId: string): Promise<void>;
   /**
@@ -227,6 +239,41 @@ export function createProjectStorageOn(
     return null;
   };
 
+  /** Downloads in flight by asset id: two callers asking at once share one download. */
+  const downloading = new Map<string, Promise<File | null>>();
+
+  /**
+   * A `url` source's bytes: downloaded once into `media/<id>` (streamed to disk, DECISIONS #200)
+   * and read from there afterwards — offline too. `media/<id>.url` is written only after the
+   * download completes and names the url and size, so a download cut short (tab killed) or a
+   * changed url is fetched again. `null` if the server can't be reached or says no.
+   */
+  const downloaded = (assetId: string, url: string): Promise<File | null> => {
+    const running = downloading.get(assetId);
+    if (running) return running;
+    const path = mediaPath(assetId);
+    const task = (async () => {
+      try {
+        const marker = await readText(`${path}.url`).catch(() => null);
+        const kept = marker ? parseUrlMarker(marker) : null;
+        if (kept && kept.url === url) {
+          const file = await files.read(path);
+          if (file && file.size === kept.size) return file;
+        }
+        await files.remove(`${path}.url`);
+        const bytes = await files.download(path, url);
+        await files.write(`${path}.url`, JSON.stringify({ url, size: bytes }));
+        return await files.read(path);
+      } catch {
+        return null;
+      } finally {
+        downloading.delete(assetId);
+      }
+    })();
+    downloading.set(assetId, task);
+    return task;
+  };
+
   const storage: ProjectStorage = {
     kind: files.kind,
 
@@ -322,25 +369,14 @@ export function createProjectStorageOn(
         if (!file || (asset.size > 0 && file.size !== asset.size)) return null;
         return file;
       }
-      if (source.type === 'url') {
-        try {
-          const response = await fetch(source.url);
-          return response.ok ? await response.blob() : null;
-        } catch {
-          return null;
-        }
-      }
-      const handle = await handles.get(source.key).catch(() => null);
+      if (source.type === 'url') return downloaded(asset.id, source.url);
+      const handle = (await handles.get(source.key).catch(() => null)) as PermissionedHandle | null;
       if (!handle) return null;
-      const permissioned = handle as FileSystemFileHandle & {
-        queryPermission?: (d: { mode: 'read' }) => Promise<PermissionState>;
-        requestPermission?: (d: { mode: 'read' }) => Promise<PermissionState>;
-      };
       try {
-        let state = (await permissioned.queryPermission?.({ mode: 'read' })) ?? 'granted';
-        // Only works inside a user gesture; otherwise the UI asks the user to re-link the file.
+        let state = (await handle.queryPermission?.({ mode: 'read' })) ?? 'granted';
+        // Only works inside a user gesture; otherwise the UI asks again from a tap (mediaAccess).
         if (state === 'prompt')
-          state = (await permissioned.requestPermission?.({ mode: 'read' })) ?? 'denied';
+          state = (await handle.requestPermission?.({ mode: 'read' })) ?? 'denied';
         if (state !== 'granted') return null;
         return await handle.getFile();
       } catch {
@@ -348,9 +384,26 @@ export function createProjectStorageOn(
       }
     },
 
+    async mediaAccess(asset) {
+      const source = asset.source;
+      if (source.type !== 'handle') return (await storage.getMedia(asset)) ? 'ok' : 'missing';
+      const handle = (await handles.get(source.key).catch(() => null)) as PermissionedHandle | null;
+      if (!handle) return 'missing';
+      try {
+        const state = (await handle.queryPermission?.({ mode: 'read' })) ?? 'granted';
+        if (state === 'prompt') return 'ask';
+        if (state !== 'granted') return 'missing';
+        await handle.getFile(); // moved or deleted → NotFoundError
+        return 'ok';
+      } catch {
+        return 'missing';
+      }
+    },
+
     async deleteMedia(assetId) {
       await files.remove(mediaPath(assetId));
       await files.remove(`${mediaPath(assetId)}.peaks`);
+      await files.remove(`${mediaPath(assetId)}.url`);
       await handles.delete(assetId).catch(() => undefined);
     },
 
@@ -364,7 +417,7 @@ export function createProjectStorageOn(
       const now = Date.now();
       let removed = 0;
       for (const name of await files.list('media')) {
-        if (name.endsWith('.peaks')) continue;
+        if (name.endsWith('.peaks') || name.endsWith('.url')) continue;
         const id = decodeURIComponent(name);
         if (used.has(id)) continue;
         const file = await files.read(mediaPath(id));
@@ -533,6 +586,24 @@ interface StoredMeta {
   name: string;
   updatedAt: string;
   assetIds: string[];
+}
+
+/** A stored file handle with the permission methods (not in every DOM typing yet). */
+type PermissionedHandle = FileSystemFileHandle & {
+  queryPermission?: (d: { mode: 'read' }) => Promise<PermissionState>;
+  requestPermission?: (d: { mode: 'read' }) => Promise<PermissionState>;
+};
+
+/** `media/<id>.url`: which url a finished download came from, and its size. */
+function parseUrlMarker(text: string): { url: string; size: number } | null {
+  try {
+    const value = JSON.parse(text) as { url?: unknown; size?: unknown };
+    return typeof value.url === 'string' && typeof value.size === 'number'
+      ? { url: value.url, size: value.size }
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 function parseSnapshot(text: string | null): { seq: number; project: Project } | null {
