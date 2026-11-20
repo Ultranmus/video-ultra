@@ -4,6 +4,9 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 
 ## Open
 
+- [ ] Dev-only advisories left after the Next.js 16.4.6 update (2026-11-20): esbuild < 0.28.1
+      (dev server file read, Windows only; tsup pins 0.27) and minimatch < 11.0.1 (pattern DoS;
+      a major bump under the dev tools). Neither ships; update when tsup / the tools move.
 - [x] (fixed 2026-11-20, #195) Owner (iPhone): switching between template fields (and editing in a
       full-height Layers sheet) still jumped like the sheet opening again, the next field hid
       under Safari's address bar, and switching fast lagged. Confirmed fixed on the iPhone.
