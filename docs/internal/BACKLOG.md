@@ -412,13 +412,18 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       Maybe later: an on-device voice model (`createOnDeviceSpeech`), like on-device captions.
 - [ ] Docs site: no search yet; the phone page list is long (a picker would be shorter).
 
-- [ ] Combined clips (#155): Separate re-makes lanes at the end of their kind (a title can come
-      back above a sticker it was under); keep their old row order.
-- [ ] Combined clips: no waveform on the timeline for a combined clip with sound (mix its inside
-      in the analyzer, cached), and Media shows it as a video. (Layers fixed 2026-11-18: combine
-      icon and "Combined clip" for screen readers.)
-- [ ] Combined clips: the inside is drawn at the output size; zoomed past 1× (scale > 1) it's
-      upscaled — draw it at the zoomed size (capped) when that matters.
+- [x] (fixed 2026-11-20, #207) Combined clips (#155): Separate re-makes lanes at the end of their
+      kind (a title can come back above a sticker it was under); keep their old row order. Now
+      the inside comes back lane by lane at the clip's own row (unit tests in compound.test).
+- [x] (fixed 2026-11-20, #207) Combined clips: no waveform on the timeline for a combined clip
+      with sound, and Media shows it as a video. The timeline mixes the inside's cached waveforms
+      (`media/compound-wave.ts`; main thread, cheap, cached per asset object — not the analyzer
+      worker, which has no project); the inspector badge shows the combine icon and the
+      timeline's screen reader layer says "combined clip". (The Media panel lists files only;
+      a combined clip isn't in it.) (Layers fixed 2026-11-18.)
+- [x] (fixed 2026-11-20, #206) Combined clips: the inside is drawn at the output size; zoomed past
+      1× (scale > 1) it's upscaled — now drawn at the zoomed size (quarter steps, ≤ 2×, ≤ 4096
+      px). compound-check: a 2× combined clip = its video at 2× (mean 0.00; was 2.1 / 255).
 - [ ] Combined clips on a budget phone: measure a combined clip over the main video (two
       decodes + a pass) in the device pass.
 
@@ -455,10 +460,18 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       applies to nothing. ("Apply to all clips" copies the LUT too — checked 2026-11-18.) Blend modes on
       a 3D-turn animation copy only the flat bounding box — confirm with a golden frame. Region
       items have no entrance / exit animations. Green screen not measured on budget phones.
-- [ ] (v0.2 D) Each frame capture creates a renderer (WebKit warns "too many WebGL contexts" in
-      export-check) — reuse one. Camera can't switch while recording; the range bar has no film
-      strip. (Fixed 2026-11-18: recording / voiceover names use a fixed `14.05.09` stamp; sound
-      only is offered only when something sounds inside the chosen part.)
+- [ ] (v0.2 D) Camera can't switch while recording; the range bar has no film strip. (Fixed
+      2026-11-18: recording / voiceover names use a fixed `14.05.09` stamp; sound only is offered
+      only when something sounds inside the chosen part. Fixed 2026-11-20, #204: each frame
+      capture created a renderer (WebKit warned "too many WebGL contexts" in export-check) —
+      stills and exports share one warm renderer now; export-check 22 → 1 renderers, 0 warnings.)
+- [ ] Picker previews (filters, transitions, animations) still make a new small renderer each
+      time their tile size changes (`looks` in the engine worker); could borrow the work renderer
+      (#204) too.
+- [ ] picture-check (desktop) times out at the blend step: the text inspector has no "Screen"
+      chip under Appearance (same on the base commit, 2026-11-20) — the check or the UI moved.
+- [ ] combine-ui-check phone (WebKit) also logs "ResizeObserver loop completed with undelivered
+      notifications" (same on the base commit; see the stage-text-check item above).
 - [ ] WebKit logs "WebKitBlobResource error 1" console messages in editor-interact (not failures).
 
 - [x] (done 2026-10-19, #134) Copy / paste elements (⌘C / ⌘V, with a paste at the playhead) — image-ultra has it; not in
@@ -487,7 +500,11 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [x] **Fast drags on 4K show almost no frames until release** — fixed 2026-10-17: the stage shows the analyzer's keyframe thumbnail while a scrub is fast (`stage/ScrubPreview.tsx`; 37/40 steps covered in a 4K drag). (decoder can't keep pace). Show
       timeline thumbnails (Day 4) while the drag is fast, exact frames when it slows/stops.
       Long-GOP 4K on WebKit settles in 1.3 s — proxies on low tier.
-- [ ] Keyframe-preview decoder isn't counted by `DecoderPool`; previews are off on the low tier.
+- [x] (fixed 2026-11-20, #205) Keyframe-preview decoder isn't counted by `DecoderPool`; previews
+      are off on the low tier. It takes a free pool slot now (never evicts, evicted first);
+      bench `--decoders 2`, 4K: 0 → 20 previews, peak 2 of 2 decoders. (The editor's stage uses
+      the analyzer's keyframe thumbnails while scrubbing; `FrameSource` previews run where a
+      caller asks for them — the lab / bench.)
 - [x] (fixed: no longer with the real engine, #68) **WebGPU export ~2× slower than WebGL2 export** (WebGPU canvas capture). Phase 2: measure
       capture paths (copyExternalImageToTexture / readback / VideoFrame from GPUTexture); export
       with WebGL2 until WebGPU wins.
@@ -544,8 +561,9 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       project lists. Add a sweep (media not referenced by any project's meta, older than a day).
 - [ ] HDR thumbnails show the browser's own HDR → SDR conversion (too bright, DECISIONS #33): the
       2D-canvas path has no correction. Fine for a strip; revisit if it looks wrong on iPhone.
-- [ ] Two decode jobs on one asset can decode the same keyframe twice (long-GOP 4K: 5 decodes for 3
-      keyframes). Share in-flight keyframe decodes across jobs.
+- [x] (fixed 2026-11-20, #205) Two decode jobs on one asset can decode the same keyframe twice
+      (long-GOP 4K: 5 decodes for 3 keyframes). In-flight decodes are shared across jobs: 4K
+      5 → 3, HEVC and rotated 3 → 2 (= keyframes; analyzer-check now fails on more).
 - [ ] Analyzer watchdog isn't exercised by a test (needs a stalled fake decoder).
 - [ ] `exact` thumbnails on long-GOP 4K take 0.7–2 s per strip — keep `keyframe` for strips; use
       `exact` only for single frames (cover / freeze preview).

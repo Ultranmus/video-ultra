@@ -1336,3 +1336,35 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       layer rename focuses the same way. Placement is then ours alone: the field in the top 30 %
       on focus, kept 64 px above the keyboard on touch screens (Safari's address bar floats there).
       Fields and labels take `touch-action: manipulation`.
+196.  **One warm work renderer for stills and exports** (2026-11-20). Frame captures, saved frames
+      and exports each made a renderer (a GPU context); WebKit keeps only a few per worker and
+      dropped the oldest ("too many WebGL contexts"), which could be the preview's. They now
+      share one renderer and canvas in the engine worker, resized per use and freed after 5 s
+      idle. Stills take turns (one queue; they share the canvas); an export borrows it for its
+      length with its own composer and gives it back (a still asked meanwhile gets its own, as
+      before; a failed export throws it away). An explicit WebGPU still stays strict. Engine
+      stats count `renderersMade`. Measured (export-check with extras): 22 → 1 renderers, WebKit
+      warnings 5 → 0; exported frames still match the preview.
+197.  **Decodes are shared and counted** (2026-11-20). Analyzer: one asset's thumbnail strip is
+      split over the free decode slots, so two jobs could decode the same keyframe; a job now
+      decodes the frames no other job is decoding, takes the others from the cache when that
+      job is done, and decodes on a later round whatever is still missing (error, eviction).
+      Long-GOP 4K strip: 5 → 3 decodes (3 keyframes). Preview: the keyframe preview's one-shot
+      decoder counts in `DecoderPool` through `tryAcquire` — only with a free slot, never
+      evicting a clip's decoder, and the first to go when a clip needs one. So previews are no
+      longer off on the low tier: with 2 decoders a single scrubbed clip gets them (4K: 0 → 20
+      previews for 25 restarts, never more than 2 decoders).
+198.  **A zoomed-in combined clip is drawn at its zoomed size** (2026-11-20; refines #155). The
+      inside's render target fits the output at scale 1; when the clip is shown bigger (scale,
+      fill or crop), the target grows with it, in quarter steps (a zoom animation doesn't make a
+      new target every frame), up to 2× and 4096 px on the long side. Measured: a combined clip
+      at 2× matches its video at 2× (mean 0.00 / 255; upscaled it was 2.1, p99 62).
+199.  **Combined clips: Separate keeps the rows, the timeline shows its sound** (2026-11-20;
+      refines #155). Separate puts the inside back lane by lane, bottom first, at the clip's own
+      row: onto the row there or just above when the pieces fit and it holds their kind, else
+      a new row just above — so nothing that plays at the same time changes its place in the
+      stack (a title under a sticker stays under it, and under the lanes that were over the
+      clip). Its waveform is the waveforms of the sounds inside (each file's own, cached) mixed
+      at their places, trims, speeds and volumes, through nested clips (peaks added, clamped);
+      the timeline caches it per asset object. The inspector badge and the timeline's screen
+      reader layer call it a combined clip.

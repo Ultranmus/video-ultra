@@ -50,6 +50,24 @@ Starting targets (2026-10-17), to be confirmed or adjusted with Phase 0 measurem
 
 ## Measurements
 
+**Wasted decodes and GPU contexts** (2026-11-20, DECISIONS #204–#206; M-series Mac, Chrome +
+Playwright WebKit, before → after):
+
+| what                                                      | before            | after                   |
+| --------------------------------------------------------- | ----------------- | ----------------------- |
+| analyzer-check keyframe strip, 4K long GOP (3 keyframes)  | 5 decodes         | **3**                   |
+| … HEVC 1080p / rotated (2 keyframes each)                 | 3 / 3             | **2 / 2**               |
+| … 4K strip, all 20 thumbnails (Chrome / WebKit)           | 111 / 272 ms      | 97 / 178 ms             |
+| export-check renderers made (stills + exports)            | 22 (mp4 only)     | **1** (mp4 + webm)      |
+| … WebKit "too many WebGL contexts" warnings               | 5                 | **0**                   |
+| bench scrub, 2 decoders (low tier), 4K: keyframe previews | 0 of 25 restarts  | 20, peak 2 / 2 decoders |
+| … seek → frame avg (Chrome)                               | 217 ms            | 216 ms                  |
+| combined clip at 2× vs its video at 2× (270 × 480)        | 2.1 / 255, p99 62 | 0.00                    |
+
+0 open frames after every check; 0 main-thread long tasks in analyzer-check; exported frames
+match the preview as before (export-check), golden frames unchanged (composite-check,
+compound-check).
+
 **GPU draw cost per frame**, `node scripts/effects-bench.ts` (new; `/lab/engine?bench=1`): each
 case at its midpoint on a 1080 × 1920 canvas — two full-screen photo layers + overlay, 60-frame
 batches timed to a forced read-back, best of 3.
