@@ -868,8 +868,12 @@ function Sheet({ tool, panel }: { tool: ToolId | null; panel: PanelId | null }):
   // Templates are pictures to judge and words to type: their sheet opens at full height (no
   // move when the keyboard comes and goes, nothing to drag up first). Editing a text covers the
   // whole editor, top bar and tab bar too (owner, 2026-10-31).
-  const cover = tool === 'text-edit';
-  const fullFirst = cover || (!tool && panel === 'templates');
+  // Typing to the Assistant covers everything too: the chat above, the box on the keyboard,
+  // nothing else (owner, 2026-11-21). Only while its box has focus.
+  const [typing, setTyping] = useState(false);
+  const assistantCover = typing && !tool && panel === 'assistant';
+  const cover = tool === 'text-edit' || assistantCover;
+  const fullFirst = tool === 'text-edit' || (!tool && panel === 'templates');
   const [expanded, setExpanded] = useState(fullFirst);
   const shownKey = `${tool}|${panel}`;
   const [lastKey, setLastKey] = useState(shownKey);
@@ -1024,9 +1028,19 @@ function Sheet({ tool, panel }: { tool: ToolId | null; panel: PanelId | null }):
       ref={ref}
       className="vu-dock"
       aria-label={title}
-      data-expanded={expanded || undefined}
+      data-expanded={expanded || assistantCover || undefined}
       data-picking={picking || undefined}
       data-cover={cover || undefined}
+      onFocus={(e) =>
+        setTyping(
+          e.target instanceof HTMLTextAreaElement ||
+            (e.target instanceof HTMLInputElement && e.target.type === 'text'),
+        )
+      }
+      onBlur={(e) => {
+        const next = e.relatedTarget;
+        if (!(next instanceof HTMLElement && ref.current?.contains(next))) setTyping(false);
+      }}
     >
       <div
         className="vu-dock-head"
