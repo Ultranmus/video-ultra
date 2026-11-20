@@ -1530,7 +1530,7 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       below (the "small" cut), where they blur. Display names are written **VideoUltra** and
       **ImageUltra** ("Ultra" in plum in the wordmark); npm names are unchanged
       (`@video-ultra/*`). `scripts/brand.ts` draws everything from one set of paths: `brand/
-      <product>/` (mark on light / dark, full and small, app icon, favicon, 512 px and Apple
+<product>/` (mark on light / dark, full and small, app icon, favicon, 512 px and Apple
       icons, the 1200 × 630 social card) and the playground's `icon.svg`, `apple-icon.png`,
       `opengraph-image.png` and `public/brand/`. Rejected along the way: letters in a square
       (any "u"/"U" drawn as a letter), geometric badges, a rotated (upright-U) comet, and
