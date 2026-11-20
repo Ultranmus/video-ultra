@@ -3,7 +3,7 @@
  * Picture tools (v0.2 group C) in a real browser, through the UI: green screen (switch, pick from
  * video, sliders), LUT import (a generated .cube, plus a broken one that must say why), blurred /
  * pixelated areas (add from the Blur panel, stretch from a side handle), blend modes (inspector
- * chips) — desktop (Chrome, mouse) and phone (WebKit, iPhone size, touch). Screenshots of each
+ * preview tiles) — desktop (Chrome, mouse) and phone (WebKit, iPhone size, touch). Screenshots of each
  * state with --shots; axe on the new controls.
  * Usage: playground running, then node scripts/picture-check.ts [--shots <dir>] [--only desktop|phone]
  *   [--port 3200]
@@ -66,6 +66,8 @@ const axe = async (page: Page, label: string, include: string) => {
 async function load(page: Page) {
   await page.goto(`http://localhost:${port}/editor?autosave=0&fresh=1&theme=${theme}`);
   await page.waitForFunction(() => (window as any).vuEditor?.engine, null, { timeout: 30000 });
+  // The dev server's own badge (Next.js "Insights") sits over the phone toolbar's first tools.
+  await page.addStyleTag({ content: 'nextjs-portal { display: none !important; }' });
   await page.locator('.vu-root input[type=file][accept^="video"]').setInputFiles(media);
   await page.waitForFunction(
     () => (window as any).vuEditor.project.tracks[0].items.length === 2,
@@ -203,20 +205,32 @@ if (only !== 'phone') {
   await snap(page, 'pc-d09-region-stretched');
   await axe(page, 'desktop blurred area inspector', '.vu-inspector');
 
-  // Blend: a text layer, Appearance → Screen.
+  // Blend: a text layer, Appearance → the Screen preview tile (tiles since 10-31).
   await page.locator('.vu-rail .vu-btn', { hasText: 'Text' }).click();
   await page.locator('.vu-panel .vu-btn', { hasText: 'Add text' }).first().click();
   await page.waitForTimeout(500);
   const textId = await page.evaluate(() => (window as any).vuEditor.ui.getState().selectedId);
   const appearance = page.locator('.vu-inspector .vu-section-toggle', { hasText: 'Appearance' });
   if ((await appearance.getAttribute('aria-expanded')) !== 'true') await appearance.click();
-  await page.locator('.vu-inspector .vu-chip', { hasText: 'Screen' }).click();
+  const blendTile = (name: string) =>
+    page.locator('.vu-inspector .vu-blend-grid').getByRole('radio', { name, exact: true });
+  await blendTile('Screen').click();
   await page.waitForTimeout(300);
-  check('desktop: blend chip sets the mode', (await item(page, textId))?.blend === 'screen');
-  await page.locator('.vu-inspector .vu-chip', { hasText: 'Screen' }).scrollIntoViewIfNeeded();
+  check(
+    'desktop: the Screen blend tile sets the mode, and shows as chosen',
+    (await item(page, textId))?.blend === 'screen' &&
+      (await blendTile('Screen').getAttribute('aria-checked')) === 'true',
+  );
+  await blendTile('Screen').scrollIntoViewIfNeeded();
   await snap(page, 'pc-d10-blend');
-  await page.locator('.vu-inspector .vu-chip', { hasText: 'Normal' }).click();
-  check('desktop: Normal removes the blend', !('blend' in ((await item(page, textId)) ?? {})));
+  await blendTile('Normal').click();
+  await page.waitForTimeout(300);
+  const unblended = await item(page, textId);
+  check(
+    'desktop: the Normal tile takes the blend away',
+    !unblended?.blend || unblended.blend === 'normal',
+    JSON.stringify(unblended?.blend),
+  );
 
   const stats = await page.evaluate(() => (window as any).vuEditor.engine.stats());
   check('desktop: no page errors', errors.length === 0, errors.join(' | '));
