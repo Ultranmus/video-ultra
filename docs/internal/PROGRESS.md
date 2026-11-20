@@ -835,3 +835,27 @@ canvas size ease (scale 0.75 → 1 over ~200 ms). Core 529 + react 24 tests pass
 - Found while taking the screenshot: the Sintel trailer added through the file picker
   previews black in Chrome on the Mac (BACKLOG); other files are fine.
 - Not done yet: ImageUltra's files copied into its repo.
+
+## 2026-11-21 (2) · Day 7 · 5.4 prep — site revamp, playground, API reference, promo video
+
+- Owner asked for a revamp of the website, docs, bench and editor view, a theming playground and
+  a promo video (DECISIONS #217–#224). Branch `feat/site-revamp` (worktree `../vu-wt-site`).
+- One site shell (header, footer with the mark and key facts, highlighted code with copy, light /
+  dark tokens). `/editor` is only the editor; `/playground` has Theme / Tools / Words / Events,
+  device sizes (zoomed to fit) and "Get the code". Home: the promo on a laptop screen with
+  controls, the live editor loading on scroll, features, theming, code. Docs grouped, phone page
+  picker, arrowed previous / next. API reference drawn by the site from the packages' types
+  (`scripts/api-reference.ts`, TypeDoc removed, `/api/*.html` redirects), with search and a right
+  column. Bench in the site's look, placeholder tables so nothing jumps.
+- Editor: IDE-style white light theme; the empty preview follows the theme; export Done column
+  sits lower for tall videos. Fixed: files imported together keep their order; a press on the
+  clip's edge grabs the trim handle; Split after a ruler click; two ways a decoded frame was
+  left unclosed (watchdog give-up, shutdown mid-decode — the "VideoSample was garbage collected"
+  console warning), with tests.
+- Promo video (`promo/record.ts`): recorded from the real editor in Chrome, Mixkit footage and
+  music (free licences, `promo/CREDITS.md`), ElevenLabs voice (Jessica, eleven_v3; the key is
+  read from the playground's `.env.local`, never committed). v1 (16:9, 73 s) is kept in
+  `promo/work/v1/`; v2 (MacBook 1470 × 956, "raw clips → finished video", real text to speech and
+  auto captions) replaces it on the home page for the owner to compare.
+- Checks: lint, format, typecheck, unit tests; docs-check 152, editor-interact, editor-check,
+  embed-check pass.

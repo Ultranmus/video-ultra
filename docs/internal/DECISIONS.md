@@ -1581,3 +1581,24 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       free licences (no credit needed; listed in `promo/CREDITS.md`), downloaded by
       `promo/fetch.sh`, never committed. Voice: ElevenLabs with the key kept on the maker's
       machine (never committed or deployed), else a stand-in system voice for timing.
+221.  **Site controls are one family, filled like the editor's** (2026-11-21; owner: "why a
+      border on dropdown, this is not our theme", "all dropdowns the same hover"). Every site
+      dropdown shares one rule in `site.css` (our chevron inset 14 px, 44 px tall, filled
+      `--s-surface`, no border, `--s-surface-2` on hover, an accent ring on keyboard focus); text
+      fields and the bench's file picker match. Pages only set width. `docs-check` fails on a
+      dropdown with the browser's own arrow. The playground's corner control is the editor's
+      ruler slider (ticks under a fixed marker), rebuilt for the site. Code blocks: the copy
+      button sits on the first line (from the code's padding and size tokens).
+222.  **Editor light theme in the style of an IDE's** (2026-11-21; owner: "use a VS Code or Java
+      IDE light theme", no grey / off-white fills). White stage and timeline, `#f8f8f8` bars and
+      panels, `#f0f0f0` / `#e5e5e5` inputs and pressed, solid `#e5e5e5` / `#cecece` borders, text
+      `#1f1f1f` / `#616161` (THEMING.md). The empty preview frame takes `--vu-surface-1` with a
+      border in both themes (not the black of a video), and its words drop the icon, then the
+      line, in small frames (container query). Dark values unchanged.
+223.  **API reference: a right column, not a nested sidebar** (2026-11-21; owner). Package pages
+      have a sticky right column (packages, then "on this page": groups and their exports, the
+      one being read marked); hidden under 1240 px. The left docs sidebar stays one level.
+224.  **Playground frames zoom to fit** (2026-11-21). A device size bigger than the stage is shown
+      with CSS `zoom` (the editor keeps the device's width, so its layout is that device's, and
+      pointers still land right) instead of being cut off or shortened; the size note says "shown
+      at N%". "Get the code" is a dialog. The event log names each event and folds repeats (×N).
