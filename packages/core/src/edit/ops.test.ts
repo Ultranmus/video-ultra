@@ -12,6 +12,7 @@ import {
 } from '../test/fixtures';
 import {
   EditError,
+  relinkAsset,
   addToLane,
   deleteItem,
   duplicateItem,
@@ -634,5 +635,18 @@ describe('paste', () => {
     expect(() =>
       pasteItems(other, [{ item: { ...clip, assetId: 'gone' }, fromMain: true }], {}, 0, ids),
     ).toThrow(EditError);
+  });
+});
+
+describe('relinkAsset', () => {
+  it('points an asset at its picked-again file; items keep their times', () => {
+    const p = fixtureProject();
+    const id = Object.keys(p.assets)[0]!;
+    const before = JSON.stringify(p.tracks);
+    relinkAsset(p, id, { type: 'opfs', key: id }, 4321);
+    expect(p.assets[id]!.source).toEqual({ type: 'opfs', key: id });
+    expect(p.assets[id]!.size).toBe(4321);
+    expect(JSON.stringify(p.tracks)).toBe(before);
+    expect(() => relinkAsset(p, 'nope', { type: 'opfs', key: 'x' }, 1)).toThrow(EditError);
   });
 });

@@ -6,6 +6,7 @@ import {
   type EditingAssistant,
   type SpeechGenerator,
   addAsset,
+  relinkAsset,
   addToLane,
   arrangeItem,
   createEditor,
@@ -124,6 +125,7 @@ import {
   Playhead,
   type AssistantTurn,
   type LayoutMode,
+  type MediaProblem,
   type PanelId,
   type ToolId,
 } from './state';
@@ -495,18 +497,122 @@ export class EditorController {
       }
       this.toast(this.labels.notPersistent, 'info');
     });
-    await Promise.all(
-      Object.values(this.project.assets)
-        .filter((asset) => asset.kind !== 'compound')
-        .map(async (asset) => {
-          const blob =
-            (await this.options.resolveMedia?.(asset).catch(() => null)) ??
-            (await this.storage!.getMedia(asset).catch(() => null));
-          if (generation !== this.#generation) return;
-          if (blob) this.#registerMedia(asset, blob);
-          else this.toast(this.labels.mediaMissing(asset.name), 'error');
-        }),
+    await this.#openStoredMedia(
+      Object.values(this.project.assets).filter((asset) => asset.kind !== 'compound'),
+      generation,
     );
+  }
+
+  /**
+   * Reads a project's media back (the host's `resolveMedia` first, then local storage) and
+   * attaches it. A file that can't be opened goes on the media banner: asked for again from a
+   * tap, or picked again (DECISIONS #201).
+   */
+  async #openStoredMedia(assets: readonly Asset[], generation: number): Promise<void> {
+    this.ui.setState({ mediaProblems: [] });
+    const problems = new Map<string, MediaProblem>();
+    await Promise.all(
+      assets.map(async (asset) => {
+        const blob =
+          (await this.options.resolveMedia?.(asset).catch(() => null)) ??
+          (await this.storage!.getMedia(asset).catch(() => null));
+        if (generation !== this.#generation) return;
+        if (blob) {
+          this.#registerMedia(asset, blob);
+          return;
+        }
+        const access = await this.storage!.mediaAccess(asset).catch(() => 'missing' as const);
+        if (generation !== this.#generation) return;
+        if (access === 'ok') {
+          const again = await this.storage!.getMedia(asset).catch(() => null);
+          if (again && generation === this.#generation) return this.#registerMedia(asset, again);
+        }
+        problems.set(asset.id, {
+          assetId: asset.id,
+          name: asset.name,
+          kind: access === 'ask' ? 'ask' : 'missing',
+        });
+      }),
+    );
+    if (generation !== this.#generation || problems.size === 0) return;
+    // In project order, so the banner names files in a stable order.
+    const ordered = assets.flatMap((a) => (problems.has(a.id) ? [problems.get(a.id)!] : []));
+    // The banner sits in the polite live region: screen readers hear it once.
+    this.ui.setState({ mediaProblems: ordered });
+  }
+
+  /**
+   * "Allow": asks the browser again for every kept file waiting for the person's OK. Call it
+   * straight from a tap (browsers only ask inside one). Files still refused move on to "Find".
+   */
+  async allowMediaAccess(): Promise<void> {
+    const storage = this.storage;
+    if (!storage) return;
+    const waiting = this.ui.getState().mediaProblems.filter((p) => p.kind === 'ask');
+    // One after another: each may show the browser's own question.
+    for (const problem of waiting) {
+      const asset = this.project.assets[problem.assetId];
+      if (!asset) continue;
+      const blob = await storage.getMedia(asset).catch(() => null);
+      if (blob) this.#registerMedia(asset, blob);
+      // Not granted: still askable (the browser's question was closed, or the tap's moment ran
+      // out) keeps Allow; refused or gone moves on to Find file.
+      const kind = blob ? null : await storage.mediaAccess(asset).catch(() => 'missing' as const);
+      this.ui.setState((s) => ({
+        mediaProblems: !kind
+          ? s.mediaProblems.filter((p) => p.assetId !== problem.assetId)
+          : s.mediaProblems.map((p) =>
+              p.assetId === problem.assetId
+                ? { ...p, kind: kind === 'ask' ? ('ask' as const) : ('missing' as const) }
+                : p,
+            ),
+      }));
+    }
+    if (this.ui.getState().mediaProblems.length === 0) this.toast(this.labels.mediaBack, 'success');
+  }
+
+  /**
+   * "Find": the person picked a missing file again. It must be the same kind of media (a video
+   * for a video…); it's stored like an import and the asset points at it — one undo step, items
+   * keep their times. Returns false (with a message) when the file doesn't fit.
+   */
+  async relinkMedia(assetId: string, file: File): Promise<boolean> {
+    const storage = this.storage;
+    const asset = this.project.assets[assetId];
+    const l = this.labels;
+    if (!storage || !asset || asset.kind === 'compound') return false;
+    try {
+      if (asset.kind !== 'lut') {
+        const probe = await this.analyzer!.probe(file, file.name);
+        if (!probe.ok || probe.media.kind !== asset.kind) {
+          this.toast(l.relinkWrongKind(file.name, asset.name), 'error');
+          return false;
+        }
+      }
+      const source = await storage.putMedia(assetId, file);
+      this.run(l.relinkFile, (d) => relinkAsset(d, assetId, source, file.size));
+      this.#registerMedia(this.project.assets[assetId] ?? asset, file);
+      this.ui.setState((s) => ({
+        mediaProblems: s.mediaProblems.filter((p) => p.assetId !== assetId),
+      }));
+      this.toast(l.relinked(asset.name), 'success');
+      return true;
+    } catch (error) {
+      this.toast(
+        error instanceof StorageFullError
+          ? l.storageFull
+          : error instanceof Error
+            ? error.message
+            : String(error),
+        'error',
+      );
+      return false;
+    }
+  }
+
+  /** Hides the media banner (the files stay missing; their clips show without a picture). */
+  dismissMediaProblems(): void {
+    this.ui.setState({ mediaProblems: [] });
   }
 
   #lock: ProjectLock | null = null;
@@ -660,17 +766,11 @@ export class EditorController {
     this.seek(0);
     if (await this.#claim(false, generation)) this.#startAutosave();
     if (generation !== this.#generation) return;
-    await Promise.all(
-      Object.values(project.assets)
-        .filter((asset) => asset.kind !== 'compound' && !this.media.has(asset.id))
-        .map(async (asset) => {
-          const blob =
-            (await this.options.resolveMedia?.(asset).catch(() => null)) ??
-            (await this.storage!.getMedia(asset).catch(() => null));
-          if (generation !== this.#generation) return;
-          if (blob) this.#registerMedia(asset, blob);
-          else this.toast(this.labels.mediaMissing(asset.name), 'error');
-        }),
+    await this.#openStoredMedia(
+      Object.values(project.assets).filter(
+        (asset) => asset.kind !== 'compound' && !this.media.has(asset.id),
+      ),
+      generation,
     );
   }
 

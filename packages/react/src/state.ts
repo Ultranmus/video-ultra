@@ -99,6 +99,17 @@ export interface Toast {
   action?: { label: string; run: () => void };
 }
 
+/**
+ * A media file the editor couldn't open (DECISIONS #201): `ask` — the browser needs the person's
+ * OK to read a kept file again (asked from a tap); `missing` — the file is gone or unreachable
+ * (they pick it again).
+ */
+export interface MediaProblem {
+  assetId: string;
+  name: string;
+  kind: 'ask' | 'missing';
+}
+
 /** UI-only state (selection, panels, playback flag). The project lives in the core editor store. */
 export interface UiState {
   /** `stopped`: the engine died mid-session (the project is safe; reload to continue). */
@@ -163,6 +174,8 @@ export interface UiState {
   save: 'idle' | 'saving' | 'saved';
   /** This project is open (and saving) in another tab: this one doesn't save until it takes over. */
   readOnly: boolean;
+  /** Media files that couldn't be opened, in project order: the banner asks or re-links them. */
+  mediaProblems: MediaProblem[];
   persistent: boolean | null;
   recording: boolean;
   /** Voiceover: 3, 2, 1 shown on the video before recording starts; null otherwise. */
@@ -206,6 +219,7 @@ export function createUiStore() {
     previewMode: false,
     save: 'idle',
     readOnly: false,
+    mediaProblems: [],
     persistent: null,
     recording: false,
     countdown: null,

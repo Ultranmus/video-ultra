@@ -296,6 +296,23 @@ export const DEFAULT_LABELS = {
   dismiss: 'Dismiss',
   mediaMissing: (name: string) =>
     `"${name}" isn't stored on this device any more. Add the file again to keep editing with it.`,
+  // Media that couldn't be opened (the banner under the top bar)
+  mediaAskBanner: (count: number, name: string) =>
+    count === 1
+      ? `Allow the editor to open “${name}” again.`
+      : `Allow the editor to open your ${count} files again.`,
+  mediaMissingBanner: (count: number, name: string) =>
+    count === 1
+      ? `Can’t find “${name}”. Pick the file again to keep editing with it.`
+      : `Can’t find “${name}” and ${count - 1} more. Pick each file again to keep editing with it.`,
+  allowAccess: 'Allow',
+  findFile: 'Find file',
+  findFileFor: (name: string) => `Find “${name}”`,
+  mediaBack: 'Your files are back',
+  relinkFile: 'Find file',
+  relinked: (name: string) => `“${name}” is back`,
+  relinkWrongKind: (picked: string, wanted: string) =>
+    `“${picked}” isn’t the same kind of file as “${wanted}”. Pick that file instead.`,
   splitOutside: 'Move the playhead inside the clip to split it.',
   nothingSelected: 'Select a clip to edit it.',
   // Why an action can't run right now (tooltips on disabled buttons)

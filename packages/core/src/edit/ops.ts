@@ -274,6 +274,25 @@ export function addAsset(project: Project, asset: Asset): void {
   project.assets[asset.id] = asset;
 }
 
+/**
+ * Points an asset at a new copy of its file (the person picked it again because the old one was
+ * moved, deleted or cleared from the device). Items keep their times; only where the bytes live
+ * and their size change.
+ */
+export function relinkAsset(
+  project: Project,
+  assetId: string,
+  source: Asset['source'],
+  size: number,
+): void {
+  const asset = project.assets[assetId];
+  if (!asset) throw new EditError('not-found', `No asset ${assetId}`);
+  if (asset.kind === 'compound' || source.type === 'compound')
+    throw new EditError('invalid', 'A combined clip has no file');
+  asset.source = source;
+  asset.size = size;
+}
+
 /** Removes a media file that no item uses any more. */
 export function removeAsset(project: Project, assetId: string): void {
   if (!project.assets[assetId]) throw new EditError('not-found', `No asset ${assetId}`);
