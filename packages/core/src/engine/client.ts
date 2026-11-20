@@ -329,6 +329,10 @@ export async function createEngine(
       );
       return;
     }
+    // iPhone: web audio is "ambient" by default, so the silent switch mutes it. A video's sound
+    // is playback, like a video app's (owner, 2026-11-21). Safari 16.4+; elsewhere a no-op.
+    const session = (navigator as { audioSession?: { type: string } }).audioSession;
+    if (session) session.type = 'playback';
     const context = new AudioContext({ latencyHint: 'interactive' });
     const ready = (async () => {
       await context.audioWorklet.addModule(new URL('./audio.worklet.js', import.meta.url));
