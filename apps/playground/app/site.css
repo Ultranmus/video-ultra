@@ -127,9 +127,9 @@ body:has(.site) {
   width: 100%;
   height: 44px;
   padding: 0 40px 0 14px;
-  border: 1px solid var(--s-border-strong);
+  border: 0;
   border-radius: 10px;
-  background: var(--s-bg) var(--s-chevron) no-repeat right 14px center / 16px 16px;
+  background: var(--s-surface) var(--s-chevron) no-repeat right 14px center / 16px 16px;
   color: var(--s-text);
   font: inherit;
   font-size: 15px;
@@ -138,14 +138,12 @@ body:has(.site) {
 }
 
 .site select:where(:not(.vu-root *)):hover {
-  border-color: var(--s-muted);
-  background-color: var(--s-bg-soft);
+  background-color: var(--s-surface-2);
 }
 
 .site select:where(:not(.vu-root *)):focus-visible {
-  border-color: var(--s-accent-text);
-  outline: 2px solid var(--s-accent-soft);
-  outline-offset: 0;
+  outline: 2px solid var(--s-accent-text);
+  outline-offset: 2px;
 }
 
 .site select:where(:not(.vu-root *)):disabled {
@@ -154,8 +152,7 @@ body:has(.site) {
 }
 
 .site select:where(:not(.vu-root *)):disabled:hover {
-  border-color: var(--s-border-strong);
-  background-color: var(--s-bg);
+  background-color: var(--s-surface);
 }
 
 /* Header */

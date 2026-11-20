@@ -393,20 +393,26 @@
 }
 
 /* Inputs and select */
+/* Text and number fields: the same filled look as the site's dropdowns (site.css). */
 .site .pg-input {
   width: 100%;
-  height: var(--pg-control);
-  padding: 0 12px;
-  border: 1px solid var(--s-border-strong);
-  border-radius: var(--s-radius-small);
-  background: var(--s-bg);
+  height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--s-surface);
   color: var(--s-text);
   font: inherit;
-  font-size: 14px;
+  font-size: 15px;
+}
+
+.site .pg-input:focus-visible {
+  outline: 2px solid var(--s-accent-text);
+  outline-offset: 2px;
 }
 
 .site .pg-input:hover {
-  border-color: var(--s-muted);
+  background: var(--s-surface-2);
 }
 
 .site .pg-input::placeholder {
