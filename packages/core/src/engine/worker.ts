@@ -978,33 +978,62 @@ async function pickColour(
   const shown = { ...found.item, hidden: false, transitionIn: null } as Item;
   for (const key of ['key', 'blend', 'animation'] as const) Reflect.deleteProperty(shown, key);
   const track = { ...found.track, muted: true, hidden: false, items: [shown] };
-  const mini: Project = {
-    ...project,
-    settings: { ...project.settings, width, height, background: { type: 'color', color: '#000' } },
-    tracks:
-      found.track.kind === 'main'
-        ? [track]
-        : [
-            { id: 'pick-main', kind: 'main', muted: true, hidden: false, locked: false, items: [] },
-            track,
-          ],
-  };
+  const tracks: Project['tracks'] =
+    found.track.kind === 'main'
+      ? [track]
+      : [
+          { id: 'pick-main', kind: 'main', muted: true, hidden: false, locked: false, items: [] },
+          track,
+        ];
+  const base = project;
+  const on = (color: string): Project => ({
+    ...base,
+    settings: { ...base.settings, width, height, background: { type: 'color', color } },
+    tracks,
+  });
+  const mini = on('#000000');
   await mediaReady(mini);
   const item = found.item;
   const t = Math.max(
     item.start,
     Math.min(item.start + item.duration - 1, Math.round(request.time)),
   );
-  await l.composer.render(mini, t, width, height, null);
-  const bitmap = l.canvas.transferToImageBitmap();
-  // The whole small frame (≤ 480 px wide, read once per pick): the tapped 5 × 5 spot, and how much
-  // of the picture a key of that colour would remove.
+  // The small frame (≤ 480 px wide, read once per pick) on black, then on white: where the two
+  // differ is the background around the picture (bars when its shape isn't the canvas's, a
+  // moved or shrunk clip), which isn't the picture's colour — left out of the tapped spot and of
+  // how much a key would remove (owner, 2026-11-18: the bars counted as black picture, so
+  // nearly every pick "removed the whole video").
   const read = new OffscreenCanvas(width, height);
   const ctx = read.getContext('2d', { willReadFrequently: true })!;
-  ctx.drawImage(bitmap, 0, 0);
-  bitmap.close();
+  const frameOn = async (p: Project): Promise<Uint8ClampedArray> => {
+    await l.composer.render(p, t, width, height, null);
+    const bitmap = l.canvas.transferToImageBitmap();
+    ctx.clearRect(0, 0, width, height);
+    ctx.drawImage(bitmap, 0, 0);
+    bitmap.close();
+    return ctx.getImageData(0, 0, width, height).data;
+  };
+  const all = await frameOn(mini);
+  const white = await frameOn(on('#ffffff'));
   looksDone();
-  const all = ctx.getImageData(0, 0, width, height).data;
+  /** Picture, not background: the same on black and on white (a little slack for rounding). */
+  const mask = new Uint8Array(width * height);
+  let pictured = 0;
+  for (let i = 0, j = 0; i < all.length; i += 4, j++) {
+    if (all[i + 3] === 0) continue;
+    const d =
+      Math.abs(all[i]! - white[i]!) +
+      Math.abs(all[i + 1]! - white[i + 1]!) +
+      Math.abs(all[i + 2]! - white[i + 2]!);
+    if (d < 24) {
+      mask[j] = 1;
+      pictured++;
+    }
+  }
+  // A see-through clip (opacity < 1) differs everywhere: then every drawn pixel counts.
+  if (pictured < (width * height) / 100) {
+    for (let i = 0, j = 0; i < all.length; i += 4, j++) mask[j] = all[i + 3] === 0 ? 0 : 1;
+  }
   const x = Math.round(request.x * width);
   const y = Math.round(request.y * height);
   let r = 0;
@@ -1013,8 +1042,9 @@ async function pickColour(
   let n = 0;
   for (let py = Math.max(0, y - 2); py <= Math.min(height - 1, y + 2); py++) {
     for (let px = Math.max(0, x - 2); px <= Math.min(width - 1, x + 2); px++) {
-      const i = (py * width + px) * 4;
-      if (all[i + 3] === 0) continue;
+      const j = py * width + px;
+      if (!mask[j]) continue;
+      const i = j * 4;
       r += all[i]!;
       g += all[i + 1]!;
       b += all[i + 2]!;
@@ -1037,7 +1067,7 @@ async function pickColour(
   let inside = 0;
   let gone = 0;
   for (let i = 0; i < all.length; i += 16) {
-    if (all[i + 3] === 0) continue;
+    if (!mask[i >> 2]) continue;
     const pr = all[i]!;
     const pg = all[i + 1]!;
     const pb = all[i + 2]!;

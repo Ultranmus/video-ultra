@@ -1144,6 +1144,11 @@
     resize: vertical;
   }
 
+  /* A text's own words (Edit sheet, inspector): a little more room than two lines. */
+  .vu-textarea.vu-text-edit-field {
+    min-height: calc(var(--vu-size-touch) * 2.4);
+  }
+
   .vu-textarea:focus {
     outline: none;
     border-color: var(--vu-accent);
@@ -2779,6 +2784,9 @@
     width: 100%;
     height: 100%;
     display: block;
+    /* Until the engine draws at a new size (canvas size change, stage resize), the last picture
+       keeps its shape instead of stretching to the new box. */
+    object-fit: contain;
   }
 
   .vu-stage-empty {
@@ -3841,14 +3849,18 @@
     transform: translateY(calc(var(--vu-keyboard-lift, var(--vu-keyboard)) * -1));
   }
 
-  /* The sheet sits on the keyboard and is never taller than the room above it (less the top
-     bar), expanded or not, so its top and the field being typed in stay on screen. */
-  /* (Full-height sheets — Templates, the text Edit cover — keep their height; see below.) */
+  /* Typing in a sheet (renaming a layer, a search…): the sheet sits on the keyboard and fills
+     all the room above it, top bar included, like the text Edit cover (owner, 2026-11-18).
+     (Full-height sheets — Templates, the text Edit cover — keep their height; see below.) */
   .vu-root[data-keyboard] .vu-dock:not([data-expanded]) {
-    --vu-sheet-y: max(
-      calc(var(--vu-sheet-full) - var(--vu-sheet-open)),
-      calc(var(--vu-sheet-full) - var(--vu-keyboard-room) + var(--vu-size-topbar))
-    );
+    --vu-sheet-y: calc(var(--vu-sheet-full) - var(--vu-keyboard-room));
+    z-index: var(--vu-z-popover);
+    border-radius: 0;
+  }
+
+  /* Its top is now the screen's top: keep the header clear of the status bar / notch. */
+  .vu-root[data-keyboard] .vu-dock:not([data-expanded]) .vu-dock-head {
+    padding-top: calc(var(--vu-space-5) + env(safe-area-inset-top));
   }
 
   /* A full-height sheet doesn't move for the keyboard at all (nothing jumps as it comes and
@@ -4769,7 +4781,10 @@
       position: static;
     }
 
-    .vu-popover {
+    /* Also beats `.vu-videos-anchor .vu-popover` (desktop: hangs from the left), which left
+       it flush with the left edge here. */
+    .vu-popover,
+    .vu-videos-anchor .vu-popover {
       top: 100%;
       right: var(--vu-space-3);
       left: var(--vu-space-3);
@@ -5111,6 +5126,16 @@
 
   .vu-menu-label {
     flex: 1;
+  }
+
+  /* Phones: Align's options open inline below it; the chevron turns over when they're open. */
+  .vu-menu-chevron {
+    display: inline-flex;
+    transition: transform var(--vu-duration-fast) var(--vu-ease-out);
+  }
+
+  .vu-menu-chevron[data-open] {
+    transform: rotate(180deg);
   }
 
   .vu-menu-key {

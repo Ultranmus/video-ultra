@@ -3,6 +3,7 @@ import type { MediaRecordingWriter } from '@video-ultra/core/internal';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { useController, useLabels, useUi } from './context';
 import { Button, IconButton } from './controls';
+import { fileTimeStamp } from './format';
 import { Icon } from './icons';
 import type { Labels } from './labels';
 
@@ -284,7 +285,7 @@ function CameraView(): ReactElement {
     try {
       const { file: stored, source } = await pending.writer.finish();
       const mime = (rec.mimeType || stored.type || 'video/webm').split(';')[0]!;
-      const stamp = new Date().toLocaleTimeString().replace(/:/g, '.');
+      const stamp = fileTimeStamp();
       // Wraps the stored (disk-backed) file: no copy.
       const file = new File(
         [stored],

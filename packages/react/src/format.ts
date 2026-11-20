@@ -11,6 +11,15 @@ export function formatClock(t: number): string {
   return h ? `${h}:${String(m % 60).padStart(2, '0')}:${body}` : `${m}:${body}`;
 }
 
+/**
+ * A file-name time stamp, `14.05.09` (24-hour, the same in every locale and safe in a file name:
+ * a locale's own format can bring colons, "PM" or other scripts).
+ */
+export function fileTimeStamp(date: Date = new Date()): string {
+  const two = (n: number) => String(n).padStart(2, '0');
+  return `${two(date.getHours())}.${two(date.getMinutes())}.${two(date.getSeconds())}`;
+}
+
 /** A duration for labels: `3.4 s`, `1 min 05 s`. */
 export function formatDurationShort(t: number): string {
   const seconds = Math.max(0, t) / FLICKS_PER_SECOND;

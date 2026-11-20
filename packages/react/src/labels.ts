@@ -730,6 +730,8 @@ export const DEFAULT_LABELS = {
   addAsLayerTip: 'Over the video, picture-in-picture',
   retake: 'Retake',
   recordingName: (time: string) => `Camera ${time}`,
+  /** A voiceover recording's file name, before its extension. */
+  voiceoverName: (time: string) => `Voiceover ${time}`,
   recordingAdded: 'Clip added',
   recordingSaving: 'Saving the clip…',
   recordingFailed: (reason: string) => `The recording couldn't be added: ${reason}`,
@@ -1173,6 +1175,8 @@ export const DEFAULT_LABELS = {
   downloadCaptions: 'Download captions',
   downloadSrt: '.srt',
   downloadVtt: '.vtt',
+  /** Export dialog, once the video is made: the captions as a subtitle file. */
+  downloadCaptionsSrt: 'Captions (.srt)',
   downloadCaptionsTip: 'A subtitle file for players and sites that show captions',
   captionsBurnedIn: 'Captions are part of the video when you export.',
   rowCaptions: 'Captions',
