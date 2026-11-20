@@ -89,7 +89,10 @@ export function PromoVideo() {
     if (document.fullscreenElement) void document.exitFullscreen();
     else if (el.requestFullscreen) void el.requestFullscreen();
     // iPhone Safari: only the video element itself can go full screen.
-    else (video() as HTMLVideoElement & { webkitEnterFullscreen?: () => void })?.webkitEnterFullscreen?.();
+    else
+      (
+        video() as HTMLVideoElement & { webkitEnterFullscreen?: () => void }
+      )?.webkitEnterFullscreen?.();
   };
 
   const progress = duration ? (time / duration) * 100 : 0;
