@@ -28,7 +28,7 @@ export {
   transitionLength,
 } from './engine/timeline';
 export type { ActiveLayer, VisualItem, LayerTransition, UpcomingItem } from './engine/timeline';
-export { measureTextBox, textFont, textFontPx } from './engine/text';
+export { measureTextBox, textFont, textFontPx, textWrapPx } from './engine/text';
 export type { MeasureText } from './engine/text';
 export {
   colourParams,

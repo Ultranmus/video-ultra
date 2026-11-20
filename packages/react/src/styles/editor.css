@@ -3885,6 +3885,13 @@
     padding-bottom: calc(var(--vu-keyboard) + var(--vu-space-4));
   }
 
+  /* Touch screens: Safari's address bar floats over the page just above the keyboard. */
+  @media (pointer: coarse) {
+    .vu-root[data-keyboard] .vu-dock[data-expanded] .vu-dock-body {
+      padding-bottom: calc(var(--vu-keyboard) + var(--vu-size-touch) + var(--vu-space-2));
+    }
+  }
+
   /* A field in a full-height sheet took focus (VideoEditor.tsx): room below it from the start, so
      it can be scrolled up out of the keyboard's way before the keyboard comes. */
   .vu-root[data-sheet-typing] .vu-dock[data-expanded] .vu-dock-body {
@@ -4623,6 +4630,17 @@
     .vu-export-side:has(> .vu-export-poster) {
       align-items: center;
       min-height: var(--vu-size-export-poster-phone);
+    }
+
+    /* The preview stays in view while the choices scroll under it, so a change (the see-through
+       switch, the quality) shows on it at once (owner, 2026-11-21: it scrolled away under the
+       title, looking cut off). */
+    .vu-export-side:has(> .vu-export-poster) {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      padding-bottom: var(--vu-space-3);
+      background: var(--vu-surface-1);
     }
 
     .vu-export-poster,
