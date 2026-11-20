@@ -4,6 +4,12 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 
 ## Open
 
+- [x] (fixed 2026-11-20, #193) Owner (iPhone): green screen on the yellow wall still said "grey,
+      white and black" on the first tap; a second or third tap on the same spot worked.
+- [x] (fixed 2026-11-20, #194) Owner (iPhone): with the Layers sheet already full height (and in
+      Templates), editing a field looked like the sheet opening again and the field was only
+      partly in view. Checked with a simulated keyboard (WebKit, iPhone 13): nothing moves when it
+      comes (before: a 230 px jump).
 - [x] (fixed 2026-11-20, #191) Owner (iPhone + desktop): a locked item showed only its top and
       bottom dashed lines on the phone, and its box stayed upright for a turned item. Now an SVG
       outline turned with the item and trimmed to the video.
