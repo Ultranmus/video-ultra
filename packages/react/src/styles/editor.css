@@ -3689,12 +3689,14 @@
      the tab bar change together, when the keyboard is there, not in steps (they flickered). */
   .vu-root:not([data-keyboard]) .vu-dock[data-cover]:has(.vu-assistant) {
     bottom: 0;
+    height: calc(var(--vu-sheet-full) - var(--vu-sheet-below, 0px));
   }
 
   .vu-dock:has(.vu-assistant):not([data-dragging]) {
     transition:
       transform var(--vu-duration-sheet) var(--vu-ease-sheet),
-      bottom var(--vu-duration-sheet) var(--vu-ease-sheet);
+      bottom var(--vu-duration-sheet) var(--vu-ease-sheet),
+      height var(--vu-duration-sheet) var(--vu-ease-sheet);
   }
 
   .vu-dock:has(.vu-assistant) .vu-dock-body {
