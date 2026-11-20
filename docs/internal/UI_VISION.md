@@ -159,6 +159,10 @@ the stage and everything drawn on it don't mirror. Text items in RTL scripts ren
   timeline (Back · the clips it sits in, the current one bold); the timeline, stage and
   inspector show its inside; Captions and canvas size show a "for the whole video" note with
   Back. Its film strip shows the pictures inside it.
+- **Text width** (#214): a selected text (not a caption) shows left / right side handles
+  when it's at least 36 px tall on screen; dragging one sets where its lines wrap (the centre
+  stays put; one undo step on release). The text style tool has a "Text width" slider
+  (100 % = "No wrap").
 - **Typing on the stage** (#151): double-click a text (mouse) or tap a selected text (touch) →
   a field over it, styled like the text, dashed accent outline; click away or ⌘/Ctrl+Enter keeps
   it, Esc puts the old text back. Phones: a tap on a selected text opens the full-screen Edit sheet
@@ -179,7 +183,8 @@ the stage and everything drawn on it don't mirror. Text items in RTL scripts ren
   Pick from video with a hint pill on the stage, Range, Edge softness, Clean edges). LUT looks
   sit at the top of the Filters panel. Canvas → Colour has a Transparent switch (checkerboard in the preview, #186). Blend modes live in "Opacity & blend" / "Appearance"
   (desktop) and the "Opacity & blend" phone tool — one sheet, opacity then a preview tile per
-  mode (#178). Blur is a rail entry and panel (box / oval × blur /
+  mode (#178). LUT looks are tiles like filters ("No LUT", then each look on the clip's own
+  frame); under them the chosen look's name with Rename and Delete look (#213). Blur is a rail entry and panel (box / oval × blur /
   pixelate); a blurred area stretches from side handles when it's larger than 88 px on screen.
 - **Capture & export:** "Record with camera" in the Media panel opens a recorder over the whole
   editor (preview, switch camera, mic, record / stop with a clock, then Add to video / Add as a

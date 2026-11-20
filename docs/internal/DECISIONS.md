@@ -1336,3 +1336,37 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       layer rename focuses the same way. Placement is then ours alone: the field in the top 30 %
       on focus, kept 64 px above the keyboard on touch screens (Safari's address bar floats there).
       Fields and labels take `touch-action: manipulation`.
+196.  **Text to speech honours the speed with every voice service** (2026-11-20; BACKLOG
+      "Playground voice (Google)"). `SpeechGenerator.appliesSpeed` (optional): `true` = the
+      service speaks at `request.speed` itself. Otherwise (the default, so a host's own
+      generator works without changes) the editor asks for speed 1 and places the clip at the
+      chosen speed with "Keep the voice natural" on (`audioFx.keepPitch`, #146 — 0.5×–2×, the
+      slider's range), in the same undo step as the import. `createSpeechEndpoint` says `true`
+      (OpenAI-style `speed`), with an `appliesSpeed` option for services that ignore it. The
+      playground passes `false` for Google's speech models (no speed setting; newer models read
+      pace words out loud), so its route no longer sends "Say slowly: …".
+197.  **LUT looks: tiles with previews, rename and delete** (2026-11-20; v0.2 C gap). The chips
+      became tiles like the filter tiles: "No LUT" and each look, showing the clip's frame
+      (its own filter and adjustments) with that look at full strength — drawn by the engine
+      worker's looks renderer (`Engine.lutPreviews`, the filter-previews request with `luts`),
+      only once the tiles scroll near the view, only for looks not drawn yet (an import draws
+      one more), kept until the picture changes. Under them the chosen look's name with Rename
+      (a field in place; Enter keeps, Esc cancels) and Delete look (toast with Undo). Both are
+      project operations (`renameAsset`, `deleteLut`: every item using the look — combined
+      clips' insides too — goes back to no LUT, one undo step; the file stays in storage for
+      undo). A text, sticker or locked clip as the target still shows the looks (to import,
+      rename, delete) with a note; an import then only adds the look to the list and the toast
+      says "pick a video or photo to use it".
+198.  **A text's wrap width from the stage** (2026-11-20; BACKLOG "Text wraps only at explicit
+      line breaks"). The model already had it (`maxWidth`, file version 3+, #157: a fraction of
+      the canvas width at scale 1, missing = break only where the text does), so no schema
+      change and no migration — old texts are untouched. New: a selected text (not a caption:
+      captions share one wrap) shows left and right side handles when its box is at least
+      36 px tall on screen (smaller: zoom the view, or use the slider); dragging one sets the
+      wrap width, both sides moving so the centre stays put (a centred title doesn't wander).
+      The drag previews only (`ctl.preview`) and commits one "Text width" step on release; the
+      box follows the pointer while dragging, then fits the wrapped lines. The text style tool
+      has a "Text width" slider (10–100 %; 100 % = "No wrap", removes the field) for keyboards
+      and phones. `updateItem` takes `maxWidth` (clamped 0.05…1, `null` removes). Golden frames
+      `pic-text-nowrap` / `pic-text-wrap` check the wrap on WebGPU and WebGL2
+      (`scripts/composite-check.ts`).
