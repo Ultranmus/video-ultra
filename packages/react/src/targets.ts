@@ -86,8 +86,15 @@ export function computeTargets(
   const frame = projectFrame(project);
 
   // Split: the selection if the playhead is inside it, else the main clip under the playhead.
+  // A selected main clip doesn't block that (the playhead moved on, e.g. a click on the ruler);
+  // a selected layer item does, so a video clip is never cut while a layer is being worked on.
+  const selectedOnMain = !!selected && items.includes(selected);
   const splitItem =
-    selected && t >= selected.start && t < itemEnd(selected) ? selected : selected ? null : under;
+    selected && t >= selected.start && t < itemEnd(selected)
+      ? selected
+      : !selected || selectedOnMain
+        ? under
+        : null;
   let splitReason: string | null = null;
   if (!hasClips) splitReason = l.needClips;
   else if (!splitItem) splitReason = selected ? l.playheadOutsideSelection : l.playheadOutsideClips;

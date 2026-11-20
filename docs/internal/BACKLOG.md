@@ -4,15 +4,15 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 
 ## Open
 
-- [ ] (found 2026-11-21, recording the promo video) Several files imported at once land in the
+- [x] (fixed 2026-11-21: each file of a batch goes right after the one before) (found 2026-11-21, recording the promo video) Several files imported at once land in the
       wrong order: picking 1–6 gives 1, 6, 5, 4, 3, 2. `importFiles` (controller.ts) puts each
       new file right after the clip under the playhead, which stays on clip 1. Keep the picked
       order.
-- [ ] (found 2026-11-21, recording the promo video) The trim handle sits just outside the clip
+- [x] (fixed 2026-11-21: a press up to 6 px inside the edge, 12 px on touch, at most a third of the clip, grabs the handle; the undo was correct) (found 2026-11-21, recording the promo video) The trim handle sits just outside the clip
       end: a press 3 px inside the end moves nothing; it responds from about +3 to +5 px past
       the end. Ctrl+Z after that no-op drag then undoes the step before (an import): a no-op
       drag must not look like an edit.
-- [ ] (found 2026-11-21, recording the promo video) Split stays disabled after clicking the
+- [x] (fixed 2026-11-21: a selected main clip elsewhere no longer blocks splitting the main clip under the playhead; a selected layer item still does) (found 2026-11-21, recording the promo video) Split stays disabled after clicking the
       ruler: the playhead moves but the old selection stays, so Split says "Move the playhead
       inside the selected clip". Select the clip under the playhead (or split it) when nothing
       selected is under it. (Landscape clips in a 9:16 project are letterboxed by default: by

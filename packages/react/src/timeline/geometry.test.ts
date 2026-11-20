@@ -104,6 +104,23 @@ describe('timeline geometry', () => {
     expect(hitTest(rows, m, scale, 200, rows[0]!.top + 28, null, false).type).toBe('transition');
   });
 
+  it('a press on the selected clip edge grabs its trim handle', () => {
+    const p = project();
+    const rows = layoutRows(p, m);
+    const scale = { pps: 100, x0: 0 };
+    const y = rows[0]!.top + 20;
+    // c1 runs 0–200 px: 4 px inside its end grabs the end handle (mouse), 10 px in on touch.
+    const mouse = hitTest(rows, m, scale, 196, y, 'c1', false);
+    expect(mouse.type === 'trim' && mouse.edge).toBe('end');
+    const finger = hitTest(rows, m, scale, 190, y, 'c1', true);
+    expect(finger.type === 'trim' && finger.edge).toBe('end');
+    // The start edge the same way.
+    const start = hitTest(rows, m, scale, 4, y, 'c1', false);
+    expect(start.type === 'trim' && start.edge).toBe('start');
+    // Further in is the clip's body (it can still be dragged).
+    expect(hitTest(rows, m, scale, 150, y, 'c1', false).type).toBe('item');
+  });
+
   it('phones: a "+" before the first clip adds at the start', () => {
     const p = project();
     const rows = layoutRows(p, m);

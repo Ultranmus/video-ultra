@@ -2064,6 +2064,9 @@ export class EditorController {
   ): Promise<void> {
     const addToTimeline = options.addToTimeline ?? true;
     let startIndex = 0;
+    // Videos and photos picked together keep the picked order: the first goes after the clip
+    // under the playhead, each next one right after the one before.
+    let nextIndex: number | null = null;
     for (const original of files) {
       const rowId = randomId();
       // SVG: drawn once into a PNG here (the engine worker can't decode SVG).
@@ -2137,10 +2140,13 @@ export class EditorController {
             const under = itemIndexAt(main, this.playhead.time);
             const at = options.atStart
               ? Math.min(startIndex++, main.length)
-              : under === -1
-                ? main.length
-                : under + 1;
+              : nextIndex !== null
+                ? Math.min(nextIndex, main.length)
+                : under === -1
+                  ? main.length
+                  : under + 1;
             insertMain(d, visualItem(asset, ctx.ids()), at);
+            nextIndex = at + 1;
           }
         });
         this.#registerMedia(asset, file);

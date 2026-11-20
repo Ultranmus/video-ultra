@@ -254,9 +254,12 @@ export function hitTest(
       const w = m.trimHandle;
       // A handle on a cut stands in for that cut's transition button (a tap opens it).
       const cut = (i: number) => (cutButtonShown(items, i, scale) ? { transition: items[i]! } : {});
-      if (x >= left - w - slop && x <= left + slop)
+      // The handles are drawn just outside the clip, but a press on the clip's own edge grabs
+      // them too (a few px in; at most a third of a short clip, so its body can still be dragged).
+      const inside = Math.min(touch ? 12 : 6, (right - left) / 3);
+      if (x >= left - w - slop && x <= left + Math.max(slop, inside))
         return { type: 'trim', item: selected, row, edge: 'start', ...cut(at) };
-      if (x >= right - slop && x <= right + w + slop)
+      if (x >= right - Math.max(slop, inside) && x <= right + w + slop)
         return { type: 'trim', item: selected, row, edge: 'end', ...cut(at + 1) };
     }
     // Transition markers sit on the cuts: every cut of the main track, and where two pictures
