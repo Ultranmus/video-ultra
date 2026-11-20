@@ -3921,7 +3921,7 @@
 
   /* A field in a full-height sheet took focus (VideoEditor.tsx): room below it from the start, so
      it can be scrolled up out of the keyboard's way before the keyboard comes. */
-  /* A whole sheet of room, as an empty block at the end: Safari doesn't count a scroll box's
+  /* Half a sheet of room, as an empty block at the end: Safari doesn't count a scroll box's
      bottom padding as room to scroll here, so on the iPhone a short list (5–7 layers) couldn't
      lift its last field above the keyboard (measured 2026-11-21: padding 649 px, scrollHeight =
      clientHeight). */
@@ -3929,7 +3929,7 @@
     content: '';
     display: block;
     flex: none;
-    height: var(--vu-sheet-full);
+    height: calc(var(--vu-sheet-full) / 2);
   }
 
   .vu-root[data-keyboard] .vu-toolbar {
