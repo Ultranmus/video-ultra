@@ -751,7 +751,10 @@ function renderStill<T>(
     const s = await workRenderer(
       width,
       height,
-      backend ?? renderer?.backend ?? 'webgl2',
+      // Stills draw like the export does (WebGL2): a still on the iPhone's WebGPU came out black
+      // or shifted in the export preview (owner, 2026-11-21), and the export's file is what the
+      // preview stands for. An explicit backend (golden checks) is still honoured.
+      backend ?? EXPORT_BACKEND,
       backend !== undefined,
       alpha,
     );

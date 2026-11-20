@@ -295,6 +295,7 @@ export function PhoneTimelineGrip(): ReactElement {
     max: number;
   } | null>(null);
   const root = () => ref.current?.closest<HTMLElement>('.vu-root') ?? null;
+  const snapTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const name = (s: PhoneTimelineSize) =>
     s === 'minimal' ? l.timelineMinimal : s === 'full' ? l.timelineFull : l.timelineNormal;
 
@@ -406,6 +407,10 @@ export function PhoneTimelineGrip(): ReactElement {
         }));
         let best = options[0]!;
         for (const o of options) if (Math.abs(o.h - now) < Math.abs(best.h - now)) best = o;
+        // Glide from where the finger left it to the size (CSS transition, only now).
+        r.setAttribute('data-timeline-snap', '');
+        clearTimeout(snapTimer.current);
+        snapTimer.current = setTimeout(() => r.removeAttribute('data-timeline-snap'), 450);
         apply(best.s, true);
       }}
       onPointerCancel={() => {
