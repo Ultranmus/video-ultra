@@ -3183,8 +3183,10 @@
     gap: var(--vu-space-2);
   }
 
-  /* Suggestions: small pills with an icon, under the box. */
+  /* Suggestions: small pills with an icon, above the box — the box stays at the foot whatever
+     shows, so it doesn't jump when they go (owner, 2026-11-21). */
   .vu-assistant-suggestions {
+    order: -1;
     display: flex;
     flex-wrap: wrap;
     gap: var(--vu-space-2);
@@ -3677,8 +3679,26 @@
 
   /* Typing to the Assistant (it covers the editor then): just the chat and the box, right on the
      keyboard — the suggestions and the note go until the keyboard closes (owner, 2026-11-21). */
-  .vu-dock[data-cover] :is(.vu-assistant-suggestions, .vu-assistant-privacy) {
+  .vu-root[data-keyboard]
+    .vu-dock[data-cover]
+    :is(.vu-assistant-suggestions, .vu-assistant-privacy) {
     display: none;
+  }
+
+  /* …and it moves with the keyboard in one glide: the room for the keyboard and the reach over
+     the tab bar change together, when the keyboard is there, not in steps (they flickered). */
+  .vu-root:not([data-keyboard]) .vu-dock[data-cover]:has(.vu-assistant) {
+    bottom: 0;
+  }
+
+  .vu-dock:has(.vu-assistant):not([data-dragging]) {
+    transition:
+      transform var(--vu-duration-sheet) var(--vu-ease-sheet),
+      bottom var(--vu-duration-sheet) var(--vu-ease-sheet);
+  }
+
+  .vu-dock:has(.vu-assistant) .vu-dock-body {
+    transition: padding-bottom var(--vu-duration-sheet) var(--vu-ease-sheet);
   }
 
   /* Covering (editing a text): the whole editor, top bar and tab bar included. */
@@ -3900,10 +3920,9 @@
   /* A field in a full-height sheet took focus (VideoEditor.tsx): room below it from the start, so
      it can be scrolled up out of the keyboard's way before the keyboard comes. */
   .vu-root[data-sheet-typing] .vu-dock[data-expanded] .vu-dock-body {
-    padding-bottom: max(
-      calc(var(--vu-sheet-full) / 2),
-      calc(var(--vu-keyboard, 0px) + var(--vu-space-4))
-    );
+    /* A whole sheet of room: half wasn't always enough to lift the last of a short list (5–7
+       layers) above the keyboard and Safari's bar on the owner's iPhone (2026-11-21). */
+    padding-bottom: max(var(--vu-sheet-full), calc(var(--vu-keyboard, 0px) + var(--vu-space-4)));
   }
 
   .vu-root[data-keyboard] .vu-toolbar {
