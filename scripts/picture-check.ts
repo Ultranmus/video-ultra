@@ -3,8 +3,9 @@
  * Picture tools (v0.2 group C) in a real browser, through the UI: green screen (switch, pick from
  * video, sliders), LUT import (a generated .cube, plus a broken one that must say why), blurred /
  * pixelated areas (add from the Blur panel, stretch from a side handle), blend modes (inspector
- * chips) — desktop (Chrome, mouse) and phone (WebKit, iPhone size, touch). Screenshots of each
- * state with --shots; axe on the new controls.
+ * chips), LUT tiles (previews, rename, delete + undo, import with no picture to put it on) and a
+ * text's wrap width from its side handle (one undo step) — desktop (Chrome, mouse) and phone
+ * (WebKit, iPhone size, touch). Screenshots of each state with --shots; axe on the new controls.
  * Usage: playground running, then node scripts/picture-check.ts [--shots <dir>] [--only desktop|phone]
  *   [--port 3200]
  */
@@ -66,6 +67,8 @@ const axe = async (page: Page, label: string, include: string) => {
 async function load(page: Page) {
   await page.goto(`http://localhost:${port}/editor?autosave=0&fresh=1&theme=${theme}`);
   await page.waitForFunction(() => (window as any).vuEditor?.engine, null, { timeout: 30000 });
+  // The dev server's own badge can sit over the phone toolbar.
+  await page.addStyleTag({ content: 'nextjs-portal { display: none !important; }' });
   await page.locator('.vu-root input[type=file][accept^="video"]').setInputFiles(media);
   await page.waitForFunction(
     () => (window as any).vuEditor.project.tracks[0].items.length === 2,
@@ -173,6 +176,71 @@ if (only !== 'phone') {
   await snap(page, 'pc-d06-lut');
   await axe(page, 'desktop LUT controls', '.vu-lut');
 
+  // LUT tiles: previews drawn by the engine (No LUT + the look), rename, delete + undo.
+  await page
+    .waitForFunction(
+      () => document.querySelectorAll('.vu-lut .vu-filter-thumb[data-ready]').length >= 2,
+      null,
+      { timeout: 10000 },
+    )
+    .catch(() => {});
+  const lutTiles = await page.evaluate(() => {
+    const canvases = [...document.querySelectorAll<HTMLCanvasElement>('.vu-lut .vu-filter-thumb')];
+    return canvases.map((c) => (c.hasAttribute('data-ready') ? c.width : 0));
+  });
+  check(
+    'desktop: LUT tiles show previews (No LUT + the look)',
+    lutTiles.length === 2 && lutTiles.every((w) => w > 0),
+    JSON.stringify(lutTiles),
+  );
+  const lutId = looked?.lut?.assetId as string;
+  await page.locator('.vu-lut-manage .vu-btn[aria-label="Rename look"]').click();
+  await page.locator('.vu-lut-rename').fill('Warm film');
+  await page.locator('.vu-lut-rename').press('Enter');
+  await page.waitForTimeout(200);
+  const renamed = await page.evaluate(
+    (id) => (window as any).vuEditor.project.assets[id]?.name,
+    lutId,
+  );
+  check(
+    'desktop: Rename look renames it (tile label too)',
+    renamed === 'Warm film' &&
+      (await page.locator('.vu-lut .vu-filter-name', { hasText: 'Warm film' }).count()) === 1,
+    renamed,
+  );
+  await snap(page, 'pc-d06b-lut-renamed');
+  await page.locator('.vu-lut-manage .vu-btn[aria-label="Delete look"]').click();
+  await page.waitForTimeout(200);
+  const afterDelete = await page.evaluate(
+    ([id, c]) => {
+      const e = (window as any).vuEditor;
+      const it = e.project.tracks[0].items.find((x: any) => x.id === c);
+      return { asset: !!e.project.assets[id!], lut: !!it?.lut };
+    },
+    [lutId, clip],
+  );
+  const deleteToast = (await page.locator('.vu-toast').allInnerTexts()).join(' ');
+  check(
+    'desktop: Delete look removes it from the project and the clip, with Undo',
+    !afterDelete.asset && !afterDelete.lut && /Deleted the look/.test(deleteToast),
+    JSON.stringify(afterDelete),
+  );
+  await page.evaluate(() => (window as any).vuEditor.undo());
+  await page.waitForTimeout(200);
+  const restored = await page.evaluate(
+    ([id, c]) => {
+      const e = (window as any).vuEditor;
+      const it = e.project.tracks[0].items.find((x: any) => x.id === c);
+      return { asset: e.project.assets[id!]?.name, lut: it?.lut?.assetId };
+    },
+    [lutId, clip],
+  );
+  check(
+    'desktop: one undo brings the look back on the clip',
+    restored.asset === 'Warm film' && restored.lut === lutId,
+    JSON.stringify(restored),
+  );
+
   // Blurred area: Blur panel → Pixelate oval, then stretch it from the right side.
   await page.locator('.vu-rail .vu-btn', { hasText: 'Blur' }).click();
   await snap(page, 'pc-d07-blur-panel');
@@ -203,20 +271,111 @@ if (only !== 'phone') {
   await snap(page, 'pc-d09-region-stretched');
   await axe(page, 'desktop blurred area inspector', '.vu-inspector');
 
-  // Blend: a text layer, Appearance → Screen.
+  // Blend: a text layer, Appearance → the Screen tile (blend modes are tiles, #178).
   await page.locator('.vu-rail .vu-btn', { hasText: 'Text' }).click();
   await page.locator('.vu-panel .vu-btn', { hasText: 'Add text' }).first().click();
   await page.waitForTimeout(500);
   const textId = await page.evaluate(() => (window as any).vuEditor.ui.getState().selectedId);
   const appearance = page.locator('.vu-inspector .vu-section-toggle', { hasText: 'Appearance' });
   if ((await appearance.getAttribute('aria-expanded')) !== 'true') await appearance.click();
-  await page.locator('.vu-inspector .vu-chip', { hasText: 'Screen' }).click();
+  const blendTile = (name: string) =>
+    page.locator('.vu-inspector .vu-blend-grid .vu-filter-tile', { hasText: name });
+  await blendTile('Screen').click();
   await page.waitForTimeout(300);
-  check('desktop: blend chip sets the mode', (await item(page, textId))?.blend === 'screen');
-  await page.locator('.vu-inspector .vu-chip', { hasText: 'Screen' }).scrollIntoViewIfNeeded();
+  check('desktop: blend tile sets the mode', (await item(page, textId))?.blend === 'screen');
+  await blendTile('Screen').scrollIntoViewIfNeeded();
   await snap(page, 'pc-d10-blend');
-  await page.locator('.vu-inspector .vu-chip', { hasText: 'Normal' }).click();
+  await blendTile('Normal').click();
   check('desktop: Normal removes the blend', !('blend' in ((await item(page, textId)) ?? {})));
+
+  // A LUT import while a text is the target: it can't take a look, but the look is still added
+  // to the list, and the toast says so.
+  await page.evaluate(() => (window as any).vuEditor.seek(705_600_000));
+  await page.locator('.vu-rail .vu-btn', { hasText: 'Filters' }).click();
+  await page.waitForTimeout(400);
+  check(
+    'desktop: a text in Filters says LUT looks are for videos and photos',
+    await page.locator('.vu-lut .vu-hint', { hasText: 'videos and photos' }).isVisible(),
+  );
+  const lutsBefore = await page.evaluate(
+    () =>
+      Object.values((window as any).vuEditor.project.assets).filter((a: any) => a.kind === 'lut')
+        .length,
+  );
+  await page.locator('.vu-lut input[type=file]').setInputFiles(goodLut);
+  await page
+    .waitForFunction(
+      (n) =>
+        Object.values((window as any).vuEditor.project.assets).filter((a: any) => a.kind === 'lut')
+          .length > n,
+      lutsBefore,
+      { timeout: 10000 },
+    )
+    .catch(() => {});
+  const lutsAfter = await page.evaluate(
+    () =>
+      Object.values((window as any).vuEditor.project.assets).filter((a: any) => a.kind === 'lut')
+        .length,
+  );
+  const onlyToast = (await page.locator('.vu-toast').allInnerTexts()).join(' ');
+  check(
+    'desktop: a LUT import with no picture to put it on is added to the list, and says so',
+    lutsAfter === lutsBefore + 1 &&
+      /pick a video or photo/.test(onlyToast) &&
+      (await page.locator('.vu-lut .vu-filter-tile').count()) === lutsAfter,
+    `${lutsBefore} → ${lutsAfter}: ${onlyToast.slice(0, 120)}`,
+  );
+  await snap(page, 'pc-d10b-lut-text');
+
+  // Text wrap width: the text's right side handle narrows it; one undo step; the box fits it.
+  await page.evaluate((id) => {
+    const c = (window as any).vuEditor;
+    c.run('t', (d: any) => {
+      for (const t of d.tracks)
+        for (const it of t.items) if (it.id === id) it.text = 'A longer title that should wrap';
+    });
+    c.select(id);
+  }, textId);
+  await page.waitForTimeout(400);
+  const side = page.locator('.vu-selection-box .vu-handle-side[data-handle="e"]');
+  const topSide = page.locator('.vu-selection-box .vu-handle-side[data-handle="n"]');
+  check(
+    'desktop: a text shows left / right handles only',
+    (await side.isVisible()) && !(await topSide.isVisible()),
+  );
+  const boxBefore = (await page.locator('.vu-selection-box').boundingBox())!;
+  const sb = (await side.boundingBox())!;
+  const steps = await page.evaluate(() => (window as any).vuEditor.editor.history().position);
+  await page.mouse.move(sb.x + sb.width / 2, sb.y + sb.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(sb.x - boxBefore.width * 0.3, sb.y + sb.height / 2, { steps: 8 });
+  await snap(page, 'pc-d11-wrap-drag');
+  await page.mouse.up();
+  await page.waitForTimeout(400);
+  const wrapped = await item(page, textId);
+  const boxAfter = (await page.locator('.vu-selection-box').boundingBox())!;
+  check(
+    'desktop: dragging the side sets a wrap width; the text gets taller and narrower',
+    typeof wrapped?.maxWidth === 'number' &&
+      wrapped.maxWidth < 1 &&
+      boxAfter.height > boxBefore.height * 1.5 &&
+      boxAfter.width < boxBefore.width,
+    `maxWidth ${wrapped?.maxWidth?.toFixed?.(3)}, box ${boxBefore.width.toFixed(0)}×${boxBefore.height.toFixed(0)} → ${boxAfter.width.toFixed(0)}×${boxAfter.height.toFixed(0)}`,
+  );
+  const stepsAfter = await page.evaluate(() => (window as any).vuEditor.editor.history().position);
+  if (steps !== null)
+    check(
+      'desktop: the drag is one undo step',
+      stepsAfter === steps + 1,
+      `${steps} → ${stepsAfter}`,
+    );
+  await snap(page, 'pc-d12-wrapped');
+  await page.evaluate(() => (window as any).vuEditor.undo());
+  check(
+    'desktop: undo puts the text back on one line',
+    !('maxWidth' in ((await item(page, textId)) ?? {})),
+  );
+  await axe(page, 'desktop text inspector (Text width)', '.vu-inspector');
 
   const stats = await page.evaluate(() => (window as any).vuEditor.engine.stats());
   check('desktop: no page errors', errors.length === 0, errors.join(' | '));
@@ -264,6 +423,86 @@ if (only !== 'desktop') {
   await page.waitForTimeout(600);
   await snap(page, 'pc-p05-region-tool');
   await axe(page, 'phone blurred area sheet', '.vu-dock');
+
+  // A text's wrap width with a finger: its right side handle, then one step on lift.
+  const phoneText = await page.evaluate(() => {
+    const c = (window as any).vuEditor;
+    c.seek(705_600_000);
+    let out = '';
+    c.addLaneItem('Add text', (id: string, start: number) => {
+      out = id;
+      return {
+        kind: 'text',
+        id,
+        start,
+        text: 'Hello there world',
+        duration: 3 * 705_600_000,
+        style: {
+          fontFamily: 'system-ui',
+          fontWeight: 700,
+          italic: false,
+          size: 0.07,
+          color: '#ffffff',
+          align: 'center',
+          lineHeight: 1.2,
+          letterSpacing: 0,
+          outline: null,
+          shadow: null,
+          background: null,
+        },
+        transform: {
+          x: 0.5,
+          y: 0.5,
+          scale: 1,
+          rotation: 0,
+          opacity: 1,
+          flipX: false,
+          flipY: false,
+        },
+        filter: null,
+        adjust: {},
+      };
+    });
+    c.select(out);
+    return out;
+  });
+  await page.waitForTimeout(600);
+  const phoneSide = page.locator('.vu-selection-box .vu-handle-side[data-handle="e"]');
+  check('phone: a text shows its side handles', await phoneSide.isVisible());
+  const ps = (await phoneSide.boundingBox())!;
+  const stage = page.locator('.vu-stage');
+  const touch = (type: string, x: number, y: number) =>
+    stage.dispatchEvent(type, {
+      pointerId: 9,
+      pointerType: 'touch',
+      clientX: x,
+      clientY: y,
+      isPrimary: true,
+      button: 0,
+    });
+  const x0 = ps.x + ps.width / 2;
+  const y0 = ps.y + ps.height / 2;
+  await phoneSide.dispatchEvent('pointerdown', {
+    pointerId: 9,
+    pointerType: 'touch',
+    clientX: x0,
+    clientY: y0,
+    isPrimary: true,
+    button: 0,
+    bubbles: true,
+  });
+  for (let i = 1; i <= 6; i++) await touch('pointermove', x0 - i * 4, y0);
+  const midDrag = await item(page, phoneText);
+  check('phone: nothing is written to the project during the drag', !('maxWidth' in midDrag));
+  await touch('pointerup', x0 - 24, y0);
+  await page.waitForTimeout(400);
+  const phoneWrapped = await item(page, phoneText);
+  check(
+    'phone: the side handle sets the wrap width on lift',
+    typeof phoneWrapped?.maxWidth === 'number' && phoneWrapped.maxWidth < 1,
+    String(phoneWrapped?.maxWidth),
+  );
+  await snap(page, 'pc-p06-wrapped');
   check('phone: no page errors', errors.length === 0, errors.join(' | '));
   await browser.close();
 }

@@ -6,9 +6,9 @@ import {
   type Item,
   type RegionItem,
 } from '@video-ultra/core';
-import { useRef, type ReactElement } from 'react';
+import type { ReactElement } from 'react';
 import { useController, useLabels, useProject, useUi } from './context';
-import { Button, Chips, EditSlider, EmptyState, Segmented } from './controls';
+import { Button, EditSlider, EmptyState, Segmented } from './controls';
 import { Icon, type IconName } from './icons';
 
 /**
@@ -141,95 +141,6 @@ export function GreenScreenTool({ item }: { item: Item }): ReactElement {
       ) : (
         <p className="vu-hint">{l.greenScreenHint}</p>
       )}
-    </div>
-  );
-}
-
-// ── LUT looks (C2) ──────────────────────────────────────────────────────────
-
-/**
- * LUT looks for a picture: the project's imported `.cube` files as chips (plus "No LUT"), an
- * Import button and the strength. Lives in the Filters panel, above the filter presets.
- */
-export function LutControls({ item }: { item: Item }): ReactElement | null {
-  const ctl = useController();
-  const l = useLabels();
-  const input = useRef<HTMLInputElement>(null);
-  const luts = useProject((p) =>
-    Object.values(p.assets)
-      .filter((a) => a.kind === 'lut')
-      .map((a) => `${a.id}\u0000${a.name}`)
-      .join('\u0001'),
-  );
-  if (!isPicture(item)) return null;
-  const list = luts
-    ? luts.split('\u0001').map((row) => {
-        const [id, name] = row.split('\u0000');
-        return { id: id!, name: name! };
-      })
-    : [];
-  const current = item.lut?.assetId ?? 'none';
-  return (
-    <div className="vu-lut">
-      <div className="vu-field-row">
-        <span className="vu-lut-title">{l.lutLooks}</span>
-        <Button
-          icon="lut"
-          label={l.importLut}
-          variant="secondary"
-          tip={l.tipImportLut}
-          onClick={() => input.current?.click()}
-        />
-        <input
-          ref={input}
-          type="file"
-          accept=".cube"
-          hidden
-          aria-hidden="true"
-          tabIndex={-1}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            e.target.value = '';
-            if (file) void ctl.importLut(file, item.id);
-          }}
-        />
-      </div>
-      {list.length ? (
-        <Chips
-          label={l.lutLooks}
-          hideLabel
-          value={current}
-          options={[
-            { value: 'none', label: l.lutNone },
-            ...list.map((lut) => ({ value: lut.id, label: lut.name, icon: 'lut' as IconName })),
-          ]}
-          onChange={(id) =>
-            ctl.run(l.lutStep, (d) =>
-              updateItem(d, item.id, {
-                lut: id === 'none' ? null : { assetId: id, intensity: item.lut?.intensity ?? 1 },
-              }),
-            )
-          }
-        />
-      ) : (
-        <p className="vu-hint">{l.lutHint}</p>
-      )}
-      {item.lut ? (
-        <EditSlider
-          label={l.lutIntensity}
-          value={item.lut.intensity}
-          min={0}
-          max={1}
-          step={0.01}
-          defaultValue={1}
-          format={percent}
-          recipe={(d, v) =>
-            updateItem(d, item.id, { lut: { assetId: item.lut!.assetId, intensity: v } })
-          }
-          commitLabel={l.lutStep}
-          coalesceKey={`lut:${item.id}`}
-        />
-      ) : null}
     </div>
   );
 }

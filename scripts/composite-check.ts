@@ -577,6 +577,35 @@ function checkPictureTools(g: Record<string, Img>, backends: string[]): void {
     // The footage band: 640 × 360 at y 140–500; outside the heart the black background shows.
     masked('mask-heart-main', 'heart', [0, 140, 640, 500], 0.3, false, footage, () => [0, 0, 0]);
   }
+  // Text wrap (DECISIONS #214): the boxed title, against the footage — one long line without a
+  // wrap width, at most 40 % of the frame wide (256 px) and several lines with one.
+  for (const b of backends) {
+    const plain = g[`pic-plain-${b}`];
+    const one = g[`pic-text-nowrap-${b}`];
+    const wrapped = g[`pic-text-wrap-${b}`];
+    if (!plain || !one || !wrapped) {
+      check(false, `${b}: text wrap frames rendered`);
+      continue;
+    }
+    const extent = (img: Img) => {
+      let [x0, y0, x1, y1] = [SIZE, SIZE, -1, -1];
+      for (let y = 0; y < SIZE; y++)
+        for (let x = 0; x < SIZE; x++) {
+          const p = px(img, x, y);
+          const q = px(plain, x, y);
+          if (Math.abs(p[0]! - q[0]!) + Math.abs(p[1]! - q[1]!) + Math.abs(p[2]! - q[2]!) < 60)
+            continue;
+          [x0, y0, x1, y1] = [Math.min(x0, x), Math.min(y0, y), Math.max(x1, x), Math.max(y1, y)];
+        }
+      return { w: x1 - x0 + 1, h: y1 - y0 + 1 };
+    };
+    const a = extent(one);
+    const w = extent(wrapped);
+    check(
+      a.w > 300 && a.h < 70 && w.w <= 262 && w.h > a.h * 1.6,
+      `${b}: text wraps at its width (one line ${a.w}×${a.h} px → wrapped ${w.w}×${w.h} px)`,
+    );
+  }
   if (backends.length === 2) {
     const base = mae(g['pic-plain-webgpu']!, g['pic-plain-webgl2']!);
     let worst = 0;

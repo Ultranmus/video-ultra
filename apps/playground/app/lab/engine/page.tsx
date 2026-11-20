@@ -649,7 +649,8 @@ const GOLDEN_BLENDS: BlendMode[] = [
  * pixelated ellipse over the middle), `blend-<mode>` (a solid orange photo at 80% over the
  * middle with that blend mode), `mask-circle` / `mask-star-invert` (the orange photo, opaque,
  * through a circle / outside a five-point star), `mask-heart-main` (the footage itself in a
- * feathered heart).
+ * feathered heart), `text-nowrap` / `text-wrap` (a boxed title, unwrapped / wrapped at 40 % of
+ * the frame).
  */
 async function buildPictureScene(variant: string): Promise<{ project: Project; blobs: Blobs }> {
   const project = createProject({ name: 'Picture tools', width: 640, height: 640 });
@@ -723,6 +724,13 @@ async function buildPictureScene(variant: string): Promise<{ project: Project; b
       ids,
     );
   }
+  if (variant === 'text-wrap' || variant === 'text-nowrap') {
+    // A boxed title in the middle; `text-wrap` wraps it at 40 % of the frame (DECISIONS #214).
+    const text = title('w', 'Wrap this title onto lines', 0, 4);
+    text.transform = { ...DEFAULT_TRANSFORM };
+    if (variant === 'text-wrap') text.maxWidth = 0.4;
+    addToLane(project, text, ids);
+  }
   if (variant.startsWith('blend-')) {
     const id = addBlobAsset(
       project,
@@ -760,6 +768,8 @@ const PICTURE_VARIANTS = [
   'mask-circle',
   'mask-star-invert',
   'mask-heart-main',
+  'text-nowrap',
+  'text-wrap',
 ];
 
 /** Animation golden times (s): mid entrance, end of entrance, mid loop (a quarter turn). */

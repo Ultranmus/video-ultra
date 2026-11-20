@@ -126,6 +126,11 @@ export type EngineRequest =
       /** Square tile size in px. */
       size: number;
       filters: (string | null)[];
+      /**
+       * LUT look tiles instead (asset ids, `null` = no LUT): the item keeps its own filter and
+       * each tile gets one LUT at full strength. `filters` is ignored.
+       */
+      luts?: (string | null)[];
     }
   | {
       type: 'item-preview';

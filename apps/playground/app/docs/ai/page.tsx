@@ -40,6 +40,12 @@ import { createSpeechEndpoint } from '@video-ultra/ai';
         &quot;Text to speech&quot; in the Audio panel and &quot;Read aloud&quot; on texts add a
         spoken sound clip, from any OpenAI-compatible <code>/audio/speech</code> endpoint.
       </p>
+      <p>
+        The Speed slider works with every voice service: when yours ignores the speed, pass{' '}
+        <code>appliesSpeed: false</code> (or leave <code>appliesSpeed</code> out of your own{' '}
+        <code>SpeechGenerator</code>) and the editor asks for normal speed, then plays the clip at
+        the chosen speed with the voice&apos;s pitch kept.
+      </p>
       <Note>
         The demo app&apos;s <code>/api/assistant</code> and <code>/api/speech</code> routes show the
         server side.

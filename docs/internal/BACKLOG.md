@@ -23,7 +23,8 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       left the field under the keyboard. The preview shrinks while typing.
 - [ ] `stage-text-check` phone part (WebKit) logs "ResizeObserver loop completed with undelivered
       notifications" — same without the 2026-11-20 changes; harmless, but find the observer that
-      changes its own target's size (Sheet's measure is the likely one).
+      changes its own target's size (Sheet's measure is the likely one). `picture-check`'s phone
+      part logs it too, already during the green screen / blur steps (2026-11-20).
 - [x] (fixed 2026-11-18: the phone rule now also overrides the desktop `left: 0`) Phone (owner,
       iPhone screenshot 2026-11-18): the "Your videos" popover looks left-aligned
       on a phone — it hangs from the top bar's start, so its left edge sits at the button's edge
@@ -59,7 +60,7 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       Edit sheet; on the video a double-click's second press moved it where it landed, and a
       mouse double-click selected everything). It now always opens after the last letter; the
       Edit sheet's box is a little taller (about 3 lines).
-- [ ] `scripts/picture-check.ts`: the blend step still looks for an "Appearance → Screen" chip;
+- [x] (fixed 2026-11-20) `scripts/picture-check.ts`: the blend step still looks for an "Appearance → Screen" chip;
       blend is now tiles (10-31). Update the step (the green screen / LUT / Blur parts pass).
 - [x] (fixed 2026-11-20, #196–#199) Transparent background in exported files (#186): WebM
       (VP9 / VP8 alpha) and PNG frames are see-through on both backends (`scripts/alpha-check.ts`:
@@ -402,10 +403,13 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       message is also hard-coded English, not a translatable label.
       Partly done 2026-10-31: the picker lists `image/heic,image/heif`; `mif1`/`msf1` files are told apart by their compatible brands (AVIF → opens, HEIC, else HEIF) and the message names HEIF vs HEIC with how to save it as JPEG. Still open: decoding HEIC/HEIF on Android Chrome (needs a decoder; measure first) and the message isn't translatable yet.
 
-- [ ] Playground voice (Google): the newer speech models (3.x) read pace words out loud and
+- [x] (fixed 2026-11-20, #212: a service that can't change its pace gets speed 1 and the clip
+      plays at the chosen speed with the pitch kept — every service, not only the playground)
+      Playground voice (Google): the newer speech models (3.x) read pace words out loud and
       take no instruction field, so the speed slider does nothing on them; only the 2.5 models
       still get "Say slowly: …". Fix: time-stretch the answer (keep pitch) or set the placed
-      clip's speed. Found 2026-10-28.
+      clip's speed. Found 2026-10-28. Owner to listen once on the real Google voice at 1.5× /
+      0.75× (the checks mock the service).
 - [ ] mediabunny's dependency `@types/dom-webcodecs` clashes with TypeScript 6's built-in
       WebCodecs types when an app type-checks with `skipLibCheck: false` (Next.js and Vite default
       to true). Upstream; pack-check uses `skipLibCheck: true`.
@@ -455,8 +459,9 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [ ] (v0.2 B) A ducking badge on timeline clips; optional look-ahead or a "listen to" choice so
       short sound effects don't dip music; default ducking on for library music (owner's call);
       show asset credits to the host at export.
-- [ ] (v0.2 C) LUT chips have no previews, no delete / rename; a LUT import with nothing selected
-      applies to nothing. ("Apply to all clips" copies the LUT too — checked 2026-11-18.) Blend modes on
+- [ ] (v0.2 C) ~~LUT chips have no previews, no delete / rename; a LUT import with nothing selected
+      applies to nothing.~~ (fixed 2026-11-20, #213: preview tiles, Rename / Delete look with
+      Undo, an import with no picture adds the look to the list and says so.) ("Apply to all clips" copies the LUT too — checked 2026-11-18.) Blend modes on
       a 3D-turn animation copy only the flat bounding box — confirm with a golden frame. Region
       items have no entrance / exit animations. Green screen not measured on budget phones.
 - [ ] (v0.2 D) Each frame capture creates a renderer (WebKit warns "too many WebGL contexts" in
@@ -592,7 +597,11 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [x] (fixed 2026-10-19: explicit bitrates, #112) Same `quality: 'medium'`, very different file sizes: the 17 s 720p MP4 is 2.9 MB (Chrome),
       3.2 MB (WebKit), 13.4 MB (Firefox). Set explicit bitrates per resolution × quality instead
       of Mediabunny's relative quality (joins the existing WebKit file-size item).
-- [ ] Text wraps only at explicit line breaks (no automatic width/wrap box yet).
+- [x] (fixed 2026-11-20, #214: side handles on the stage + a "Text width" slider set
+      `maxWidth`; golden frames on both backends) Text wraps only at explicit line breaks (no
+      automatic width/wrap box yet).
+- [ ] Text width side handles hide when the text is under 36 px tall on screen (small text on a
+      phone): the slider in Style still works; consider a handle outside the box for small text.
 - [ ] Sharpen is an unsharp mask at 1.5 source texels — mostly invisible when the source is much
       larger than the preview; scale the tap distance with the on-screen size if users notice.
 - [ ] Blur transition uses a 13-tap disc on the full-size frame: at full strength rings can show

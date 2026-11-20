@@ -426,6 +426,10 @@ export const DEFAULT_LABELS = {
   textEffects: 'Effects',
   letterSpacing: 'Letter spacing',
   lineHeight: 'Line height',
+  /** A text's wrap width (inspector slider, stage side handles). */
+  textWidth: 'Text width',
+  /** Text width at 100 %: lines break only where the text does. */
+  textWidthNone: 'No wrap',
   thickness: 'Thickness',
   softness: 'Softness',
   distance: 'Distance',
@@ -784,6 +788,14 @@ export const DEFAULT_LABELS = {
   lutStep: 'LUT look',
   lutImporting: (name: string) => `Reading ${name}…`,
   lutAdded: (name: string) => `Added the look “${name}”`,
+  lutAddedOnly: (name: string) =>
+    `Added the look “${name}” to LUT looks — pick a video or photo to use it`,
+  lutPictureOnly: 'LUT looks work on videos and photos — select one to use a look.',
+  lutName: 'Look name',
+  lutRename: 'Rename look',
+  lutDelete: 'Delete look',
+  lutDeleteTip: 'Removes the look from this video, and from the clips using it',
+  lutDeleted: (name: string) => `Deleted the look “${name}”`,
   lutFailed: (name: string, why: string) => `${name} can’t be used: ${why}`,
   lutNotFile: 'Pick a .cube file.',
   lutUnavailable: 'The editor is still starting — try again in a moment.',

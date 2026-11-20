@@ -30,18 +30,8 @@ async function gemini(key: string, body: Record<string, unknown>): Promise<Respo
   const text = String(body.input ?? '').slice(0, 4000);
   if (!text.trim()) return new Response('Nothing to say', { status: 400 });
   const voice = GEMINI_VOICES.some((v) => v.id === body.voice) ? String(body.voice) : 'Kore';
-  // No speed setting in this API: the pace is asked for in words (2.5 models only).
-  const speed = Number(body.speed) || 1;
-  const pace =
-    speed >= 1.4
-      ? 'Say quickly'
-      : speed > 1.05
-        ? 'Say a little faster than usual'
-        : speed <= 0.7
-          ? 'Say slowly'
-          : speed < 0.95
-            ? 'Say a little slower than usual'
-            : 'Say';
+  // No speed setting in this API (newer models read pace words out loud): the editor asks for
+  // normal speed and plays the clip at the chosen one, keeping the pitch (DECISIONS #212).
   // Each model has its own daily free allowance: on a used-up one (429), a busy one or no audio,
   // the next is tried. `SPEECH_MODEL` pins one.
   const models = process.env.SPEECH_MODEL ? [process.env.SPEECH_MODEL] : GEMINI_SPEECH_MODELS;
@@ -54,10 +44,8 @@ async function gemini(key: string, body: Record<string, unknown>): Promise<Respo
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
         body: JSON.stringify({
-          // Only the 2.5 models take the pace as words; newer ones read them out loud.
-          contents: [
-            { parts: [{ text: model.startsWith('gemini-2.5') ? `${pace}: ${text}` : text }] },
-          ],
+          // The 2.5 models need to be told to read the text (newer ones would read "Say").
+          contents: [{ parts: [{ text: model.startsWith('gemini-2.5') ? `Say: ${text}` : text }] }],
           generationConfig: {
             responseModalities: ['AUDIO'],
             speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },

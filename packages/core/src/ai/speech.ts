@@ -18,7 +18,10 @@ export interface SpeechVoice {
 export interface SpeechRequest {
   text: string;
   voice: string;
-  /** 0.5…2, 1 = normal. */
+  /**
+   * 0.5…2, 1 = normal. Always 1 unless the generator says it applies the speed itself
+   * ({@link SpeechGenerator.appliesSpeed}).
+   */
   speed: number;
   signal: AbortSignal;
 }
@@ -29,4 +32,10 @@ export interface SpeechGenerator {
   voices(): SpeechVoice[] | Promise<SpeechVoice[]>;
   /** The speech as an audio file the browser can decode (MP3, WAV, Opus…). */
   speak(request: SpeechRequest): Promise<Blob>;
+  /**
+   * `true`: the service speaks at {@link SpeechRequest.speed} itself. Otherwise (the default) the
+   * editor asks for normal speed and plays the added clip at the chosen speed with the voice's
+   * pitch kept ("Keep the voice natural"), so the speed works with any service.
+   */
+  appliesSpeed?: boolean;
 }

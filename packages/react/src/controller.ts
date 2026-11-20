@@ -8,6 +8,7 @@ import {
   addAsset,
   addToLane,
   arrangeItem,
+  setSpeed,
   createEditor,
   createProject,
   deleteItem,
@@ -1954,6 +1955,11 @@ export class EditorController {
       atStart?: boolean;
       /** Sounds go here instead of the playhead (a voiceover: where its recording started). */
       at?: Time;
+      /**
+       * Added sounds play at this speed with their pitch kept (text to speech from a service
+       * that can't change its pace). Default 1.
+       */
+      speed?: number;
     } = {},
   ): Promise<void> {
     const addToTimeline = options.addToTimeline ?? true;
@@ -2020,6 +2026,11 @@ export class EditorController {
           } else if (asset.kind === 'audio') {
             const sound = audioItem(asset, ctx.ids(), options.at ?? this.playhead.time);
             addToLane(d, sound, ctx.ids);
+            const speed = options.speed ?? 1;
+            if (Math.abs(speed - 1) > 1e-3) {
+              updateItem(d, sound.id, { audioFx: { keepPitch: true } });
+              setSpeed(d, sound.id, speed, ctx.ids);
+            }
             if (options.selectSound) selectId = sound.id;
           } else {
             const main = mainTrack(d).items;
@@ -2218,8 +2229,8 @@ export class EditorController {
 
   /**
    * Imports a `.cube` LUT: checked in the engine worker (clear message when it can't be used),
-   * stored like media (never inlined in the project), added as a `lut` asset and applied to
-   * `itemId` when that is a picture.
+   * stored like media (never inlined in the project), added as a `lut` asset (to the LUT looks
+   * list) and applied to `itemId` when that is an unlocked picture; the toast says which.
    */
   async importLut(file: File, itemId: string | null): Promise<void> {
     const l = this.labels;
@@ -2249,14 +2260,18 @@ export class EditorController {
         hasAudio: false,
         source,
       };
+      let applied = false;
       this.run(l.lutStep, (d) => {
         addAsset(d, asset);
         const target = itemId ? findItem(d, itemId)?.item : null;
-        if (isPicture(target) && !this.isLocked(target.id))
+        if (isPicture(target) && !this.isLocked(target.id)) {
           updateItem(d, target.id, { lut: { assetId, intensity: 1 } });
+          applied = true;
+        }
       });
       this.#registerMedia(asset, file);
-      this.toast(l.lutAdded(asset.name), 'success');
+      // Nothing to put it on (no picture selected): it's still in the list, and we say so.
+      this.toast(applied ? l.lutAdded(asset.name) : l.lutAddedOnly(asset.name), 'success');
     } catch (error) {
       this.toast(
         l.lutFailed(
@@ -2571,10 +2586,14 @@ export class EditorController {
     this.ui.setState({ speechBusy: true });
     try {
       const voice = options.voice ?? (await speech.voices())[0]?.id ?? 'default';
+      const speed = Math.min(2, Math.max(0.5, options.speed ?? 1));
+      // A service that can't change its pace speaks normally; the clip then plays at the chosen
+      // speed with the voice's pitch kept (DECISIONS #212).
+      const native = speech.appliesSpeed === true;
       const audio = await speech.speak({
         text: words,
         voice,
-        speed: options.speed ?? 1,
+        speed: native ? speed : 1,
         signal: abort.signal,
       });
       if (abort.signal.aborted) return false;
@@ -2591,6 +2610,7 @@ export class EditorController {
       if (options.at !== undefined) this.seek(options.at);
       await this.importFiles([new File([audio], name, { type: audio.type })], {
         selectSound: true,
+        ...(native ? {} : { speed }),
       });
       return true;
     } catch (error) {

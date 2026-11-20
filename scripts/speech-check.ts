@@ -161,6 +161,45 @@ check(
 );
 check('…with the text’s words', sent?.input === 'The end');
 
+// 2b. A faster voice: a service that can't change its pace (Google's newer models, and this
+// mock when the server has no key) is asked for normal speed and the clip plays at 1.5× with
+// its pitch kept; one that can gets the speed and the clip stays at 1× (DECISIONS #212).
+const native = await page.evaluate(() => (window as any).vuEditor.options.speech.appliesSpeed);
+await page.evaluate(() => (window as any).vuEditor.seek(0));
+await page.evaluate(() => (window as any).vuEditor.speak('Faster please', { speed: 1.5 }));
+const fast = await page.evaluate(() => {
+  const c = (window as any).vuEditor;
+  const items = c.project.tracks.flatMap((t: any) => t.items);
+  const i = items.find(
+    (x: any) => x.kind === 'audio' && /Faster/.test(c.project.assets[x.assetId].name),
+  );
+  return i
+    ? { speed: i.speed, keepPitch: !!i.audioFx?.keepPitch, duration: i.duration / 705_600_000 }
+    : null;
+});
+const slow = list.find((s: any) => Math.abs(s.start - 2) < 0.05)?.duration ?? 0;
+check(
+  native
+    ? 'a service that changes its own pace gets the speed; the clip plays at 1×'
+    : 'a service that can’t change its pace gets speed 1; the clip plays at 1.5×, pitch kept',
+  native
+    ? sent?.speed === 1.5 && fast?.speed === 1
+    : sent?.speed === 1 &&
+        fast?.speed === 1.5 &&
+        fast.keepPitch &&
+        Math.abs(fast.duration - slow / 1.5) < 0.1,
+  JSON.stringify({ sent: sent?.speed, fast, slow }),
+);
+const undone = await page.evaluate(() => {
+  const c = (window as any).vuEditor;
+  c.undo();
+  return c.project.tracks
+    .flatMap((t: any) => t.items)
+    .some((x: any) => x.kind === 'audio' && /Faster/.test(c.project.assets[x.assetId]?.name ?? ''));
+});
+check('…one undo step takes the faster voice away', !undone);
+list = await sounds(page);
+
 // 3. A failing service: says so, adds nothing.
 fail = true;
 const before = list.length;
