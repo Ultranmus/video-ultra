@@ -410,6 +410,7 @@ function ThemeOptions({
           value={setup.radius}
           min={0}
           max={20}
+          defaultValue={8}
           unit="px"
           onChange={(radius) => set({ radius })}
         />

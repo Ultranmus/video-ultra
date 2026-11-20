@@ -307,76 +307,89 @@
   text-transform: uppercase;
 }
 
-/* Slider, like the editor's: rounded track, accent fill, white round handle with an accent ring. */
-.pg-slider {
-  width: 100%;
-  height: 20px;
-  margin: 0;
-  background: transparent;
-  cursor: pointer;
-  appearance: none;
+/* The editor's ruler slider: ticks slide under a fixed centre marker. */
+.pg-ruler {
+  position: relative;
+  height: 32px;
+  border-radius: 6px;
+  cursor: grab;
+  touch-action: pan-y;
+  outline: none;
 }
 
-.pg-slider::-webkit-slider-runnable-track {
-  height: 6px;
-  border-radius: 999px;
-  background: linear-gradient(
-    to right,
-    var(--s-accent) var(--pg-fill, 0%),
-    var(--s-surface-2) var(--pg-fill, 0%)
-  );
+.pg-ruler[data-dragging] {
+  cursor: grabbing;
 }
 
-.pg-slider::-moz-range-track {
-  height: 6px;
-  border-radius: 999px;
-  background: var(--s-surface-2);
+.pg-ruler:focus-visible {
+  box-shadow: 0 0 0 2px var(--s-accent-text);
 }
 
-.pg-slider::-moz-range-progress {
+.pg-ruler-viewport {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  mask-image: linear-gradient(90deg, transparent, #000000 22%, #000000 78%, transparent);
+}
+
+.pg-ruler-track {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pg-ruler-track {
+    transition: transform 0.12s ease;
+  }
+
+  .pg-ruler[data-dragging] .pg-ruler-track {
+    transition: none;
+  }
+}
+
+.pg-ruler-tick {
+  position: absolute;
+  top: 50%;
+  width: 1px;
   height: 6px;
+  margin: -3px 0 0 -0.5px;
+  background: var(--s-muted);
+  opacity: 0.6;
+}
+
+.pg-ruler-tick[data-major] {
+  height: 11px;
+  margin-top: -5.5px;
+  opacity: 1;
+}
+
+.pg-ruler-tick[data-default] {
+  height: 15px;
+  margin-top: -7.5px;
+  background: var(--s-text);
+  opacity: 1;
+}
+
+.pg-ruler-fill {
+  position: absolute;
+  bottom: 2px;
+  height: 2px;
   border-radius: 999px;
   background: var(--s-accent);
 }
 
-.pg-slider::-webkit-slider-thumb {
-  width: 20px;
-  height: 20px;
-  margin-top: -7px;
-  border: 0;
-  border-radius: 50%;
-  background: #ffffff;
-  box-shadow:
-    0 0 0 2px var(--s-accent),
-    0 1px 4px rgba(0, 0, 0, 0.35);
-  appearance: none;
-}
-
-.pg-slider::-moz-range-thumb {
-  width: 20px;
-  height: 20px;
-  border: 0;
-  border-radius: 50%;
-  background: #ffffff;
-  box-shadow:
-    0 0 0 2px var(--s-accent),
-    0 1px 4px rgba(0, 0, 0, 0.35);
-}
-
-.site .pg-slider:focus-visible {
-  outline: none;
-}
-
-.pg-slider:focus-visible::-webkit-slider-thumb {
-  box-shadow:
-    0 0 0 2px var(--s-accent),
-    0 0 0 6px var(--s-accent-soft);
-}
-
-.pg-slider:focus-visible::-moz-range-thumb {
-  box-shadow:
-    0 0 0 2px var(--s-accent),
-    0 0 0 6px var(--s-accent-soft);
+.pg-ruler-marker {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 50%;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 999px;
+  background: var(--s-accent-text);
+  pointer-events: none;
 }
 
 /* Inputs and select */

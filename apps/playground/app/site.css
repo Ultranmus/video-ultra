@@ -280,6 +280,9 @@ body:has(.site) {
 
 /* Code (highlighted at build time, light and dark) */
 .s-code {
+  /* The code's top padding and type: the copy button lines up with the first line from these. */
+  --code-pad: 16px;
+  --code-size: 13.5px;
   position: relative;
   margin: 16px 0;
   border: 1px solid var(--s-border);
@@ -291,10 +294,11 @@ body:has(.site) {
   overflow-x: auto;
   white-space: pre;
   margin: 0;
-  padding: 16px 18px;
+  /* Room on the right for the copy button, so code never runs under it. */
+  padding: var(--code-pad) 56px var(--code-pad) 18px;
   background: transparent !important;
   font-family: var(--s-mono);
-  font-size: 13.5px;
+  font-size: var(--code-size);
   line-height: 1.6;
 }
 
@@ -327,8 +331,9 @@ body:has(.site) {
 
 .site .s-code-copy {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  /* Centred on the first line of code (so a one-line block has it in the middle). */
+  top: calc(var(--code-pad) + var(--code-size) * 0.8 - 20px);
+  right: 11px;
   display: grid;
   place-items: center;
   width: 32px;
@@ -667,10 +672,25 @@ body:has(.site) {
     padding: 14px var(--s-gutter) 0;
   }
 
+  .docs-nav-pick {
+    position: relative;
+  }
+
+  .docs-nav-pick svg {
+    position: absolute;
+    top: calc(50% + 7px);
+    right: calc(var(--s-gutter) + 14px);
+    color: var(--s-muted);
+    pointer-events: none;
+    transform: translateY(-50%);
+  }
+
   .docs-nav-pick select {
     width: 100%;
     min-height: 44px;
-    padding: 0 12px;
+    padding: 0 42px 0 14px;
+    cursor: pointer;
+    appearance: none;
     border: 1px solid var(--s-border-strong);
     border-radius: 10px;
     background: var(--s-bg-soft);

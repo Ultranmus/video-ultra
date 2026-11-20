@@ -4,7 +4,7 @@
  * The playground's form parts, one look for all: sections, rows, segmented choices, a slider
  * in the editor's style, a select with its own chevron, switches and fields.
  */
-import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 
 /** A titled group of options (a fieldset, so screen readers hear its title). */
 export function Section({
@@ -118,12 +118,29 @@ export function Choice<T extends string>({
   );
 }
 
-/** A slider drawn like the editor's: a rounded track, an accent fill, a round handle. */
+const TICK_PX = 8;
+const SNAP_PX = 6;
+
+/** A tick spacing that gives about 40 ticks over the range (1, 2, 5 × 10ⁿ). */
+function niceTick(range: number): number {
+  const raw = range / 40;
+  const pow = Math.pow(10, Math.floor(Math.log10(raw)));
+  const n = raw / pow;
+  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * pow;
+}
+
+/**
+ * The editor's slider, for the site: a tick scale that slides under a fixed centre marker.
+ * Drag it, use the arrow keys (Shift = ×10, Home / End), or double-click to reset; it snaps to
+ * the default. A sideways touch drags it; an upward one still scrolls the page.
+ */
 export function Slider({
   label,
   value,
   min,
   max,
+  step = 1,
+  defaultValue,
   unit = '',
   onChange,
 }: {
@@ -131,32 +148,144 @@ export function Slider({
   value: number;
   min: number;
   max: number;
+  step?: number;
+  defaultValue?: number;
   unit?: string;
   onChange: (v: number) => void;
 }) {
-  const id = useId();
-  const fill = ((value - min) / (max - min)) * 100;
+  const labelId = useId();
+  const ref = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ id: number; x: number; start: number; moved: boolean } | null>(null);
+  const [dragging, setDragging] = useState(false);
+  // Touch: the page may scroll over the ruler (pan-y), but a gesture that starts sideways is ours.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let x = 0;
+    let y = 0;
+    let axis: 'x' | 'y' | null = null;
+    const onStart = (e: TouchEvent) => {
+      const t = e.touches[0];
+      if (!t || e.touches.length > 1) return;
+      x = t.clientX;
+      y = t.clientY;
+      axis = null;
+    };
+    const onMove = (e: TouchEvent) => {
+      const t = e.touches[0];
+      if (!t || e.touches.length > 1) return;
+      if (!axis) {
+        const dx = Math.abs(t.clientX - x);
+        const dy = Math.abs(t.clientY - y);
+        if (dx < 2 && dy < 2) return;
+        axis = dx >= dy ? 'x' : 'y';
+      }
+      if (axis === 'x' && e.cancelable) e.preventDefault();
+    };
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchmove', onMove, { passive: false });
+    return () => {
+      el.removeEventListener('touchstart', onStart);
+      el.removeEventListener('touchmove', onMove);
+    };
+  }, []);
+
+  const tick = niceTick(max - min);
+  const pxPerUnit = TICK_PX / tick;
+  const clamp = (v: number) => Math.min(max, Math.max(min, Math.round(v / step) * step));
+  const count = Math.round((max - min) / tick);
+  const offset = (value - min) * pxPerUnit;
+  const set = (v: number) => {
+    if (v !== value) onChange(v);
+  };
+
   return (
     <div className="pg-field">
       <div className="pg-field-top">
-        <label className="pg-label" htmlFor={id}>
+        <span className="pg-label" id={labelId}>
           {label}
-        </label>
-        <output className="pg-value" htmlFor={id}>
+        </span>
+        <span className="pg-value" aria-hidden="true">
           {value}
           {unit}
-        </output>
+        </span>
       </div>
-      <input
-        id={id}
-        className="pg-slider"
-        type="range"
-        min={min}
-        max={max}
-        value={value}
-        style={{ '--pg-fill': `${fill}%` } as React.CSSProperties}
-        onChange={(e) => onChange(Number(e.target.value))}
-      />
+      <div
+        ref={ref}
+        className="pg-ruler"
+        role="slider"
+        tabIndex={0}
+        aria-labelledby={labelId}
+        aria-valuemin={min}
+        aria-valuemax={max}
+        aria-valuenow={value}
+        aria-valuetext={`${value}${unit}`}
+        data-dragging={dragging || undefined}
+        onPointerDown={(e) => {
+          if (e.button > 0) return;
+          e.currentTarget.setPointerCapture(e.pointerId);
+          drag.current = { id: e.pointerId, x: e.clientX, start: value, moved: false };
+        }}
+        onPointerMove={(e) => {
+          const d = drag.current;
+          if (!d || d.id !== e.pointerId) return;
+          const dx = e.clientX - d.x;
+          if (!d.moved && Math.abs(dx) < 3) return;
+          if (!d.moved) setDragging(true);
+          d.moved = true;
+          // Dragging the scale left brings higher values under the marker.
+          let v = clamp(d.start - dx / pxPerUnit);
+          if (defaultValue !== undefined && Math.abs(v - defaultValue) * pxPerUnit < SNAP_PX)
+            v = defaultValue;
+          set(v);
+        }}
+        onPointerUp={() => {
+          drag.current = null;
+          setDragging(false);
+        }}
+        onPointerCancel={() => {
+          drag.current = null;
+          setDragging(false);
+        }}
+        onDoubleClick={() => {
+          if (defaultValue !== undefined) set(defaultValue);
+        }}
+        onKeyDown={(e) => {
+          const big = e.shiftKey ? 10 : 1;
+          let next: number | null = null;
+          if (e.key === 'ArrowRight' || e.key === 'ArrowUp') next = clamp(value + step * big);
+          else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') next = clamp(value - step * big);
+          else if (e.key === 'Home') next = min;
+          else if (e.key === 'End') next = max;
+          else if ((e.key === 'Enter' || e.key === 'Delete') && defaultValue !== undefined)
+            next = defaultValue;
+          if (next === null) return;
+          e.preventDefault();
+          set(next);
+        }}
+      >
+        <div className="pg-ruler-viewport">
+          <div className="pg-ruler-track" style={{ transform: `translateX(${-offset}px)` }}>
+            {Array.from({ length: count + 1 }, (_, i) => {
+              const v = min + i * tick;
+              return (
+                <span
+                  key={i}
+                  className="pg-ruler-tick"
+                  data-major={Math.abs(Math.round(v / tick) % 5) === 0 || undefined}
+                  data-default={
+                    (defaultValue !== undefined && Math.abs(v - defaultValue) < tick / 2) ||
+                    undefined
+                  }
+                  style={{ left: `${i * TICK_PX}px` }}
+                />
+              );
+            })}
+            <span className="pg-ruler-fill" style={{ left: 0, width: `${offset}px` }} />
+          </div>
+        </div>
+        <span className="pg-ruler-marker" aria-hidden="true" />
+      </div>
     </div>
   );
 }
