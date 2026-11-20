@@ -1336,3 +1336,51 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       layer rename focuses the same way. Placement is then ours alone: the field in the top 30 %
       on focus, kept 64 px above the keyboard on touch screens (Safari's address bar floats there).
       Fields and labels take `touch-action: manipulation`.
+
+<!-- 204–207: reserved for work on parallel branches -->
+
+208.  **Captions: a window the model ends early is heard on from its last word** (2026-11-20;
+      closes the open point of #152). The on-device model sometimes writes a few words, then its
+      end token, while the 30 s window has much more speech (measured on our 3-minute English
+      talk with `base`: three windows stopped after 14, 31 and 40 words; ~200 words lost, and the
+      time warping stretched the few words over the whole window). Where the heard text ends is
+      the median of the frames the last three text tokens attend to most; when that is more than
+      1.5 s before the window's end and ≥ 2 s of sound follow it, the words are timed within what
+      was heard, and the rest of the window is heard again from 0.4 s before that point (like a
+      seek), up to 3 times per window; words the next hearing repeats in its first second are
+      kept once. In the worker (`WhisperRunner.transcribe`), no extra copies of the sound.
+      Measured (Chrome, WebAssembly): talk `base` 403 → 600 words, WER 0.35 → 0.02, 24 → 32 s;
+      `tiny` 455 → 509, WER 0.27 → 0.18 (its remaining loss is a window dropped as made up —
+      BACKLOG); the 30 s clips, music, 4 s and 2.5 s pauses (clean and over noise): unchanged;
+      four no-speech phone clips: still nothing. The service helper (`createCaptionsEndpoint`)
+      does the same where it can tell: when a reply's own word times stop > 2 s before the piece
+      ends with ≥ 3 s of voice after, the rest of the piece is asked for once more (one extra
+      request at most; replies without times are timed from the sound, so there's nothing to
+      tell).
+209.  **Right-to-left captions get the word highlight** (2026-11-20; BACKLOG v0.2 A). Arabic,
+      Hebrew, Urdu, Persian captions showed no highlight: positions are measured in reading order
+      (prefix widths), which for right-to-left text run from the line's right end, so the
+      highlight was switched off there. Now `highlightRanges` mirrors them: the word being said,
+      its box, and the fill growing leftwards. Drawn in the text raster, so both GPU backends get
+      the same pixels — golden frames in the engine lab (English and Arabic, word / box / fill),
+      checked by composite-check: highlight on the right for the first Arabic word and on the left
+      for the last, WebGPU = WebGL2 (difference 0.00). Known limit: inside a right-to-left line, an
+      embedded left-to-right run (a brand name, digits) is placed by reading order, so its
+      highlight can sit off that word.
+210.  **A long captions list renders only the rows near the view** (2026-11-20; BACKLOG v0.2 A).
+      From 200 captions on (an hour of speech is ~700), the Captions panel's list renders the rows
+      in its scroll view plus 12 each side; the others are room above and below, from measured
+      row heights (else their average). Worked out on a frame after a scroll, never per event.
+      Accessible: rows keep their place among all (`aria-posinset` / `aria-setsize`, "412 of
+      1,500"); Tab walks on through the list (the next rows render as the focused one scrolls in);
+      a caption selected far down (Next to check, a tap on the timeline) is scrolled into view.
+      Under 200 every row renders as before. Measured with 1,500 captions: 12 rows instead of
+      1,500, the import's long task 278 → 98 ms; axe passes.
+211.  **Codec checks run in a small worker** (2026-11-20; refines the startup probe in PERF.md).
+      `detectCapabilities` asks WebCodecs about nine codecs; in Chrome the 4K H.264 encoder check
+      alone is ~50 ms of synchronous work (up to 70 ms while the page loads), a long main-thread
+      task even when the checks start one task apart. They now run in `probe.worker.js` (started
+      first, overlapping the GPU checks; the worker closes after). Without workers, without
+      WebCodecs in workers, or if the worker fails or takes over 5 s, the main thread checks as
+      before. Same answers (Chrome, WebKit, Firefox); startup long tasks in editor-check: only the
+      audio service start (the accepted one, PERF.md), which the check now reports apart.
