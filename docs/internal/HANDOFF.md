@@ -11,6 +11,12 @@ warm wall (#189), edit a text (caret at the end, taller box, #190).
 Backlog candidates left for later: Separate keeps the old lane order (combined clips), playground
 test flags (DECISIONS #92), transition stills cache.
 
+## 2026-11-20 (2) — green screen first tap + sheet typing; owner re-tests once pushed
+
+Owner confirmed the locked outline ✓. Re-test on the iPhone: green screen first tap on the
+yellow wall (#193), Layers expanded → rename the bottom row, Templates → second field (#194).
+Then: transparent background export (#186).
+
 ## 2026-11-20 — locked outline + template keyboard pushed; owner re-tests
 
 Owner re-tests on the live site: locked item (phone + desktop, turned and big), template words

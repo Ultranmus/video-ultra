@@ -767,3 +767,13 @@ canvas size ease (scale 0.75 → 1 over ~200 ms). Core 529 + react 24 tests pass
   rename at the bottom of the list (same simulation): sheet covers the top bar, row above it.
 - Checks: `pnpm verify` green (react 28 tests); stage-text-check all pass except a pre-existing
   WebKit ResizeObserver message (BACKLOG).
+
+## 2026-11-20 (2) · Green screen first tap, full-height sheet typing
+
+- Green screen (#193): the pick warms its render up and waits for decodes, then retries once if
+  the colour would remove nearly everything. Desktop Chrome picked right on the first tap before
+  and after (no repro there — iPhone WebGPU only); picks still ~0.3 s.
+- Full-height sheets (#194): a focused field is placed in the top part of the sheet before the
+  keyboard comes. Simulated keyboard (WebKit, iPhone 13): Layers rename and template words don't
+  move when the keyboard shows (before: 230 px / 205 px jumps).
+- Checks: `pnpm verify` green; stage-text-check as before (the WebKit ResizeObserver message).

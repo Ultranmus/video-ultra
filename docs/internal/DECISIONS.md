@@ -1315,3 +1315,14 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       the template preview is 120 px tall instead of 260 px, so the word fields sit high in the
       full-height sheet, above the keyboard, and the words still show in the preview. No height
       animation: the keyboard code measures the field's place in the same frame.
+193.  **Green screen pick: warm up, then try once more** (owner, 2026-11-20; refines #189). The
+      pick's small render is drawn once and thrown away, then again until nothing is still
+      decoding (a fresh draw can be black: frame not decoded yet, or a renderer's first draw on
+      iPhone WebGPU). A pick that would still remove nearly the whole picture is tried once more
+      before the "grey / too much" message — what the owner's second or third tap did.
+194.  **A field in a full-height sheet is placed before the keyboard comes** (owner, 2026-11-20).
+      On a touch screen, focusing a field in an expanded sheet (Layers, Templates) scrolls it into
+      the top 45 % of the editor at once, with room below it (half the sheet), and shrinks the
+      template preview at the same moment (`data-sheet-typing` on the root). iOS then has nothing
+      to shift, so the sheet no longer seems to open again; the keyboard code only adds a small
+      scroll if a keyboard is taller than expected. Half-open sheets keep rising with the keyboard.
