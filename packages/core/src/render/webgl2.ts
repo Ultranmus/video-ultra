@@ -56,12 +56,15 @@ export function createWebGL2Renderer(
   options: RendererOptions = {},
 ): Renderer {
   const correct = options.hdrCorrection ?? true;
+  const alpha = options.alpha ?? false;
   const gl = canvas.getContext('webgl2', {
-    alpha: false,
+    alpha,
     antialias: false,
     depth: false,
     stencil: false,
-    premultipliedAlpha: false,
+    // Opaque: never matters. See-through (DECISIONS #196): the drawing buffer is premultiplied
+    // (straight-alpha blending over a transparent clear), so tell the browser it is.
+    premultipliedAlpha: alpha,
     preserveDrawingBuffer: false,
     powerPreference: 'high-performance',
   });
@@ -119,8 +122,8 @@ export function createWebGL2Renderer(
   // Copy of the pixels under a layer (blend modes, blurred areas): grows to the largest rectangle
   // needed (one texture, re-specified rarely). Starts as a 1×1 stand-in.
   gl.activeTexture(gl.TEXTURE2);
-  // copyTexSubImage2D needs a format the canvas can fill: the canvas has no alpha (alpha:
-  // false), so the copy is RGB (sampled alpha reads as 1).
+  // copyTexSubImage2D needs a format the canvas can fill: an opaque canvas (alpha: false) gives
+  // an RGB copy (sampled alpha reads as 1); a see-through one an RGBA copy.
   const grabRgb = !gl.getParameter(gl.ALPHA_BITS);
   const grabFormat = grabRgb ? gl.RGB8 : gl.RGBA8;
   const grabLayout = grabRgb ? gl.RGB : gl.RGBA;

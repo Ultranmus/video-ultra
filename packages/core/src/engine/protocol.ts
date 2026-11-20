@@ -114,6 +114,8 @@ export type EngineRequest =
       width?: number;
       height?: number;
       backend?: RenderBackend;
+      /** Keep a transparent background see-through (DECISIONS #196). */
+      alpha?: boolean;
     }
   /** One frame of a visual item with each filter applied (filter strip thumbnails). */
   | {

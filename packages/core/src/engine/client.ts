@@ -89,11 +89,12 @@ export interface Engine {
   captureImage(time: Time, options: FrameImageOptions): Promise<FrameImage>;
   /**
    * One exact frame of the project at `time` as an ImageBitmap (caller closes it): preview size by
-   * default, or `width × height`; `backend` picks the GPU path (golden-image checks).
+   * default, or `width × height`; `backend` picks the GPU path (golden-image checks). `alpha`:
+   * a transparent background stays see-through (the PNG / WebM export path) instead of black.
    */
   capture(
     time: Time,
-    options?: { width?: number; height?: number; backend?: RenderBackend },
+    options?: { width?: number; height?: number; backend?: RenderBackend; alpha?: boolean },
   ): Promise<ImageBitmap>;
   /**
    * Square thumbnails of one visual item's frame at timeline `time` (inside the item), one per
@@ -493,7 +494,12 @@ export async function createEngine(
     },
     async capture(
       time: Time,
-      captureOptions: { width?: number; height?: number; backend?: RenderBackend } = {},
+      captureOptions: {
+        width?: number;
+        height?: number;
+        backend?: RenderBackend;
+        alpha?: boolean;
+      } = {},
     ) {
       const data = await send({ type: 'capture', time, ...captureOptions });
       if (data.type !== 'capture') throw new Error('Unexpected engine response');

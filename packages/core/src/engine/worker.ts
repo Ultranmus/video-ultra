@@ -10,7 +10,7 @@ import { createWebGPURenderer } from '../render/webgpu';
 import { Mixer, type AudioTrackSource } from '../audio/mixer';
 import { AudioOutput } from './audio-output';
 import { openAnimatedImage } from './animated';
-import { Composer, type MediaLibrary, type VideoMedia } from './compose';
+import { Composer, isTransparentBackground, type MediaLibrary, type VideoMedia } from './compose';
 import {
   cleanStaleExports,
   encodeFrameImage,
@@ -503,15 +503,20 @@ function pausePlayback(): void {
 
 // ── export & capture ─────────────────────────────────────────────────────
 
-async function makeRenderer(canvas: OffscreenCanvas, backend: RenderBackend): Promise<Renderer> {
+/** `alpha`: a see-through canvas (transparent background in a WebM / PNG export, #196). */
+async function makeRenderer(
+  canvas: OffscreenCanvas,
+  backend: RenderBackend,
+  alpha = false,
+): Promise<Renderer> {
   if (backend === 'webgpu') {
     try {
-      return await createWebGPURenderer(canvas);
+      return await createWebGPURenderer(canvas, { alpha });
     } catch {
       // A canvas gets one context type; WebGPU fails before getContext in the common cases.
     }
   }
-  return createWebGL2Renderer(canvas);
+  return createWebGL2Renderer(canvas, { alpha });
 }
 
 /** Everything the project uses is loaded (decoders and audio readers can start). */
@@ -556,7 +561,8 @@ async function startExport(
         project: p,
         media,
         audioOf: (assetId) => audioTracks.get(assetId) ?? null,
-        makeRenderer: (canvas) => makeRenderer(canvas, request.backend ?? EXPORT_BACKEND),
+        makeRenderer: (canvas, alpha) =>
+          makeRenderer(canvas, request.backend ?? EXPORT_BACKEND, alpha),
         decoderBudget: DECODER_BUDGET[tier],
         rasterBudget: RASTER_BUDGET[tier],
         isCancelled: () => job.cancelled,
@@ -616,7 +622,8 @@ async function startAudioExport(
 /**
  * One exact frame of `p` at `time` on a fresh `width × height` canvas, handed to `withBitmap` while the
  * renderer is still alive (a bitmap from a GL canvas can be emptied when its context goes). An
- * explicit backend is strict (golden checks must know which path drew the picture).
+ * explicit backend is strict (golden checks must know which path drew the picture). `alpha`: a
+ * transparent background stays see-through (a see-through canvas, #196).
  */
 async function renderStill<T>(
   p: Project,
@@ -625,14 +632,16 @@ async function renderStill<T>(
   height: number,
   backend: RenderBackend | undefined,
   withBitmap: (bitmap: ImageBitmap, backend: RenderBackend) => Promise<T> | T,
+  alpha = false,
 ): Promise<T> {
   await mediaReady(p);
   const canvas = new OffscreenCanvas(width, height);
   const r =
     backend === 'webgpu'
-      ? await createWebGPURenderer(canvas)
-      : await makeRenderer(canvas, backend ?? renderer?.backend ?? 'webgl2');
+      ? await createWebGPURenderer(canvas, { alpha })
+      : await makeRenderer(canvas, backend ?? renderer?.backend ?? 'webgl2', alpha);
   const c = new Composer(r, new DecoderPool(2), media, true, RASTER_BUDGET[tier], false);
+  c.keepTransparency = alpha;
   try {
     await c.render(p, Math.max(0, Math.round(time)), width, height, null);
     return await withBitmap(canvas.transferToImageBitmap(), r.backend);
@@ -662,6 +671,7 @@ async function capture(
       data: { type: 'capture', bitmap, backend },
       transfer: [bitmap],
     }),
+    request.alpha === true,
   );
 }
 
@@ -679,8 +689,15 @@ async function captureImage(
     : { width: p.settings.width, height: p.settings.height };
   const time = Math.min(Math.max(0, request.time), Math.max(0, projectDuration(p) - 1));
   const png = request.options.format === 'png';
-  const blob = await renderStill(p, time, width, height, EXPORT_BACKEND, (bitmap) =>
-    encodeFrameImage(bitmap, request.options.format, request.options.quality),
+  // PNG keeps a transparent background see-through; JPEG has no alpha (black there).
+  const blob = await renderStill(
+    p,
+    time,
+    width,
+    height,
+    EXPORT_BACKEND,
+    (bitmap) => encodeFrameImage(bitmap, request.options.format, request.options.quality),
+    png && isTransparentBackground(p),
   );
   return {
     type: 'capture-image',

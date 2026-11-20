@@ -27,7 +27,7 @@ import { projectDuration } from '../model/project';
 import type { Project } from '../model/schema';
 import { FLICKS_PER_SECOND } from '../model/time';
 import type { Renderer } from '../render/types';
-import { Composer, type MediaLibrary } from './compose';
+import { Composer, isTransparentBackground, type MediaLibrary } from './compose';
 import {
   audioFramesFor,
   exportAudioBitrate,
@@ -35,7 +35,9 @@ import {
   EXPORT_SAMPLE_RATE,
   exportFrameCount,
   exportFrameTime,
+  exportKeepsTransparency,
   exportSize,
+  exportVideoCodecs,
   resolveExportRange,
   type AudioExportOptions,
   type AudioExportResult,
@@ -349,7 +351,8 @@ export interface ExportDeps {
   project: Project;
   media: MediaLibrary;
   audioOf: (assetId: string) => AudioTrackSource | null;
-  makeRenderer: (canvas: OffscreenCanvas) => Promise<Renderer>;
+  /** `alpha`: a see-through canvas (a transparent background exported as WebM). */
+  makeRenderer: (canvas: OffscreenCanvas, alpha: boolean) => Promise<Renderer>;
   decoderBudget: number;
   rasterBudget: number;
   isCancelled: () => boolean;
@@ -461,16 +464,21 @@ export async function runExport(
   // (DECISIONS #111). Measured with scripts/export-check.ts.
   const firefox = /firefox/i.test(globalThis.navigator?.userAgent ?? '');
   const asked = options.videoCodec ?? 'auto';
-  const candidates: VideoCodec[] =
-    asked === 'hevc' && format === 'mp4'
-      ? ['hevc']
-      : asked === 'av1'
-        ? ['av1']
-        : format === 'mp4'
-          ? ['avc']
-          : firefox
-            ? ['vp8', 'vp9']
-            : ['vp9', 'vp8'];
+  // A transparent background stays see-through in WebM (VP9 / VP8 alpha, DECISIONS #196); the
+  // colour / alpha split runs in mediabunny's own small worker, so it needs nested workers.
+  let alpha = exportKeepsTransparency(isTransparentBackground(project), format);
+  if (alpha && typeof Worker === 'undefined') {
+    alpha = false;
+    warnings.push(
+      "This browser can't make see-through video here, so the transparent background is black.",
+    );
+  }
+  if (alpha && asked === 'av1') {
+    warnings.push(
+      'AV1 can’t keep the background see-through, so this WebM file uses VP9 / VP8 instead.',
+    );
+  }
+  const candidates: VideoCodec[] = exportVideoCodecs(format, asked, firefox, alpha);
   let videoCodec: VideoCodec | null = null;
   for (const codec of candidates) {
     if (await canEncodeVideo(codec, { width, height, frameRate: fps, quality })) {
@@ -516,9 +524,10 @@ export async function runExport(
   });
 
   const canvas = new OffscreenCanvas(width, height);
-  const renderer = await deps.makeRenderer(canvas);
+  const renderer = await deps.makeRenderer(canvas, alpha);
   const pool = new DecoderPool(deps.decoderBudget);
   const composer = new Composer(renderer, pool, deps.media, true, deps.rasterBudget, false);
+  composer.keepTransparency = alpha;
   const stats: ExportRunStats = {
     backend: renderer.backend,
     composeMs: 0,
@@ -540,8 +549,11 @@ export async function runExport(
     ),
     keyFrameInterval: 2,
     latencyMode: 'quality',
+    // See-through: mediabunny splits each frame into colour + alpha (its worker, on the CPU) and
+    // encodes the alpha as a second VP9 / VP8 stream, written as WebM alpha side data.
+    alpha: alpha ? 'keep' : 'discard',
   });
-  output.addVideoTrack(videoSource, { frameRate: fps });
+  output.addVideoTrack(videoSource, { frameRate: fps, canBeTransparent: alpha });
   let audioSource: AudioSampleSource | null = null;
   if (audioCodec) {
     audioSource = new AudioSampleSource({
@@ -669,6 +681,7 @@ export async function runExport(
       videoCodec,
       audioCodec,
       elapsedSeconds: (performance.now() - started) / 1000,
+      transparent: alpha,
       warnings,
     },
     stats,

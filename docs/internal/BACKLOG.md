@@ -61,11 +61,12 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       Edit sheet's box is a little taller (about 3 lines).
 - [ ] `scripts/picture-check.ts`: the blend step still looks for an "Appearance → Screen" chip;
       blend is now tiles (10-31). Update the step (the green screen / LUT / Blur parts pass).
-- [ ] Transparent background in exported files (#186): the preview shows a checkerboard; video
-      files and PNG frames come out black there. Needs an alpha-capable export canvas on both
-      backends (WebGL2 `alpha: true`, WebGPU `alphaMode: 'premultiplied'` with premultiplied
-      output), VideoEncoder `alpha: 'keep'` (VP9 in WebM — mediabunny supports alpha side data),
-      golden-frame tests on both backends, and PNG frames with alpha. MP4 / H.264 stays black.
+- [x] (fixed 2026-11-20, #196–#199) Transparent background in exported files (#186): WebM
+      (VP9 / VP8 alpha) and PNG frames are see-through on both backends (`scripts/alpha-check.ts`:
+      golden frames + ffmpeg decode); MP4 / JPEG stay black and the export dialog says so.
+- [ ] See-through WebM on real devices (#197): checked in Chrome on the Mac only. Needs the
+      owner's iPhone (Safari's VP9 encoder, nested workers) and Android check. Where Safari can't
+      encode WebM, the dialog shows the "can't make see-through video" note instead of the switch.
 - [ ] HEIF on Android (#187): decoded with WebCodecs HEVC; needs the owner's Android check with
       a real iPhone HEIC (grid of tiles) and a Samsung one. Devices without an HEVC decoder still
       get the "save it as JPEG" message (a WASM decoder only after measuring, CLAUDE.md).

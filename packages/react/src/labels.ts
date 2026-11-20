@@ -19,10 +19,17 @@ export const DEFAULT_LABELS = {
   resizeTip: 'Drag to resize · double-click to reset',
   transparent: 'Transparent',
   exportTransparent:
-    'The background is transparent: the video file shows black there (video files can’t be see-through yet).',
+    'The background is transparent, but this browser can’t make see-through video: the file shows black there.',
+  exportSeeThrough: 'See-through background',
+  exportSeeThroughOn:
+    'Saves a WebM file that stays see-through where there’s no background. Some phone apps can’t open WebM.',
+  exportSeeThroughOff: 'Saves MP4: the transparent background comes out black.',
+  seeThroughTag: 'see-through',
+  imageSeeThroughPng: 'PNG keeps the transparent background see-through.',
+  imageSeeThroughJpeg: 'JPEG can’t be see-through: the transparent background comes out black.',
   tipTransparent: 'No background colour: only what you put on the video shows',
   transparentHint:
-    'The checkerboard shows where it’s see-through. Video files can’t be see-through yet: there it exports black.',
+    'The checkerboard shows where it’s see-through. WebM videos and PNG pictures keep it see-through; MP4 and JPEG show black there.',
   phoneTimelineTip: 'Drag up or down to resize the timeline',
   timelineMinimal: 'Play bar only',
   timelineNormal: 'Normal',

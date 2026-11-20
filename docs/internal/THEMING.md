@@ -103,3 +103,8 @@ more`) sets `data-vu-contrast` on `.vu-root`. High contrast redefines the colour
 
 Blend tiles (#178): `--vu-blend-under` (the colour ramp under the dot) and `--vu-blend-over` (the
 dot).
+
+See-through exports (#196–#199): `--vu-see-through-a` `#d4d4d8` / `--vu-see-through-b` `#a1a1aa`
+(the same in every theme — the stage's own checkerboard greys) and `--vu-size-see-through-cell`
+24px (two squares) draw the checkerboard under the export poster and the finished WebM / PNG
+when the background is transparent.

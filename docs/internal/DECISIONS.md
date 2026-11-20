@@ -1336,3 +1336,34 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       layer rename focuses the same way. Placement is then ours alone: the field in the top 30 %
       on focus, kept 64 px above the keyboard on touch screens (Safari's address bar floats there).
       Fields and labels take `touch-action: manipulation`.
+196.  **See-through exports: WebM (VP9 / VP8 alpha) and PNG** (2026-11-20; finishes #186). A
+      transparent background stays see-through in a WebM video and a PNG picture; MP4 and JPEG
+      have no alpha and keep black there. The export canvas keeps alpha only then (renderer
+      option `alpha`: WebGL2 `alpha` + `premultipliedAlpha`, WebGPU `alphaMode: 'premultiplied'`;
+      every other export and the preview stay opaque, unchanged) and the composer clears to
+      (0, 0, 0, 0) (`keepTransparency`). No shader change: straight-alpha blending over a
+      transparent clear already leaves premultiplied pixels, which is what both canvases expect.
+      Blend modes and blurred areas over a see-through part mix with nothing (black), as in an
+      opaque export.
+197.  **Alpha is encoded by mediabunny's split** (2026-11-20). `CanvasSource` with `alpha: 'keep'`
+      and `canBeTransparent`: mediabunny splits each canvas frame into colour + alpha in its own
+      small worker (on the CPU, frames it owns and closes) and runs a second VP9 / VP8 encoder for
+      the alpha, written as WebM alpha side data (`alpha_mode = 1`; ffmpeg's libvpx and Chrome
+      play it). A see-through export is always VP9 (VP8 first on Firefox, #111), even when AV1 was
+      asked (a warning says so); without nested workers (`Worker` missing in the engine worker)
+      the export falls back to black with a warning instead of failing. Cost measured in PERF.md.
+198.  **The export dialog asks once, in plain words** (2026-11-20). With a transparent background
+      the Video tab shows a "See-through background" switch (on by default): on = a WebM file,
+      with "some phone apps can't open WebM"; off = MP4, "the transparent background comes out
+      black". Picking MP4 under File type turns it off. Without a WebM encoder on the device the
+      switch is replaced by the plain "this browser can't make see-through video" note. The
+      Picture tab says PNG keeps it / JPEG is black. The poster and the finished file are drawn
+      over the stage's checkerboard (`--vu-see-through-a/b`) when they are see-through, and the
+      result line adds "see-through". The engine's `capture` takes `alpha` for that poster.
+199.  **Proof: `scripts/alpha-check.ts`** (2026-11-20). The engine lab's `?alpha=1` scene (an
+      opaque square, a 50 % one half over it, nothing else; no video so headless WebGPU can draw
+      it) is captured on both backends and exported as WebM / MP4 and PNG / JPEG; the files are
+      decoded by ffmpeg (libvpx) and checked pixel by pixel: see-through corner, exact opaque
+      colour, straight-alpha 50 % (colour not darkened twice), the overlap opaque, both backends
+      equal. `?alpha=video` adds real footage (WebGL2): the bands around it see-through, the
+      footage opaque. Run it for any change to the renderers or the export.

@@ -72,6 +72,11 @@ export interface ExportResult {
   audioCodec: string | null;
   /** Wall time of the export, seconds. */
   elapsedSeconds: number;
+  /**
+   * The file is see-through where the project's background is transparent (WebM with VP9 / VP8
+   * alpha). False for every other export, including MP4 of a transparent project (black there).
+   */
+  transparent: boolean;
   /** Things the user should know (e.g. no Opus encoder → video without sound). */
   warnings: string[];
 }
@@ -195,6 +200,38 @@ export function resolveExportRange(
   const start = Math.max(0, Math.min(Math.round(range.start), duration));
   const end = Math.max(0, Math.min(Math.round(range.end), duration));
   return end > start ? { start, end } : null;
+}
+
+/** Video codecs the export tries, in mediabunny's names. */
+export type ExportCodecName = 'avc' | 'hevc' | 'av1' | 'vp9' | 'vp8';
+
+/**
+ * Whether an export keeps a transparent background see-through (DECISIONS #196): only WebM can
+ * (VP9 / VP8 with alpha); MP4 (H.264 / HEVC / AV1) has no alpha and shows black there.
+ */
+export function exportKeepsTransparency(
+  transparentBackground: boolean,
+  format: ExportOptions['format'],
+): boolean {
+  return transparentBackground && format === 'webm';
+}
+
+/**
+ * The video codecs an export tries, best first. WebM is VP9 (VP8 first on Firefox, whose VP9
+ * encoder is slower than real time, DECISIONS #111). A see-through export (`alpha`) is always
+ * VP9 / VP8 — the codecs whose alpha WebM carries and browsers play — even when AV1 was asked.
+ */
+export function exportVideoCodecs(
+  format: ExportOptions['format'],
+  asked: ExportVideoCodec,
+  firefox: boolean,
+  alpha = false,
+): ExportCodecName[] {
+  const webm: ExportCodecName[] = firefox ? ['vp8', 'vp9'] : ['vp9', 'vp8'];
+  if (alpha && format === 'webm') return webm;
+  if (asked === 'hevc' && format === 'mp4') return ['hevc'];
+  if (asked === 'av1') return ['av1'];
+  return format === 'mp4' ? ['avc'] : webm;
 }
 
 /** Export audio is always 48 kHz stereo (DECISIONS #29). */

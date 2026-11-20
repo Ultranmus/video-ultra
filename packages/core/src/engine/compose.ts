@@ -239,6 +239,12 @@ export class Composer {
    * no alpha). Exports leave it off (and get black where there's nothing).
    */
   showTransparency = false;
+  /**
+   * See-through output (DECISIONS #196): a transparent background is left transparent (cleared
+   * to 0, 0, 0, 0) instead of black. Only for a renderer made with `alpha: true` — WebM VP9 and
+   * PNG exports of a transparent project.
+   */
+  keepTransparency = false;
   private checker: OffscreenCanvas | null = null;
   private readonly checkerDraw: LayerDraw = {
     source: null as unknown as VideoFrame,
@@ -776,7 +782,11 @@ export class Composer {
       draws.unshift(this.checkerDraw);
     }
     const t1 = performance.now();
-    this.renderer.render(draws, into ? null : backgroundColor(project), backdrop, into);
+    const clear =
+      into || (this.keepTransparency && isTransparentBackground(project))
+        ? null
+        : backgroundColor(project);
+    this.renderer.render(draws, clear, backdrop, into);
     result.drawMs = performance.now() - t1;
     result.layers = draws.length;
     for (const frame of temporary) frame.close();
@@ -1169,7 +1179,7 @@ export function isTransparentBackground(p: Project): boolean {
 
 /**
  * The project's background colour as RGB 0…1 (black under a blurred background, and for a
- * transparent one: the video formats here have no alpha).
+ * transparent one where the output has no alpha: MP4, JPEG, the opaque preview canvas).
  */
 export function backgroundColor(p: Project): [number, number, number] {
   const bg = p.settings.background;

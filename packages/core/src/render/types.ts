@@ -10,6 +10,14 @@ export interface RendererOptions {
    * conversion — used by the bench's HDR check to measure a device.
    */
   hdrCorrection?: boolean;
+  /**
+   * The canvas keeps transparency (default false: opaque). On for a transparent background in a
+   * see-through export (WebM VP9 / PNG, DECISIONS #196): the canvas holds premultiplied colour —
+   * WebGL2 `alpha` + `premultipliedAlpha`, WebGPU `alphaMode: 'premultiplied'`. Straight-alpha
+   * blending over a (0, 0, 0, 0) clear already leaves premultiplied pixels, so the shaders are
+   * the same either way.
+   */
+  alpha?: boolean;
 }
 
 /** How a source frame is placed on the output canvas. */

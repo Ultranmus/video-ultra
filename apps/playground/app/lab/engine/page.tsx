@@ -14,7 +14,8 @@
  * ducking scene instead of the demo.
  * overlays on lanes, element animations, picture tools: green screen, LUT, blurred / pixelated
  * areas, blend modes). `?bench=1` measures the GPU draw cost of the heaviest
- * transitions on both backends. `?bg=color` turns the blurred background off.
+ * transitions on both backends. `?bg=color` turns the blurred background off. `?alpha=1` builds
+ * the transparent-background scene (scripts/alpha-check.ts) instead of the demo.
  */
 import {
   addAsset,
@@ -562,6 +563,62 @@ async function solidPng(color: string): Promise<Blob> {
   return c.convertToBlob({ type: 'image/png' });
 }
 
+/**
+ * Transparent-background scene (DECISIONS #196), 640×640, 3 s, no video (WebGPU in headless
+ * Chrome can't import video textures): an opaque orange square (x 96–288), a blue one at 50 %
+ * (x 240–464) half over it, both y 224–416; nothing else, so the rest is see-through.
+ * `withVideo` (`?alpha=video`): real footage on the main track instead (16:9 fitted: y 140–500,
+ * see-through bands above and below) with the transparent logo PNG in the top band. `opaque`
+ * (`&opaque=1`): the same scene on black, to measure what see-through costs.
+ */
+async function buildAlphaScene(
+  withVideo = false,
+  opaque = false,
+): Promise<{ project: Project; blobs: Blobs }> {
+  const project = createProject({ name: 'See-through', width: 640, height: 640 });
+  project.settings.background = { type: 'color', color: opaque ? '#000000' : 'transparent' };
+  const blobs: Blobs = new Map();
+  if (withVideo) {
+    insertMain(project, video('v', await loadAsset(project, blobs, 'bbb-1080p60.mp4'), 3, 2));
+    const logo = await loadAsset(project, blobs, 'logo.png');
+    addToLane(
+      project,
+      {
+        id: 'logo',
+        kind: 'image',
+        assetId: logo,
+        start: 0,
+        duration: fromSeconds(3),
+        ...look(),
+        transform: { ...DEFAULT_TRANSFORM, x: 0.5, y: 0.1, scale: 0.15 },
+      },
+      () => 'logo-lane',
+    );
+    return { project, blobs };
+  }
+  let n = 0;
+  const ids = () => `a${++n}`;
+  const square = async (id: string, color: string, x: number, opacity: number) => {
+    addBlobAsset(project, blobs, id, await solidPng(color), 'image', 64);
+    addToLane(
+      project,
+      {
+        id: `${id}-item`,
+        kind: 'image',
+        assetId: id,
+        start: 0,
+        duration: fromSeconds(3),
+        ...look(),
+        transform: { ...DEFAULT_TRANSFORM, x, y: 0.5, scale: 0.3, opacity },
+      },
+      ids,
+    );
+  };
+  await square('orange', 'rgb(200,120,40)', 0.3, 1);
+  await square('blue', 'rgb(40,80,220)', 0.55, 0.5);
+  return { project, blobs };
+}
+
 /** A 33-point .cube that inverts the picture. */
 function invertCube(size = 33): Blob {
   const rows: string[] = [`TITLE "Invert"`, `LUT_3D_SIZE ${size}`];
@@ -1026,12 +1083,16 @@ declare global {
         s: number,
         options: FrameImageOptions,
       ): Promise<{ image: Omit<FrameImage, 'blob'>; base64: string }>;
-      /** One exact frame (the export's compositor path) as base64 RGBA. */
+      /**
+       * One exact frame (the export's compositor path) as base64 RGBA; `alpha` keeps a
+       * transparent background see-through.
+       */
       captureFrame(
         s: number,
         width: number,
         height: number,
         backend?: 'webgpu' | 'webgl2',
+        alpha?: boolean,
       ): Promise<string>;
       duration: number;
       ended: boolean;
@@ -1100,13 +1161,15 @@ export default function EngineLab() {
         setStatus('Golden done');
         return;
       }
-      const { project, blobs } = params.get('duck')
-        ? await buildDuckScene()
-        : await buildDemo(
-            params.get('bg') !== 'color',
-            Math.max(1, Number(params.get('repeat') ?? 1)),
-            params.get('picture') === '1',
-          );
+      const { project, blobs } = params.get('alpha')
+        ? await buildAlphaScene(params.get('alpha') === 'video', params.get('opaque') === '1')
+        : params.get('duck')
+          ? await buildDuckScene()
+          : await buildDemo(
+              params.get('bg') !== 'color',
+              Math.max(1, Number(params.get('repeat') ?? 1)),
+              params.get('picture') === '1',
+            );
       if (disposed) return;
       const lab = {
         duration: toSeconds(projectDuration(project)),
@@ -1147,11 +1210,13 @@ export default function EngineLab() {
           width: number,
           height: number,
           backend?: 'webgpu' | 'webgl2',
+          alpha?: boolean,
         ) {
           const bitmap = await e.capture(fromSeconds(sec), {
             width,
             height,
             backend: backend ?? 'webgl2',
+            alpha: alpha === true,
           });
           return bitmapPixels(bitmap);
         },

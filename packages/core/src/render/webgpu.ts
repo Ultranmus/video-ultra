@@ -45,7 +45,9 @@ export async function createWebGPURenderer(
   context.configure({
     device,
     format,
-    alphaMode: 'opaque',
+    // See-through exports (DECISIONS #196): the pixels are premultiplied already (straight-alpha
+    // blending over a transparent clear), which is what 'premultiplied' expects.
+    alphaMode: options.alpha ? 'premultiplied' : 'opaque',
     usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
   });
 

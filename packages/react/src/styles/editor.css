@@ -4325,6 +4325,17 @@
     background: black;
   }
 
+  /* A see-through file (WebM / PNG of a transparent background): the stage's checkerboard
+     under it. */
+  .vu-export-poster[data-see-through],
+  .vu-export-result[data-see-through] {
+    background: repeating-conic-gradient(
+        var(--vu-see-through-b) 0 25%,
+        var(--vu-see-through-a) 0 50%
+      )
+      0 0 / var(--vu-size-see-through-cell) var(--vu-size-see-through-cell);
+  }
+
   .vu-export-poster-still {
     display: block;
     width: 100%;
