@@ -118,6 +118,8 @@ export {
 } from './media/scenes';
 export type { SceneSensitivity, SceneOptions } from './media/scenes';
 export { accumulatePeaks, peaksPerSecondFor, MAX_PEAKS } from './media/peaks';
+export { compoundSoundParts, mixPeaks } from './media/compound-wave';
+export type { SoundPart } from './media/compound-wave';
 
 // Persistence: media storage, autosave via the op log, crash recovery.
 export { createProjectStorage, createProjectStorageOn } from './storage/project-storage';

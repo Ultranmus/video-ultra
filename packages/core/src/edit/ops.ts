@@ -232,13 +232,19 @@ function placeInOrder(project: Project, level: number, lanes: Item[][], ids: IdF
   for (const pieces of lanes) {
     if (pieces.length === 0) continue;
     const kind = laneKindFor(pieces[0]!.kind);
-    let target: Track | undefined;
-    if (takes(project.tracks[cursor], kind, pieces)) target = project.tracks[cursor];
-    else if (takes(project.tracks[cursor + 1], kind, pieces)) target = project.tracks[++cursor];
-    else {
-      target = { id: ids(), kind, muted: false, hidden: false, locked: false, items: [] };
-      project.tracks.splice(++cursor, 0, target);
+    if (!takes(project.tracks[cursor], kind, pieces)) {
+      cursor++;
+      if (!takes(project.tracks[cursor], kind, pieces))
+        project.tracks.splice(cursor, 0, {
+          id: ids(),
+          kind,
+          muted: false,
+          hidden: false,
+          locked: false,
+          items: [],
+        });
     }
+    const target = project.tracks[cursor]!;
     for (const piece of pieces) insertSorted(target, piece);
   }
   tidyLaneTransitions(project);

@@ -100,6 +100,7 @@ export const DEFAULT_LABELS = {
     audio: 'audio',
     text: 'text',
     sticker: 'sticker',
+    combined: 'combined clip',
   } as Record<string, string>,
   // Tools
   split: 'Split',
