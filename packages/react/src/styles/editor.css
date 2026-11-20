@@ -1978,6 +1978,12 @@
     max-height: none;
   }
 
+  /* Typing a template's words with the keyboard up: a smaller preview, so the fields sit high in
+     the sheet, above the keyboard, and the words still show in the preview (owner, 2026-11-20). */
+  .vu-root[data-keyboard] .vu-template-preview .vu-template-frame {
+    height: var(--vu-size-template-preview-typing);
+  }
+
   .vu-template-field,
   .vu-text-field {
     display: flex;
