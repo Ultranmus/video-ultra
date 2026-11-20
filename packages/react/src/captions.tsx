@@ -8,7 +8,16 @@ import {
   type TextItem,
   type TranscriberCheck,
 } from '@video-ultra/core';
-import { useEffect, useRef, useState, type ReactElement } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactElement,
+  type RefObject,
+} from 'react';
 import { useController, useLabels, useProject, useUi } from './context';
 import { WholeVideoOnly } from './multiedit';
 import { Button, Chips, ColorField, IconButton, Section, Segmented } from './controls';
@@ -552,6 +561,162 @@ function PresetTile({
   );
 }
 
+/** From this many captions on, the list renders only the rows near the view (DECISIONS #210). */
+const CAPTION_WINDOW_FROM = 200;
+/** Rows rendered past each edge of the view (Tab never reaches an unrendered one). */
+const OVERSCAN = 12;
+/** A row's height and gap before any row is measured (px). */
+const ROW_GUESS = 64;
+
+/** The nearest ancestor that scrolls (the panel, or the phone's sheet). */
+function scrollParent(el: HTMLElement): HTMLElement | null {
+  for (let p = el.parentElement; p; p = p.parentElement) {
+    const o = getComputedStyle(p).overflowY;
+    if (o === 'auto' || o === 'scroll') return p;
+  }
+  return null;
+}
+
+/** Rows of a windowed list: those rendered, and the room the others take (px above / below). */
+interface RowWindow {
+  from: number;
+  to: number;
+  before: number;
+  after: number;
+}
+
+/** Row heights (plus the gap after) measured so far by id, and their average for the others. */
+interface Pitches {
+  byId: Map<string, number>;
+  guess: number;
+}
+
+/** The rows from `top` to `bottom` (px in the list) plus {@link OVERSCAN} each side. Pure. */
+function rowWindow(
+  ids: readonly string[],
+  pitches: Pitches,
+  top: number,
+  bottom: number,
+): RowWindow {
+  const n = ids.length;
+  const h = (i: number) => pitches.byId.get(ids[i]!) ?? pitches.guess;
+  let at = 0;
+  let first = n;
+  let last = n;
+  for (let i = 0; i < n; i++) {
+    if (first === n && at + h(i) > top) first = i;
+    if (at >= bottom) {
+      last = i;
+      break;
+    }
+    at += h(i);
+  }
+  const from = Math.max(0, first - OVERSCAN);
+  const to = Math.min(n, last + OVERSCAN);
+  let before = 0;
+  let after = 0;
+  for (let i = 0; i < from; i++) before += h(i);
+  for (let i = to; i < n; i++) after += h(i);
+  return { from, to, before, after };
+}
+
+/**
+ * Which rows of a long list to render (DECISIONS #210): those in the scroll view plus
+ * {@link OVERSCAN} each side, worked out on a frame after a scroll (never per event). `keep` (the
+ * caption being edited or selected: Next to check, a tap on the timeline) is scrolled to when
+ * it's out of view. With `enabled` false every row renders.
+ */
+function useRowWindow(
+  ids: readonly string[],
+  list: RefObject<HTMLOListElement | null>,
+  enabled: boolean,
+  keep: string | null,
+): RowWindow {
+  const pitches = useRef<Pitches>({ byId: new Map(), guess: ROW_GUESS });
+  const schedule = useRef<(() => void) | null>(null);
+  const [win, setWin] = useState<RowWindow>({ from: 0, to: 3 * OVERSCAN, before: 0, after: 0 });
+
+  useEffect(() => {
+    const el = list.current;
+    const box = enabled && el ? scrollParent(el) : null;
+    if (!el || !box) return;
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const top = box.getBoundingClientRect().top - el.getBoundingClientRect().top;
+      const next = rowWindow(ids, pitches.current, top, top + box.clientHeight);
+      setWin((prev) =>
+        prev.from === next.from &&
+        prev.to === next.to &&
+        Math.abs(prev.before - next.before) < 1 &&
+        Math.abs(prev.after - next.after) < 1
+          ? prev
+          : next,
+      );
+    };
+    const later = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    schedule.current = later;
+    box.addEventListener('scroll', later, { passive: true });
+    window.addEventListener('resize', later);
+    later();
+    return () => {
+      cancelAnimationFrame(frame);
+      schedule.current = null;
+      box.removeEventListener('scroll', later);
+      window.removeEventListener('resize', later);
+    };
+  }, [enabled, list, ids]);
+
+  // Measure the rendered rows once they're laid out; the room above / below follows next frame.
+  useLayoutEffect(() => {
+    const el = list.current;
+    if (!enabled || !el) return;
+    const p = pitches.current;
+    const rows = el.children;
+    let changed = false;
+    let gap = 0;
+    for (let k = 0; k < rows.length; k++) {
+      const row = rows[k] as HTMLElement;
+      const next = rows[k + 1] as HTMLElement | undefined;
+      const id = row.dataset.id;
+      if (!id) continue;
+      if (next) gap = Math.max(0, next.offsetTop - row.offsetTop - row.offsetHeight);
+      const h = row.offsetHeight + gap;
+      if (Math.abs((p.byId.get(id) ?? -1) - h) >= 1) {
+        p.byId.set(id, h);
+        changed = true;
+      }
+    }
+    if (!changed) return;
+    let sum = 0;
+    for (const h of p.byId.values()) sum += h;
+    p.guess = sum / p.byId.size;
+    schedule.current?.();
+  });
+
+  const index = keep ? ids.indexOf(keep) : -1;
+  useEffect(() => {
+    const el = list.current;
+    const box = enabled && el && index >= 0 ? scrollParent(el) : null;
+    if (!el || !box) return;
+    const p = pitches.current;
+    let offset = 0;
+    for (let i = 0; i < index; i++) offset += p.byId.get(ids[i]!) ?? p.guess;
+    const h = p.byId.get(ids[index]!) ?? p.guess;
+    const top = box.getBoundingClientRect().top - el.getBoundingClientRect().top;
+    if (offset >= top && offset + h <= top + box.clientHeight) return;
+    // Its scroll brings it in (rendered next frame); a row being edited then takes the focus.
+    box.scrollTop += offset - top - box.clientHeight / 3;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the kept row changes
+  }, [enabled, index]);
+
+  if (!enabled) return { from: 0, to: ids.length, before: 0, after: 0 };
+  const from = Math.min(win.from, ids.length);
+  return { ...win, from, to: Math.min(Math.max(win.to, from), ids.length) };
+}
+
 function CaptionList(): ReactElement {
   const ctl = useController();
   const l = useLabels();
@@ -562,6 +727,10 @@ function CaptionList(): ReactElement {
   const selectedId = useUi((s) => s.selectedId);
   const editing = useUi((s) => s.captionEditing);
   const unsure = items.filter((i) => i.unsure).length;
+  const listRef = useRef<HTMLOListElement>(null);
+  const windowed = items.length >= CAPTION_WINDOW_FROM;
+  const ids = useMemo(() => items.map((i) => i.id), [items]);
+  const { from, to, before, after } = useRowWindow(ids, listRef, windowed, editing ?? selectedId);
   return (
     <Section title={l.captionList} collapsible defaultOpen>
       {unsure ? (
@@ -575,14 +744,28 @@ function CaptionList(): ReactElement {
           />
         </div>
       ) : null}
-      <ol className="vu-caption-list">
-        {items.map((item, i) => (
+      <ol
+        ref={listRef}
+        className="vu-caption-list"
+        data-windowed={windowed || undefined}
+        style={
+          windowed
+            ? ({
+                '--vu-caption-list-before': `${before}px`,
+                '--vu-caption-list-after': `${after}px`,
+              } as CSSProperties)
+            : undefined
+        }
+      >
+        {items.slice(from, to).map((item, k) => (
           <CaptionRow
             key={item.id}
             item={item}
             selected={selectedId === item.id}
             focus={editing === item.id}
-            last={i === items.length - 1}
+            last={from + k === items.length - 1}
+            // Rows not rendered still count: "caption 412 of 1,300".
+            position={windowed ? { at: from + k + 1, of: items.length } : null}
             onFocusDone={() => ctl.ui.setState({ captionEditing: null })}
           />
         ))}
@@ -596,12 +779,15 @@ function CaptionRow({
   selected,
   focus,
   last,
+  position,
   onFocusDone,
 }: {
   item: TextItem;
   selected: boolean;
   focus: boolean;
   last: boolean;
+  /** In a windowed list: the row's place among all captions (1-based). */
+  position: { at: number; of: number } | null;
   onFocusDone: () => void;
 }): ReactElement {
   const ctl = useController();
@@ -621,6 +807,9 @@ function CaptionRow({
   return (
     <li
       className="vu-caption-row"
+      data-id={item.id}
+      aria-posinset={position?.at}
+      aria-setsize={position?.of}
       data-selected={selected || undefined}
       data-unsure={item.unsure || undefined}
     >

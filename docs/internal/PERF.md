@@ -400,6 +400,16 @@ Result: long tasks `['3281+116']` (the audio service only), none during startup 
 check taps Play ~1.8 s after load, before the idle preparation, so it runs inside the tap
 (CDP profile: 103–105 ms self time in `prepareAudio`). Text add / type / drag: no long task.
 
+2026-11-20 (dev server, Chrome on the Mac): editor-check saw 56–70 ms at ~0.5 s in 2 of 5 loads.
+CDP profile: one codec check — `VideoEncoder.isConfigSupported` for 4K H.264 takes 49–50 ms of
+synchronous work by itself (1080p H.264 15 ms, VP9 8 ms, decoders ~0), more while the page loads,
+so starting checks one task apart no longer keeps it under 50 ms. The checks now run in a small
+worker (DECISIONS #211): 0 of 9 loads with a startup long task; editor-check reports the audio
+service start (118–164 ms, accepted) apart and fails on any other.
+
+**Captions list, 1,500 captions** (DECISIONS #210, captions-check): rows rendered 1,500 → 12;
+the .srt import's long task 278 → 98 ms (the rest is the import itself).
+
 ## v0.2 sound, picture tools, capture & export (2026-10-19)
 
 - **Ducking DSP:** ~20 µs per 2048-frame block (0.05 % of real time); 600 s of audio in ~270 ms;
@@ -478,7 +488,21 @@ background. Window numbers (no-speech · confidence): speech under sound 0.17–
 | iPhone, no speech | 0             | 0 (5 clips × tiny / base / small, English and Hindi) |
 
 Hindi 2 stays low: the model writes a few words and ends the window (no seek past an early end
-yet — BACKLOG). The `real/*-phone.m4a` re-recordings give 1–3 words with or without guards — the
+yet — BACKLOG; done 2026-11-20, below).
+
+**Early ends heard on (DECISIONS #208, 2026-11-20, Chrome on the Mac, WebAssembly, lab
+`/lab/captions`):** clips with known text; words / word error rate / time to hear.
+
+| Clip                                        | `base` before         | `base` after                   | `tiny` before | `tiny` after |
+| ------------------------------------------- | --------------------- | ------------------------------ | ------------- | ------------ |
+| speech-en-long (3 min talk, 600 words)      | 403 / 0.352 / 24–30 s | 600 / 0.022 / 31–32 s          | 455 / 0.265   | 509 / 0.177  |
+| speech-en-gb · en-in · en-music             | — · — · 99            | 100 · 100 · 99 (WER 0.02–0.04) | —             | 99 · — · 98  |
+| 4 s / 2.5 s pauses, clean and over noise    | 100 each              | 100 each (WER 0.02)            | 100           | 98–100       |
+| real/en-tts-phone, 4 iPhone no-speech clips | 0                     | 0                              | —             | 0            |
+
+The talk's three early windows (14, 31, 40 words) each needed one more hearing; no other clip
+seeked. `tiny`'s remaining loss is one window it hears as a single unsure word (dropped as made
+up — BACKLOG). The `real/*-phone.m4a` re-recordings give 1–3 words with or without guards — the
 speech is buried under the room sound; English re-recorded the same way gives "Thank you.".
 
 ## Shape masks (v0.3, 2026-10-19)

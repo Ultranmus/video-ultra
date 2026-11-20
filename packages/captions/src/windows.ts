@@ -120,6 +120,45 @@ export function activeShare(active: Uint8Array): number {
   return active.length ? k / active.length : 0;
 }
 
+/** A word without case and punctuation, for comparing. */
+const bare = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+
+/**
+ * Adds the words of a hearing that started `offset` s into the window (DECISIONS #208) to
+ * `words`, on the window's clock. That hearing starts a little before the last word already
+ * kept, so its first words (said in its first second) may repeat the last ones: those are kept
+ * once. Pure apart from `words`; tested.
+ */
+export function joinHeard(
+  words: TranscriptWord[],
+  heard: readonly TranscriptWord[],
+  offset: number,
+): void {
+  let skip = 0;
+  if (offset > 0 && words.length) {
+    for (let k = Math.min(3, words.length, heard.length); k > 0 && !skip; k--) {
+      let same = heard[k - 1]!.start < 1;
+      for (let i = 0; i < k && same; i++) {
+        const a = bare(heard[i]!.text);
+        same = a !== '' && a === bare(words[words.length - k + i]!.text);
+      }
+      if (same) skip = k;
+    }
+  }
+  for (let i = skip; i < heard.length; i++) {
+    const w = heard[i]!;
+    words.push(offset ? { ...w, start: w.start + offset, end: w.end + offset } : w);
+  }
+}
+
+/** Seconds of frames with sound from `from` (s) to the end. */
+export function voicedSeconds(active: Uint8Array, from = 0): number {
+  let k = 0;
+  for (let f = Math.max(0, Math.floor((from * 16_000) / FRAME)); f < active.length; f++)
+    k += active[f]!;
+  return (k * FRAME) / 16_000;
+}
+
 /** Drops words said where there was no sound at all (times relative to the window, s). */
 export function wordsWithSound<W extends { start: number; end: number }>(
   words: readonly W[],

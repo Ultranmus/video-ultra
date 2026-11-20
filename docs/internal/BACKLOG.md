@@ -21,10 +21,11 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       outline turned with the item and trimmed to the video.
 - [x] (fixed 2026-11-20, #192) Owner (iPhone): typing a template's words, the full-height sheet
       left the field under the keyboard. The preview shrinks while typing.
-- [ ] `stage-text-check` phone part (WebKit) logs "ResizeObserver loop completed with undelivered
-      notifications" — same without the 2026-11-20 changes; harmless, but find the observer that
-      changes its own target's size (Sheet's measure is the likely one). `picture-check`'s phone
-      part logs it too, already during the green screen / blur steps (2026-11-20).
+- [x] (fixed 2026-11-20) `stage-text-check` phone part (WebKit) logs "ResizeObserver loop
+      completed with undelivered notifications" — not the Sheet: the editor started in the
+      desktop layout and switched to phone inside its own root ResizeObserver callback, which
+      changes the root's size. The layout is now set before the first paint, resizes a frame
+      later. stage-text-check and captions-check phone parts: no page errors.
 - [x] (fixed 2026-11-18: the phone rule now also overrides the desktop `left: 0`) Phone (owner,
       iPhone screenshot 2026-11-18): the "Your videos" popover looks left-aligned
       on a phone — it hangs from the top bar's start, so its left edge sits at the button's edge
@@ -60,8 +61,10 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       Edit sheet; on the video a double-click's second press moved it where it landed, and a
       mouse double-click selected everything). It now always opens after the last letter; the
       Edit sheet's box is a little taller (about 3 lines).
-- [x] (fixed 2026-11-20) `scripts/picture-check.ts`: the blend step still looks for an "Appearance → Screen" chip;
-      blend is now tiles (10-31). Update the step (the green screen / LUT / Blur parts pass).
+- [x] (fixed 2026-11-20) `scripts/picture-check.ts`: the blend step still looks for an
+      "Appearance → Screen" chip; blend is now tiles (10-31). The step picks the Screen / Normal
+      tiles (radios); the phone part hides the dev server's "Insights" badge, which covered the
+      first toolbar tools. All picture checks pass (desktop + phone).
 - [x] (fixed 2026-11-20, #196–#199) Transparent background in exported files (#186): WebM
       (VP9 / VP8 alpha) and PNG frames are see-through on both backends (`scripts/alpha-check.ts`:
       golden frames + ffmpeg decode); MP4 / JPEG stay black and the export dialog says so.
@@ -442,18 +445,36 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       Layers drag restacks — lanes now slide to their new places (180 ms, ease-out; reduced
       motion: instant). Measured: 12 in-between timeline frames instead of one jump.
 - [ ] Checks that fail on this Mac before and after today's work (same numbers on main without
-      it, 2026-10-20): editor-check (two 404s in the console + long tasks 58–137 ms on startup),
-      proxies-check (preview luma 130 vs 128: the threshold is too tight here), cutout-check
-      ("background gone" 35 → 10 with the test chart — it needs a real portrait as its argument).
-- [ ] Captions: when the model ends a window early (a few words, then end of text), hear the
-      rest of the window again from the last word (like a seek), so long speech isn't cut (#152).
+      it, 2026-10-20): ~~editor-check (two 404s in the console + long tasks 58–137 ms on
+      startup)~~ fixed 2026-11-20: the 404s were the playground's missing favicon (it has an icon
+      now); the long tasks were the 4K H.264 encoder check (~50–70 ms synchronous in Chrome — the
+      codec checks now run in a worker, DECISIONS #211) and the audio service start (the accepted
+      one, now reported apart; any other fails the check). ~~proxies-check (preview luma 130 vs
+      128: the threshold is too tight here)~~ fixed 2026-11-20: not the threshold — the preview
+      still showed the original after a fixed 500 ms; it now waits for the switch (≤ 5 s).
+      Left: cutout-check ("background gone" 35 → 10 with the test chart — it needs a real
+      portrait as its argument).
+- [x] (fixed 2026-11-20, DECISIONS #208) Captions: when the model ends a window early (a few
+      words, then end of text), hear the rest of the window again from the last word (like a
+      seek), so long speech isn't cut (#152). On-device: up to 3 seeks per window, the early
+      words timed within what was heard; 3-minute English talk (base) 403 → 600 words, WER
+      0.35 → 0.02. Service helper: the rest of a piece asked once more when its own word times
+      stop early.
+- [ ] Captions on the device, `tiny`: a window full of speech can come back as one unsure word
+      ("it.") that the made-up-text guard drops — the whole window is lost (speech-en-long:
+      113–141 s). Not an early end (nothing to seek from); a second try (another start offset or
+      `base`) might recover it. `base` (the usual model) doesn't do it on the same clip.
 - [ ] Captions: speech far under room sound (a phone re-recording) gives nothing — the model
       itself hears 1–3 words; consider a speech-band filter / noise reduction before the model.
 
-- [ ] (v0.2 A) Captions: right-to-left captions show without the word highlight; Chinese /
+- [ ] (v0.2 A) Captions: ~~right-to-left captions show without the word highlight~~ (fixed
+      2026-11-20, DECISIONS #209: word / box / fill mirrored from the line's right end; golden
+      frames on both backends; a line mixing right-to-left and left-to-right words places the
+      highlight by reading order, which is off for the embedded run); Chinese /
       Japanese / Thai: character-based words done (DECISIONS #164); one caption row (no
-      multi-language rows); the captions list renders every row (virtualise past a few hundred);
-      phones not measured yet. (Hindi / other languages on the device: dropped — English only,
+      multi-language rows); ~~the captions list renders every row (virtualise past a few
+      hundred)~~ (fixed 2026-11-20, DECISIONS #210: from 200 captions only the rows near the view
+      render); phones not measured yet. (Hindi / other languages on the device: dropped — English only,
       other languages through the host's own service, DECISIONS #162.)
 - [ ] Captions: the on-device model could be the English-only Whisper builds (`*.en`: same size,
       a little more accurate on English) — needs timestamped ONNX builds and a captions-bench

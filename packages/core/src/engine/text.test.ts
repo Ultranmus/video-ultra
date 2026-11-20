@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_TEXT_STYLE } from '../model/project';
 import { textItem } from '../test/fixtures';
 import {
+  highlightRanges,
   measureReveal,
   measureTextBox,
   rasterSize,
@@ -136,5 +137,20 @@ describe('typewriter / word reveal', () => {
     const c = revealCuts(rtl, 1 / 8, 'char', { line: 0, cutA: 0, cutB: 0, fadeB: 0 });
     // Line 0 ends at 50 px: the first character sits at its right end.
     expect(c.cutA).toBeCloseTo((200 - 50 + 10) / 200);
+  });
+
+  it('places the caption highlight from the reading start (right-to-left mirrored)', () => {
+    const word = (k: number) => ({ mode: 'word' as const, color: '#f00', word: k, chars: 0 });
+    // Line 0 "ab cd" sits at 0–50 px, line 1 "efg" at 35–65 px.
+    expect(highlightRanges(layout, word(1))).toEqual([[30, 50], null]);
+    const rtl = { ...layout, rtl: true };
+    // Right to left: the first word is at the line's right end, the second at its left.
+    expect(highlightRanges(rtl, word(0))).toEqual([[30, 50], null]);
+    expect(highlightRanges(rtl, word(1))).toEqual([[0, 20], null]);
+    expect(highlightRanges(rtl, word(2))).toEqual([null, [35, 65]]);
+    // Fill: 1½ characters done grows from the right end.
+    const fill = { mode: 'fill' as const, color: '#f00', word: 0, chars: 1.5 };
+    expect(highlightRanges(rtl, fill)).toEqual([[35, 50], null]);
+    expect(highlightRanges(layout, fill)).toEqual([[0, 15], null]);
   });
 });

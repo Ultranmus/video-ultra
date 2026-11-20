@@ -57,6 +57,50 @@ export function tokenStartTimes(
   return dtwJumps(matrix, rows, frames);
 }
 
+/**
+ * Where the heard text ends in the sound (s): the median of the frames the last three text
+ * tokens attend to most (alignment heads summed). When the model ends a window early (a few
+ * words, then the end token — DECISIONS #208) this sits at the last word said, while the time
+ * warping above stretches the words over the whole window. Pure.
+ */
+export function heardUntil(
+  attention: readonly Float32Array[],
+  frames: number,
+  firstText: number,
+  lastText: number,
+): number {
+  const peaks: number[] = [];
+  for (let r = Math.max(firstText, lastText - 2); r <= lastText; r++) {
+    let best = -Infinity;
+    let at = 0;
+    for (let f = 0; f < frames; f++) {
+      let s = 0;
+      for (const head of attention) s += head[r * frames + f]!;
+      if (s > best) {
+        best = s;
+        at = f;
+      }
+    }
+    peaks.push(at);
+  }
+  peaks.sort((a, b) => a - b);
+  return peaks[peaks.length >> 1]! * FRAME_SECONDS;
+}
+
+/** The first `keep` frames of each head's `rows × frames` attention. Pure. */
+export function firstFrames(
+  attention: readonly Float32Array[],
+  rows: number,
+  frames: number,
+  keep: number,
+): Float32Array[] {
+  return attention.map((head) => {
+    const out = new Float32Array(rows * keep);
+    for (let r = 0; r < rows; r++) out.set(head.subarray(r * frames, r * frames + keep), r * keep);
+    return out;
+  });
+}
+
 function median(values: Float32Array, n: number): number {
   const a = Array.from(values.subarray(0, n)).sort((x, y) => x - y);
   return a[n >> 1]!;

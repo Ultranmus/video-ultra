@@ -1,6 +1,7 @@
 import type { TranscriptWord } from '@video-ultra/core';
 import type * as Ort from 'onnxruntime-web';
-import { tokenStartTimes, wordsFromTokens } from './align';
+import { activeFrames, joinHeard, voicedSeconds } from '../windows';
+import { firstFrames, heardUntil, tokenStartTimes, wordsFromTokens } from './align';
 import { MelExtractor, N_FRAMES, SAMPLE_RATE } from './mel';
 import type { WhisperTokenizer } from './tokenizer';
 
@@ -45,6 +46,15 @@ const DETECT_AMONG = new Set([
   'mr',
 ]);
 
+/** Most extra hearings of one window after early ends (DECISIONS #208). */
+export const MAX_SEEKS = 3;
+/** An early end: the text stops more than this before the window's end (s)… */
+const SEEK_MIN_LEFT = 1.5;
+/** …and at least this much sound with voice follows it (s). */
+const SEEK_MIN_VOICE = 2;
+/** The next hearing starts this long before the last word's peak (s). */
+const SEEK_BACK = 0.4;
+
 export class WhisperRunner {
   readonly #ort: typeof Ort;
   readonly #encoder: Session;
@@ -78,12 +88,38 @@ export class WhisperRunner {
 
   /**
    * Hears one window (≤ 30 s of 16 kHz mono). `language` is an ISO code or `'auto'`. Returns
-   * words (seconds from the window's start) and the language used.
+   * words (seconds from the window's start) and the language used. When the model ends early
+   * (a few words, then its end token, with speech still to come) it hears the rest again from
+   * the last word, like a seek (DECISIONS #208), up to {@link MAX_SEEKS} times.
    */
   async transcribe(
     audio: Float32Array,
     language: string,
-  ): Promise<{ words: TranscriptWord[]; language: string }> {
+  ): Promise<{ words: TranscriptWord[]; language: string; seeks: number }> {
+    const words: TranscriptWord[] = [];
+    let lang = language;
+    let offset = 0;
+    let seeks = 0;
+    for (;;) {
+      const part = offset ? audio.subarray(Math.round(offset * SAMPLE_RATE)) : audio;
+      const heard = await this.#hearOnce(part, lang);
+      lang = heard.language;
+      joinHeard(words, heard.words, offset);
+      if (heard.endedAt === null || seeks >= MAX_SEEKS) break;
+      offset += heard.endedAt;
+      seeks++;
+    }
+    return { words, language: lang, seeks };
+  }
+
+  /**
+   * One pass of the model over `audio`. `endedAt`: where the heard text ends (s) when the model
+   * stopped early with more speech after it, else null.
+   */
+  async #hearOnce(
+    audio: Float32Array,
+    language: string,
+  ): Promise<{ words: TranscriptWord[]; language: string; endedAt: number | null }> {
     const ort = this.#ort;
     const cfg = this.#cfg;
     const special = this.#tok.special;
@@ -148,7 +184,7 @@ export class WhisperRunner {
 
     // Text tokens (without the end token and any trailing repetition cut).
     const text = tokens.filter((t) => t < special.eot);
-    if (!text.length) return { words: [], language: lang };
+    if (!text.length) return { words: [], language: lang, endedAt: null };
     // Made-up text (DECISIONS #130): with no clear speech the model still writes confident
     // sentences. Drop the window when it thought nobody was speaking and wasn't sure of what it
     // wrote (Whisper's own rule), when it was very unsure, or when it only repeated itself.
@@ -164,27 +200,46 @@ export class WhisperRunner {
     // confident, wordy window is kept whatever that probability says.
     const seconds = audio.length / SAMPLE_RATE;
     const wordy = said.length >= Math.max(4, seconds * 0.3);
-    if (
-      avg < -1 ||
-      (noSpeech > 0.06 && avg < -0.6) ||
-      (noSpeech > 0.5 && !(wordy && avg >= -0.6)) ||
-      (said.length > 8 && unique < 0.3)
-    )
-      return { words: [], language: lang };
     const totalRows = prompt.length + tokens.length;
     const attention = rows.map((r) => {
       const m = new Float32Array(totalRows * frames);
       r.slice(0, totalRows).forEach((row, i) => m.set(row, i * frames));
       return m;
     });
-    const jumps = tokenStartTimes(attention, totalRows, frames);
+    // Ended early: the text stops well before the sound does and there is speech after it. The
+    // words are timed within what was heard (the warping would stretch them over the rest), and
+    // the caller hears on from there.
+    const until = heardUntil(attention, frames, prompt.length, prompt.length + text.length - 1);
+    const early =
+      until >= 1 &&
+      until < seconds - SEEK_MIN_LEFT &&
+      voicedSeconds(activeFrames(audio), until + 0.3) >= SEEK_MIN_VOICE;
+    if (
+      avg < -1 ||
+      (noSpeech > 0.06 && avg < -0.6) ||
+      (noSpeech > 0.5 && !(wordy && avg >= -0.6)) ||
+      (said.length > 8 && unique < 0.3)
+    )
+      return { words: [], language: lang, endedAt: null };
+    const timedFrames = early ? Math.min(frames, Math.ceil((until + 0.3) / 0.02)) : frames;
+    const jumps = tokenStartTimes(
+      early ? firstFrames(attention, totalRows, frames, timedFrames) : attention,
+      totalRows,
+      timedFrames,
+    );
     const starts = new Float32Array(text.length);
     const ends = new Float32Array(text.length);
     for (let k = 0; k < text.length; k++) {
       starts[k] = jumps[prompt.length + k]!;
       ends[k] = jumps[prompt.length + k + 1]!;
     }
-    return { words: wordsFromTokens(this.#tok, text, starts, ends), language: lang };
+    return {
+      words: wordsFromTokens(this.#tok, text, starts, ends),
+      language: lang,
+      // Heard again from a little before the last word: the model skips words when its sound
+      // starts mid-speech, and words heard twice are kept once.
+      endedAt: early ? until - SEEK_BACK : null,
+    };
   }
 
   /** One decoder pass for `ids` (the prompt, or one new token). */

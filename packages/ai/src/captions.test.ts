@@ -46,8 +46,9 @@ const run = (fetch: typeof globalThis.fetch, audio: Float32Array, language = 'en
 
 describe('createCaptionsEndpoint', () => {
   it('cuts pieces at a pause between 25 and 30 s and places each piece’s words', async () => {
-    const server = fakeServer((_l, _s, n) => ({
-      words: [{ text: `piece${n}`, start: 1, end: 1.5 }],
+    // One long "word" per piece, to its end (a service that ends early is asked again: below).
+    const server = fakeServer((_l, seconds, n) => ({
+      words: [{ text: `piece${n}`, start: 1, end: seconds }],
       language: 'en',
     }));
     const result = await run(server.fetch, speech(60.5));
@@ -82,8 +83,8 @@ describe('createCaptionsEndpoint', () => {
   });
 
   it('keeps every piece when some are in the chosen language (speech that switches)', async () => {
-    const server = fakeServer((_l, _s, n) => ({
-      words: [{ text: `w${n}`, start: 0, end: 1 }],
+    const server = fakeServer((_l, seconds, n) => ({
+      words: [{ text: `w${n}`, start: 0, end: seconds }],
       language: n === 1 ? 'hi' : 'en',
     }));
     const result = await run(server.fetch, speech(60), 'hi');
@@ -92,8 +93,8 @@ describe('createCaptionsEndpoint', () => {
   });
 
   it('Detect decides by vote, then asks every piece for that language', async () => {
-    const server = fakeServer((language, _s, n) => ({
-      words: [{ text: `w${n}`, start: 0, end: 1 }],
+    const server = fakeServer((language, seconds, n) => ({
+      words: [{ text: `w${n}`, start: 0, end: seconds }],
       // Piece by piece, the service would hear English, then Spanish, Spanish, Spanish.
       language: language === 'auto' ? (n === 1 ? 'en' : 'es') : language,
     }));
@@ -130,6 +131,36 @@ describe('createCaptionsEndpoint', () => {
     }));
     expect(await run(server.fetch, speech(60), 'en')).toEqual({ words: [], language: 'en' });
     expect((await run(server.fetch, speech(60), 'auto')).words).toEqual([]);
+  });
+
+  it('asks once more for the rest of a piece when the service stopped early', async () => {
+    // The first answer stops at 3.6 s of a 20 s piece full of speech; the second hears the rest.
+    const server = fakeServer((_l, seconds, n) => ({
+      words:
+        n === 1
+          ? [
+              { text: 'a', start: 0.1, end: 0.5 },
+              { text: 'b', start: 3.1, end: 3.6 },
+            ]
+          : [{ text: 'c', start: 0.4, end: seconds - 1 }],
+      language: 'en',
+    }));
+    const result = await run(server.fetch, speech(20));
+    expect(server.calls).toHaveLength(2);
+    // From the frame of the last word's end.
+    expect(server.calls[1]!.seconds).toBeCloseTo(20 - 3.6, 1);
+    expect(result.words.map((w) => w.text)).toEqual(['a', 'b', 'c']);
+    expect(result.words[2]!.start).toBeGreaterThan(3.6);
+    // Words without their own times (timed from the sound) or a quiet rest: asked once.
+    const plain = fakeServer(() => ({ words: ['a', 'b'], language: 'en' }));
+    await run(plain.fetch, speech(20));
+    expect(plain.calls).toHaveLength(1);
+    const quiet = fakeServer(() => ({
+      words: [{ text: 'a', start: 0.1, end: 0.5 }],
+      language: 'en',
+    }));
+    await run(quiet.fetch, speech(20, 2));
+    expect(quiet.calls).toHaveLength(1);
   });
 
   it('leaves out words a service timed past the end of the piece', async () => {

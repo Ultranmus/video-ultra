@@ -214,6 +214,10 @@ for (const name of names) {
   checkTransitions(g, backends);
   checkAnimations(g, backends);
   checkPictureTools(g, backends);
+  // Captions are drawn over a photo: both backends even where video can't reach WebGPU.
+  const captionBackends = ['webgpu', 'webgl2'].filter((b) => g[`cap-rtl-word-${b}-0.5`]);
+  check(captionBackends.length > 0, `caption frames rendered (${captionBackends.join(', ')})`);
+  checkCaptions(g, captionBackends);
   if (backends.length === 2) {
     // The two backends get slightly different pixels from the browser's own YUV → RGB step (the
     // plain video area already differs by ~2 / 255 on Chrome); effects must not add to that.
@@ -412,6 +416,68 @@ function blendRef(mode: string, b: number, s: number): number {
  * blurred / pixelated areas and every blend mode, checked against the plain footage and CPU
  * references on each backend; the two backends must agree (checked with the other `pic-` frames).
  */
+/**
+ * Caption word highlight (DECISIONS #209): four words in red on grey, one second each. English
+ * reads from the left, Arabic from the right: the first word's red sits on the reading start's
+ * side, the last word's on the other; the fill grows from the reading start; both backends agree.
+ */
+function checkCaptions(g: Record<string, Img>, backends: string[]): void {
+  /** Red pixels in the caption band: count and mean x. */
+  const red = (img: Img) => {
+    let n = 0;
+    let sx = 0;
+    for (let y = 240; y < 400; y++)
+      for (let x = 0; x < SIZE; x++) {
+        const p = px(img, x, y);
+        if (p[0]! > 180 && p[1]! < 90 && p[2]! < 90) {
+          n++;
+          sx += x;
+        }
+      }
+    return { n, x: n ? sx / n : -1 };
+  };
+  const at: Record<string, ReturnType<typeof red>> = {};
+  for (const b of backends) {
+    const shot = (v: string, t: number) => g[`cap-${v}-${b}-${t}`];
+    if (!shot('rtl-word', 0.5)) {
+      check(false, `${b}: caption frames rendered`);
+      continue;
+    }
+    for (const v of ['ltr-word', 'rtl-word', 'rtl-box', 'rtl-fill'])
+      for (const t of [0.5, 2, 3.5]) at[`${v}-${b}-${t}`] = red(shot(v, t)!);
+    const s = (v: string, t: number) => at[`${v}-${b}-${t}`]!;
+    const show = (v: string, t: number) => `${s(v, t).n} px at x ${s(v, t).x.toFixed(0)}`;
+    check(
+      s('ltr-word', 0.5).n > 150 && s('ltr-word', 3.5).x > s('ltr-word', 0.5).x + 50,
+      `${b}: English word highlight follows the words left → right (${show('ltr-word', 0.5)}; ${show('ltr-word', 3.5)})`,
+    );
+    check(
+      s('rtl-word', 0.5).n > 100 && s('rtl-word', 0.5).x > s('rtl-word', 3.5).x + 50,
+      `${b}: Arabic word highlight follows the words right → left (${show('rtl-word', 0.5)}; ${show('rtl-word', 3.5)})`,
+    );
+    check(
+      s('rtl-box', 0.5).n > 400 && s('rtl-box', 0.5).x > s('rtl-box', 3.5).x + 50,
+      `${b}: Arabic box highlight sits behind the word being said (${show('rtl-box', 0.5)}; ${show('rtl-box', 3.5)})`,
+    );
+    check(
+      s('rtl-fill', 2).n > s('rtl-fill', 0.5).n &&
+        s('rtl-fill', 3.5).n > s('rtl-fill', 2).n &&
+        s('rtl-fill', 2).x > 320,
+      `${b}: Arabic fill grows from the right (${show('rtl-fill', 0.5)}; ${show('rtl-fill', 2)}; ${show('rtl-fill', 3.5)})`,
+    );
+  }
+  if (backends.length === 2)
+    for (const v of ['ltr-word', 'rtl-word', 'rtl-box', 'rtl-fill']) {
+      const a = at[`${v}-webgpu-2`];
+      const b = at[`${v}-webgl2-2`];
+      const d = mae(g[`cap-${v}-webgpu-2`]!, g[`cap-${v}-webgl2-2`]!, 0, 240, SIZE, 400);
+      check(
+        !!a && !!b && Math.abs(a.n - b.n) <= Math.max(20, a.n * 0.05) && d < 1.5,
+        `captions ${v}: WebGPU and WebGL2 match (red ${a?.n} / ${b?.n} px, mean difference ${d.toFixed(2)} / 255)`,
+      );
+    }
+}
+
 function checkPictureTools(g: Record<string, Img>, backends: string[]): void {
   for (const b of backends) {
     const at = (v: string) => g[`pic-${v}-${b}`];

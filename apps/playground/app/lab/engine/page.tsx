@@ -19,6 +19,7 @@
  */
 import {
   addAsset,
+  addCaptions,
   addToLane,
   createProject,
   DEFAULT_TEXT_STYLE,
@@ -31,6 +32,7 @@ import {
   projectDuration,
   setAnimation,
   setBackground,
+  setCaptionLook,
   setTransition,
   toSeconds,
   type AudioItem,
@@ -508,6 +510,71 @@ async function buildAnimationScene(plain: boolean): Promise<{ project: Project; 
   return { project, blobs };
 }
 
+/**
+ * Captions with a word highlight (DECISIONS #209): one caption of four words, one second each, in
+ * red on a plain grey picture. `rtl` is Arabic (read from the right), else English; `mode` the
+ * highlight. composite-check finds the red pixels.
+ */
+async function buildCaptionScene(
+  rtl: boolean,
+  mode: 'word' | 'fill' | 'box',
+): Promise<{ project: Project; blobs: Blobs }> {
+  const project = createProject({ name: 'Captions', width: 640, height: 640 });
+  const blobs: Blobs = new Map();
+  const grey = addBlobAsset(project, blobs, 'grey', await solidPng('rgb(60,60,60)'), 'image', 64);
+  insertMain(project, {
+    id: 'bg',
+    kind: 'image',
+    assetId: grey,
+    start: 0,
+    duration: fromSeconds(4),
+    ...look(),
+    fit: 'fill',
+  });
+  const said = rtl ? ['مرحبا', 'بكم', 'في', 'القناة'] : ['Welcome', 'to', 'the', 'channel'];
+  let n = 0;
+  addCaptions(
+    project,
+    [
+      {
+        start: 0,
+        end: fromSeconds(4),
+        text: said.join(' '),
+        words: said.map((text, i) => ({
+          text,
+          start: fromSeconds(i),
+          end: fromSeconds(i + 1),
+        })),
+      },
+    ],
+    () => `c${++n}`,
+  );
+  setCaptionLook(project, {
+    highlight: mode,
+    highlightColor: '#ff0000',
+    style: {
+      ...DEFAULT_TEXT_STYLE,
+      size: 0.09,
+      color: '#ffffff',
+      outline: null,
+      shadow: null,
+      background: null,
+      align: 'center',
+    },
+    y: 0.5,
+  });
+  return { project, blobs };
+}
+
+const CAPTION_VARIANTS = [
+  { key: 'ltr-word', rtl: false, mode: 'word' },
+  { key: 'rtl-word', rtl: true, mode: 'word' },
+  { key: 'rtl-box', rtl: true, mode: 'box' },
+  { key: 'rtl-fill', rtl: true, mode: 'fill' },
+] as const;
+/** First word, last word; the fill at its middle. */
+const CAPTION_TIMES = [0.5, 2, 3.5];
+
 /** Registers a generated file (a PNG or a .cube LUT) as an asset of `project`. */
 function addBlobAsset(
   project: Project,
@@ -839,6 +906,15 @@ async function runGolden(engine: EngineInternal): Promise<Record<string, string>
       () => buildPictureScene(variant),
       [1],
       (b) => `pic-${variant}-${b}`,
+      out,
+    );
+  }
+  for (const v of CAPTION_VARIANTS) {
+    await captureAll(
+      engine,
+      () => buildCaptionScene(v.rtl, v.mode),
+      CAPTION_TIMES,
+      (b, t) => `cap-${v.key}-${b}-${t}`,
       out,
     );
   }

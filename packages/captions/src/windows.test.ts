@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { keepWords, ownedSpan, spreadCollapsed, windowsOf } from './windows';
+import {
+  joinHeard,
+  keepWords,
+  ownedSpan,
+  spreadCollapsed,
+  voicedSeconds,
+  windowsOf,
+} from './windows';
 
 async function* pieces(total: number, size: number, rate: number) {
   let left = total;
@@ -98,5 +105,38 @@ describe('sound check', () => {
       { text: 'c', start: 6, end: 6.4 },
     ];
     expect(spreadCollapsed(fine, active)).toEqual(fine);
+  });
+});
+
+describe('hearing on after an early end (DECISIONS #208)', () => {
+  const w = (text: string, start: number) => ({ text, start, end: start + 0.3 });
+
+  it('adds the next hearing on the window clock, without the words heard twice', () => {
+    const words = [w('see', 4), w('you', 4.3), w('next', 4.6), w('time.', 4.9)];
+    // Heard again from 4.5 s: "next time." are in its first second.
+    joinHeard(words, [w('Next', 0.1), w('time.', 0.4), w('Welcome', 1.2), w('back', 1.5)], 4.5);
+    expect(words.map((x) => x.text)).toEqual(['see', 'you', 'next', 'time.', 'Welcome', 'back']);
+    expect(words[4]!.start).toBeCloseTo(5.7);
+  });
+
+  it('keeps a repeated word said later, and everything on the first hearing', () => {
+    const words = [w('time', 1)];
+    joinHeard(words, [w('then', 0.2), w('time', 1.5)], 2);
+    expect(words.map((x) => x.text)).toEqual(['time', 'then', 'time']);
+    const fresh: { text: string; start: number; end: number }[] = [];
+    joinHeard(fresh, [w('a', 0), w('b', 1)], 0);
+    expect(fresh).toEqual([w('a', 0), w('b', 1)]);
+    // Same word, but not at the start of the next hearing: kept.
+    const late = [w('go', 3)];
+    joinHeard(late, [w('go', 1.4)], 3);
+    expect(late).toHaveLength(2);
+  });
+
+  it('measures the sound left after a time', () => {
+    const active = new Uint8Array(1500);
+    active.fill(1, 500, 1000); // 10–20 s
+    expect(voicedSeconds(active)).toBeCloseTo(10);
+    expect(voicedSeconds(active, 15)).toBeCloseTo(5);
+    expect(voicedSeconds(active, 25)).toBe(0);
   });
 });

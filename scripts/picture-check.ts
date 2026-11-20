@@ -67,7 +67,7 @@ const axe = async (page: Page, label: string, include: string) => {
 async function load(page: Page) {
   await page.goto(`http://localhost:${port}/editor?autosave=0&fresh=1&theme=${theme}`);
   await page.waitForFunction(() => (window as any).vuEditor?.engine, null, { timeout: 30000 });
-  // The dev server's own badge can sit over the phone toolbar.
+  // The dev server's own badge (Next.js "Insights") sits over the phone toolbar's first tools.
   await page.addStyleTag({ content: 'nextjs-portal { display: none !important; }' });
   await page.locator('.vu-root input[type=file][accept^="video"]').setInputFiles(media);
   await page.waitForFunction(
@@ -271,7 +271,7 @@ if (only !== 'phone') {
   await snap(page, 'pc-d09-region-stretched');
   await axe(page, 'desktop blurred area inspector', '.vu-inspector');
 
-  // Blend: a text layer, Appearance → the Screen tile (blend modes are tiles, #178).
+  // Blend: a text layer, Appearance → the Screen preview tile (tiles since 10-31).
   await page.locator('.vu-rail .vu-btn', { hasText: 'Text' }).click();
   await page.locator('.vu-panel .vu-btn', { hasText: 'Add text' }).first().click();
   await page.waitForTimeout(500);
@@ -279,14 +279,24 @@ if (only !== 'phone') {
   const appearance = page.locator('.vu-inspector .vu-section-toggle', { hasText: 'Appearance' });
   if ((await appearance.getAttribute('aria-expanded')) !== 'true') await appearance.click();
   const blendTile = (name: string) =>
-    page.locator('.vu-inspector .vu-blend-grid .vu-filter-tile', { hasText: name });
+    page.locator('.vu-inspector .vu-blend-grid').getByRole('radio', { name, exact: true });
   await blendTile('Screen').click();
   await page.waitForTimeout(300);
-  check('desktop: blend tile sets the mode', (await item(page, textId))?.blend === 'screen');
+  check(
+    'desktop: the Screen blend tile sets the mode, and shows as chosen',
+    (await item(page, textId))?.blend === 'screen' &&
+      (await blendTile('Screen').getAttribute('aria-checked')) === 'true',
+  );
   await blendTile('Screen').scrollIntoViewIfNeeded();
   await snap(page, 'pc-d10-blend');
   await blendTile('Normal').click();
-  check('desktop: Normal removes the blend', !('blend' in ((await item(page, textId)) ?? {})));
+  await page.waitForTimeout(300);
+  const unblended = await item(page, textId);
+  check(
+    'desktop: the Normal tile takes the blend away',
+    !unblended?.blend || unblended.blend === 'normal',
+    JSON.stringify(unblended?.blend),
+  );
 
   // A LUT import while a text is the target: it can't take a look, but the look is still added
   // to the list, and the toast says so.

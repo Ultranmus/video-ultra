@@ -11,6 +11,7 @@ export default defineConfig({
     'analyzer.worker': 'src/media/analyzer-worker.ts',
     'storage.worker': 'src/storage/worker.ts',
     'proxy.worker': 'src/media/proxy-worker.ts',
+    'probe.worker': 'src/probe-worker.ts',
     // AudioWorklet module: loaded with addModule(), copied as-is by bundlers (no imports inside).
     'audio.worklet': 'src/audio/worklet.ts',
   },
