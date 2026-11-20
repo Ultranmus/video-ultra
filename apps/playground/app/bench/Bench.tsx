@@ -93,6 +93,13 @@ function playSeconds(): number {
   return Number.isFinite(value) && value > 0 ? value : 10;
 }
 
+/** `?decoders=2` runs the scrub test with a low-tier decoder budget. */
+function scrubDecoders(): number | undefined {
+  if (typeof window === 'undefined') return undefined;
+  const value = Number(new URLSearchParams(window.location.search).get('decoders'));
+  return Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
 export function Bench() {
   const [caps, setCaps] = useState<Capabilities | null>(null);
   const [capsError, setCapsError] = useState<string | null>(null);
@@ -257,7 +264,10 @@ export function Bench() {
 
   async function scrub() {
     const stop = startMainThreadMonitor();
-    const r = await run('Scrubbing 30 seeks', (s) => s.scrub(30));
+    const decoders = scrubDecoders();
+    const r = await run('Scrubbing 30 seeks', (s) =>
+      s.scrub(30, decoders ? { decoders } : undefined),
+    );
     const main = stop();
     if (!r) return;
     addResult({
@@ -267,6 +277,10 @@ export function Bench() {
         [
           'Decoders / previews / continued / restarts',
           `${r.sessions} / ${r.previews} / ${r.continued} / ${r.restarts}`,
+        ],
+        [
+          'Previews skipped (no free decoder) / peak decoders',
+          `${r.previewsSkipped} / ${r.peakDecoders} of ${r.decoderBudget}`,
         ],
         [
           'Drag (45 seeks, 16 ms apart)',

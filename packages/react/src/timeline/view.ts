@@ -2238,7 +2238,11 @@ export class TimelineView {
     color: string,
     mode: 'mirror' | 'up',
   ): void {
-    const wave = this.#cache.waveform(item.assetId);
+    const project = this.#ctl.project;
+    const wave =
+      project.assets[item.assetId]?.kind === 'compound'
+        ? this.#cache.compoundWaveform(project, item.assetId)
+        : this.#cache.waveform(item.assetId);
     if (!wave) return;
     const ctx = this.#ctx;
     const left = Math.max(bx, this.#m.header);

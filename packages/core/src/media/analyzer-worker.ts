@@ -29,7 +29,8 @@ import { SCENE_FRAME_HEIGHT, SCENE_FRAME_WIDTH, SceneDetector } from './scenes';
  *   one decoder for its lifetime.
  * - **Thumbnails** are batched per asset, newest request first; a batch is decoded in time order
  *   through one `samplesAtTimestamps` pass (one decoder). In `keyframe` mode every target snaps to
- *   its keyframe, so each thumbnail costs one packet decode. Same keyframe + height = one decode.
+ *   its keyframe, so each thumbnail costs one packet decode. Same keyframe + height = one decode,
+ *   also across jobs: a frame another job is decoding is waited for and taken from the cache.
  *   Results go through a small byte-budgeted cache (zooming the timeline asks for the same
  *   keyframes again).
  * - **Waveforms** stream-decode audio into fixed buckets (never the whole PCM). On a full decode
@@ -481,14 +482,59 @@ async function videoThumbs(entry: MediaEntry, batch: ThumbRequest[]): Promise<vo
     if (group) group.push(r);
     else heights.set(r.height, [r]);
   }
-  for (const [ts, heights] of byTime) {
-    for (const [height, group] of heights) {
-      if (await fromCache(cacheKey(entry.assetId, ts, height), group)) heights.delete(height);
+  // Another job may be decoding some of these frames already (one asset's strip is split over
+  // the free decode slots): this job decodes the rest, then takes those from the cache once that
+  // job is done. Whatever isn't there then (an error, evicted) is decoded on a later round.
+  for (let round = 0; byTime.size > 0; round++) {
+    for (const [ts, heights] of byTime) {
+      for (const [height, group] of heights) {
+        if (await fromCache(cacheKey(entry.assetId, ts, height), group)) heights.delete(height);
+        else if (!group.some((r) => live(r.id))) heights.delete(height);
+      }
+      if (heights.size === 0) byTime.delete(ts);
     }
-    if (heights.size === 0) byTime.delete(ts);
+    const waits: Promise<void>[] = [];
+    const own = new Map<number, Map<number, ThumbRequest[]>>();
+    let cached = false;
+    for (const [ts, heights] of byTime) {
+      const elsewhere = decoding.get(decodeKey(entry.assetId, ts));
+      if (elsewhere && round < 3) waits.push(elsewhere);
+      else if (
+        round < 3 &&
+        [...heights.keys()].every((h) => cache.has(cacheKey(entry.assetId, ts, h)))
+      )
+        cached = true; // drawn by another job while this one read the cache: next round takes it
+      else own.set(ts, heights);
+    }
+    for (const ts of own.keys()) byTime.delete(ts);
+    if (own.size > 0) await decodeThumbs(entry, info, own);
+    if (waits.length === 0 && !cached) return;
+    await Promise.all(waits);
   }
-  if (byTime.size === 0) return;
+}
 
+/** Frames being decoded for thumbnails right now (asset + timestamp), settled when drawn. */
+const decoding = new Map<string, Promise<void>>();
+const decodeKey = (assetId: string, ts: number) => `${assetId}|${ts}`;
+
+/** Decodes the frames at `byTime`'s timestamps in one pass and draws each asked height. */
+async function decodeThumbs(
+  entry: MediaEntry,
+  info: VideoInfo,
+  byTime: Map<number, Map<number, ThumbRequest[]>>,
+): Promise<void> {
+  const done = new Map<number, () => void>();
+  for (const ts of byTime.keys()) {
+    const key = decodeKey(entry.assetId, ts);
+    decoding.set(key, new Promise<void>((resolve) => done.set(ts, resolve)));
+  }
+  const finish = (ts: number) => {
+    const resolve = done.get(ts);
+    if (!resolve) return;
+    done.delete(ts);
+    decoding.delete(decodeKey(entry.assetId, ts));
+    resolve();
+  };
   const wanted = (ts: number) =>
     [...(byTime.get(ts)?.values() ?? [])].some((g) => g.some((r) => live(r.id)));
   const times = [...byTime.keys()].sort((a, b) => a - b);
@@ -497,7 +543,10 @@ async function videoThumbs(entry: MediaEntry, batch: ThumbRequest[]): Promise<vo
   // are skipped before they cost a decode.
   function* stamps(): Generator<number> {
     for (const ts of times) {
-      if (!wanted(ts)) continue;
+      if (!wanted(ts)) {
+        finish(ts);
+        continue;
+      }
       fifo.push(ts);
       yield ts;
     }
@@ -509,7 +558,10 @@ async function videoThumbs(entry: MediaEntry, batch: ThumbRequest[]): Promise<vo
       if (result.done) break;
       const sample = result.value;
       const ts = fifo.shift();
-      if (!sample) continue;
+      if (!sample) {
+        if (ts !== undefined) finish(ts);
+        continue;
+      }
       stats.framesDecoded++;
       stats.openFrames++;
       try {
@@ -521,12 +573,14 @@ async function videoThumbs(entry: MediaEntry, batch: ThumbRequest[]): Promise<vo
       } finally {
         sample.close();
         stats.openFrames--;
+        finish(ts!);
       }
     }
   } catch (error) {
     if (error instanceof WatchdogError) stats.watchdogResets++;
   } finally {
     void iterator.return?.(undefined).catch(() => undefined);
+    for (const ts of [...done.keys()]) finish(ts);
   }
 }
 

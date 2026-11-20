@@ -19,7 +19,8 @@ export interface LabSession {
   resize(width: number, height: number): Promise<void>;
   load(file: File): Promise<MediaInfo>;
   play(seconds: number): Promise<PlayResult>;
-  scrub(count: number): Promise<ScrubResult>;
+  /** `decoders`: the decoder pool's budget for this run (default 4; low tier 2). */
+  scrub(count: number, options?: { decoders?: number }): Promise<ScrubResult>;
   exportVideo(
     options: Omit<Extract<LabRequest, { type: 'export' }>, 'type'>,
   ): Promise<LabExportResult>;
@@ -105,8 +106,8 @@ export async function createLabSession(
     async play(seconds: number) {
       return (await expect({ type: 'play', seconds }, 'play')).result;
     },
-    async scrub(count: number) {
-      return (await expect({ type: 'scrub', count }, 'scrub')).result;
+    async scrub(count: number, options: { decoders?: number } = {}) {
+      return (await expect({ type: 'scrub', count, ...options }, 'scrub')).result;
     },
     async exportVideo(options: Omit<Extract<LabRequest, { type: 'export' }>, 'type'>) {
       return (await expect({ type: 'export', ...options }, 'export')).result;

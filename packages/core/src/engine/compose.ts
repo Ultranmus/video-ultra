@@ -47,12 +47,14 @@ import type {
   Adjust,
   Asset,
   CaptionWord,
+  Crop,
   Item,
   ItemAnimation,
   Project,
   TextItem,
   TextStyle,
   Transform,
+  VideoItem,
 } from '../model/schema';
 import { FLICKS_PER_SECOND, frameIndex, type Time } from '../model/time';
 import {
@@ -132,6 +134,32 @@ const BACKDROP_TRANSFORM: Transform = Object.freeze({
 });
 /** Combined clips inside combined clips: this deep, no deeper (a guard, not a design limit). */
 const MAX_NESTING = 4;
+/** A combined clip's inside is drawn at most this many times its fitted size (zoomed in)… */
+export const COMPOUND_MAX_ZOOM = 2;
+/** …and never with a side longer than this (px). */
+export const COMPOUND_MAX_SIDE = 4096;
+
+/**
+ * How much bigger than its fitted size (`fw × fh`, inside a `width × height` output) a combined
+ * clip is shown: its scale, fill and crop. 1 when it isn't bigger (or barely); else rounded up to
+ * a quarter, at most {@link COMPOUND_MAX_ZOOM}.
+ */
+export function compoundZoom(
+  fw: number,
+  fh: number,
+  width: number,
+  height: number,
+  look: { transform: { scale: number }; crop: Crop; fit: VideoItem['fit'] },
+): number {
+  const { crop } = look;
+  const cw = fw * Math.max(1e-6, 1 - crop.left - crop.right);
+  const ch = fh * Math.max(1e-6, 1 - crop.top - crop.bottom);
+  const base =
+    look.fit === 'fill' ? Math.max(width / cw, height / ch) : Math.min(width / cw, height / ch);
+  const z = base * Math.abs(look.transform.scale);
+  if (!(z > 1.05)) return 1;
+  return Math.min(COMPOUND_MAX_ZOOM, Math.ceil(z * 4) / 4);
+}
 
 /** Animation blur at full strength: radius as a fraction of the picture's shorter side. */
 const ANIMATION_BLUR = 0.12;
@@ -294,8 +322,8 @@ export class Composer {
     private readonly media: MediaLibrary,
     readonly exact: boolean,
     rasterBudget: number,
-    /** Low tier: no keyframe-preview decoder. */
-    private readonly allowPreviews = pool.budget > 2,
+    /** Keyframe previews while scrubbing (they take a free pool slot; exports leave them out). */
+    private readonly allowPreviews = true,
   ) {
     this.rasters = new RasterCache(renderer, rasterBudget);
   }
@@ -797,13 +825,16 @@ export class Composer {
   }
 
   /**
-   * Draws a combined clip's inside at its time `at` into its item's render target — sized to
-   * fit the output (as the clip would be at scale 1), so exports stay sharp — and returns it.
+   * Draws a combined clip's inside at its time `at` into its item's render target and returns it.
+   * The target fits the output (as the clip would be at scale 1), so exports stay sharp; when the
+   * clip is shown bigger than that (zoomed past 1×, filled or cropped) it grows with it, in
+   * quarter steps (a zoom animation doesn't make a new target every frame), up to
+   * {@link COMPOUND_MAX_ZOOM}× and {@link COMPOUND_MAX_SIDE} px (DECISIONS #206).
    */
   private async drawCompound(
     project: Project,
     asset: Asset,
-    itemId: string,
+    item: Pick<VideoItem, 'id' | 'transform' | 'crop' | 'fit'>,
     at: Time,
     width: number,
     height: number,
@@ -811,9 +842,12 @@ export class Composer {
     result: ComposeResult,
   ): Promise<RenderTarget | null> {
     if (this.depth >= MAX_NESTING || !asset.tracks) return null;
+    const itemId = item.id;
     const aw = asset.width ?? project.settings.width;
     const ah = asset.height ?? project.settings.height;
-    const k = Math.min(width / aw, height / ah);
+    const fitK = Math.min(width / aw, height / ah);
+    const zoom = compoundZoom(aw * fitK, ah * fitK, width, height, item);
+    const k = fitK * Math.max(1, Math.min(zoom, COMPOUND_MAX_SIDE / (Math.max(aw, ah) * fitK)));
     const tw = Math.max(1, Math.round(aw * k));
     const th = Math.max(1, Math.round(ah * k));
     let child = this.children.get(itemId);
@@ -1087,7 +1121,7 @@ export class Composer {
           const target = await this.drawCompound(
             project,
             compound,
-            item.id,
+            item,
             layer.sourceTime,
             width,
             height,

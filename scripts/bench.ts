@@ -3,6 +3,7 @@
  * Usage: start the playground (`pnpm --filter playground dev`), then
  *   node scripts/bench.ts [--browsers chrome,chromium,webkit,firefox] [--files avc-1080p30.mp4,...]
  *                         [--backends auto,webgl2] [--play seconds] [--save dir] [--headed]
+ *                         [--decoders 2]   (scrub with a low-tier decoder budget)
  *
  * `chrome` is the installed Google Chrome (real GPU + hardware decoding) — the closest to what
  * users run. `chromium`, `webkit` and `firefox` are Playwright's builds (WebKit ≈ Safari's engine).
@@ -41,7 +42,10 @@ async function launch(name: string): Promise<Browser> {
 }
 
 async function runOne(page: Page, file: string, backend: string): Promise<string> {
-  await page.goto(`${base}/bench${args.has('play') ? `?play=${args.get('play')}` : ''}`);
+  const query = new URLSearchParams();
+  if (args.has('play')) query.set('play', args.get('play')!);
+  if (args.has('decoders')) query.set('decoders', args.get('decoders')!);
+  await page.goto(`${base}/bench${query.size ? `?${query}` : ''}`);
   await page.waitForFunction(() => /Engine ready|failed/.test(document.body.innerText), null, {
     timeout: 30_000,
   });

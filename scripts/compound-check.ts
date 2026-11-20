@@ -328,6 +328,44 @@ for (const b of backends) {
   const d = diff(before.get(`${b}@2`)!, await frame(page, 2.0, b));
   check(`${b}: after Separate the frame is as before`, d.mean < 0.3, `mean ${d.mean.toFixed(2)}`);
 }
+
+// Zoomed in: a combined clip at 2× is drawn at the zoomed size (DECISIONS #206), so it looks like
+// its one video at 2× — not like a small picture stretched (blurry).
+const zoom = (scale: number) =>
+  page.evaluate((s) => {
+    const c = (window as any).vuEditor;
+    c.run('Zoom', (d: any) => (d.tracks[0].items[0].transform.scale = s));
+  }, scale);
+await zoom(2);
+await page.waitForTimeout(300);
+const zoomed = new Map<string, number[]>();
+for (const b of backends) zoomed.set(b, await frame(page, 0.5, b));
+await zoom(1);
+await page.evaluate(() => {
+  const c = (window as any).vuEditor;
+  // The video and the photo after it (one clip can't be combined alone).
+  const [video, photo] = c.project.tracks[0].items;
+  c.select(video.id, { only: true });
+  c.select(photo.id, { add: true });
+  c.combineSelected();
+});
+await page.waitForTimeout(400);
+const alone = await page.evaluate(() => {
+  const c = (window as any).vuEditor;
+  const clip = c.project.tracks[0].items[0];
+  return c.project.assets[clip.assetId]?.kind;
+});
+check('the video and photo combined', alone === 'compound', String(alone));
+await zoom(2);
+await page.waitForTimeout(300);
+for (const b of backends) {
+  const d = diff(zoomed.get(b)!, await frame(page, 0.5, b));
+  check(
+    `${b}: a combined clip at 2× is as sharp as its video at 2×`,
+    d.mean < 1,
+    `mean ${d.mean.toFixed(2)}, p99 ${d.p99}`,
+  );
+}
 check('no page errors', errors.length === 0, errors.join(' | '));
 await browser.close();
 console.log(results.join('\n'));

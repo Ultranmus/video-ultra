@@ -1,5 +1,10 @@
-import type { DeviceTier } from '@video-ultra/core';
-import type { MediaAnalyzer, Waveform } from '@video-ultra/core/internal';
+import { FLICKS_PER_SECOND, type Asset, type DeviceTier, type Project } from '@video-ultra/core';
+import {
+  compoundSoundParts,
+  mixPeaks,
+  type MediaAnalyzer,
+  type Waveform,
+} from '@video-ultra/core/internal';
 
 /** Byte budget for timeline thumbnails per device tier. */
 // Small on purpose: the analyzer worker keeps its own byte-budgeted cache and re-serves a cached
@@ -34,6 +39,11 @@ export class TimelineMediaCache {
   readonly #inFlight = new Map<string, AbortController>();
   #wanted: { key: string; assetId: string; seconds: number; height: number }[] = [];
   readonly #waveforms = new Map<string, Waveform | null | 'pending'>();
+  /**
+   * Combined clips' mixed waveforms, per asset object (an edit inside makes a new one), with the
+   * combined clips they read (stale when one of those changed).
+   */
+  readonly #mixes = new WeakMap<Asset, { reads: Asset[]; wave: Waveform | null }>();
   #destroyed = false;
 
   constructor(analyzer: () => MediaAnalyzer | null, tier: DeviceTier, onChange: () => void) {
@@ -134,6 +144,38 @@ export class TimelineMediaCache {
       })
       .catch(() => this.#waveforms.set(assetId, null));
     return null;
+  }
+
+  /**
+   * A combined clip's waveform: the waveforms of the sounds inside it, mixed at their places
+   * (DECISIONS #207). Null until every one of them is known (a redraw follows each arrival).
+   */
+  compoundWaveform(project: Project, assetId: string): Waveform | null {
+    const asset = project.assets[assetId];
+    if (!asset || asset.kind !== 'compound') return null;
+    const hit = this.#mixes.get(asset);
+    if (hit && hit.reads.every((a) => project.assets[a.id] === a)) return hit.wave;
+    if (!this.#analyzer()) return null;
+    const { parts, compounds } = compoundSoundParts(project, assetId);
+    let waiting = false;
+    for (const part of parts) {
+      this.waveform(part.assetId);
+      if (this.#waveforms.get(part.assetId) === 'pending') waiting = true;
+    }
+    if (waiting) return null;
+    const wave = parts.length
+      ? mixPeaks(asset.duration / FLICKS_PER_SECOND, parts, (id) => {
+          const w = this.#waveforms.get(id);
+          return w && w !== 'pending' ? w : null;
+        })
+      : null;
+    const reads: Asset[] = [];
+    for (const id of compounds) {
+      const a = project.assets[id];
+      if (a) reads.push(a);
+    }
+    this.#mixes.set(asset, { reads, wave });
+    return wave;
   }
 
   /** Bytes held by thumbnails (for tests and the stats overlay). */

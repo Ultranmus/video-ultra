@@ -351,8 +351,16 @@ export interface ExportDeps {
   project: Project;
   media: MediaLibrary;
   audioOf: (assetId: string) => AudioTrackSource | null;
-  /** `alpha`: a see-through canvas (a transparent background exported as WebM). */
-  makeRenderer: (canvas: OffscreenCanvas, alpha: boolean) => Promise<Renderer>;
+  /**
+   * A renderer drawing into a `width × height` canvas, for the export's length (the engine lends
+   * its warm work renderer). `alpha`: a see-through canvas (a transparent background exported as
+   * WebM, #196). `release(ok)` gives it back; `ok` false: something failed, drop it.
+   */
+  renderer: (
+    width: number,
+    height: number,
+    alpha: boolean,
+  ) => Promise<{ canvas: OffscreenCanvas; renderer: Renderer; release: (ok: boolean) => void }>;
   decoderBudget: number;
   rasterBudget: number;
   isCancelled: () => boolean;
@@ -550,8 +558,9 @@ export async function runExport(
     target: sink.target,
   });
 
-  const canvas = new OffscreenCanvas(width, height);
-  const renderer = await deps.makeRenderer(canvas, alpha);
+  const lease = await deps.renderer(width, height, alpha);
+  const { canvas, renderer } = lease;
+  let leaseOk = false;
   const pool = new DecoderPool(deps.decoderBudget);
   const composer = new Composer(renderer, pool, deps.media, true, deps.rasterBudget, false);
   composer.keepTransparency = alpha;
@@ -681,14 +690,17 @@ export async function runExport(
     audioSource?.close();
     if (deps.isCancelled()) throw new ExportCancelled();
     await output.finalize();
+    leaseOk = true;
   } catch (error) {
+    // A cancel leaves the renderer healthy.
+    leaseOk = error instanceof ExportCancelled;
     await abandon(output, [videoSource, audioSource]);
     await sink.remove();
     throw error;
   } finally {
     composer.destroy();
     mixer?.dispose();
-    renderer.destroy();
+    lease.release(leaseOk);
   }
   report(framesTotal, true);
 

@@ -370,7 +370,7 @@ export function Inspector(): ReactElement {
     <aside className="vu-inspector" aria-label={name}>
       <div className="vu-panel-head">
         <span className="vu-kind-badge" data-kind={item.kind}>
-          <Icon name={KIND_ICON[item.kind]} size={16} />
+          <Icon name={ctl.isCombined(item) ? 'combine' : KIND_ICON[item.kind]} size={16} />
         </span>
         <div className="vu-inspector-title">
           <h2 className="vu-panel-title">{name}</h2>
@@ -672,7 +672,7 @@ function TimelineA11y({ onReveal }: { onReveal: (item: Item) => void }): ReactEl
                     role="option"
                     tabIndex={selectedId === item.id || (selectedId === null && n === 1) ? 0 : -1}
                     aria-selected={selectedId === item.id}
-                    aria-label={`${l.clipLabel(index + 1, kindLabel(l, item.kind), formatTime(item.start), formatTime(itemEnd(item)))}: ${itemTitle(item, assets)}${item.locked || track.locked ? `, ${l.lockedState}` : ''}${item.hidden ? `, ${l.hiddenState}` : ''}`}
+                    aria-label={`${l.clipLabel(index + 1, ctl.isCombined(item) ? (l.kind.combined ?? l.combinedKind) : kindLabel(l, item.kind), formatTime(item.start), formatTime(itemEnd(item)))}: ${itemTitle(item, assets)}${item.locked || track.locked ? `, ${l.lockedState}` : ''}${item.hidden ? `, ${l.hiddenState}` : ''}`}
                     onFocus={() => {
                       ctl.select(item.id);
                       ctl.seek(item.start);
