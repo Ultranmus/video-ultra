@@ -4,7 +4,10 @@ import Link from 'next/link';
 export function SiteFooter() {
   return (
     <footer className="site-footer">
-      <p>VideoUltra · free and MIT licensed · a sibling of ImageUltra</p>
+      <p>
+        VideoUltra · free and MIT licensed · a sibling of{' '}
+        <a href="https://imageultra.ashvattech.com">ImageUltra</a>
+      </p>
       <nav aria-label="More">
         <Link href="/docs">Docs</Link>
         <Link href="/playground">Playground</Link>

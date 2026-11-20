@@ -19,7 +19,13 @@ const base = (arg('base') ?? `http://localhost:${arg('port') ?? '3200'}`).replac
 const shots = arg('shots');
 /** The API reference: the overview (in DOCS) and one page per package. */
 const API_PACKAGES = ['react', 'core', 'captions', 'ai'];
-const PATHS = ['/', ...DOCS.map((p) => p.href), ...API_PACKAGES.map((p) => `/docs/api/${p}`)];
+const PATHS = [
+  '/',
+  '/playground',
+  '/bench',
+  ...DOCS.map((p) => p.href),
+  ...API_PACKAGES.map((p) => `/docs/api/${p}`),
+];
 
 let failures = 0;
 const results: string[] = [];
@@ -47,6 +53,17 @@ for (const [kind, context] of [
       axe.violations.length === 0,
       axe.violations.map((v) => `${v.id}×${v.nodes.length}`).join(','),
     );
+    // Every dropdown uses the site's chevron with room for it (never the browser's own arrow).
+    const plain = await page.evaluate(
+      () =>
+        [...document.querySelectorAll<HTMLSelectElement>('.site select')]
+          .filter((el) => !el.closest('.vu-root'))
+          .filter((el) => {
+            const c = getComputedStyle(el);
+            return c.appearance !== 'none' || !c.backgroundImage.startsWith('url');
+          }).length,
+    );
+    check(`${kind} ${path}: dropdowns use the site chevron`, plain === 0, `${plain} plain`);
     if (kind === 'phone') {
       const wide = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1);
       check(`phone ${path}: no sideways scroll`, !wide);

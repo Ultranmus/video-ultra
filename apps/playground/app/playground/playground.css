@@ -393,8 +393,7 @@
 }
 
 /* Inputs and select */
-.site .pg-input,
-.pg-select select {
+.site .pg-input {
   width: 100%;
   height: var(--pg-control);
   padding: 0 12px;
@@ -406,33 +405,13 @@
   font-size: 14px;
 }
 
-.site .pg-input:hover,
-.pg-select select:hover {
+.site .pg-input:hover {
   border-color: var(--s-muted);
 }
 
 .site .pg-input::placeholder {
   color: var(--s-muted);
   opacity: 0.8;
-}
-
-.pg-select {
-  position: relative;
-}
-
-.pg-select select {
-  padding-right: 36px;
-  cursor: pointer;
-  appearance: none;
-}
-
-.pg-select svg {
-  position: absolute;
-  top: 50%;
-  right: 12px;
-  color: var(--s-muted);
-  pointer-events: none;
-  transform: translateY(-50%);
 }
 
 /* Switch: a checkbox drawn as a switch. */

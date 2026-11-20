@@ -4572,6 +4572,12 @@
     text-align: center;
   }
 
+  /* Done, tall (portrait) video: the result sits a little below the top of the preview beside
+     it, not jammed against it (and not dead centre). Square and wide videos are short enough. */
+  .vu-export[data-state='done'] .vu-export-body:not([data-wide]) .vu-export-done {
+    padding-top: var(--vu-space-8);
+  }
+
   .vu-export-done-title {
     font-size: var(--vu-text-lg);
     font-weight: var(--vu-weight-semibold);
@@ -4651,6 +4657,10 @@
   /* Phones: one column. Only the preview and the choices scroll; the summary and button are a
      bar fixed at the bottom of the screen. */
   @container vu (max-width: 767px) {
+    .vu-export[data-state='done'] .vu-export-body:not([data-wide]) .vu-export-done {
+      padding-top: 0;
+    }
+
     .vu-export-body,
     .vu-export-body[data-wide] {
       display: flex;
