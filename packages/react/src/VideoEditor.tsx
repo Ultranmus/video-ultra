@@ -335,6 +335,8 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
       const sheet = field.closest<HTMLElement>('.vu-dock[data-expanded]');
       root.removeAttribute('data-sheet-typing');
       if (!sheet || !matchMedia('(pointer: coarse)').matches) return;
+      // The Assistant's box is pinned at the panel's foot: room below it only pushes it up.
+      if (field.closest('.vu-assistant')) return;
       let scroller = field.parentElement;
       while (scroller && scroller !== sheet) {
         const oy = getComputedStyle(scroller).overflowY;
