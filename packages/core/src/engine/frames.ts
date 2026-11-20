@@ -260,6 +260,11 @@ export class FrameSource implements DecoderOwner {
     for (;;) {
       if (id !== this.latestId) return null; // overtaken: leave the iterator where it is
       const next = await this.nextSample();
+      if (this.destroyed) {
+        // Shut down while this frame was decoding: it has no owner any more.
+        next?.close();
+        return null;
+      }
       if (!next) {
         // End of the track: the last frame stays on screen.
         this.stopIterator(false);
@@ -277,11 +282,17 @@ export class FrameSource implements DecoderOwner {
     const timeout = new Promise<'timeout'>((resolve) => {
       timer = setTimeout(() => resolve('timeout'), WATCHDOG_MS);
     });
-    const result = await Promise.race([iterator.next(), timeout]).finally(() =>
-      clearTimeout(timer),
-    );
+    const pending = iterator.next();
+    const result = await Promise.race([pending, timeout]).finally(() => clearTimeout(timer));
     if (result === 'timeout') {
       this.stats.watchdogResets++;
+      // The frame may still come after we gave up on it: close it then (it has no owner).
+      void pending.then(
+        (late) => {
+          if (!late.done) late.value.close();
+        },
+        () => undefined,
+      );
       throw new Error('Decoder stopped answering');
     }
     return result.done ? null : result.value;

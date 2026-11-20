@@ -566,22 +566,27 @@ async function hdrCheck(times: number[], width: number): Promise<HdrCheckResult>
       for (const t of times) {
         const sample = await sink.getSample(t);
         if (!sample) continue;
+        // Closed even when drawing throws (the error is recorded for this backend below).
         const frame = frameOf(sample);
-        r.draw(frame, placement);
-        if (frames.length === 0) {
-          // The first WebGPU draw came back black on an iPhone: record whether it happens, then
-          // draw again so the measurement isn't spoiled.
-          const first = canvas.transferToImageBitmap();
-          readback.drawImage(first, 0, 0);
-          first.close();
-          const px = readback.getImageData(0, 0, w, h).data;
-          let lit = false;
-          for (let i = 0; i < px.length && !lit; i += 4) lit = px[i]! + px[i + 1]! + px[i + 2]! > 0;
-          firstDrawBlank[backend] = !lit;
+        try {
           r.draw(frame, placement);
+          if (frames.length === 0) {
+            // The first WebGPU draw came back black on an iPhone: record whether it happens, then
+            // draw again so the measurement isn't spoiled.
+            const first = canvas.transferToImageBitmap();
+            readback.drawImage(first, 0, 0);
+            first.close();
+            const px = readback.getImageData(0, 0, w, h).data;
+            let lit = false;
+            for (let i = 0; i < px.length && !lit; i += 4)
+              lit = px[i]! + px[i + 1]! + px[i + 2]! > 0;
+            firstDrawBlank[backend] = !lit;
+            r.draw(frame, placement);
+          }
+        } finally {
+          closeFrame(frame);
+          sample.close();
         }
-        closeFrame(frame);
-        sample.close();
         const bitmap = canvas.transferToImageBitmap();
         readback.drawImage(bitmap, 0, 0);
         bitmap.close();
