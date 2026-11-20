@@ -777,3 +777,16 @@ canvas size ease (scale 0.75 → 1 over ~200 ms). Core 529 + react 24 tests pass
   keyboard comes. Simulated keyboard (WebKit, iPhone 13): Layers rename and template words don't
   move when the keyboard shows (before: 230 px / 205 px jumps).
 - Checks: `pnpm verify` green; stage-text-check as before (the WebKit ResizeObserver message).
+
+## 2026-11-20 (3) · Sheet fields without iOS's scroll (owner checked on the iPhone ✓)
+
+- A temporary `?kbdebug=1` log in the local playground (not committed) showed iOS scrolling the
+  page by up to the keyboard height on every field focus, and our undo making the jump.
+- #195: sheet text fields get focus with `preventScroll` (on touch when the keyboard is up);
+  layer rename the same; placement in the top 30 %, 64 px above the keyboard; fields take
+  `touch-action: manipulation`. Owner: "works now, no jump and switching is fast"; Layers ✓,
+  green screen first tap ✓ (#193).
+- Local phone testing over https: `next dev --experimental-https` couldn't make its certificate
+  without a password, so one was made with the existing mkcert CA for the Mac's LAN address
+  (`apps/playground/certificates/`, kept out of git via `.git/info/exclude`).
+- Checks: `pnpm verify` green; stage-text-check 23 pass + the known WebKit ResizeObserver message.

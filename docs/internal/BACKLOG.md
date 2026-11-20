@@ -4,6 +4,9 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 
 ## Open
 
+- [x] (fixed 2026-11-20, #195) Owner (iPhone): switching between template fields (and editing in a
+      full-height Layers sheet) still jumped like the sheet opening again, the next field hid
+      under Safari's address bar, and switching fast lagged. Confirmed fixed on the iPhone.
 - [x] (fixed 2026-11-20, #193) Owner (iPhone): green screen on the yellow wall still said "grey,
       white and black" on the first tap; a second or third tap on the same spot worked.
 - [x] (fixed 2026-11-20, #194) Owner (iPhone): with the Layers sheet already full height (and in

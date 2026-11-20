@@ -7,6 +7,7 @@ import {
   type Time,
 } from '@video-ultra/core';
 import {
+  useCallback,
   useEffect,
   useId,
   useLayoutEffect,
@@ -306,6 +307,9 @@ function LayerRow({
   const l = useLabels();
   const [renaming, setRenaming] = useState(false);
   const rowRef = useRef<HTMLLIElement>(null);
+  const focusQuietly = useCallback((el: HTMLInputElement | null) => {
+    el?.focus({ preventScroll: true });
+  }, []);
   const name = main && !item.name ? l.rowVideo : itemTitle(item, ctl.project.assets);
   const shown = item.kind === 'text' ? item.text.split('\n')[0] || name : name;
   const locked = !!item.locked;
@@ -347,7 +351,9 @@ function LayerRow({
             aria-label={l.rename}
             defaultValue={item.name ?? ''}
             placeholder={shown}
-            autoFocus
+            // Focused without a scroll: iOS would shift the page to it (the keyboard code
+            // places it instead, VideoEditor.tsx).
+            ref={focusQuietly}
             onBlur={(e) => {
               ctl.renameItem(item.id, e.currentTarget.value);
               setRenaming(false);

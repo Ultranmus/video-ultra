@@ -57,6 +57,12 @@
     touch-action: manipulation;
   }
 
+  /* Fields too: without it iOS waits after each quick tap to see if it's a double-tap (zoom), so
+     switching between fields fast lagged (owner, 2026-11-20). */
+  :where(.vu-root) :where(input, textarea, select, label) {
+    touch-action: manipulation;
+  }
+
   :where(.vu-root) :where(h2, h3, p, ol, ul, dl, dd) {
     margin: 0;
   }
