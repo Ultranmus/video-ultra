@@ -528,6 +528,105 @@ if (webkitModel) {
   await browser.close();
 }
 
+// ── a long captions list: only the rows near the view render (DECISIONS #210) ──
+{
+  const browser = await chromium.launch({ channel: 'chrome' });
+  const page = await (
+    await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  ).newPage();
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await load(page, '', ['avc-long-360p.mp4']);
+  const N = 1500;
+  const stamp = (s: number) =>
+    `00:${String(Math.floor(s / 60)).padStart(2, '0')}:${(s % 60).toFixed(3).padStart(6, '0').replace('.', ',')}`;
+  const srt = Array.from(
+    { length: N },
+    (_, i) => `${i + 1}\n${stamp(i * 0.4)} --> ${stamp(i * 0.4 + 0.3)}\nCaption ${i + 1}\n`,
+  ).join('\n');
+  const srtIn = join(mkdtempSync(join(tmpdir(), 'vu-cap-')), 'long.srt');
+  writeFileSync(srtIn, srt);
+  await page.locator('.vu-rail .vu-btn', { hasText: 'Captions' }).click();
+  await page.evaluate(() => {
+    (window as any).longTasks = [];
+    new PerformanceObserver((list) => {
+      for (const e of list.getEntries()) (window as any).longTasks.push(Math.round(e.duration));
+    }).observe({ type: 'longtask' });
+  });
+  await page.locator('.vu-panel input[type=file][accept^=".srt"]').setInputFiles(srtIn);
+  await page.waitForFunction(
+    (n) =>
+      document.querySelectorAll('.vu-caption-row').length > 0 &&
+      (window as any).vuEditor.project.tracks.some(
+        (t: any) => t.kind === 'caption' && t.items.length === n,
+      ),
+    N,
+    { timeout: 30000 },
+  );
+  await page.waitForTimeout(500);
+  const rows = () => page.locator('.vu-caption-row');
+  const rendered = await rows().count();
+  const sizes = await rows()
+    .first()
+    .evaluate((li) => [li.getAttribute('aria-posinset'), li.getAttribute('aria-setsize')]);
+  const longTasks = (await page.evaluate(() => (window as any).longTasks)) as number[];
+  check(
+    `${N} captions: only the rows near the view render, each says its place among all`,
+    rendered < 80 && sizes[0] === '1' && sizes[1] === String(N),
+    `${rendered} rows, first ${sizes.join(' of ')}, long tasks on import ${longTasks.join(', ') || 'none'} ms`,
+  );
+  // Scrolling to the end renders the last rows.
+  const scroller = async (to: 'end' | number) =>
+    page.locator('.vu-caption-list').evaluate((ol, at) => {
+      let p = ol.parentElement;
+      while (p && !/(auto|scroll)/.test(getComputedStyle(p).overflowY)) p = p.parentElement;
+      p!.scrollTop = at === 'end' ? p!.scrollHeight : at;
+      return p!.scrollHeight;
+    }, to);
+  const height = await scroller('end');
+  await page.waitForTimeout(300);
+  const lastText = await rows().last().locator('textarea').inputValue();
+  check(
+    'scrolled to the end: the last caption shows, the list keeps its full height',
+    lastText === `Caption ${N}` && height > N * 30,
+    `${lastText}, ${height} px, ${await rows().count()} rows`,
+  );
+  // Keyboard: Tab from the first caption walks on through rows rendered as it goes.
+  await scroller(0);
+  await page.waitForTimeout(300);
+  await rows().first().locator('textarea').focus();
+  for (let i = 0; i < 120; i++) await page.keyboard.press('Tab');
+  const at = await page.evaluate(() =>
+    Number(document.activeElement?.closest('.vu-caption-row')?.getAttribute('aria-posinset') ?? 0),
+  );
+  check('Tab keeps walking through the captions past the first rendered rows', at > 20, `at ${at}`);
+  // Selecting a far caption (Next to check, the timeline) brings its row into view.
+  const farId = await page.evaluate(
+    () =>
+      (window as any).vuEditor.project.tracks.find((t: any) => t.kind === 'caption').items[1199].id,
+  );
+  await page.evaluate((id) => (window as any).vuEditor.select(id, { keepPanel: true }), farId);
+  await page.waitForTimeout(400);
+  const far = page.locator('.vu-caption-row[aria-posinset="1200"]');
+  check(
+    'a caption selected far down the list is rendered and in view',
+    (await far.count()) === 1 &&
+      (await far.isVisible()) &&
+      (await far.locator('textarea').inputValue()) === 'Caption 1200',
+  );
+  const axe = await new AxeBuilder({ page })
+    .include('.vu-panel')
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'])
+    .analyze();
+  check(
+    'long captions list passes axe',
+    axe.violations.length === 0,
+    axe.violations.map((v) => v.id).join(','),
+  );
+  check('no page errors (long list)', errors.length === 0, errors.join(' | '));
+  await browser.close();
+}
+
 // ── phone ───────────────────────────────────────────────────────────────
 {
   const browser = await webkit.launch();

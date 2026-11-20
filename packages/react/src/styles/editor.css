@@ -6143,6 +6143,11 @@
     list-style: none;
   }
 
+  /* Long lists render only the rows near the view; the rest is room above and below (#210). */
+  .vu-caption-list[data-windowed] {
+    padding-block: var(--vu-caption-list-before) var(--vu-caption-list-after);
+  }
+
   .vu-caption-row {
     display: grid;
     grid-template-columns: var(--vu-size-caption-time) 1fr;
