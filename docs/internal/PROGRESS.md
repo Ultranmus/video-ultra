@@ -804,4 +804,11 @@ canvas size ease (scale 0.75 → 1 over ~200 ms). Core 529 + react 24 tests pass
   README and LICENSE titles, page titles and headings, package descriptions, the "not a
   VideoUltra project" message, starter sound credits, the API reference title. Unchanged on
   purpose: storage keys, the `@layer video-ultra` name, storage folder / namespace, test data.
-- Not done yet: landing page; ImageUltra's files copied into its repo.
+- Home page (DECISIONS #216): hero with the mark, demo / get-started buttons and the install
+  command, the editor window (screenshot → live editor on request; phones open `/editor`),
+  eight features, the code sample, a footer. Shared top bar with the docs. Checked: desktop
+  dark / light, iPhone 13, 360 px Android (no sideways scroll), `docs-check` 71/71 including
+  axe on `/` and both demo buttons.
+- Found while taking the screenshot: the Sintel trailer added through the file picker
+  previews black in Chrome on the Mac (BACKLOG); other files are fine.
+- Not done yet: ImageUltra's files copied into its repo.

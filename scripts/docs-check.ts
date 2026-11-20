@@ -1,6 +1,7 @@
 /**
- * The docs site in a real browser: every page loads with no errors, passes axe (WCAG 2 A/AA),
- * has no horizontal scroll at phone width, and the API reference is served.
+ * The docs site in a real browser: the home page and every docs page load with no errors, pass
+ * axe (WCAG 2 A/AA), have no horizontal scroll at phone width, and the API reference is served.
+ * The home page's demo button loads the editor in place (desktop) or opens it (phone).
  * Usage: playground running (and `pnpm docs:api` run), then node scripts/docs-check.ts [--shots <dir>]
  */
 import AxeBuilder from '@axe-core/playwright';
@@ -43,22 +44,43 @@ for (const [kind, context] of [
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
-  for (const p of PAGES) {
-    const url = `http://localhost:${port}/docs${p ? `/${p}` : ''}`;
-    const response = await page.goto(url);
-    const name = p || 'intro';
-    check(`${kind} /docs/${p}: loads`, response?.ok() ?? false, String(response?.status()));
+  for (const path of ['/', ...PAGES.map((p) => `/docs${p ? `/${p}` : ''}`)]) {
+    const response = await page.goto(`http://localhost:${port}${path}`);
+    const name = path === '/' ? 'home' : path.split('/').pop() || 'intro';
+    check(`${kind} ${path}: loads`, response?.ok() ?? false, String(response?.status()));
     const axe = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
     check(
-      `${kind} /docs/${p}: axe`,
+      `${kind} ${path}: axe`,
       axe.violations.length === 0,
       axe.violations.map((v) => `${v.id}×${v.nodes.length}`).join(','),
     );
     if (kind === 'phone') {
       const wide = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1);
-      check(`phone /docs/${p}: no sideways scroll`, !wide);
+      check(`phone ${path}: no sideways scroll`, !wide);
     }
     if (shots) await page.screenshot({ path: `${shots}/${kind}-${name}.png`, fullPage: false });
+  }
+  // The home page's demo: the real editor in place on a desktop, the full-screen editor on a phone.
+  await page.goto(`http://localhost:${port}/`);
+  await page
+    .getByRole('button', { name: kind === 'desktop' ? 'Try it here' : 'Open the editor' })
+    .click();
+  if (kind === 'desktop') {
+    const frame = page.frameLocator('iframe[title="VideoUltra live editor"]');
+    const shown = await frame
+      .locator('.vu-root')
+      .waitFor({ timeout: 30_000 })
+      .then(
+        () => true,
+        () => false,
+      );
+    check('desktop /: "Try it here" loads the editor in place', shown);
+  } else {
+    const opened = await page.waitForURL('**/editor', { timeout: 30_000 }).then(
+      () => true,
+      () => false,
+    );
+    check('phone /: "Open the editor" opens the editor', opened);
   }
   check(`${kind}: no page errors`, errors.length === 0, errors.slice(0, 3).join(' | '));
 }

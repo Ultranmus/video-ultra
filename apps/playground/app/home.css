@@ -1,0 +1,422 @@
+/* The home page (playground only). Colours come from the docs' --d-* variables (docs.css). */
+.home {
+  --h-radius: 14px;
+  --h-max: 1120px;
+  --h-gutter: 24px;
+  --h-button: #7a2f7a;
+  --h-button-hover: #8a3a8a;
+  --h-shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.35);
+}
+
+@media (prefers-color-scheme: dark) {
+  .home {
+    --h-button: #9c479c;
+    --h-button-hover: #ad55ad;
+    --h-shadow: 0 24px 80px -24px rgba(196, 122, 196, 0.25);
+  }
+}
+
+.home main {
+  max-width: var(--h-max);
+  margin: 0 auto;
+  padding: 0 var(--h-gutter) 32px;
+}
+
+.home a:focus-visible,
+.home button:focus-visible {
+  outline: 2px solid var(--d-accent);
+  outline-offset: 3px;
+}
+
+/* Hero */
+.home-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 64px 0 40px;
+  text-align: center;
+}
+
+.home-hero-mark {
+  display: block;
+  margin-bottom: 20px;
+}
+
+.home-hero h1 {
+  max-width: 16ch;
+  margin: 0 0 16px;
+  font-size: clamp(34px, 6vw, 60px);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+
+.home-lead {
+  max-width: 600px;
+  margin: 0 0 28px;
+  color: var(--d-muted);
+  font-size: 19px;
+  line-height: 1.55;
+}
+
+.home-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.home .home-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 46px;
+  padding: 0 22px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: var(--h-button);
+  color: #ffffff;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.home .home-button:hover {
+  background: var(--h-button-hover);
+}
+
+.home .home-button-quiet {
+  border-color: var(--d-border);
+  background: transparent;
+  color: var(--d-text);
+}
+
+.home .home-button-quiet:hover {
+  background: var(--d-surface);
+}
+
+.home-install {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 4px 4px 4px 16px;
+  border: 1px solid var(--d-border);
+  border-radius: 10px;
+  background: var(--d-code);
+}
+
+.home-install code {
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.home-install button {
+  display: grid;
+  place-items: center;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--d-muted);
+}
+
+.home-install button:hover {
+  background: var(--d-surface);
+  color: var(--d-text);
+}
+
+.home-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The editor window */
+.home-demo {
+  margin: 8px 0 0;
+}
+
+.home-demo > div:first-child,
+.home-demo-view {
+  border: 1px solid var(--d-border);
+}
+
+.home-demo-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 0 !important;
+  border-radius: var(--h-radius) var(--h-radius) 0 0;
+  background: var(--d-surface);
+  font-size: 13px;
+}
+
+.home-demo-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.home-demo-dots i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--d-border);
+}
+
+.home-demo-title {
+  flex: 1;
+  color: var(--d-muted);
+  text-align: center;
+}
+
+.home .home-demo-full {
+  color: var(--d-muted);
+  text-decoration: none;
+}
+
+.home .home-demo-full:hover {
+  color: var(--d-text);
+}
+
+.home-demo-view {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0 0 var(--h-radius) var(--h-radius);
+  background: #0b0b0d;
+  box-shadow: var(--h-shadow);
+  aspect-ratio: 1680 / 828;
+}
+
+.home-demo-view img,
+.home-demo-view iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.home-demo-view iframe {
+  /* The editor needs room: on wide screens a taller window than the picture. */
+  height: min(760px, 82dvh);
+}
+
+.home-demo-view:has(iframe) {
+  aspect-ratio: auto;
+}
+
+.home .home-demo-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 0 26px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--h-button);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  color: #ffffff;
+  font-size: 17px;
+  font-weight: 600;
+  transform: translate(-50%, -50%);
+}
+
+.home .home-demo-play:hover {
+  background: var(--h-button-hover);
+}
+
+.home-narrow {
+  display: none;
+}
+
+.home-demo figcaption {
+  margin-top: 12px;
+  color: var(--d-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* Sections */
+.home-section {
+  padding-top: 88px;
+}
+
+.home-section h2 {
+  margin: 0 0 24px;
+  font-size: clamp(26px, 3.6vw, 36px);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  text-align: center;
+}
+
+.home-features {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.home-features li {
+  padding: 20px;
+  border: 1px solid var(--d-border);
+  border-radius: var(--h-radius);
+  background: var(--d-surface);
+}
+
+.home-features strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 16px;
+}
+
+.home-features span {
+  color: var(--d-muted);
+  font-size: 14.5px;
+  line-height: 1.55;
+}
+
+.home-code {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 40px;
+  align-items: center;
+}
+
+.home-code h2 {
+  text-align: left;
+}
+
+.home-code p {
+  color: var(--d-muted);
+}
+
+/* Code keeps its lines (it scrolls sideways in its own box on narrow screens). */
+.home .docs-code {
+  white-space: pre;
+}
+
+.home-code p code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--d-code);
+  color: var(--d-text);
+  font-size: 0.9em;
+}
+
+/* Footer */
+.home-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px 24px;
+  /* Lines up with the content: the gutter on narrow screens, centred at the content width. */
+  margin: 72px max(var(--h-gutter), calc((100% - var(--h-max)) / 2 + var(--h-gutter))) 0;
+  padding: 28px 0 40px;
+  border-top: 1px solid var(--d-border);
+  color: var(--d-muted);
+  font-size: 14px;
+}
+
+.home-footer nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.home .home-footer a {
+  color: var(--d-muted);
+  text-decoration: none;
+}
+
+.home .home-footer a:hover {
+  color: var(--d-text);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .home .home-button,
+  .home .home-demo-play,
+  .home-install button {
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease;
+  }
+}
+
+/* Phones */
+@media (max-width: 760px) {
+  .home {
+    --h-gutter: 16px;
+  }
+
+  .home-hero {
+    padding: 40px 0 28px;
+  }
+
+  .home-lead {
+    font-size: 17px;
+  }
+
+  .home-wide {
+    display: none;
+  }
+
+  .home-narrow {
+    display: inline;
+  }
+
+  .home-demo-full,
+  .home-demo-dots {
+    display: none !important;
+  }
+
+  /* The picture is small on a phone: the button goes under it, full width, not over it. */
+  .home-demo-view {
+    overflow: visible;
+    border-radius: 0 0 var(--h-radius) var(--h-radius);
+  }
+
+  .home-demo-view img {
+    height: auto;
+    border-radius: 0 0 var(--h-radius) var(--h-radius);
+  }
+
+  .home .home-demo-play {
+    position: static;
+    justify-content: center;
+    width: 100%;
+    margin-top: 12px;
+    white-space: nowrap;
+    transform: none;
+  }
+
+  .home-demo-view:has(.home-demo-play) {
+    aspect-ratio: auto;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .home-section {
+    padding-top: 64px;
+  }
+
+  .home-code {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .home-code h2 {
+    text-align: center;
+  }
+}

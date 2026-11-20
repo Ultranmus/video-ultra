@@ -1535,3 +1535,13 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       `opengraph-image.png` and `public/brand/`. Rejected along the way: letters in a square
       (any "u"/"U" drawn as a letter), geometric badges, a rotated (upright-U) comet, and
       simplified passes that lost the flowing streams.
+216.  **Home page: a picture first, the live editor on request** (2026-11-21; Day 7 · 5.4). The
+      site's home (`/`, was a developer index) is the product page: the mark, one line on what
+      it is, "Try the demo" / "Get started", the install command with a copy button, the editor
+      window, eight features, the code to add it, and a footer (Bench kept there for
+      contributors). The editor window starts as a still screenshot (`public/home/editor.jpg`,
+      Big Buck Bunny, credited) because the editor is heavy (workers, decoders) and the home
+      page must stay fast on any phone; "Try it here" loads the real editor in an iframe in
+      place on wide screens, and on phones ("Open the editor", under the picture) opens
+      `/editor` full screen. The top bar is shared with the docs (`SiteHeader`).
+      `docs-check` covers `/` too (axe, no sideways scroll, both demo buttons).

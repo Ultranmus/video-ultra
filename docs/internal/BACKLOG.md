@@ -4,6 +4,12 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 
 ## Open
 
+- [ ] (found 2026-11-21, landing-page screenshot) The Sintel trailer (`sintel-trailer-480p.mp4`)
+      added through the Media panel's file picker previews **black** in Chrome on the Mac
+      (`engine.scopes` luma 0 at 16–18 s, after a seek and after playing), while its timeline
+      thumbnails show the picture. `bbb-1080p60.mp4` and `avc-1080p30.mp4` added the same way
+      preview fine, and `proxies-check` (Sintel set as a proxy) passes. Branch based on main
+      367b38a. Check on the iPhone and in a real browser session before v0.1.
 - [ ] Dev-only advisories left after the Next.js 16.4.6 update (2026-11-20): esbuild < 0.28.1
       (dev server file read, Windows only; tsup pins 0.27) and minimatch < 11.0.1 (pattern DoS;
       a major bump under the dev tools). Neither ships; update when tsup / the tools move.
