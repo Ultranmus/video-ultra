@@ -308,7 +308,8 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
           const f = field.getBoundingClientRect();
           const sr = scroller.getBoundingClientRect();
           const bottom = Math.min(sr.bottom, visBottom);
-          const pad = 16;
+          // Touch screens: Safari's address bar floats over the page just above the keyboard.
+          const pad = matchMedia('(pointer: coarse)').matches ? 64 : 16;
           if (f.bottom > bottom - pad) scroller.scrollTop += f.bottom - (bottom - pad);
           else if (f.top < sr.top + pad) scroller.scrollTop -= sr.top + pad - f.top;
         }
@@ -335,8 +336,9 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
       }
       if (!scroller || scroller === sheet) return;
       const r = root.getBoundingClientRect();
-      // A phone keyboard (with its bar) takes about the lower half of the screen.
-      const limit = r.top + r.height * 0.45;
+      // A phone keyboard (with its bar and Safari's address bar above it) takes a little over
+      // the lower half of the screen; high enough that the next field shows too.
+      const limit = r.top + r.height * 0.3;
       const f = field.getBoundingClientRect();
       if (f.bottom > limit) scroller.scrollTop += f.bottom - limit;
     };
@@ -360,11 +362,55 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
       if (keepScroll !== null && typingField() && Math.abs(window.scrollY - keepScroll) > 1)
         window.scrollTo(window.scrollX, keepScroll);
     };
+    // A tap on a text field in a sheet: focus it ourselves, without a scroll. iOS scrolls the
+    // page to a field it focuses — by up to the keyboard's height, and again on every switch to
+    // another field, even one already in view — and undoing that is a visible jump (the sheet
+    // seemed to open again; measured on the owner's iPhone, 2026-11-20). The keyboard code above
+    // places the field instead. A drag that started on a field is a scroll, not a tap.
+    let touchStart: { x: number; y: number } | null = null;
+    let focusedOnTouch: HTMLElement | null = null;
+    const quietField = (
+      target: EventTarget | null,
+    ): HTMLInputElement | HTMLTextAreaElement | null =>
+      (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) &&
+      target.matches('input:is([type="text"], [type="search"], :not([type])), textarea') &&
+      !target.disabled &&
+      !target.readOnly &&
+      !!target.closest('.vu-dock')
+        ? target
+        : null;
+    const onTouchStart = (e: TouchEvent) => {
+      const t = e.touches[0];
+      const field = quietField(e.target);
+      touchStart = t && field ? { x: t.clientX, y: t.clientY } : null;
+      focusedOnTouch = null;
+      // The keyboard is up (another field has focus): switch on touch, as Safari itself does —
+      // waiting for the finger to lift felt slow when hopping between fields (owner, 2026-11-20).
+      const current = typingField();
+      if (field && current && current !== field) {
+        field.focus({ preventScroll: true });
+        focusedOnTouch = field;
+      }
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      const field = quietField(e.target);
+      const t = e.changedTouches[0];
+      const switched = !!field && field === focusedOnTouch;
+      focusedOnTouch = null;
+      if (!field || !touchStart || !t) return;
+      if (Math.hypot(t.clientX - touchStart.x, t.clientY - touchStart.y) > 10) return;
+      if (!switched && document.activeElement === field) return;
+      // Our tap: Safari's own handling would scroll the page to the field.
+      e.preventDefault();
+      if (!switched) field.focus({ preventScroll: true });
+    };
     vv.addEventListener('resize', schedule);
     vv.addEventListener('scroll', schedule);
     window.addEventListener('scroll', onScroll, { passive: true });
     root.addEventListener('focusin', onFocusIn);
     root.addEventListener('focusout', onFocusOut);
+    root.addEventListener('touchstart', onTouchStart, { passive: true });
+    root.addEventListener('touchend', onTouchEnd, { passive: false });
     update();
     return () => {
       cancelAnimationFrame(frame);
@@ -373,6 +419,8 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
       window.removeEventListener('scroll', onScroll);
       root.removeEventListener('focusin', onFocusIn);
       root.removeEventListener('focusout', onFocusOut);
+      root.removeEventListener('touchstart', onTouchStart);
+      root.removeEventListener('touchend', onTouchEnd);
       root.style.removeProperty('--vu-stage-lift');
     };
   }, []);
