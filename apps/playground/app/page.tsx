@@ -3,7 +3,7 @@ import Link from 'next/link';
 export default function Home() {
   return (
     <main className="page">
-      <h1>video-ultra playground</h1>
+      <h1>VideoUltra playground</h1>
       <ul>
         <li>
           <Link href="/editor">Editor</Link> — the full editor (add <code>?theme=light</code>,{' '}

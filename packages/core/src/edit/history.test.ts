@@ -103,7 +103,7 @@ describe('opening projects', () => {
     });
     expect(parseProject({ hello: 1 })).toMatchObject({
       ok: false,
-      error: expect.stringContaining('not a video-ultra project'),
+      error: expect.stringContaining('not a VideoUltra project'),
     });
     expect(parseProject({ ...startProject(), tracks: 'x' })).toMatchObject({
       ok: false,

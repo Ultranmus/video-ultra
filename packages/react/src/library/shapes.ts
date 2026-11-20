@@ -1,5 +1,5 @@
 /**
- * video-ultra's own shape stickers: bold, simple artwork on a 64 × 64 grid with a light outline so
+ * VideoUltra's own shape stickers: bold, simple artwork on a 64 × 64 grid with a light outline so
  * it reads on any video. Drawn for this project. Rasterised to a PNG when placed.
  */
 export interface ShapeSticker {

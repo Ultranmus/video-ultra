@@ -1,4 +1,4 @@
-# video-ultra
+# VideoUltra
 
 A free (MIT), fast, fully typed **video editor for React and Next.js** — simple enough for anyone,
 deep enough for pros. It runs entirely in the browser (WebCodecs + WebGPU / WebGL2), on phones and

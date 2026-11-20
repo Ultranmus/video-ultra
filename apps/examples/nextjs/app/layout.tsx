@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export const metadata = { title: 'video-ultra · Next.js example' };
+export const metadata = { title: 'VideoUltra · Next.js example' };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (

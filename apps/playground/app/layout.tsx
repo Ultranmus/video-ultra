@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'video-ultra playground',
+  title: 'VideoUltra playground',
   description: 'Development playground and performance bench for video-ultra.',
 };
 

@@ -68,11 +68,11 @@ export function parseProject(input: unknown, ids: IdFactory = randomId): ParseRe
     }
   }
   if (typeof data !== 'object' || data === null) {
-    return { ok: false, error: 'This is not a video-ultra project.' };
+    return { ok: false, error: 'This is not a VideoUltra project.' };
   }
   let record = data as Record<string, unknown>;
   if (typeof record.version !== 'number' || !Number.isInteger(record.version)) {
-    return { ok: false, error: 'This is not a video-ultra project.' };
+    return { ok: false, error: 'This is not a VideoUltra project.' };
   }
   const version = record.version;
   if (version > PROJECT_VERSION) {

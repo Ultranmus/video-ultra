@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: 'Introduction' };
 export default function Introduction() {
   return (
     <article>
-      <h1>video-ultra</h1>
+      <h1>VideoUltra</h1>
       <p className="docs-lead">
         A free (MIT), fast, fully typed video editor for React and Next.js. Simple enough for anyone
         on a phone, deep enough for pros on a desktop. It runs in the browser and never uploads the

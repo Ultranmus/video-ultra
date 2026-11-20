@@ -11,7 +11,7 @@ const MUSIC: (AudioLibraryTrack & { file: string })[] = [
     id: 'music-tone',
     file: 'music.mp3',
     title: 'Steady tone',
-    artist: 'video-ultra test media',
+    artist: 'VideoUltra test media',
     duration: 30,
     credit: 'Generated test tone · CC0',
   },
@@ -19,7 +19,7 @@ const MUSIC: (AudioLibraryTrack & { file: string })[] = [
     id: 'music-pulse',
     file: 'music-3min.mp3',
     title: 'Slow pulse',
-    artist: 'video-ultra test media',
+    artist: 'VideoUltra test media',
     duration: 180,
     credit: 'Generated test tone · CC0',
   },
@@ -27,7 +27,7 @@ const MUSIC: (AudioLibraryTrack & { file: string })[] = [
     id: 'music-low',
     file: 'voice.m4a',
     title: 'Low hum',
-    artist: 'video-ultra test media',
+    artist: 'VideoUltra test media',
     duration: 20,
     credit: 'Generated test tone · CC0',
   },
@@ -49,7 +49,7 @@ export function createDemoSounds(): AudioLibrary {
   return {
     title: 'Music & sounds (demo)',
     categories: [{ id: 'music', label: 'Music' }, ...(starter.categories ?? [])],
-    notice: 'Demo source: generated test tones and video-ultra starter sounds · CC0',
+    notice: 'Demo source: generated test tones and VideoUltra starter sounds · CC0',
     async search(query, signal) {
       await wait(250, signal);
       const words = query.text.toLowerCase().split(/\s+/).filter(Boolean);

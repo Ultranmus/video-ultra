@@ -374,7 +374,7 @@ export function Bench() {
   async function shareHdrFile() {
     if (!hdrFile) return;
     try {
-      await navigator.share({ files: [hdrFile], title: 'video-ultra HDR check' });
+      await navigator.share({ files: [hdrFile], title: 'VideoUltra HDR check' });
     } catch (e) {
       setError(
         `Sharing didn't work (${e instanceof Error ? e.message : String(e)}). Use Download instead.`,
@@ -420,7 +420,7 @@ export function Bench() {
   async function shareReport() {
     const file = reportFile();
     try {
-      await navigator.share({ files: [file], title: 'video-ultra bench report' });
+      await navigator.share({ files: [file], title: 'VideoUltra bench report' });
     } catch (e) {
       // Cancelled, or sharing files isn't supported here: fall back to a download.
       if (e instanceof Error && e.name === 'AbortError') return;

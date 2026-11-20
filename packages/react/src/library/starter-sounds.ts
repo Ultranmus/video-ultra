@@ -30,7 +30,7 @@ export interface StarterSoundLabels {
 
 const DEFAULT_STARTER_LABELS: StarterSoundLabels = {
   title: 'Starter sounds',
-  credit: 'Made by video-ultra · CC0, free for any use',
+  credit: 'Made by VideoUltra · CC0, free for any use',
   transitions: 'Transitions',
   interface: 'Taps & alerts',
   impacts: 'Impacts',

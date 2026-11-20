@@ -5,7 +5,7 @@ import { DocsNav } from './sidebar';
 import './docs.css';
 
 export const metadata: Metadata = {
-  title: { template: '%s · video-ultra docs', default: 'video-ultra docs' },
+  title: { template: '%s · VideoUltra docs', default: 'VideoUltra docs' },
   description: 'A free, fast, fully typed video editor for React and Next.js.',
 };
 

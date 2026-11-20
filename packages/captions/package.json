@@ -1,7 +1,7 @@
 {
   "name": "@video-ultra/captions",
   "version": "0.0.0",
-  "description": "Optional on-device auto-captions for video-ultra: speech to timed words in a worker, nothing uploaded.",
+  "description": "Optional on-device auto-captions for VideoUltra: speech to timed words in a worker, nothing uploaded.",
   "license": "MIT",
   "author": "Ultranmus",
   "repository": {

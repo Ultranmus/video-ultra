@@ -104,7 +104,7 @@ const TICK_PX = 8;
 const SNAP_PX = 6;
 
 /**
- * The ruler: a tick scale that slides under a fixed centre marker (image-ultra's slider). Drag it
+ * The ruler: a tick scale that slides under a fixed centre marker (ImageUltra's slider). Drag it
  * (touch or mouse), use the arrow keys (Shift = ×10), or double-click to reset; it snaps to the
  * default. `onChange(value, final)`: `final` is false while dragging, true on release / key press.
  * Presentational — {@link EditSlider} adds the label row and the edit plumbing.

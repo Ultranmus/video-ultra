@@ -800,5 +800,8 @@ canvas size ease (scale 0.75 → 1 over ~200 ms). Core 529 + react 24 tests pass
   playground's favicon, Apple icon, social image and `public/brand/` marks.
 - Docs header: the mark (light / dark by colour scheme) + "VideoUltra". Checked in Chromium on
   desktop (dark, light) and iPhone 13 size; favicon, Apple icon and `og:image` are served.
-- Not done yet: the rest of the site's text still says "video-ultra" (waiting on the owner:
-  rename display text only, or more); landing page; ImageUltra's files copied into its repo.
+- Display text renamed to VideoUltra (owner: display text only, npm names stay `@video-ultra/*`):
+  README and LICENSE titles, page titles and headings, package descriptions, the "not a
+  VideoUltra project" message, starter sound credits, the API reference title. Unchanged on
+  purpose: storage keys, the `@layer video-ultra` name, storage folder / namespace, test data.
+- Not done yet: landing page; ImageUltra's files copied into its repo.
