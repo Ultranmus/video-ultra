@@ -107,3 +107,53 @@ export function snapCentre(value: number, threshold: number): { value: number; s
     ? { value: 0.5, snapped: true }
     : { value, snapped: false };
 }
+
+/**
+ * A locked item's outline on screen: the corners of its (turned) box grown by `pad`, trimmed to
+ * the frame `w` × `h` inset by `inset`, so a box bigger than the video or running off it still
+ * shows a closed outline (its cut sides along the frame's edge). Box in screen px. Empty when
+ * the box is wholly outside.
+ */
+export function lockOutline(
+  box: Box,
+  pad: number,
+  w: number,
+  h: number,
+  inset: number,
+): { x: number; y: number }[] {
+  const rad = (box.rotation * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const hw = box.width / 2 + pad;
+  const hh = box.height / 2 + pad;
+  let points = [
+    [-hw, -hh],
+    [hw, -hh],
+    [hw, hh],
+    [-hw, hh],
+  ].map(([x, y]) => ({ x: box.cx + x! * cos - y! * sin, y: box.cy + x! * sin + y! * cos }));
+  // Sutherland–Hodgman against each side of the frame (the box is convex).
+  const sides: [(p: { x: number; y: number }) => number, 'x' | 'y', number][] = [
+    [(p) => p.x - inset, 'x', inset],
+    [(p) => w - inset - p.x, 'x', w - inset],
+    [(p) => p.y - inset, 'y', inset],
+    [(p) => h - inset - p.y, 'y', h - inset],
+  ];
+  for (const [inside, axis, edge] of sides) {
+    const next: { x: number; y: number }[] = [];
+    for (let i = 0; i < points.length; i++) {
+      const a = points[i]!;
+      const b = points[(i + 1) % points.length]!;
+      const ia = inside(a) >= 0;
+      const ib = inside(b) >= 0;
+      if (ia) next.push(a);
+      if (ia !== ib) {
+        const t = (edge - a[axis]) / (b[axis] - a[axis]);
+        next.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+      }
+    }
+    points = next;
+    if (points.length === 0) break;
+  }
+  return points;
+}

@@ -252,6 +252,8 @@
     --vu-size-template: 72px;
     --vu-size-template-max: 180px;
     --vu-size-template-preview: 260px;
+    /* …while its words are being typed on a phone (the fields stay above the keyboard). */
+    --vu-size-template-preview-typing: 120px;
     /* Template tiles stand in for footage: a dusky gradient (same in both themes). */
     --vu-template-bg: linear-gradient(160deg, #3a3550, #1d2433 55%, #12151d);
     /* v0.3 Shape masks */

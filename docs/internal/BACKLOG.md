@@ -4,6 +4,14 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 
 ## Open
 
+- [x] (fixed 2026-11-20, #191) Owner (iPhone + desktop): a locked item showed only its top and
+      bottom dashed lines on the phone, and its box stayed upright for a turned item. Now an SVG
+      outline turned with the item and trimmed to the video.
+- [x] (fixed 2026-11-20, #192) Owner (iPhone): typing a template's words, the full-height sheet
+      left the field under the keyboard. The preview shrinks while typing.
+- [ ] `stage-text-check` phone part (WebKit) logs "ResizeObserver loop completed with undelivered
+      notifications" — same without the 2026-11-20 changes; harmless, but find the observer that
+      changes its own target's size (Sheet's measure is the likely one).
 - [x] (fixed 2026-11-18: the phone rule now also overrides the desktop `left: 0`) Phone (owner,
       iPhone screenshot 2026-11-18): the "Your videos" popover looks left-aligned
       on a phone — it hangs from the top bar's start, so its left edge sits at the button's edge

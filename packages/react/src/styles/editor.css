@@ -1978,6 +1978,12 @@
     max-height: none;
   }
 
+  /* Typing a template's words with the keyboard up: a smaller preview, so the fields sit high in
+     the sheet, above the keyboard, and the words still show in the preview (owner, 2026-11-20). */
+  .vu-root[data-keyboard] .vu-template-preview .vu-template-frame {
+    height: var(--vu-size-template-preview-typing);
+  }
+
   .vu-template-field,
   .vu-text-field {
     display: flex;
@@ -5176,17 +5182,27 @@
     box-shadow: 0 0 0 calc(2px / var(--vu-stage-zoom, 1)) var(--vu-selection);
   }
 
-  .vu-selection-box[data-locked] {
-    box-sizing: border-box;
-    /* A border, inside the box (Safari doesn't draw a negative-offset outline's sides reliably):
-       with the box kept inside the frame (Stage.tsx), all four sides always show. */
-    border: calc(1.5px / var(--vu-stage-zoom, 1)) dashed var(--vu-selection);
-    box-shadow: none;
+  /* Locked: a dashed outline turned with the item, trimmed to the frame (Stage.tsx). An SVG:
+     Safari drops the sides of a thin dashed CSS border. */
+  .vu-lock-outline {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
   }
 
-  .vu-selection-box[data-locked] .vu-handle,
-  .vu-selection-box[data-locked] .vu-rotate-stem {
+  .vu-lock-outline:not([data-shown]) {
     display: none;
+  }
+
+  .vu-lock-outline polygon {
+    fill: none;
+    stroke: var(--vu-selection);
+    stroke-width: calc(1.5px / var(--vu-stage-zoom, 1));
+    stroke-dasharray: calc(5px / var(--vu-stage-zoom, 1)) calc(4px / var(--vu-stage-zoom, 1));
+    stroke-linejoin: round;
   }
 
   .vu-member-outlines {
@@ -6020,10 +6036,6 @@
 
   .vu-handle-side[data-handle='w'] {
     left: 0;
-  }
-
-  .vu-selection-box[data-locked] .vu-handle-side {
-    display: none;
   }
 
   /* ── v0.2 A. Captions ── */

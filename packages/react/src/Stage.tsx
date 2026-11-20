@@ -19,6 +19,7 @@ import {
   boxContains,
   hitStage,
   itemBox,
+  lockOutline,
   snapCentre,
   visibleItemsAt,
   type Box,
@@ -123,6 +124,7 @@ export function Stage(): ReactElement {
   const frameRef = useRef<HTMLDivElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const outlinesRef = useRef<HTMLDivElement>(null);
+  const lockRef = useRef<SVGPolygonElement>(null);
   const marqueeRef = useRef<HTMLDivElement>(null);
   const guideX = useRef<HTMLDivElement>(null);
   const guideY = useRef<HTMLDivElement>(null);
@@ -287,14 +289,16 @@ export function Stage(): ReactElement {
   const placeBox = (entries: { item: Item; box: Box }[], locked: boolean) => {
     const el = boxRef.current;
     const outlines = outlinesRef.current;
-    if (!el || !outlines) return;
+    const lock = lockRef.current;
+    if (!el || !outlines || !lock) return;
+    lock.parentElement!.toggleAttribute('data-shown', locked && entries.length > 0);
     if (entries.length === 0) {
       el.hidden = true;
       outlines.replaceChildren();
       return;
     }
-    el.hidden = false;
-    el.toggleAttribute('data-locked', locked);
+    // Locked: no box and no handles, a dashed outline instead (below).
+    el.hidden = locked;
     el.toggleAttribute('data-group', entries.length > 1);
     // A blurred area also stretches from its sides.
     // A blurred area also stretches from its sides — when it's big enough on screen that the
@@ -312,35 +316,32 @@ export function Stage(): ReactElement {
       entries.length === 1
         ? entries[0]!.box
         : boundsBox(unionBounds(entries.map((e) => boundsOf(e.box))));
-    let w = box.width * scale + pad * 2;
-    let h = box.height * scale + pad * 2;
-    let x = box.cx * scale - w / 2;
-    let y = box.cy * scale - h / 2;
-    // Locked (dashed, no handles): an upright box is kept inside the frame, so an item as wide
-    // or tall as the video (or bigger) still shows all four sides.
-    let rotation = box.rotation;
+    const w = box.width * scale + pad * 2;
+    const h = box.height * scale + pad * 2;
+    const x = box.cx * scale - w / 2;
+    const y = box.cy * scale - h / 2;
+    // Locked: a dashed outline turned with the item and trimmed to the frame, so an item as big
+    // as the video (or running off it) still shows a closed outline. An SVG polygon: Safari drops
+    // the sides of a thin dashed CSS border.
     if (locked) {
-      // Turned: its upright bounds (a locked item only needs to show where it is).
-      if (box.rotation % 360 !== 0) {
-        const b = boundsOf(box);
-        w = (b.right - b.left) * scale + pad * 2;
-        h = (b.bottom - b.top) * scale + pad * 2;
-        x = b.left * scale - pad;
-        y = b.top * scale - pad;
-        rotation = 0;
-      }
-      const fw = pw * scale;
-      const fh = ph * scale;
-      const left = Math.max(1, x);
-      const top = Math.max(1, y);
-      w = Math.max(0, Math.min(fw - 1, x + w) - left);
-      h = Math.max(0, Math.min(fh - 1, y + h) - top);
-      x = left;
-      y = top;
+      const points = lockOutline(
+        {
+          cx: box.cx * scale,
+          cy: box.cy * scale,
+          width: box.width * scale,
+          height: box.height * scale,
+          rotation: box.rotation,
+        },
+        pad,
+        pw * scale,
+        ph * scale,
+        1,
+      );
+      lock.setAttribute('points', points.map((p) => `${p.x},${p.y}`).join(' '));
     }
     el.style.width = `${w}px`;
     el.style.height = `${h}px`;
-    el.style.transform = `translate(${x}px, ${y}px) rotate(${rotation}deg)`;
+    el.style.transform = `translate(${x}px, ${y}px) rotate(${box.rotation}deg)`;
     // Member outlines (several only), reusing the elements already there.
     const need = entries.length > 1 ? entries.length : 0;
     while (outlines.children.length > need) outlines.lastElementChild!.remove();
@@ -1178,6 +1179,9 @@ export function Stage(): ReactElement {
         <div ref={guideX} className="vu-guide vu-guide-x" hidden />
         <div ref={guideY} className="vu-guide vu-guide-y" hidden />
         <div ref={outlinesRef} className="vu-member-outlines" aria-hidden="true" />
+        <svg className="vu-lock-outline" aria-hidden="true">
+          <polygon ref={lockRef} />
+        </svg>
         <div ref={marqueeRef} className="vu-marquee" aria-hidden="true" hidden />
         <div ref={boxRef} className="vu-selection-box" hidden>
           <span className="vu-handle" data-handle="nw" />

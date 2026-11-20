@@ -753,3 +753,17 @@ canvas size ease (scale 0.75 → 1 over ~200 ms). Core 529 + react 24 tests pass
 - Text editing: the caret opens at the end everywhere (#190); a double-click's second press no
   longer moves it; the Edit sheet's field is a little taller. stage-text-check updated (desktop
   part passes).
+
+## 2026-11-20 · Owner's phone notes: locked outline, template keyboard (pushed)
+
+- Merged the 2026-11-18 cloud branch (`claude/mobile-popup-alignment-l6akr1`: green screen on a
+  warm wall #189, typing in a sheet covers the top bar #188, caret at the end #190) — the owner
+  had tested the live site without it.
+- Locked outline (#191): turned with the item, trimmed to the video, an SVG polygon (Safari
+  dropped the dashed border's sides). `lockOutline` in `stage/geometry.ts` + 4 unit tests.
+  Checked in WebKit at iPhone 13 size and in Chromium desktop: all four sides, turned.
+- Template words (#192): preview 120 px while the keyboard is up. Checked with a simulated
+  keyboard (WebKit, iPhone 13): fields and Add above it, words visible in the preview. Layers
+  rename at the bottom of the list (same simulation): sheet covers the top bar, row above it.
+- Checks: `pnpm verify` green (react 28 tests); stage-text-check all pass except a pre-existing
+  WebKit ResizeObserver message (BACKLOG).

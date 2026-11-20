@@ -9,7 +9,7 @@ import {
 } from '@video-ultra/core';
 import { describe, expect, it } from 'vitest';
 import { measureTextBox } from '@video-ultra/core/internal';
-import { boxContains, hitStage, itemBox, snapCentre } from './geometry';
+import { boxContains, hitStage, itemBox, lockOutline, snapCentre } from './geometry';
 import { kindLabel, regionItem } from '../items';
 import { DEFAULT_LABELS } from '../labels';
 
@@ -138,5 +138,49 @@ describe('stage geometry', () => {
     expect(big.width).toBeCloseTo(box.width * 2);
     expect(kindLabel(DEFAULT_LABELS, 'region', true)).toBe('Blurred area');
     expect(kindLabel(DEFAULT_LABELS, 'image')).toBe('photo');
+  });
+});
+
+describe('lockOutline', () => {
+  const round = (ps: { x: number; y: number }[]) =>
+    ps.map((p) => [Math.round(p.x), Math.round(p.y)]);
+
+  it('keeps an upright box inside the frame as is (grown by pad)', () => {
+    const box = { cx: 50, cy: 40, width: 20, height: 10, rotation: 0 };
+    expect(round(lockOutline(box, 2, 100, 100, 1))).toEqual([
+      [38, 33],
+      [62, 33],
+      [62, 47],
+      [38, 47],
+    ]);
+  });
+
+  it('turns with the item', () => {
+    const box = { cx: 50, cy: 50, width: 20, height: 20, rotation: 45 };
+    const ps = lockOutline(box, 0, 100, 100, 1);
+    expect(ps).toHaveLength(4);
+    // A square turned 45°: corners on the axes through the centre.
+    expect(round(ps)).toContainEqual([50, 36]);
+    expect(round(ps)).toContainEqual([64, 50]);
+  });
+
+  it('trims a box bigger than the frame to the frame, every side inside', () => {
+    const box = { cx: 50, cy: 50, width: 300, height: 40, rotation: 8 };
+    const ps = lockOutline(box, 0, 100, 100, 1);
+    expect(ps.length).toBeGreaterThanOrEqual(4);
+    for (const p of ps) {
+      expect(p.x).toBeGreaterThanOrEqual(1 - 1e-9);
+      expect(p.x).toBeLessThanOrEqual(99 + 1e-9);
+      expect(p.y).toBeGreaterThanOrEqual(1 - 1e-9);
+      expect(p.y).toBeLessThanOrEqual(99 + 1e-9);
+    }
+    // Cut along both side edges of the frame.
+    expect(ps.some((p) => Math.abs(p.x - 1) < 1e-6)).toBe(true);
+    expect(ps.some((p) => Math.abs(p.x - 99) < 1e-6)).toBe(true);
+  });
+
+  it('is empty for a box wholly off the frame', () => {
+    const box = { cx: 300, cy: 50, width: 20, height: 20, rotation: 0 };
+    expect(lockOutline(box, 0, 100, 100, 1)).toEqual([]);
   });
 });
