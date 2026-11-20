@@ -98,30 +98,78 @@
   color: var(--s-text);
 }
 
-/* Promo video */
+/* Promo video, on a laptop screen (the recording is a 1470 × 956 MacBook screen). */
 .home-promo {
-  max-width: 1040px;
-  margin: 16px auto 0;
+  max-width: 1080px;
+  margin: 24px auto 0;
 }
 
-.home-promo-frame {
+.home-laptop {
+  filter: drop-shadow(0 30px 50px rgba(0, 0, 0, 0.35));
+}
+
+.home-laptop-screen {
   position: relative;
   overflow: hidden;
-  border: 1px solid var(--s-border);
-  border-radius: 18px;
+  margin: 0 5%;
+  border: 12px solid #18181b;
+  border-bottom-width: 16px;
+  border-radius: 18px 18px 6px 6px;
   background: #000000;
-  box-shadow: var(--s-shadow);
-  aspect-ratio: 16 / 9;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  aspect-ratio: 1470 / 956;
 }
 
-.home-promo video {
+.home-laptop-screen[data-full] {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+.home-laptop-screen video {
   display: block;
   width: 100%;
+  max-height: none;
   height: 100%;
-  object-fit: cover;
+  border-radius: 0;
+  object-fit: contain;
+  cursor: pointer;
 }
 
-.site .home-promo-play {
+.home-laptop-base {
+  position: relative;
+  height: 18px;
+  border-radius: 0 0 14px 14px;
+  background: linear-gradient(#d4d4d8, #9f9fa7);
+}
+
+.home-laptop-base::before {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 14%;
+  height: 6px;
+  border-radius: 0 0 8px 8px;
+  background: #a1a1aa;
+  content: '';
+  transform: translateX(-50%);
+}
+
+@media (prefers-color-scheme: dark) {
+  .home-laptop-screen {
+    border-color: #26262b;
+  }
+
+  .home-laptop-base {
+    background: linear-gradient(#3f3f46, #27272a);
+  }
+
+  .home-laptop-base::before {
+    background: #1f1f23;
+  }
+}
+
+.site .home-promo-big {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -143,32 +191,109 @@
   transform: translate(-50%, -50%);
 }
 
-.site .home-promo-play:hover {
+.site .home-promo-big:hover {
   background: var(--s-accent-hover);
 }
 
-.site .home-promo-sound {
+/* The control bar: always there on touch screens, on hover / focus with a mouse. */
+.home-promo-bar {
   position: absolute;
-  right: 14px;
-  bottom: 14px;
-  display: inline-flex;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 38px;
-  padding: 0 14px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.55);
+  gap: 6px;
+  padding: 24px 12px 10px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
   color: #ffffff;
-  font: inherit;
-  font-size: 13.5px;
-  font-weight: 600;
-  cursor: pointer;
-  backdrop-filter: blur(8px);
 }
 
-.site .home-promo-sound:hover {
-  background: rgba(0, 0, 0, 0.75);
+@media (hover: hover) {
+  .home-promo-bar {
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+
+  .home-laptop-screen:hover .home-promo-bar,
+  .home-promo-bar:focus-within {
+    opacity: 1;
+  }
+}
+
+.site .home-promo-bar button {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.site .home-promo-bar button:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.home-promo-seek {
+  flex: 1;
+  min-width: 60px;
+  height: 20px;
+  margin: 0 6px;
+  background: transparent;
+  cursor: pointer;
+  appearance: none;
+}
+
+.home-promo-seek::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    #ffffff var(--seek, 0%),
+    rgba(255, 255, 255, 0.3) var(--seek, 0%)
+  );
+}
+
+.home-promo-seek::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.home-promo-seek::-moz-range-progress {
+  height: 4px;
+  border-radius: 999px;
+  background: #ffffff;
+}
+
+.home-promo-seek::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border: 0;
+  border-radius: 50%;
+  background: #ffffff;
+  appearance: none;
+}
+
+.home-promo-seek::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 50%;
+  background: #ffffff;
+}
+
+.home-promo-time {
+  flex: none;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 /* Sections */
@@ -391,24 +516,25 @@
     font-size: 17px;
   }
 
-  .home-promo-frame {
-    border-radius: 14px;
+  .home-laptop-screen {
+    margin: 0 3%;
+    border-width: 6px;
+    border-bottom-width: 8px;
+    border-radius: 10px 10px 4px 4px;
   }
 
-  .site .home-promo-play {
-    min-height: 46px;
+  .home-laptop-base {
+    height: 10px;
+  }
+
+  .site .home-promo-big {
+    min-height: 44px;
     padding: 0 18px;
     font-size: 15px;
   }
 
-  .site .home-promo-sound span {
+  .home-promo-time {
     display: none;
-  }
-
-  .site .home-promo-sound {
-    right: 10px;
-    bottom: 10px;
-    padding: 0 10px;
   }
 
   .home-section {

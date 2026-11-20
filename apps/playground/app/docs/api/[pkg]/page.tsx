@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { Code, highlight } from '../../../code';
 import { KINDS, KIND_LABEL, PACKAGES, itemHref, loadApi, resolveLink } from '../data';
 import { Doc, type LinkResolver } from '../doc';
+import { ApiToc } from '../toc';
 import type { ApiItem } from '../types';
 import '../api.css';
 
@@ -41,86 +42,99 @@ export default async function ApiPackagePage({ params }: Props) {
   const prev = PACKAGES[at - 1];
   const next = PACKAGES[at + 1];
 
+  const toc = KINDS.map(([kind, title]) => ({
+    id: `kind-${kind}`,
+    title,
+    items: own.filter((i) => i.kind === kind).map((i) => i.name),
+  })).filter((g) => g.items.length > 0);
+
   return (
-    <article className="api">
-      <p className="api-crumb">
-        <Link href="/docs/api">API reference</Link>
-      </p>
-      <h1 className="api-title">{info.name}</h1>
-      <p className="docs-lead">{info.blurb}</p>
-      <Code lang="bash">{`npm install ${info.name}`}</Code>
-
-      {items.length === 0 ? (
-        <aside className="docs-note">
-          <p>
-            The reference data isn&apos;t generated in this build. Build the packages, then run{' '}
-            <code>pnpm docs:api</code>.
-          </p>
-        </aside>
-      ) : (
-        <nav className="api-index" aria-label={`${info.name} exports`}>
-          {KINDS.map(([kind, title]) => {
-            const group = items.filter((i) => i.kind === kind);
-            if (group.length === 0) return null;
-            return (
-              <div key={kind}>
-                <h2 className="api-index-title">
-                  {title} <span className="api-count">{group.length}</span>
-                </h2>
-                <ul>
-                  {group.map((item) => (
-                    <li key={item.name}>
-                      <a href={item.fromCore ? itemHref(slug, item) : `#${item.name}`}>
-                        {item.name}
-                      </a>
-                      {item.fromCore ? (
-                        <span className="api-from" title="Documented on the core page">
-                          core
-                        </span>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            );
-          })}
-        </nav>
-      )}
-
-      {items.some((i) => i.fromCore) ? (
-        <p className="api-hint">
-          Names marked <span className="api-from">core</span> are re-exported from{' '}
-          <Link href="/docs/api/core">@video-ultra/core</Link> and documented there — import them
-          from either package.
+    <div className="api-layout">
+      <article className="api">
+        <p className="api-crumb">
+          <Link href="/docs/api">API reference</Link>
         </p>
-      ) : null}
+        <h1 className="api-title">{info.name}</h1>
+        <p className="docs-lead">{info.blurb}</p>
+        <Code lang="bash">{`npm install ${info.name}`}</Code>
 
-      {KINDS.map(([kind, title]) => {
-        const group = own.filter((i) => i.kind === kind);
-        if (group.length === 0) return null;
-        return (
-          <section key={kind} className="api-group">
-            <h2 id={`kind-${kind}`}>{title}</h2>
-            {group.map((item) => (
-              <Entry key={item.name} item={item} link={link} />
-            ))}
-          </section>
-        );
-      })}
+        {items.length === 0 ? (
+          <aside className="docs-note">
+            <p>
+              The reference data isn&apos;t generated in this build. Build the packages, then run{' '}
+              <code>pnpm docs:api</code>.
+            </p>
+          </aside>
+        ) : (
+          <nav className="api-index" aria-label={`${info.name} exports`}>
+            {KINDS.map(([kind, title]) => {
+              const group = items.filter((i) => i.kind === kind);
+              if (group.length === 0) return null;
+              return (
+                <div key={kind}>
+                  <h2 className="api-index-title">
+                    {title} <span className="api-count">{group.length}</span>
+                  </h2>
+                  <ul>
+                    {group.map((item) => (
+                      <li key={item.name}>
+                        <a href={item.fromCore ? itemHref(slug, item) : `#${item.name}`}>
+                          {item.name}
+                        </a>
+                        {item.fromCore ? (
+                          <span className="api-from" title="Documented on the core page">
+                            core
+                          </span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </nav>
+        )}
 
-      <nav className="docs-pagenav" aria-label="More API reference">
-        <Link href={prev ? `/docs/api/${prev.slug}` : '/docs/api'}>
-          <small>Previous</small>
-          {prev ? prev.name : 'API overview'}
-        </Link>
-        {next ? (
-          <Link href={`/docs/api/${next.slug}`} className="docs-pagenav-next">
-            <small>Next</small>
-            {next.name}
-          </Link>
+        {items.some((i) => i.fromCore) ? (
+          <p className="api-hint">
+            Names marked <span className="api-from">core</span> are re-exported from{' '}
+            <Link href="/docs/api/core">@video-ultra/core</Link> and documented there — import them
+            from either package.
+          </p>
         ) : null}
-      </nav>
-    </article>
+
+        {KINDS.map(([kind, title]) => {
+          const group = own.filter((i) => i.kind === kind);
+          if (group.length === 0) return null;
+          return (
+            <section key={kind} className="api-group">
+              <h2 id={`kind-${kind}`}>{title}</h2>
+              {group.map((item) => (
+                <Entry key={item.name} item={item} link={link} />
+              ))}
+            </section>
+          );
+        })}
+
+        <nav className="docs-pagenav" aria-label="More API reference">
+          <Link href={prev ? `/docs/api/${prev.slug}` : '/docs/api'}>
+            <small>Previous</small>
+            {prev ? prev.name : 'API overview'}
+          </Link>
+          {next ? (
+            <Link href={`/docs/api/${next.slug}`} className="docs-pagenav-next">
+              <small>Next</small>
+              {next.name}
+            </Link>
+          ) : null}
+        </nav>
+      </article>
+      <ApiToc
+        packages={PACKAGES.map((p) => ({ slug: p.slug, name: p.name }))}
+        current={slug}
+        groups={toc}
+      />
+    </div>
   );
 }
 

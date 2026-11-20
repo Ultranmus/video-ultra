@@ -276,16 +276,16 @@
   }
 
   .vu-root[data-vu-theme='light'] {
-    --vu-bg: #f4f4f6;
-    --vu-stage: #e2e2e8;
-    --vu-surface-1: #ffffff;
-    --vu-surface-2: #f1f1f4;
-    --vu-surface-3: #e4e4ea;
-    --vu-border: rgba(0, 0, 0, 0.08);
-    --vu-border-strong: rgba(0, 0, 0, 0.16);
-    --vu-text: #18181b;
-    --vu-text-muted: #5b5b66;
-    --vu-text-subtle: #8a8a94;
+    --vu-bg: #f8f8f8;
+    --vu-stage: #ffffff;
+    --vu-surface-1: #f8f8f8;
+    --vu-surface-2: #f0f0f0;
+    --vu-surface-3: #e5e5e5;
+    --vu-border: #e5e5e5;
+    --vu-border-strong: #cecece;
+    --vu-text: #1f1f1f;
+    --vu-text-muted: #616161;
+    --vu-text-subtle: #8a8a8a;
     --vu-accent: #4d194d;
     --vu-accent-hover: #3a123a;
     --vu-accent-soft: rgba(77, 25, 77, 0.1);
@@ -295,10 +295,10 @@
     --vu-warning: #9a5b00;
     --vu-overlay: rgba(0, 0, 0, 0.45);
     --vu-checker-a: #ffffff;
-    --vu-checker-b: #e6e6ea;
+    --vu-checker-b: #e8e8e8;
     --vu-shadow-popover: 0 12px 32px rgba(0, 0, 0, 0.14);
-    --vu-timeline-bg: #ececf0;
-    --vu-track-bg: #f7f7f9;
+    --vu-timeline-bg: #ffffff;
+    --vu-track-bg: #f8f8f8;
     --vu-timeline-slot: rgba(0, 0, 0, 0.03);
     --vu-clip-video: #d9d9e3;
     --vu-clip-lane: #ffffff;
@@ -324,16 +324,16 @@
   /* theme="auto": no data attribute, follow the OS. Same values as the light block above. */
   @media (prefers-color-scheme: light) {
     .vu-root:not([data-vu-theme]) {
-      --vu-bg: #f4f4f6;
-      --vu-stage: #e2e2e8;
-      --vu-surface-1: #ffffff;
-      --vu-surface-2: #f1f1f4;
-      --vu-surface-3: #e4e4ea;
-      --vu-border: rgba(0, 0, 0, 0.08);
-      --vu-border-strong: rgba(0, 0, 0, 0.16);
-      --vu-text: #18181b;
-      --vu-text-muted: #5b5b66;
-      --vu-text-subtle: #8a8a94;
+      --vu-bg: #f8f8f8;
+      --vu-stage: #ffffff;
+      --vu-surface-1: #f8f8f8;
+      --vu-surface-2: #f0f0f0;
+      --vu-surface-3: #e5e5e5;
+      --vu-border: #e5e5e5;
+      --vu-border-strong: #cecece;
+      --vu-text: #1f1f1f;
+      --vu-text-muted: #616161;
+      --vu-text-subtle: #8a8a8a;
       --vu-accent: #4d194d;
       --vu-accent-hover: #3a123a;
       --vu-accent-soft: rgba(77, 25, 77, 0.1);
@@ -344,10 +344,10 @@
       --vu-warning: #9a5b00;
       --vu-overlay: rgba(0, 0, 0, 0.45);
       --vu-checker-a: #ffffff;
-      --vu-checker-b: #e6e6ea;
+      --vu-checker-b: #e8e8e8;
       --vu-shadow-popover: 0 12px 32px rgba(0, 0, 0, 0.14);
-      --vu-timeline-bg: #ececf0;
-      --vu-track-bg: #f7f7f9;
+      --vu-timeline-bg: #ffffff;
+      --vu-track-bg: #f8f8f8;
       --vu-timeline-slot: rgba(0, 0, 0, 0.03);
       --vu-clip-video: #d9d9e3;
       --vu-clip-lane: #ffffff;

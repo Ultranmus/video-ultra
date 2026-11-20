@@ -4,6 +4,17 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 
 ## Open
 
+- [ ] (found 2026-11-21, recording the promo video) Editor problems seen while driving it: 1. **Several files imported at once land in the wrong order**: picking 1–6 gives
+      1, 6, 5, 4, 3, 2 — `importFiles` (controller.ts) puts each new file right after the
+      clip under the playhead, which stays on clip 1. Keep the picked order. 2. **The trim handle sits just outside the clip end**: a press 3 px inside the end moves
+      nothing; it responds from about +3 to +5 px past the end. Then Ctrl+Z after that no-op
+      drag undoes the step before (an import) — a no-op drag must not look like an edit. 3. **Split stays disabled after clicking the ruler**: the playhead moves but the old
+      selection stays, so Split says "Move the playhead inside the selected clip". Select
+      the clip under the playhead (or split it) when nothing selected is under it. 4. **A visible snap when media is added** (owner, in the promo): something jumps after
+      the import (being pinned down in the v2 recording; see its report).
+      Also: landscape clips in a 9:16 project are letterboxed by default (by design; the promo
+      sets Fill per clip).
+
 - [ ] (found 2026-11-21, landing-page screenshot) The Sintel trailer (`sintel-trailer-480p.mp4`)
       added through the Media panel's file picker previews **black** in Chrome on the Mac
       (`engine.scopes` luma 0 at 16–18 s, after a seek and after playing), while its timeline

@@ -23,7 +23,14 @@ Plum `#4d194d` (shared with image-ultra). Exact in light theme; lightened tints 
 
 ## Colour tokens
 
-Chrome tokens have the same values as image-ultra: `--vu-bg`, `--vu-stage`, `--vu-surface-1/2/3`,
+Light theme (owner, 2026-11-21: "use a VS Code / JetBrains light theme", no grey or off-white
+fills): white work areas (`--vu-stage`, `--vu-timeline-bg` `#ffffff`), `#f8f8f8` bars and panels
+(`--vu-bg`, `--vu-surface-1`), `#f0f0f0` / `#e5e5e5` for inputs and pressed states, solid hairline
+borders `#e5e5e5` / `#cecece`, text `#1f1f1f` / `#616161`. The empty preview frame takes
+`--vu-surface-1` with a border (not the black of a video) in both themes. Dark values are
+unchanged.
+
+Dark chrome tokens have the same values as image-ultra: `--vu-bg`, `--vu-stage`, `--vu-surface-1/2/3`,
 `--vu-border`, `--vu-border-strong`, `--vu-text`, `--vu-text-muted`, `--vu-text-subtle`,
 `--vu-accent`, `--vu-accent-hover`, `--vu-accent-contrast`, `--vu-accent-soft`,
 `--vu-accent-text`, `--vu-danger`, `--vu-warning`, `--vu-overlay`, `--vu-handle-fill`,
@@ -33,8 +40,8 @@ Video-specific tokens:
 
 | Token               | Dark                     | Light              | Used for                                  |
 | ------------------- | ------------------------ | ------------------ | ----------------------------------------- |
-| `--vu-timeline-bg`  | `#0e0e11`                | `#ececf0`          | timeline area                             |
-| `--vu-track-bg`     | `#16161a`                | `#f7f7f9`          | lane background                           |
+| `--vu-timeline-bg`  | `#0e0e11`                | `#ffffff`          | timeline area                             |
+| `--vu-track-bg`     | `#16161a`                | `#f8f8f8`          | lane background                           |
 | `--vu-clip-video`   | `#3b3b46`                | `#d9d9e3`          | video/photo clip body (behind thumbnails) |
 | `--vu-clip-text`    | `#7a4a14`                | `#f3d9b5`          | text items                                |
 | `--vu-clip-sticker` | `#1f5a4a`                | `#bfe6d8`          | stickers / PIP                            |

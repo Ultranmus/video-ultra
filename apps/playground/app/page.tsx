@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Code } from './code';
-import { EditorWindow, Install, PromoVideo } from './home-parts';
+import { EditorWindow, Install } from './home-parts';
+import { PromoVideo } from './promo-player';
 import { SiteFooter } from './site-footer';
 import { SiteHeader } from './site-header';
 import './site.css';

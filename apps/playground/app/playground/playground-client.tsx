@@ -14,20 +14,20 @@ import {
 } from '@video-ultra/react';
 import '@video-ultra/react/styles.css';
 import { useSearchParams } from 'next/navigation';
-import {
-  Suspense,
-  useCallback,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-  type KeyboardEvent,
-  type ReactNode,
-} from 'react';
-import { CopyButton } from '../copy-button';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDemoServices, type ServerSetup } from '../editor/services';
 import { SiteHeader } from '../site-header';
+import { CodeDialog } from './code-dialog';
+import {
+  Choice,
+  NumberField,
+  Section,
+  SelectField,
+  Slider,
+  Switch,
+  Tabs,
+  TextField,
+} from './controls';
 import {
   ACCENTS,
   COLOR_FIELDS,
@@ -39,9 +39,7 @@ import {
   TOOL_GROUPS,
   WORDS,
   contrastRatio,
-  cssCode,
   overridesOf,
-  propsCode,
   type ColorKey,
   type Mode,
   type Setup,
@@ -59,25 +57,28 @@ type TabId = (typeof TABS)[number]['id'];
 interface LogEntry {
   id: number;
   time: string;
+  kind: EditorEvent['type'] | 'onSave' | 'onExport';
   text: string;
+  /** How many times in a row the same event came (shown as ×N). */
+  count: number;
 }
 
 function describe(event: EditorEvent): string {
   switch (event.type) {
     case 'change':
-      return `change${event.label ? ` · ${event.label}` : ''}`;
+      return event.label ?? 'project updated';
     case 'selection':
-      return `selection · ${event.ids.length} selected`;
+      return event.ids.length ? `${event.ids.length} selected` : 'nothing selected';
     case 'playback':
-      return `playback · ${event.playing ? 'playing' : 'paused'}`;
+      return event.playing ? 'playing' : 'paused';
     case 'command':
-      return `command · ${event.id}`;
+      return event.id;
     case 'import':
-      return `import · ${event.name}`;
+      return event.name;
     case 'export':
-      return `export · ${event.phase}`;
+      return event.phase;
     case 'panel':
-      return `panel · ${event.id ?? 'closed'}`;
+      return event.id ?? 'closed';
   }
 }
 
@@ -94,7 +95,7 @@ function useOsDark(): boolean {
   return dark;
 }
 
-/** The stage's size, so a tall device frame shrinks to fit (its width, which picks the layout, stays). */
+/** An element's size, kept up to date. */
 function useBoxSize(ref: React.RefObject<HTMLElement | null>) {
   const [size, setSize] = useState({ width: 0, height: 0 });
   useEffect(() => {
@@ -120,7 +121,7 @@ function Playground({ server }: { server: ServerSetup }) {
     const t = params.get('tab');
     return TABS.some((x) => x.id === t) ? (t as TabId) : 'theme';
   });
-  const [code, setCode] = useState<'props' | 'css' | null>(null);
+  const [codeOpen, setCodeOpen] = useState(false);
   const [log, setLog] = useState<LogEntry[]>([]);
   const logId = useRef(0);
   const osDark = useOsDark();
@@ -145,10 +146,15 @@ function Playground({ server }: { server: ServerSetup }) {
     cutout: setup.services.backgroundRemover,
   });
 
-  // Stable: the editor keeps the first onEvent it gets until it restarts.
-  const add = useCallback((text: string) => {
-    const entry = { id: ++logId.current, time: new Date().toLocaleTimeString(), text };
-    setLog((entries) => [entry, ...entries].slice(0, 60));
+  // Stable: the log keeps one row per run of the same event (×N), newest first.
+  const add = useCallback((kind: LogEntry['kind'], text: string) => {
+    const time = new Date().toLocaleTimeString();
+    setLog((entries) => {
+      const last = entries[0];
+      if (last && last.kind === kind && last.text === text)
+        return [{ ...last, time, count: last.count + 1 }, ...entries.slice(1)];
+      return [{ id: ++logId.current, time, kind, text, count: 1 }, ...entries].slice(0, 80);
+    });
   }, []);
 
   // What the editor reads only when it starts: a change restarts it.
@@ -165,9 +171,12 @@ function Playground({ server }: { server: ServerSetup }) {
       : setup.size === 'custom'
         ? setup.custom
         : { width: size.width, height: size.height };
-  // A frame taller than the stage gets shorter (never below 560 px: then the stage scrolls).
-  const frameHeight =
-    frame && stage.height ? Math.max(Math.min(frame.height, stage.height - 32), 560) : 0;
+  // A frame bigger than the stage is zoomed out to fit (CSS zoom: the editor keeps its own size,
+  // so its layout is the device's, and pointers still land where they should).
+  const zoom =
+    frame && stage.width && stage.height
+      ? Math.min(1, (stage.width - 48) / frame.width, (stage.height - 48) / frame.height)
+      : 1;
 
   const editorProps: VideoEditorProps = {
     theme: setup.mode,
@@ -178,12 +187,12 @@ function Playground({ server }: { server: ServerSetup }) {
     labels,
     customize: { hide: setup.hide },
     ...services,
-    onEvent: (event) => add(describe(event)),
-    onSave: () => add('onSave · project saved'),
-    onExport: (r) => add(`onExport · ${r.width}×${r.height}, ${(r.blob.size / 1e6).toFixed(1)} MB`),
+    onEvent: (event) => add(event.type, describe(event)),
+    onSave: () => add('onSave', 'project saved'),
+    onExport: (r) =>
+      add('onExport', `${r.width}×${r.height}, ${(r.blob.size / 1e6).toFixed(1)} MB`),
   };
 
-  const codeText = code === 'css' ? cssCode(setup) : propsCode(setup);
   const changed = JSON.stringify(setup) !== JSON.stringify(DEFAULT_SETUP);
 
   return (
@@ -195,7 +204,7 @@ function Playground({ server }: { server: ServerSetup }) {
             <h1 id="pg-title">Playground</h1>
             <p>Shape the editor for your app, then copy the code.</p>
           </div>
-          <Tabs tab={tab} onTab={setTab} />
+          <Tabs tabs={TABS} tab={tab} onTab={setTab} label="Options" idPrefix="pg" />
           <div
             className="pg-panel-body"
             role="tabpanel"
@@ -209,6 +218,23 @@ function Playground({ server }: { server: ServerSetup }) {
             {tab === 'tools' ? <ToolOptions setup={setup} set={set} /> : null}
             {tab === 'words' ? <WordOptions setup={setup} set={set} /> : null}
             {tab === 'events' ? <EventLog log={log} onClear={() => setLog([])} /> : null}
+          </div>
+          <div className="pg-panel-foot">
+            {changed ? (
+              <button
+                type="button"
+                className="s-btn s-btn-quiet s-btn-small"
+                onClick={() => {
+                  setSetup(DEFAULT_SETUP);
+                  setWords({});
+                }}
+              >
+                Reset all
+              </button>
+            ) : null}
+            <button type="button" className="s-btn s-btn-small" onClick={() => setCodeOpen(true)}>
+              Get the code
+            </button>
           </div>
         </aside>
 
@@ -250,155 +276,28 @@ function Playground({ server }: { server: ServerSetup }) {
                 />
               </div>
             ) : null}
+            {frame ? (
+              <span className="pg-size-note">
+                {frame.width} × {frame.height}
+                {zoom < 1 ? ` · shown at ${Math.round(zoom * 100)}%` : ''}
+              </span>
+            ) : null}
             <a className="pg-jump" href="#pg-title">
               Options ↓
             </a>
-            <div className="pg-toolbar-end">
-              {changed ? (
-                <button
-                  type="button"
-                  className="s-btn s-btn-quiet s-btn-small"
-                  onClick={() => {
-                    setSetup(DEFAULT_SETUP);
-                    setWords({});
-                  }}
-                >
-                  Reset all
-                </button>
-              ) : null}
-              <button
-                type="button"
-                className="s-btn s-btn-small"
-                aria-expanded={code !== null}
-                aria-controls="pg-code"
-                onClick={() => setCode(code ? null : 'props')}
-              >
-                {code ? 'Hide code' : 'Get the code'}
-              </button>
-            </div>
           </div>
 
           <div className="pg-stage" ref={stageRef} data-framed={frame ? '' : undefined}>
             <div
               className="pg-frame"
-              style={
-                frame ? { width: frame.width, height: frameHeight || frame.height } : undefined
-              }
+              style={frame ? { width: frame.width, height: frame.height, zoom: zoom } : undefined}
             >
               <VideoEditor key={restartKey} {...editorProps} />
             </div>
-            {frame && frameHeight > 0 && frameHeight < frame.height ? (
-              <p className="pg-note">
-                Shown {frame.width} × {frameHeight}: shortened to fit this window.
-              </p>
-            ) : null}
           </div>
-
-          {code ? (
-            <div className="pg-code" id="pg-code">
-              <div className="pg-code-bar">
-                <div className="s-seg" role="group" aria-label="Code as">
-                  {(['props', 'css'] as const).map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      aria-pressed={code === c}
-                      onClick={() => setCode(c)}
-                    >
-                      {c === 'props' ? 'React props' : 'CSS'}
-                    </button>
-                  ))}
-                </div>
-                <CopyButton text={codeText} label="Copy the code" className="pg-copy" />
-              </div>
-              <pre tabIndex={0} aria-label="Code for this setup">
-                <code data-testid="pg-code">{codeText}</code>
-              </pre>
-            </div>
-          ) : null}
         </section>
       </main>
-    </div>
-  );
-}
-
-function Tabs({ tab, onTab }: { tab: TabId; onTab: (t: TabId) => void }) {
-  const refs = useRef<(HTMLButtonElement | null)[]>([]);
-  const onKey = (e: KeyboardEvent, i: number) => {
-    const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
-    const to =
-      e.key === 'Home'
-        ? 0
-        : e.key === 'End'
-          ? TABS.length - 1
-          : (i + step + TABS.length) % TABS.length;
-    if (!step && e.key !== 'Home' && e.key !== 'End') return;
-    e.preventDefault();
-    onTab(TABS[to]!.id);
-    refs.current[to]?.focus();
-  };
-  return (
-    <div className="pg-tabs" role="tablist" aria-label="Options">
-      {TABS.map((t, i) => (
-        <button
-          key={t.id}
-          ref={(el) => {
-            refs.current[i] = el;
-          }}
-          type="button"
-          role="tab"
-          id={`pg-tab-${t.id}`}
-          aria-selected={tab === t.id}
-          aria-controls={`pg-panel-${t.id}`}
-          tabIndex={tab === t.id ? 0 : -1}
-          onClick={() => onTab(t.id)}
-          onKeyDown={(e) => onKey(e, i)}
-        >
-          {t.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function Group({ title, children, hint }: { title: string; children: ReactNode; hint?: string }) {
-  return (
-    <fieldset className="pg-group">
-      <legend>{title}</legend>
-      {hint ? <p className="pg-hint">{hint}</p> : null}
-      {children}
-    </fieldset>
-  );
-}
-
-function Choice<T extends string>({
-  label,
-  hideLabel = false,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  hideLabel?: boolean;
-  value: T;
-  options: { value: T; label: string }[];
-  onChange: (v: T) => void;
-}) {
-  return (
-    <div className="pg-row">
-      {hideLabel ? null : <span className="pg-row-label">{label}</span>}
-      <div className="s-seg" role="group" aria-label={label}>
-        {options.map((o) => (
-          <button
-            key={o.value}
-            type="button"
-            aria-pressed={value === o.value}
-            onClick={() => onChange(o.value)}
-          >
-            {o.label}
-          </button>
-        ))}
-      </div>
+      {codeOpen ? <CodeDialog setup={setup} onClose={() => setCodeOpen(false)} /> : null}
     </div>
   );
 }
@@ -414,7 +313,6 @@ function ThemeOptions({
   color: (k: ColorKey) => string;
   shown: 'dark' | 'light';
 }) {
-  const id = useId();
   const ratios = [
     { label: 'Button text on accent', value: contrastRatio('#ffffff', color('accent')) },
     { label: 'Text on panels', value: contrastRatio(color('text'), color('surface1')) },
@@ -426,46 +324,71 @@ function ThemeOptions({
   ];
   return (
     <>
-      <Group title="Mode">
+      <Section title="Mode">
         <Choice<Mode>
-          label="Colours"
+          label="Colour mode"
           hideLabel
           value={setup.mode}
           options={[
             { value: 'dark', label: 'Dark' },
             { value: 'light', label: 'Light' },
-            { value: 'auto', label: 'Follow the device' },
+            { value: 'auto', label: 'System' },
           ]}
           onChange={(mode) => set({ mode, colors: {} })}
         />
-      </Group>
+      </Section>
 
-      <Group title="Accent">
+      <Section title="Accent">
         <div className="pg-swatches" role="group" aria-label="Accent colour">
-          {ACCENTS.map((a) => (
-            <button
-              key={a.name}
-              type="button"
-              className="pg-swatch"
-              style={{ background: a.accent }}
-              aria-label={a.name}
-              title={a.name}
-              aria-pressed={color('accent') === a.accent}
-              onClick={() =>
-                set({
-                  colors: {
-                    ...setup.colors,
-                    accent: a.accent,
-                    accentText: shown === 'dark' ? a.dark : a.accent,
-                  },
-                })
-              }
-            />
-          ))}
+          {ACCENTS.map((a) => {
+            const on = color('accent') === a.accent;
+            return (
+              <button
+                key={a.name}
+                type="button"
+                className="pg-swatch"
+                style={{ background: a.accent }}
+                aria-label={a.name}
+                title={a.name}
+                aria-pressed={on}
+                onClick={() =>
+                  set({
+                    colors: {
+                      ...setup.colors,
+                      accent: a.accent,
+                      accentText: shown === 'dark' ? a.dark : a.accent,
+                    },
+                  })
+                }
+              >
+                {on ? (
+                  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                    <path
+                      d="M5 12.5l4.5 4.5L19 7.5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                ) : null}
+              </button>
+            );
+          })}
         </div>
-      </Group>
+      </Section>
 
-      <Group title="Colours">
+      <Section
+        title="Colours"
+        action={
+          Object.keys(setup.colors).length ? (
+            <button type="button" className="pg-link" onClick={() => set({ colors: {} })}>
+              Reset
+            </button>
+          ) : null
+        }
+      >
         <div className="pg-colors">
           {COLOR_FIELDS.map(({ key, label }) => (
             <label key={key} className="pg-color">
@@ -479,43 +402,26 @@ function ThemeOptions({
             </label>
           ))}
         </div>
-        {Object.keys(setup.colors).length ? (
-          <button type="button" className="pg-link" onClick={() => set({ colors: {} })}>
-            Reset colours
-          </button>
-        ) : null}
-      </Group>
+      </Section>
 
-      <Group title="Shape and type">
-        <label className="pg-row" htmlFor={`${id}-radius`}>
-          <span className="pg-row-label">Corners · {setup.radius}px</span>
-          <input
-            id={`${id}-radius`}
-            type="range"
-            min={0}
-            max={20}
-            value={setup.radius}
-            onChange={(e) => set({ radius: Number(e.target.value) })}
-          />
-        </label>
-        <label className="pg-row" htmlFor={`${id}-font`}>
-          <span className="pg-row-label">Font</span>
-          <select
-            id={`${id}-font`}
-            className="pg-select"
-            value={setup.font}
-            onChange={(e) => set({ font: e.target.value })}
-          >
-            {FONTS.map((f) => (
-              <option key={f.label} value={f.value}>
-                {f.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      </Group>
+      <Section title="Shape and type">
+        <Slider
+          label="Corners"
+          value={setup.radius}
+          min={0}
+          max={20}
+          unit="px"
+          onChange={(radius) => set({ radius })}
+        />
+        <SelectField
+          label="Font"
+          value={setup.font}
+          options={FONTS.map((f) => ({ value: f.value, label: f.label }))}
+          onChange={(font) => set({ font })}
+        />
+      </Section>
 
-      <Group title="Comfort">
+      <Section title="Comfort">
         <Choice
           label="Control size"
           value={setup.density}
@@ -532,13 +438,13 @@ function ThemeOptions({
           options={[
             { value: 'normal', label: 'Normal' },
             { value: 'high', label: 'High' },
-            { value: 'auto', label: 'Follow the device' },
+            { value: 'auto', label: 'System' },
           ]}
           onChange={(contrast) => set({ contrast })}
         />
-      </Group>
+      </Section>
 
-      <Group title="Readable?" hint="WCAG AA needs 4.5 for text.">
+      <Section title="Readable?" hint="Text needs 4.5 or more (WCAG AA).">
         <ul className="pg-ratios">
           {ratios.map((r) => {
             const ok = r.value >= 4.5;
@@ -546,13 +452,14 @@ function ThemeOptions({
               <li key={r.label}>
                 <span>{r.label}</span>
                 <strong data-ok={ok}>
-                  {r.value.toFixed(1)} {ok ? '· good' : '· too low'}
+                  {r.value.toFixed(1)}
+                  <span className="pg-badge">{ok ? 'Good' : 'Too low'}</span>
                 </strong>
               </li>
             );
           })}
         </ul>
-      </Group>
+      </Section>
     </>
   );
 }
@@ -562,12 +469,12 @@ function ToolOptions({ setup, set }: { setup: Setup; set: (p: Partial<Setup>) =>
     set({ hide: on ? setup.hide.filter((h) => h !== id) : [...setup.hide, id] });
   return (
     <>
-      <p className="pg-hint pg-hint-top">
+      <p className="pg-intro">
         Turn parts off to keep the editor simple. The editor restarts to apply them; your project
         comes back.
       </p>
       {TOOL_GROUPS.map((g) => (
-        <Group key={g.title} title={g.title}>
+        <Section key={g.title} title={g.title}>
           {g.items.map((item) => (
             <Switch
               key={item.id}
@@ -576,9 +483,9 @@ function ToolOptions({ setup, set }: { setup: Setup; set: (p: Partial<Setup>) =>
               onChange={(on) => toggle(item.id, on)}
             />
           ))}
-        </Group>
+        </Section>
       ))}
-      <Group title="Services" hint="Things your app passes in: each one adds its tools.">
+      <Section title="Services" hint="Things your app passes in; each one adds its tools.">
         {SERVICES.map((s) => (
           <Switch
             key={s.id}
@@ -587,43 +494,7 @@ function ToolOptions({ setup, set }: { setup: Setup; set: (p: Partial<Setup>) =>
             onChange={(on) => set({ services: { ...setup.services, [s.id]: on } })}
           />
         ))}
-      </Group>
-    </>
-  );
-}
-
-function WordOptions({ setup, set }: { setup: Setup; set: (p: Partial<Setup>) => void }) {
-  const id = useId();
-  return (
-    <>
-      <Group title="Direction">
-        <Choice
-          label="Reading order"
-          value={setup.dir}
-          options={[
-            { value: 'ltr', label: 'Left to right' },
-            { value: 'rtl', label: 'Right to left' },
-          ]}
-          onChange={(dir) => set({ dir })}
-        />
-      </Group>
-      <Group
-        title="Your own words"
-        hint="Every label in the editor can be changed or translated with the labels prop. Try a few:"
-      >
-        {WORDS.map((w) => (
-          <label key={w.key} className="pg-field" htmlFor={`${id}-${w.key}`}>
-            <span>{w.label}</span>
-            <input
-              id={`${id}-${w.key}`}
-              type="text"
-              placeholder={DEFAULT_WORDS[w.key]}
-              value={setup.words[w.key] ?? ''}
-              onChange={(e) => set({ words: { ...setup.words, [w.key]: e.target.value } })}
-            />
-          </label>
-        ))}
-      </Group>
+      </Section>
     </>
   );
 }
@@ -636,91 +507,89 @@ const DEFAULT_WORDS: Partial<Record<keyof Labels, string>> = {
   untitledVideo: 'Untitled video',
 };
 
+function WordOptions({ setup, set }: { setup: Setup; set: (p: Partial<Setup>) => void }) {
+  return (
+    <>
+      <Section title="Direction">
+        <Choice
+          label="Reading order"
+          hideLabel
+          value={setup.dir}
+          options={[
+            { value: 'ltr', label: 'Left to right' },
+            { value: 'rtl', label: 'Right to left' },
+          ]}
+          onChange={(dir) => set({ dir })}
+        />
+      </Section>
+      <Section
+        title="Your own words"
+        hint="Any label in the editor can be changed or translated with the labels prop. Try a few:"
+      >
+        {WORDS.map((w) => (
+          <TextField
+            key={w.key}
+            label={w.label}
+            placeholder={DEFAULT_WORDS[w.key] ?? ''}
+            value={setup.words[w.key] ?? ''}
+            onChange={(value) => set({ words: { ...setup.words, [w.key]: value } })}
+          />
+        ))}
+      </Section>
+    </>
+  );
+}
+
+const KIND_LABEL: Record<LogEntry['kind'], string> = {
+  change: 'change',
+  selection: 'selection',
+  playback: 'playback',
+  command: 'command',
+  import: 'import',
+  export: 'export',
+  panel: 'panel',
+  onSave: 'onSave',
+  onExport: 'onExport',
+};
+
 function EventLog({ log, onClear }: { log: LogEntry[]; onClear: () => void }) {
   return (
     <>
-      <p className="pg-hint pg-hint-top">
+      <p className="pg-intro">
         What your app hears through <code>onEvent</code>, <code>onSave</code> and{' '}
         <code>onExport</code>. Use the editor and watch.
       </p>
       <div className="pg-log-bar">
-        <span aria-live="polite">{log.length ? `${log.length} events` : 'No events yet'}</span>
+        <span aria-live="polite">
+          {log.length ? `${log.length} ${log.length === 1 ? 'event' : 'events'}` : 'No events yet'}
+        </span>
         {log.length ? (
           <button type="button" className="pg-link" onClick={onClear}>
             Clear
           </button>
         ) : null}
       </div>
-      <ol className="pg-log">
-        {log.map((e) => (
-          <li key={e.id}>
-            <time>{e.time}</time>
-            <code>{e.text}</code>
-          </li>
-        ))}
-      </ol>
+      {log.length ? (
+        <ol className="pg-log">
+          {log.map((e) => (
+            <li key={e.id}>
+              <span className="pg-log-kind" data-kind={e.kind}>
+                {KIND_LABEL[e.kind]}
+              </span>
+              <span className="pg-log-text">
+                {e.text}
+                {e.count > 1 ? <span className="pg-log-count"> ×{e.count}</span> : null}
+              </span>
+              <time>{e.time}</time>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="pg-empty">
+          Select a clip, press play or add some media: each event shows here.
+        </p>
+      )}
     </>
-  );
-}
-
-function Switch({
-  label,
-  on,
-  onChange,
-}: {
-  label: string;
-  on: boolean;
-  onChange: (on: boolean) => void;
-}) {
-  return (
-    <label className="pg-switch">
-      <span>{label}</span>
-      <input
-        type="checkbox"
-        role="switch"
-        checked={on}
-        onChange={(e) => onChange(e.target.checked)}
-      />
-    </label>
-  );
-}
-
-function NumberField({
-  label,
-  value,
-  min,
-  max,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  onChange: (v: number) => void;
-}) {
-  // The parent keys this field by its value, so a new value starts a fresh draft.
-  const [text, setText] = useState(String(value));
-  const commit = () => {
-    const n = Math.round(Number(text));
-    if (Number.isFinite(n)) onChange(Math.min(max, Math.max(min, n)));
-    else setText(String(value));
-  };
-  return (
-    <label className="pg-number">
-      <span className="site-sr">{label}</span>
-      <input
-        type="number"
-        inputMode="numeric"
-        min={min}
-        max={max}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') commit();
-        }}
-      />
-    </label>
   );
 }
 

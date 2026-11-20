@@ -2801,19 +2801,51 @@
     object-fit: contain;
   }
 
+  /* No clips yet: the frame takes the theme's panel colour (not the black of a video). It
+     measures itself, so the words fit any frame: a small frame drops the icon, then the line. */
   .vu-stage-empty {
+    container: vu-empty / size;
+    overflow: hidden;
     position: absolute;
     inset: 0;
     display: flex;
     align-items: center;
     justify-content: center;
     padding: var(--vu-space-3);
-    color: var(--vu-on-media);
+    border-radius: inherit;
+    background: var(--vu-surface-1);
+    box-shadow: inset 0 0 0 1px var(--vu-border);
+    color: var(--vu-text);
   }
 
   .vu-stage-empty .vu-empty-body {
-    color: var(--vu-on-media);
-    opacity: 0.72;
+    color: var(--vu-text-muted);
+  }
+
+  .vu-stage-empty .vu-empty {
+    padding: var(--vu-space-3);
+  }
+
+  @container vu-empty (max-height: 380px) {
+    .vu-stage-empty .vu-empty-icon {
+      display: none;
+    }
+  }
+
+  @container vu-empty (max-height: 280px) or (max-width: 220px) {
+    .vu-stage-empty .vu-empty-body {
+      display: none;
+    }
+
+    .vu-stage-empty .vu-empty-title {
+      font-size: var(--vu-text-md);
+    }
+  }
+
+  @container vu-empty (max-height: 150px) {
+    .vu-stage-empty .vu-empty-title {
+      display: none;
+    }
   }
 
   .vu-loading,

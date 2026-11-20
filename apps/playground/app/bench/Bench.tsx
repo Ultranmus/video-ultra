@@ -200,58 +200,58 @@ function verdictFor(c: Capabilities): Verdict {
   };
 }
 
-type CapValue = boolean | string;
+/** A capability's value; null while the check is still running (a placeholder shows). */
+type CapValue = boolean | string | null;
 
 /** The capability tables, grouped. Each is a real table (scripts/bench.ts reads them as text). */
-function capGroups(c: Capabilities): { title: string; rows: [string, CapValue][] }[] {
+function capGroups(c: Capabilities | null): { title: string; rows: [string, CapValue][] }[] {
   return [
     {
       title: 'Device',
       rows: [
-        ['Supported', c.supported],
-        ['Performance tier', c.tier],
-        [
-          'Device',
-          `${c.mobile ? 'mobile' : 'desktop'}, ${c.cores} cores, ${c.deviceMemoryGb ?? '?'} GB RAM`,
-        ],
-        ['GPU', c.gpu ?? 'not exposed'],
+        ['Supported', c ? c.supported : null],
+        ['Tier', c ? c.tier : null],
+        ['Type', c ? (c.mobile ? 'Phone or tablet' : 'Desktop') : null],
+        ['Cores', c ? String(c.cores) : null],
+        ['Memory', c ? (c.deviceMemoryGb ? `${c.deviceMemoryGb} GB` : 'not exposed') : null],
+        ['GPU', c ? (c.gpu ?? 'not exposed') : null],
       ],
     },
     {
       title: 'Drawing',
       rows: [
-        ['WebGPU', c.webgpu],
-        ['WebGL2', c.webgl2],
-        ['OffscreenCanvas', c.offscreenCanvas],
+        ['WebGPU', c ? c.webgpu : null],
+        ['WebGL2', c ? c.webgl2 : null],
+        ['OffscreenCanvas', c ? c.offscreenCanvas : null],
       ],
     },
     {
       title: 'Playing (decode)',
       rows: [
-        ['WebCodecs video', c.webcodecs.video],
-        ['WebCodecs audio', c.webcodecs.audio],
-        ['H.264', c.decode.avc],
-        ['HEVC', c.decode.hevc],
-        ['VP9', c.decode.vp9],
-        ['AV1', c.decode.av1],
+        ['WebCodecs video', c ? c.webcodecs.video : null],
+        ['WebCodecs audio', c ? c.webcodecs.audio : null],
+        ['H.264', c ? c.decode.avc : null],
+        ['HEVC', c ? c.decode.hevc : null],
+        ['VP9', c ? c.decode.vp9 : null],
+        ['AV1', c ? c.decode.av1 : null],
       ],
     },
     {
       title: 'Exporting (encode)',
       rows: [
-        ['H.264 1080p', c.encode.avc1080],
-        ['H.264 4K', c.encode.avc4k],
-        ['VP9', c.encode.vp9],
-        ['AAC audio', c.encode.aac],
-        ['Opus audio', c.encode.opus],
+        ['H.264 1080p', c ? c.encode.avc1080 : null],
+        ['H.264 4K', c ? c.encode.avc4k : null],
+        ['VP9', c ? c.encode.vp9 : null],
+        ['AAC audio', c ? c.encode.aac : null],
+        ['Opus audio', c ? c.encode.opus : null],
       ],
     },
     {
       title: 'Storage and security',
       rows: [
-        ['OPFS (disk space for exports)', c.opfs],
-        ['File System Access', c.fileSystemAccess],
-        ['Secure context', window.isSecureContext],
+        ['OPFS (disk space for exports)', c ? c.opfs : null],
+        ['File System Access', c ? c.fileSystemAccess : null],
+        ['Secure context', c ? window.isSecureContext : null],
       ],
     },
   ];
@@ -769,7 +769,17 @@ export function Bench() {
       <section className="bench-card bench-device" aria-labelledby="bench-device-title">
         <h2 id="bench-device-title">This device</h2>
         {capsError && <p className="error">{capsError}</p>}
-        {!caps && !capsError && <p className="bench-muted">Checking what this browser can do…</p>}
+        {!caps && !capsError ? (
+          <div className="bench-verdict is-checking" role="status">
+            <span className="bench-verdict-icon bench-spinner" aria-hidden="true" />
+            <div>
+              <p className="bench-verdict-title">Checking what this browser can do…</p>
+              <p className="bench-verdict-detail">
+                Testing drawing, decoding, encoding and storage in this browser. It takes a moment.
+              </p>
+            </div>
+          </div>
+        ) : null}
         {verdict && (
           <div className={`bench-verdict is-${verdict.kind}`}>
             <span className="bench-verdict-icon" aria-hidden="true">
@@ -787,8 +797,8 @@ export function Bench() {
             </div>
           </div>
         )}
-        {caps && (
-          <div className="bench-caps">
+        {capsError ? null : (
+          <div className="bench-caps" aria-busy={caps ? undefined : true}>
             {capGroups(caps).map((group) => (
               <table key={group.title}>
                 <caption>{group.title}</caption>
@@ -796,7 +806,15 @@ export function Bench() {
                   {group.rows.map(([k, v]) => (
                     <tr key={k}>
                       <th scope="row">{k}</th>
-                      <td>{typeof v === 'boolean' ? <Badge ok={v} /> : v}</td>
+                      <td>
+                        {v === null ? (
+                          <span className="bench-skeleton" aria-hidden="true" />
+                        ) : typeof v === 'boolean' ? (
+                          <Badge ok={v} />
+                        ) : (
+                          v
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

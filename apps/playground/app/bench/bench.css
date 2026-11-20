@@ -595,3 +595,49 @@
     font-size: 20px;
   }
 }
+
+/* While the device check runs: the same tables with shimmering placeholders, so nothing below
+   moves when the answers arrive. */
+.bench-skeleton {
+  display: inline-block;
+  width: 56px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--s-surface-2);
+  vertical-align: middle;
+}
+
+.bench-spinner {
+  border: 2px solid var(--s-border-strong);
+  border-top-color: var(--s-accent-text);
+  border-radius: 50%;
+  background: none !important;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .bench-skeleton {
+    animation: bench-shimmer 1.2s ease-in-out infinite alternate;
+  }
+
+  .bench-spinner {
+    animation: bench-spin 0.8s linear infinite;
+  }
+}
+
+@keyframes bench-shimmer {
+  to {
+    opacity: 0.45;
+  }
+}
+
+@keyframes bench-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.bench-verdict-icon.bench-spinner {
+  width: 24px;
+  height: 24px;
+  margin: 6px;
+}

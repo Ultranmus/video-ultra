@@ -35,14 +35,14 @@ export const DEFAULT_COLORS: Record<'dark' | 'light', Record<ColorKey, string>> 
   light: {
     accent: '#4d194d',
     accentText: '#4d194d',
-    bg: '#f4f4f6',
-    stage: '#e2e2e8',
-    surface1: '#ffffff',
-    surface2: '#f1f1f4',
-    surface3: '#e4e4ea',
-    text: '#18181b',
-    textMuted: '#5b5b66',
-    timelineBg: '#ececf0',
+    bg: '#f8f8f8',
+    stage: '#ffffff',
+    surface1: '#f8f8f8',
+    surface2: '#f0f0f0',
+    surface3: '#e5e5e5',
+    text: '#1f1f1f',
+    textMuted: '#616161',
+    timelineBg: '#ffffff',
   },
 };
 
