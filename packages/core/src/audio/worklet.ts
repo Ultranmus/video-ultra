@@ -41,7 +41,19 @@ class VideoUltraPlayer extends AudioWorkletProcessor {
 
   constructor() {
     super();
-    this.port.onmessage = (event: MessageEvent<{ type: 'port'; port: MessagePort }>) => {
+    this.port.onmessage = (
+      event: MessageEvent<{ type: 'port'; port: MessagePort } | { type: 'flush' }>,
+    ) => {
+      // Pause straight from the page: the sound already queued is dropped at once, even while the
+      // engine worker is busy (its own stop came late on phones — the sound ran on after the
+      // picture stopped). Only the queue: starting and stopping stay the worker's, so this can
+      // never leave playback silent.
+      if (event.data.type === 'flush') {
+        this.queue.length = 0;
+        this.offset = 0;
+        this.buffered = 0;
+        return;
+      }
       if (event.data.type !== 'port') return;
       this.data = event.data.port;
       this.data.onmessage = (e: MessageEvent<DataMessage>) => this.onData(e.data);

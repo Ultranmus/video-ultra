@@ -680,7 +680,11 @@ async function workRenderer(
 ): Promise<Work> {
   clearTimeout(stillIdle);
   const key = `${strict && backend === 'webgpu' ? 'webgpu!' : backend}${alpha ? '+alpha' : ''}`;
-  if (!still || still.key !== key) {
+  // WebGPU isn't resized: a new size gets a new renderer. On the owner's iPhone a resized one
+  // drew the export preview small and shifted (2026-11-21); WebGL2 resizes fine.
+  const resizes = still?.renderer.backend !== 'webgpu';
+  const sized = still && still.canvas.width === width && still.canvas.height === height;
+  if (!still || still.key !== key || (!resizes && !sized)) {
     dropStill();
     const canvas = new OffscreenCanvas(width, height);
     let r: Renderer;
@@ -747,7 +751,10 @@ function renderStill<T>(
     const s = await workRenderer(
       width,
       height,
-      backend ?? renderer?.backend ?? 'webgl2',
+      // Stills draw like the export does (WebGL2): a still on the iPhone's WebGPU came out black
+      // or shifted in the export preview (owner, 2026-11-21), and the export's file is what the
+      // preview stands for. An explicit backend (golden checks) is still honoured.
+      backend ?? EXPORT_BACKEND,
       backend !== undefined,
       alpha,
     );

@@ -3183,8 +3183,10 @@
     gap: var(--vu-space-2);
   }
 
-  /* Suggestions: small pills with an icon, under the box. */
+  /* Suggestions: small pills with an icon, above the box — the box stays at the foot whatever
+     shows, so it doesn't jump when they go (owner, 2026-11-21). */
   .vu-assistant-suggestions {
+    order: -1;
     display: flex;
     flex-wrap: wrap;
     gap: var(--vu-space-2);
@@ -3465,6 +3467,12 @@
     min-width: 0;
   }
 
+  /* Let go of the grip: the timeline glides to its size (not a jump), like the canvas frame does
+     when its size changes (owner, 2026-11-21). Only for that moment (splitters.tsx). */
+  .vu-root[data-timeline-snap] .vu-timeline-area {
+    transition: height var(--vu-duration-sheet) var(--vu-ease-sheet);
+  }
+
   /* Only the play bar: the lanes are out of the way (the sheet still opens over this spot). */
   .vu-root[data-timeline-size='minimal'] .vu-timeline {
     visibility: hidden;
@@ -3667,6 +3675,32 @@
     will-change: transform;
     animation: vu-dock-in var(--vu-duration-sheet) var(--vu-ease-sheet);
     transition: transform var(--vu-duration-sheet) var(--vu-ease-sheet);
+  }
+
+  /* Typing to the Assistant (it covers the editor then): just the chat and the box, right on the
+     keyboard — the suggestions and the note go until the keyboard closes (owner, 2026-11-21). */
+  .vu-root[data-keyboard]
+    .vu-dock[data-cover]
+    :is(.vu-assistant-suggestions, .vu-assistant-privacy) {
+    display: none;
+  }
+
+  /* …and it moves with the keyboard in one glide: the room for the keyboard and the reach over
+     the tab bar change together, when the keyboard is there, not in steps (they flickered). */
+  .vu-root:not([data-keyboard]) .vu-dock[data-cover]:has(.vu-assistant) {
+    bottom: 0;
+    height: calc(var(--vu-sheet-full) - var(--vu-sheet-below, 0px));
+  }
+
+  .vu-dock:has(.vu-assistant):not([data-dragging]) {
+    transition:
+      transform var(--vu-duration-sheet) var(--vu-ease-sheet),
+      bottom var(--vu-duration-sheet) var(--vu-ease-sheet),
+      height var(--vu-duration-sheet) var(--vu-ease-sheet);
+  }
+
+  .vu-dock:has(.vu-assistant) .vu-dock-body {
+    transition: padding-bottom var(--vu-duration-sheet) var(--vu-ease-sheet);
   }
 
   /* Covering (editing a text): the whole editor, top bar and tab bar included. */
@@ -3885,20 +3919,17 @@
     padding-bottom: calc(var(--vu-keyboard) + var(--vu-space-4));
   }
 
-  /* Touch screens: Safari's address bar floats over the page just above the keyboard. */
-  @media (pointer: coarse) {
-    .vu-root[data-keyboard] .vu-dock[data-expanded] .vu-dock-body {
-      padding-bottom: calc(var(--vu-keyboard) + var(--vu-size-touch) + var(--vu-space-2));
-    }
-  }
-
   /* A field in a full-height sheet took focus (VideoEditor.tsx): room below it from the start, so
      it can be scrolled up out of the keyboard's way before the keyboard comes. */
-  .vu-root[data-sheet-typing] .vu-dock[data-expanded] .vu-dock-body {
-    padding-bottom: max(
-      calc(var(--vu-sheet-full) / 2),
-      calc(var(--vu-keyboard, 0px) + var(--vu-space-4))
-    );
+  /* Half a sheet of room, as an empty block at the end: Safari doesn't count a scroll box's
+     bottom padding as room to scroll here, so on the iPhone a short list (5–7 layers) couldn't
+     lift its last field above the keyboard (measured 2026-11-21: padding 649 px, scrollHeight =
+     clientHeight). */
+  .vu-root[data-sheet-typing] .vu-dock[data-expanded] .vu-dock-body::after {
+    content: '';
+    display: block;
+    flex: none;
+    height: calc(var(--vu-sheet-full) / 2);
   }
 
   .vu-root[data-keyboard] .vu-toolbar {
@@ -4605,8 +4636,10 @@
         'side'
         'main';
       grid-template-columns: minmax(0, 1fr);
-      /* The screen's spare room goes to the preview. */
-      grid-template-rows: minmax(var(--vu-size-export-poster-phone), 1fr) auto;
+      /* The preview keeps one size: growing into the spare room made it change with every
+         choice (the text under it grew or shrank) and push the choices around (owner,
+         2026-11-21). */
+      grid-template-rows: var(--vu-size-export-poster-phone) auto;
       gap: var(--vu-space-4);
       min-height: 0;
       margin: 0 calc(var(--vu-space-5) * -1);

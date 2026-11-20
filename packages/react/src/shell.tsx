@@ -868,8 +868,12 @@ function Sheet({ tool, panel }: { tool: ToolId | null; panel: PanelId | null }):
   // Templates are pictures to judge and words to type: their sheet opens at full height (no
   // move when the keyboard comes and goes, nothing to drag up first). Editing a text covers the
   // whole editor, top bar and tab bar too (owner, 2026-10-31).
-  const cover = tool === 'text-edit';
-  const fullFirst = cover || (!tool && panel === 'templates');
+  // Typing to the Assistant covers everything too: the chat above, the box on the keyboard,
+  // nothing else (owner, 2026-11-21). Only while its box has focus.
+  const [typing, setTyping] = useState(false);
+  const assistantCover = typing && !tool && panel === 'assistant';
+  const cover = tool === 'text-edit' || assistantCover;
+  const fullFirst = tool === 'text-edit' || (!tool && panel === 'templates');
   const [expanded, setExpanded] = useState(fullFirst);
   const shownKey = `${tool}|${panel}`;
   const [lastKey, setLastKey] = useState(shownKey);
@@ -892,22 +896,38 @@ function Sheet({ tool, panel }: { tool: ToolId | null; panel: PanelId | null }):
     const area = sheet?.parentElement;
     const root = sheet?.closest<HTMLElement>('.vu-root');
     if (!sheet || !area || !root) return;
+    // Without the keyboard's lift: while the keyboard is up the bottom area is lifted (a
+    // transform), and a height measured then stayed ~270 px short once it closed — the sheet
+    // couldn't be dragged all the way up (owner's iPhone, 2026-11-21).
+    const areaBottom = () => {
+      let y = area.getBoundingClientRect().bottom - root.getBoundingClientRect().top;
+      // Take out the lifts (translateY) between the area and the editor.
+      for (let n: HTMLElement | null = area; n && n !== root; n = n.parentElement) {
+        const t = getComputedStyle(n).transform;
+        if (t && t !== 'none') y -= new DOMMatrixReadOnly(t).m42;
+      }
+      return y;
+    };
     const measure = () => {
-      const r = root.getBoundingClientRect();
-      const a = area.getBoundingClientRect();
+      const bottom = areaBottom();
       // Covering: down to the editor's bottom too (over the tab bar).
-      const below = sheet.hasAttribute('data-cover') ? Math.max(0, r.bottom - a.bottom) : 0;
+      const below = sheet.hasAttribute('data-cover')
+        ? Math.max(0, root.getBoundingClientRect().height - bottom)
+        : 0;
       sheet.style.setProperty('--vu-sheet-below', `${Math.round(below)}px`);
-      sheet.style.setProperty(
-        '--vu-sheet-full',
-        `${Math.max(0, Math.round(a.bottom + below - r.top))}px`,
-      );
+      sheet.style.setProperty('--vu-sheet-full', `${Math.max(0, Math.round(bottom + below))}px`);
     };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(root);
     ro.observe(area);
-    return () => ro.disconnect();
+    // The keyboard coming and going doesn't resize anything here: measure then too.
+    const vv = window.visualViewport;
+    vv?.addEventListener('resize', measure);
+    return () => {
+      ro.disconnect();
+      vv?.removeEventListener('resize', measure);
+    };
   }, [cover]);
   const entry = RAIL.find((r) => r.id === panel);
   const custom = ctl.options.customize?.panels?.find((p) => `custom:${p.id}` === panel);
@@ -1024,9 +1044,19 @@ function Sheet({ tool, panel }: { tool: ToolId | null; panel: PanelId | null }):
       ref={ref}
       className="vu-dock"
       aria-label={title}
-      data-expanded={expanded || undefined}
+      data-expanded={expanded || assistantCover || undefined}
       data-picking={picking || undefined}
       data-cover={cover || undefined}
+      onFocus={(e) =>
+        setTyping(
+          e.target instanceof HTMLTextAreaElement ||
+            (e.target instanceof HTMLInputElement && e.target.type === 'text'),
+        )
+      }
+      onBlur={(e) => {
+        const next = e.relatedTarget;
+        if (!(next instanceof HTMLElement && ref.current?.contains(next))) setTyping(false);
+      }}
     >
       <div
         className="vu-dock-head"

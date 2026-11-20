@@ -1,4 +1,4 @@
-import { probeCodecs, type CodecSupport } from './codec-probe';
+import { probeCodecs, type CodecSupport } from './codec-checks';
 
 /** The codec checks of `detectCapabilities`, off the main thread (DECISIONS #211). */
 
