@@ -19,7 +19,9 @@ import {
  * - **Backward or far jumps restart** from the right keyframe (a new iterator).
  * - **Latest request wins**: requests overtaken by a newer one resolve to `null` and stop early.
  * - **Keyframe-first** on far restarts: a one-shot decode of the keyframe is shown as a preview
- *   while the exact frame decodes (not on the low tier — it's a second decoder).
+ *   while the exact frame decodes. It's a second decoder, so it counts in the pool: it runs only
+ *   while a slot is free (never evicting a playing clip's decoder) — on the low tier that's while
+ *   one clip is scrubbed alone.
  * - A **pool** caps decoders per device tier (least recently used closes first); a **watchdog**
  *   replaces an iterator whose decoder stops answering.
  */
@@ -27,6 +29,8 @@ import {
 /** Caps the number of live decoders and evicts the least recently used. */
 export class DecoderPool {
   private readonly live = new Map<DecoderOwner, number>();
+  /** Owners that came in through {@link tryAcquire}: evicted before any other. */
+  private readonly optional = new Set<DecoderOwner>();
   private clock = 0;
 
   /** @param budget Max decoders alive at once (e.g. low tier 2, mid 4, high 8). */
@@ -41,23 +45,48 @@ export class DecoderPool {
   acquire(owner: DecoderOwner): void {
     this.live.set(owner, ++this.clock);
     while (this.live.size > this.budget) {
+      // Optional decoders (previews) go first, then the least recently used.
       let oldest: DecoderOwner | null = null;
       let oldestAt = Infinity;
       for (const [candidate, at] of this.live) {
-        if (candidate !== owner && at < oldestAt) {
+        const rank = this.optional.has(candidate) ? at - 1e15 : at;
+        if (candidate !== owner && rank < oldestAt) {
           oldest = candidate;
-          oldestAt = at;
+          oldestAt = rank;
         }
       }
       if (!oldest) break;
       this.live.delete(oldest);
+      this.optional.delete(oldest);
       oldest.releaseDecoder();
     }
+    this.peak = Math.max(this.peak, this.live.size);
   }
 
+  /**
+   * Registers `owner` only if a slot is free (evicts nobody): for optional decoders such as
+   * keyframe previews. Returns whether it got the slot.
+   */
+  tryAcquire(owner: DecoderOwner): boolean {
+    if (this.live.has(owner)) {
+      this.live.set(owner, ++this.clock);
+      return true;
+    }
+    if (this.live.size >= this.budget) return false;
+    this.live.set(owner, ++this.clock);
+    this.optional.add(owner);
+    this.peak = Math.max(this.peak, this.live.size);
+    return true;
+  }
+
+  /** Gives `owner`'s slot back. */
   release(owner: DecoderOwner): void {
     this.live.delete(owner);
+    this.optional.delete(owner);
   }
+
+  /** Most decoders open at once since the pool was made (tests, bench). */
+  peak = 0;
 }
 
 /** Something that holds a decoder and can give it up when the pool asks. */
@@ -71,6 +100,8 @@ export interface FrameSourceStats {
   /** Requests overtaken by a newer one (latest-wins savings). */
   skipped: number;
   previews: number;
+  /** Previews left out because the pool had no free slot. */
+  previewsSkipped: number;
   /** Seeks served by continuing the running iterator. */
   continued: number;
   /** Seeks that started a new iterator (new decoder, from a keyframe). */
@@ -107,16 +138,25 @@ export class FrameSource implements DecoderOwner {
     requests: 0,
     skipped: 0,
     previews: 0,
+    previewsSkipped: 0,
     continued: 0,
     restarts: 0,
     watchdogResets: 0,
   };
 
+  /** The keyframe preview's decoder, as the pool sees it (evicted: its picture is dropped). */
+  private readonly previewSlot: DecoderOwner & { evicted: boolean } = {
+    evicted: false,
+    releaseDecoder() {
+      this.evicted = true;
+    },
+  };
+
   constructor(
     private readonly track: InputVideoTrack,
     private readonly pool: DecoderPool,
-    /** Low tier: no preview decoder (it would be a second decoder per clip). */
-    private readonly allowPreviews = pool.budget > 2,
+    /** Keyframe previews (exports and captures leave them out); they also need a free pool slot. */
+    private readonly allowPreviews = true,
   ) {
     this.sink = new VideoSampleSink(track);
     this.previewSink = new VideoSampleSink(track);
@@ -252,11 +292,20 @@ export class FrameSource implements DecoderOwner {
     id: number,
     onPreview: (sample: VideoSample) => void,
   ): Promise<void> {
+    let slot = false;
     try {
       const key = await this.packets.getKeyPacket(time, { verifyKeyPackets: true });
       if (!key || time - key.timestamp < PREVIEW_MIN_GAP_S) return;
+      if (id !== this.latestId || this.destroyed) return;
+      // A second decoder: only with a free slot (the exact frame's decoder has taken its own).
+      slot = this.pool.tryAcquire(this.previewSlot);
+      if (!slot) {
+        this.stats.previewsSkipped++;
+        return;
+      }
+      this.previewSlot.evicted = false;
       const sample = await this.previewSink.getSample(key.timestamp);
-      if (sample && id === this.latestId && this.waiting.has(id)) {
+      if (sample && id === this.latestId && this.waiting.has(id) && !this.previewSlot.evicted) {
         this.stats.previews++;
         onPreview(sample);
       } else {
@@ -264,6 +313,8 @@ export class FrameSource implements DecoderOwner {
       }
     } catch {
       // A preview is a nicety; the exact frame still comes.
+    } finally {
+      if (slot) this.pool.release(this.previewSlot);
     }
   }
 

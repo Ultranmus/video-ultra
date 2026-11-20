@@ -242,12 +242,20 @@ async function play(seconds: number): Promise<PlayResult> {
   };
 }
 
-const pool = new DecoderPool(4);
+let pool = new DecoderPool(4);
 let frames: FrameSource | null = null;
 
 function frameSource(video: InputVideoTrack): FrameSource {
   frames ??= new FrameSource(video, pool);
   return frames;
+}
+
+/** A fresh pool of `budget` decoders (and frame source) for a scrub run. */
+function withDecoders(budget: number): void {
+  if (pool.budget === budget) return;
+  frames?.destroy();
+  frames = null;
+  pool = new DecoderPool(budget);
 }
 
 function draw(r: Renderer, sample: VideoSample): void {
@@ -258,9 +266,10 @@ function draw(r: Renderer, sample: VideoSample): void {
 }
 
 /** Random seeks, one after another (each waits for its frame). */
-async function scrub(count: number): Promise<ScrubResult> {
+async function scrub(count: number, decoders = 4): Promise<ScrubResult> {
   const { renderer: r, video } = requireLoaded();
   cancelled = false;
+  withDecoders(decoders);
   const source = frameSource(video);
   const latencies: number[] = [];
   // Deterministic pseudo-random seek points so runs are comparable across devices.
@@ -280,6 +289,9 @@ async function scrub(count: number): Promise<ScrubResult> {
     drag: await drag(r, source),
     sessions: source.stats.restarts,
     previews: source.stats.previews,
+    previewsSkipped: source.stats.previewsSkipped,
+    peakDecoders: pool.peak,
+    decoderBudget: pool.budget,
     continued: source.stats.continued,
     restarts: source.stats.restarts,
   };
@@ -613,7 +625,7 @@ async function handle(request: LabRequest): Promise<LabResponseData> {
     case 'play':
       return { type: 'play', result: await play(request.seconds) };
     case 'scrub':
-      return { type: 'scrub', result: await scrub(request.count) };
+      return { type: 'scrub', result: await scrub(request.count, request.decoders) };
     case 'export':
       return { type: 'export', result: await exportVideo(request) };
     case 'hdrCheck':

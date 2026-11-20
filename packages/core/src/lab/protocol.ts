@@ -63,6 +63,11 @@ export interface ScrubResult {
   sessions: number;
   /** Keyframe previews shown before exact frames. */
   previews: number;
+  /** Previews left out because every decoder slot was taken. */
+  previewsSkipped: number;
+  /** Most decoders open at once (previews included) / the pool's budget. */
+  peakDecoders: number;
+  decoderBudget: number;
   /** Seeks that continued decoding forward vs restarted from a keyframe. */
   continued: number;
   restarts: number;
@@ -111,7 +116,7 @@ export type LabRequest =
   | { type: 'resize'; width: number; height: number }
   | { type: 'load'; file: File }
   | { type: 'play'; seconds: number }
-  | { type: 'scrub'; count: number }
+  | { type: 'scrub'; count: number; decoders?: number }
   | {
       type: 'export';
       width: number;

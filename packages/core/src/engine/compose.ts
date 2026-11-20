@@ -316,8 +316,8 @@ export class Composer {
     private readonly media: MediaLibrary,
     readonly exact: boolean,
     rasterBudget: number,
-    /** Low tier: no keyframe-preview decoder. */
-    private readonly allowPreviews = pool.budget > 2,
+    /** Keyframe previews while scrubbing (they take a free pool slot; exports leave them out). */
+    private readonly allowPreviews = true,
   ) {
     this.rasters = new RasterCache(renderer, rasterBudget);
   }
