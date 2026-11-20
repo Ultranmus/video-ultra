@@ -48,6 +48,7 @@ import type {
   AudioFx,
   TextStyle,
   Track,
+  TrackKind,
   Transform,
   Transition,
 } from '../model/schema';
@@ -211,6 +212,36 @@ function placeInLane(
     if (t.kind === kind) lastOfKind = i;
   });
   project.tracks.splice(lastOfKind === -1 ? project.tracks.length : lastOfKind + 1, 0, lane);
+}
+
+/**
+ * Puts lanes of pieces back on the timeline in their stacking order (bottom first), at the level
+ * of track `level` (a separated combined clip's own track): each lane's pieces go on the track at
+ * the cursor or the one just above it when they fit there and it holds their kind, else on a new
+ * lane just above the cursor. Either way nothing that overlaps them in time changes its place in
+ * the stack (a track only stacks against what plays at the same time), so the pieces look as they
+ * did inside the clip and under the lanes that were above it.
+ */
+function placeInOrder(project: Project, level: number, lanes: Item[][], ids: IdFactory): void {
+  let cursor = level;
+  const takes = (track: Track | undefined, kind: TrackKind, pieces: Item[]) =>
+    !!track &&
+    track.kind === kind &&
+    !track.locked &&
+    pieces.every((p) => fits(track, p.start, itemEnd(p)));
+  for (const pieces of lanes) {
+    if (pieces.length === 0) continue;
+    const kind = laneKindFor(pieces[0]!.kind);
+    let target: Track | undefined;
+    if (takes(project.tracks[cursor], kind, pieces)) target = project.tracks[cursor];
+    else if (takes(project.tracks[cursor + 1], kind, pieces)) target = project.tracks[++cursor];
+    else {
+      target = { id: ids(), kind, muted: false, hidden: false, locked: false, items: [] };
+      project.tracks.splice(++cursor, 0, target);
+    }
+    for (const piece of pieces) insertSorted(target, piece);
+  }
+  tidyLaneTransitions(project);
 }
 
 /**
@@ -1899,8 +1930,8 @@ export function separateItem(project: Project, itemId: string, ids: IdFactory): 
   const to = item.sourceIn + sourceSpan(item);
   const toOuter = (t: Time) => item.start + Math.round((t - from) / speed);
   const groups = new Map<string, string>();
-  const made: { piece: Item; main: boolean }[] = [];
-  for (const inner of asset.tracks) {
+  const made: { piece: Item; main: boolean; lane: number }[] = [];
+  for (const [lane, inner] of asset.tracks.entries()) {
     for (const child of inner.items) {
       const a = Math.max(child.start, from);
       const b = Math.min(itemEnd(child), to);
@@ -1925,7 +1956,7 @@ export function separateItem(project: Project, itemId: string, ids: IdFactory): 
         piece.fadeOut = Math.round(piece.fadeOut / speed);
       }
       clampFades(piece);
-      made.push({ piece, main: inner.kind === 'main' });
+      made.push({ piece, main: inner.kind === 'main', lane });
     }
   }
   track.items.splice(index, 1);
@@ -1941,12 +1972,14 @@ export function separateItem(project: Project, itemId: string, ids: IdFactory): 
       last.duration = Math.max(frame, last.duration + item.duration - filled);
     layoutMain(project);
   }
-  for (const { piece, main } of made) {
+  const lanePieces: Item[][] = asset.tracks.map(() => []);
+  for (const { piece, main, lane } of made) {
     if (main && track.kind === 'main') continue;
     if ('transitionIn' in piece) piece.transitionIn = null;
     if (piece.kind === 'video' && main) delete piece.groupId;
-    placeInLane(project, piece, ids);
+    lanePieces[lane]!.push(piece);
   }
+  placeInOrder(project, project.tracks.indexOf(track), lanePieces, ids);
   if (!assetInUse(project, asset.id)) Reflect.deleteProperty(project.assets, asset.id);
   removeEmptyLanes(project);
   return made.map((m) => m.piece.id);

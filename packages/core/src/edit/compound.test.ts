@@ -94,6 +94,88 @@ describe('combined clips', () => {
     expect((mainTrack(p).items[1] as VideoItem).transitionIn?.duration).toBe(s(0.5));
   });
 
+  /** Row (track index) of the item with this id, or of the first piece of this kind. */
+  const rowOf = (p: Project, pick: (kind: string, id: string) => boolean) =>
+    p.tracks.findIndex((t) => t.items.some((i) => pick(i.kind, i.id)));
+  const lane = (id: string, kind: 'overlay' | 'text', items: Project['tracks'][0]['items']) => ({
+    id,
+    kind,
+    muted: false,
+    hidden: false,
+    locked: false,
+    items,
+  });
+
+  it('separate keeps the inside’s row order and its place under the lanes above it', () => {
+    // Over b: a sticker, a title over it, a sticker over the title; a title lane above all.
+    const p = fixtureProject();
+    insertMain(p, videoItem('a', 'vidA', 5));
+    insertMain(p, videoItem('b', 'vidB', 4));
+    p.tracks.push(lane('l1', 'overlay', [stickerItem('k1', 5.5, 2)]));
+    p.tracks.push(lane('l2', 'text', [textItem('t', 5.5, 2)]));
+    p.tracks.push(lane('l3', 'overlay', [stickerItem('k2', 6, 1)]));
+    p.tracks.push(lane('l4', 'text', [textItem('over', 5, 3)]));
+    ok(p);
+    const id = combineItems(p, ['b', 'k1', 't', 'k2'], sequentialIds('n'));
+    ok(p);
+    const assetId = (mainTrack(p).items[1] as VideoItem).assetId;
+    expect(p.assets[assetId]!.tracks!.map((t) => t.kind)).toEqual([
+      'main',
+      'overlay',
+      'text',
+      'overlay',
+    ]);
+    const pieces = separateItem(p, id, sequentialIds('m'));
+    ok(p);
+    const piece = (kind: string) => (k: string, x: string) => k === kind && pieces.includes(x);
+    const k1 = p.tracks.findIndex((t) =>
+      t.items.some((i) => pieces.includes(i.id) && i.start === s(5.5) && i.kind === 'sticker'),
+    );
+    const title = rowOf(p, piece('text'));
+    const k2 = p.tracks.findIndex((t) =>
+      t.items.some((i) => pieces.includes(i.id) && i.start === s(6) && i.kind === 'sticker'),
+    );
+    const over = rowOf(p, (_, x) => x === 'over');
+    expect([k1, title, k2, over]).toEqual([1, 2, 3, 4]);
+    expect(p.tracks).toHaveLength(5);
+  });
+
+  it('separate on a lane puts the inside at that lane’s level', () => {
+    const p = fixtureProject();
+    insertMain(p, videoItem('a', 'vidA', 10));
+    p.tracks.push(lane('l1', 'text', [textItem('t', 1, 2)]));
+    p.tracks.push(lane('l2', 'overlay', [stickerItem('k', 1, 2)]));
+    p.tracks.push(lane('l3', 'text', [textItem('over', 0, 5)]));
+    // Layers alone: the combined clip goes on a picture lane.
+    const id = combineItems(p, ['t', 'k'], sequentialIds('n'));
+    ok(p);
+    // Put the combined clip under the top title (as it was), then separate it.
+    const at = rowOf(p, (_, x) => x === id);
+    const [moved] = p.tracks.splice(at, 1);
+    p.tracks.splice(1, 0, moved!);
+    const pieces = separateItem(p, id, sequentialIds('m'));
+    ok(p);
+    const title = rowOf(p, (k, x) => k === 'text' && pieces.includes(x));
+    const sticker = rowOf(p, (k, x) => k === 'sticker' && pieces.includes(x));
+    const over = rowOf(p, (_, x) => x === 'over');
+    expect(title).toBeLessThan(sticker);
+    expect(sticker).toBeLessThan(over);
+  });
+
+  it('separate reuses a free row of the kind right above instead of adding one', () => {
+    const p = fixtureProject();
+    insertMain(p, videoItem('a', 'vidA', 5));
+    insertMain(p, videoItem('b', 'vidB', 4));
+    p.tracks.push(lane('l1', 'overlay', [stickerItem('k1', 5.5, 2), stickerItem('early', 0, 1)]));
+    const id = combineItems(p, ['b', 'k1'], sequentialIds('n'));
+    ok(p);
+    // The lane stays (it holds 'early'); the sticker comes back onto it.
+    expect(p.tracks).toHaveLength(2);
+    separateItem(p, id, sequentialIds('m'));
+    ok(p);
+    expect(p.tracks).toHaveLength(2);
+  });
+
   it('separate applies the clip’s trim and speed to the pieces', () => {
     const p = project();
     const id = combineItems(p, ['b', 'c'], sequentialIds('n'));
