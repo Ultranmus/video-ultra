@@ -125,6 +125,7 @@ const stats: EngineStats = {
   avOffsetMs: null,
   rasterBytes: 0,
   exporting: false,
+  renderersMade: 0,
 };
 
 function post(message: EngineMessage, transfer: Transferable[] = []): void {
@@ -504,6 +505,7 @@ function pausePlayback(): void {
 // ── export & capture ─────────────────────────────────────────────────────
 
 async function makeRenderer(canvas: OffscreenCanvas, backend: RenderBackend): Promise<Renderer> {
+  stats.renderersMade++;
   if (backend === 'webgpu') {
     try {
       return await createWebGPURenderer(canvas);
@@ -556,7 +558,7 @@ async function startExport(
         project: p,
         media,
         audioOf: (assetId) => audioTracks.get(assetId) ?? null,
-        makeRenderer: (canvas) => makeRenderer(canvas, request.backend ?? EXPORT_BACKEND),
+        renderer: (width, height) => leaseWork(width, height, request.backend ?? EXPORT_BACKEND),
         decoderBudget: DECODER_BUDGET[tier],
         rasterBudget: RASTER_BUDGET[tier],
         isCancelled: () => job.cancelled,
@@ -614,11 +616,114 @@ async function startAudioExport(
 }
 
 /**
- * One exact frame of `p` at `time` on a fresh `width × height` canvas, handed to `withBitmap` while the
+ * Stills (captures, saved frames) and exports share one work renderer and canvas, kept warm a few
+ * seconds and resized per use: a renderer per still made WebKit drop old GL contexts ("too many
+ * WebGL contexts"). Stills take turns (they share the canvas); an export takes the renderer for
+ * its length and gives it back (a still asked meanwhile gets one of its own).
+ */
+interface Work {
+  canvas: OffscreenCanvas;
+  renderer: Renderer;
+  /** The stills' composer (an export brings its own). */
+  composer: Composer;
+  /** The backend asked for ('webgpu!' = strict WebGPU, never a fallback). */
+  key: string;
+}
+let still: Work | null = null;
+let stillIdle: ReturnType<typeof setTimeout> | undefined;
+let stillQueue: Promise<unknown> = Promise.resolve();
+
+function inStillQueue<T>(job: () => Promise<T>): Promise<T> {
+  const run = stillQueue.then(job, job);
+  stillQueue = run.catch(() => undefined);
+  return run;
+}
+
+/** The stills' composer on the work renderer (exact frames, its own two decoders). */
+function stillComposer(r: Renderer): Composer {
+  return new Composer(r, new DecoderPool(2), media, true, RASTER_BUDGET[tier], false);
+}
+
+function destroyWork(work: Work): void {
+  work.composer.destroy();
+  work.renderer.destroy();
+}
+
+function dropStill(): void {
+  clearTimeout(stillIdle);
+  if (still) destroyWork(still);
+  still = null;
+}
+
+function idleStill(): void {
+  clearTimeout(stillIdle);
+  stillIdle = setTimeout(() => void inStillQueue(async () => dropStill()), 5000);
+}
+
+/**
+ * The work renderer at `width × height` for `backend` (strict: an explicit WebGPU never falls
+ * back). Made, remade for another backend, or resized. Run inside the still queue.
+ */
+async function workRenderer(
+  width: number,
+  height: number,
+  backend: RenderBackend,
+  strict: boolean,
+): Promise<Work> {
+  clearTimeout(stillIdle);
+  const key = strict && backend === 'webgpu' ? 'webgpu!' : backend;
+  if (!still || still.key !== key) {
+    dropStill();
+    const canvas = new OffscreenCanvas(width, height);
+    let r: Renderer;
+    if (key === 'webgpu!') {
+      stats.renderersMade++;
+      r = await createWebGPURenderer(canvas);
+    } else r = await makeRenderer(canvas, backend);
+    still = {
+      canvas,
+      renderer: r,
+      composer: stillComposer(r),
+      key,
+    };
+  }
+  if (still.canvas.width !== width || still.canvas.height !== height)
+    still.renderer.resize(width, height);
+  return still;
+}
+
+/** Lends the work renderer to an export (back with `release`; `ok` false: it's thrown away). */
+async function leaseWork(
+  width: number,
+  height: number,
+  backend: RenderBackend,
+): Promise<{ canvas: OffscreenCanvas; renderer: Renderer; release: (ok: boolean) => void }> {
+  const work = await inStillQueue(async () => {
+    const w = await workRenderer(width, height, backend, false);
+    still = null;
+    // The stills' decoders, frames and rasters go: the export has the device's memory.
+    w.composer.destroy();
+    return w;
+  });
+  return {
+    canvas: work.canvas,
+    renderer: work.renderer,
+    release: (ok) => {
+      if (ok && !still) {
+        work.composer = stillComposer(work.renderer);
+        still = work;
+        idleStill();
+      } else work.renderer.destroy();
+    },
+  };
+}
+
+/**
+ * One exact frame of `p` at `time` on a `width × height` canvas, handed to `withBitmap` while the
  * renderer is still alive (a bitmap from a GL canvas can be emptied when its context goes). An
  * explicit backend is strict (golden checks must know which path drew the picture).
  */
-async function renderStill<T>(
+function renderStill<T>(
   p: Project,
   time: number,
   width: number,
@@ -626,20 +731,27 @@ async function renderStill<T>(
   backend: RenderBackend | undefined,
   withBitmap: (bitmap: ImageBitmap, backend: RenderBackend) => Promise<T> | T,
 ): Promise<T> {
-  await mediaReady(p);
-  const canvas = new OffscreenCanvas(width, height);
-  const r =
-    backend === 'webgpu'
-      ? await createWebGPURenderer(canvas)
-      : await makeRenderer(canvas, backend ?? renderer?.backend ?? 'webgl2');
-  const c = new Composer(r, new DecoderPool(2), media, true, RASTER_BUDGET[tier], false);
-  try {
-    await c.render(p, Math.max(0, Math.round(time)), width, height, null);
-    return await withBitmap(canvas.transferToImageBitmap(), r.backend);
-  } finally {
-    c.destroy();
-    r.destroy();
-  }
+  return inStillQueue(async () => {
+    await mediaReady(p);
+    const s = await workRenderer(
+      width,
+      height,
+      backend ?? renderer?.backend ?? 'webgl2',
+      backend !== undefined,
+    );
+    try {
+      await s.composer.render(p, Math.max(0, Math.round(time)), width, height, null);
+      // Only what this still showed keeps a decoder.
+      s.composer.prune(s.composer.activeIds());
+      return await withBitmap(s.canvas.transferToImageBitmap(), s.renderer.backend);
+    } catch (error) {
+      // Start clean next time (a lost context, a failed decode).
+      dropStill();
+      throw error;
+    } finally {
+      if (still === s) idleStill();
+    }
+  });
 }
 
 /** Renders one exact frame at any size and backend into an ImageBitmap (tests, cover images). */

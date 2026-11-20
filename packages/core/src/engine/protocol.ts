@@ -51,6 +51,11 @@ export interface EngineStats {
   rasterBytes: number;
   /** An export is running (preview paused). */
   exporting: boolean;
+  /**
+   * Renderers (GPU contexts) made since start besides the preview's: stills, exports, picker
+   * previews. Browsers keep only so many contexts alive, so this should stay small.
+   */
+  renderersMade: number;
 }
 
 /** Export timing details for checks and the bench (not public API). */

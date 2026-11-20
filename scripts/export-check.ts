@@ -411,6 +411,14 @@ for (const name of browsers) {
       'console',
       (m) => m.type() === 'error' && !/404/.test(m.text()) && errors.push(m.text()),
     );
+    // WebKit warns when a page has too many WebGL contexts (the oldest is then lost).
+    let contextWarnings = 0;
+    page.on('console', (m) => {
+      if (/too many (active )?WebGL contexts/i.test(m.text())) {
+        contextWarnings++;
+        console.log(`  [warning] ${m.text()}`);
+      }
+    });
     const query = [repeat > 1 ? `repeat=${repeat}` : '', picture ? 'picture=1' : '']
       .filter(Boolean)
       .join('&');
@@ -597,6 +605,10 @@ for (const name of browsers) {
     );
     const stats = await page.evaluate(() => window.engineLab!.stats());
     check(!stats.exporting, `preview resumed after export (exporting = ${stats.exporting})`);
+    console.log(
+      `  GPU contexts: ${stats.renderersMade ?? '?'} renderers made after start, ${contextWarnings} "too many WebGL contexts" warnings`,
+    );
+    check(contextWarnings === 0, 'no "too many WebGL contexts" warnings');
     if (errors.length) console.log(`  page errors: ${errors.slice(0, 5).join(' | ')}`);
     await browser.close();
   }

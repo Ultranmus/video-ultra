@@ -349,7 +349,14 @@ export interface ExportDeps {
   project: Project;
   media: MediaLibrary;
   audioOf: (assetId: string) => AudioTrackSource | null;
-  makeRenderer: (canvas: OffscreenCanvas) => Promise<Renderer>;
+  /**
+   * A renderer drawing into a `width × height` canvas, for the export's length (the engine lends
+   * its warm work renderer). `release(ok)` gives it back; `ok` false: something failed, drop it.
+   */
+  renderer: (
+    width: number,
+    height: number,
+  ) => Promise<{ canvas: OffscreenCanvas; renderer: Renderer; release: (ok: boolean) => void }>;
   decoderBudget: number;
   rasterBudget: number;
   isCancelled: () => boolean;
@@ -515,8 +522,9 @@ export async function runExport(
     target: sink.target,
   });
 
-  const canvas = new OffscreenCanvas(width, height);
-  const renderer = await deps.makeRenderer(canvas);
+  const lease = await deps.renderer(width, height);
+  const { canvas, renderer } = lease;
+  let leaseOk = false;
   const pool = new DecoderPool(deps.decoderBudget);
   const composer = new Composer(renderer, pool, deps.media, true, deps.rasterBudget, false);
   const stats: ExportRunStats = {
@@ -642,7 +650,10 @@ export async function runExport(
     audioSource?.close();
     if (deps.isCancelled()) throw new ExportCancelled();
     await output.finalize();
+    leaseOk = true;
   } catch (error) {
+    // A cancel leaves the renderer healthy.
+    leaseOk = error instanceof ExportCancelled;
     if (output.state !== 'finalized' && output.state !== 'canceled')
       await output.cancel().catch(() => undefined);
     await sink.remove();
@@ -650,7 +661,7 @@ export async function runExport(
   } finally {
     composer.destroy();
     mixer?.dispose();
-    renderer.destroy();
+    lease.release(leaseOk);
   }
   report(framesTotal, true);
 
