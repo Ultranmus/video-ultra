@@ -107,6 +107,17 @@ export interface Engine {
     filters: readonly (string | null)[],
   ): Promise<ImageBitmap[]>;
   /**
+   * Square thumbnails of one picture's frame at timeline `time`, one per LUT look (`lutIds`:
+   * `lut` asset ids, `null` = no LUT) at full strength, with the item's own filter and
+   * adjustments — for the LUT tiles. The caller closes the bitmaps.
+   */
+  lutPreviews(
+    itemId: string,
+    time: Time,
+    size: number,
+    lutIds: readonly (string | null)[],
+  ): Promise<ImageBitmap[]>;
+  /**
    * A short flip-book of one transition played on the real cut before `itemId` (its previous
    * clip into it): `frames` bitmaps across the transition window, `width × height` — for the
    * transition picker's hover preview. The caller closes the bitmaps.
@@ -511,6 +522,23 @@ export async function createEngine(
         time,
         size,
         filters: [...filters],
+      });
+      if (data.type !== 'filter-previews') throw new Error('Unexpected engine response');
+      return data.bitmaps;
+    },
+    async lutPreviews(
+      itemId: string,
+      time: Time,
+      size: number,
+      lutIds: readonly (string | null)[],
+    ) {
+      const data = await send({
+        type: 'filter-previews',
+        itemId,
+        time,
+        size,
+        filters: [],
+        luts: [...lutIds],
       });
       if (data.type !== 'filter-previews') throw new Error('Unexpected engine response');
       return data.bitmaps;

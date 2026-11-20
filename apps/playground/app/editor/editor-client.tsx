@@ -64,7 +64,9 @@ function Editor({ speechSetup, captions }: { speechSetup: SpeechSetup; captions:
   // AI editing: the server's model, or an offline demo (`?assistant=0`: none).
   const [assistant] = useState(createPlaygroundAssistant);
   // Text to speech: the server's voice service, only when it has one (see the top comment).
-  const [speech] = useState(() => createPlaygroundSpeech(speechSetup?.voices));
+  const [speech] = useState(() =>
+    createPlaygroundSpeech(speechSetup?.voices, speechSetup?.appliesSpeed ?? false),
+  );
   const [wide, setWide] = useState(false);
   const [room, setRoom] = useState(0);
   useEffect(() => {
@@ -158,8 +160,11 @@ function Editor({ speechSetup, captions }: { speechSetup: SpeechSetup; captions:
   );
 }
 
-/** The server's voice service: null = none; `voices` = its voices (unset: the editor's own). */
-type SpeechSetup = { voices?: SpeechVoice[] } | null;
+/**
+ * The server's voice service: null = none; `voices` = its voices (unset: the editor's own);
+ * `appliesSpeed`: it changes its own pace (else the editor plays the clip at the speed).
+ */
+type SpeechSetup = { voices?: SpeechVoice[]; appliesSpeed: boolean } | null;
 
 /** The editor page's client side. */
 export function EditorClient({ speech, captions }: { speech: SpeechSetup; captions: boolean }) {

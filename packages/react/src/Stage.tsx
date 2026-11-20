@@ -6,6 +6,7 @@ import {
   setTransformAt,
   transformAt,
   type Item,
+  type ItemPatch,
   type Project,
   type Transform,
 } from '@video-ultra/core';
@@ -91,12 +92,14 @@ type StageDrag =
     }
   /**
    * A blurred area's side handle: changes its width or height, the opposite side stays put
-   * (v0.2 C3). `w × h`: its box in canvas px when the drag started.
+   * (v0.2 C3). A text's left / right handle: its wrap width, the centre stays put
+   * (DECISIONS #214). `w × h`: its box in canvas px when the drag started.
    */
   | {
       type: 'stretch';
       id: number;
       itemId: string;
+      text: boolean;
       edge: 'n' | 'e' | 's' | 'w';
       x: number;
       y: number;
@@ -105,6 +108,11 @@ type StageDrag =
       h: number;
       moved: boolean;
     };
+
+/** Whether a text is a caption (captions share one wrap width: no side handles). */
+function isCaptionItem(project: Project, itemId: string): boolean {
+  return project.tracks.some((t) => t.kind === 'caption' && t.items.some((i) => i.id === itemId));
+}
 
 /** How the stage view is zoomed and panned (CSS on the frame; the project doesn't change). */
 interface View {
@@ -300,16 +308,21 @@ export function Stage(): ReactElement {
     // Locked: no box and no handles, a dashed outline instead (below).
     el.hidden = locked;
     el.toggleAttribute('data-group', entries.length > 1);
-    // A blurred area also stretches from its sides.
     // A blurred area also stretches from its sides — when it's big enough on screen that the
-    // side handles don't crowd the corners.
+    // side handles don't crowd the corners. A text's left and right handles set its wrap width
+    // (not on captions: they share one wrap).
     const only = entries.length === 1 ? entries[0]! : null;
-    el.toggleAttribute(
-      'data-sides',
-      !!only &&
-        only.item.kind === 'region' &&
-        Math.min(only.box.width, only.box.height) * scale * view.current.z > 88,
-    );
+    const onScreen = scale * view.current.z;
+    const sides =
+      only?.item.kind === 'region' && Math.min(only.box.width, only.box.height) * onScreen > 88
+        ? 'all'
+        : only?.item.kind === 'text' &&
+            only.box.height * onScreen + 12 >= 36 &&
+            !isCaptionItem(ctl.project, only.item.id)
+          ? 'x'
+          : null;
+    if (sides) el.setAttribute('data-sides', sides);
+    else el.removeAttribute('data-sides');
     // A little air around the item so handles never sit on top of small text or stickers.
     const pad = 6;
     const box: Box =
@@ -599,8 +612,8 @@ export function Stage(): ReactElement {
     longPress.current = null;
   };
 
-  /** Latest width / height / transform of a blurred area being stretched. */
-  const stretched = useRef<{ width: number; height: number; transform: Transform } | null>(null);
+  /** Latest change of the item being stretched (a blurred area's size, a text's wrap width). */
+  const stretched = useRef<ItemPatch | null>(null);
 
   const onPointerDown = (e: React.PointerEvent) => {
     // Touch drags move the selection frame with the drawn picture (see onPreviewDrawn below).
@@ -697,13 +710,14 @@ export function Stage(): ReactElement {
     if (
       (handle === 'n' || handle === 'e' || handle === 's' || handle === 'w') &&
       box &&
-      only?.kind === 'region'
+      (only?.kind === 'region' || (only?.kind === 'text' && (handle === 'e' || handle === 'w')))
     ) {
       stretched.current = null;
       drag.current = {
         type: 'stretch',
         id: e.pointerId,
         itemId: only.id,
+        text: only.kind === 'text',
         edge: handle,
         x: p.x,
         y: p.y,
@@ -908,6 +922,28 @@ export function Stage(): ReactElement {
     const slop = e.pointerType === 'mouse' ? 2 : 10;
     if (!d.moved && Math.hypot(p.x - d.x, p.y - d.y) * k < slop) return;
     d.moved = true;
+    if (d.type === 'stretch' && d.text) {
+      // A text's wrap width: both sides move (the centre stays), so a centred title stays put.
+      // Its box follows the pointer while dragging; on release it fits the wrapped lines.
+      const rad = (d.tf.rotation * Math.PI) / 180;
+      const along = (p.x - d.x) * Math.cos(rad) + (p.y - d.y) * Math.sin(rad);
+      const sign = d.edge === 'e' ? 1 : -1;
+      const s = d.tf.scale;
+      const width = Math.min(pw * s, Math.max(0.05 * pw * s, d.w + 2 * sign * along));
+      const next: ItemPatch = { maxWidth: width / (pw * s) };
+      stretched.current = next;
+      const project = ctl.preview((draft) => updateItem(draft, d.itemId, next));
+      const item = project ? findItem(project, d.itemId)?.item : null;
+      if (project && item && !touchDrag.current)
+        placeBox(
+          boxesAt(project, [item], ctl.playhead.time).map((b) => ({
+            item: b.item,
+            box: { ...b.box, width: Math.max(b.box.width, width) },
+          })),
+          false,
+        );
+      return;
+    }
     if (d.type === 'stretch') {
       // The pointer's move along the box's own axes; the opposite side stays where it is.
       const rad = (d.tf.rotation * Math.PI) / 180;
@@ -1025,7 +1061,7 @@ export function Stage(): ReactElement {
         ctl.preview(null);
         return;
       }
-      ctl.run(l.resize, (draft) => updateItem(draft, d.itemId, next));
+      ctl.run(d.text ? l.textWidth : l.resize, (draft) => updateItem(draft, d.itemId, next));
       return;
     }
     if (d.type === 'pinch') {

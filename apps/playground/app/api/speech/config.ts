@@ -65,10 +65,14 @@ export const GEMINI_VOICES: SpeechVoice[] = [
 
 /**
  * What the editor page needs: null = no voice service (text to speech hidden); `voices` unset =
- * the editor's default (OpenAI-style) voices.
+ * the editor's default (OpenAI-style) voices; `appliesSpeed`: the service changes its own pace
+ * (OpenAI-style `speed`). Google's speech models can't, so the editor plays the clip at the
+ * chosen speed with the voice's pitch kept.
  */
-export function speechSetup(): { voices?: SpeechVoice[] } | null {
+export function speechSetup(): { voices?: SpeechVoice[]; appliesSpeed: boolean } | null {
   const provider = speechProvider();
   if (!provider) return null;
-  return provider === 'gemini' ? { voices: GEMINI_VOICES } : {};
+  return provider === 'gemini'
+    ? { voices: GEMINI_VOICES, appliesSpeed: false }
+    : { appliesSpeed: true };
 }

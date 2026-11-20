@@ -759,13 +759,22 @@ async function filterPreviews(
       : [{ id: 'looks', kind: 'main', muted: true, hidden: false, locked: false, items: [base] }],
   };
   await mediaReady(mini);
+  // LUT tiles: the item's own filter stays, each tile gets one LUT at full strength.
+  const luts = request.luts;
+  const own = base.filter;
+  const picture = 'crop' in base ? base : null;
   // A fresh renderer's first draw can land before the frame is decoded: warm it up once.
-  base.filter = null;
+  base.filter = luts ? own : null;
+  if (picture && luts) delete picture.lut;
   await looks.composer.render(mini, local, size, size, null);
   looks.canvas.transferToImageBitmap().close();
   const bitmaps: ImageBitmap[] = [];
-  for (const id of request.filters) {
-    base.filter = id ? { id, intensity: 1 } : null;
+  for (const id of luts ?? request.filters) {
+    if (luts) {
+      if (picture && id && project.assets[id]?.kind === 'lut')
+        picture.lut = { assetId: id, intensity: 1 };
+      else if (picture) delete picture.lut;
+    } else base.filter = id ? { id, intensity: 1 } : null;
     await looks.composer.render(mini, local, size, size, null);
     bitmaps.push(looks.canvas.transferToImageBitmap());
   }

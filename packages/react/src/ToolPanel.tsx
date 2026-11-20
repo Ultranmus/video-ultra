@@ -958,6 +958,23 @@ function TextStyleTool({ item }: { item: Item }) {
         commitLabel={l.style}
         coalesceKey={`textline:${item.id}`}
       />
+      {/* Wrap width (also the stage's side handles); captions keep their own. 100 % = none. */}
+      {ctl.project.tracks.some(
+        (t) => t.kind === 'caption' && t.items.some((i) => i.id === item.id),
+      ) ? null : (
+        <EditSlider
+          label={l.textWidth}
+          value={item.maxWidth ?? 1}
+          min={0.1}
+          max={1}
+          step={0.01}
+          defaultValue={1}
+          format={(v) => (v >= 0.995 ? l.textWidthNone : `${Math.round(v * 100)}%`)}
+          recipe={(d, v) => updateItem(d, item.id, { maxWidth: v >= 0.995 ? null : v })}
+          commitLabel={l.textWidth}
+          coalesceKey={`textwidth:${item.id}`}
+        />
+      )}
       <div className="vu-field">
         <span className="vu-field-row">{l.textEffects}</span>
         <div className="vu-effects">

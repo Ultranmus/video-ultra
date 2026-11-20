@@ -62,5 +62,7 @@ describe('speech endpoint', () => {
     expect(body).toMatchObject({ input: 'Hello', voice: 'nova', speed: 2, response_format: 'mp3' });
     expect(audio.type).toBe('audio/mpeg');
     expect((await speech.voices()).length).toBe(6);
+    expect(speech.appliesSpeed).toBe(true);
+    expect(createSpeechEndpoint({ endpoint: '/x', appliesSpeed: false }).appliesSpeed).toBe(false);
   });
 });

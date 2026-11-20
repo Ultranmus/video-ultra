@@ -14,6 +14,12 @@ export interface SpeechEndpointOptions {
   /** Audio format asked for (default `mp3`). */
   format?: 'mp3' | 'wav' | 'opus' | 'aac' | 'flac';
   headers?: Record<string, string>;
+  /**
+   * Whether the service honours the OpenAI-style `speed` field (default `true`). Set `false` for
+   * one that ignores it: the editor then sends speed 1 and plays the clip at the chosen speed,
+   * keeping the voice's pitch.
+   */
+  appliesSpeed?: boolean;
   /** For tests / custom transports. */
   fetch?: typeof fetch;
 }
@@ -39,6 +45,7 @@ export function createSpeechEndpoint(options: SpeechEndpointOptions): SpeechGene
   const call = options.fetch ?? fetch.bind(globalThis);
   const format = options.format ?? 'mp3';
   return {
+    appliesSpeed: options.appliesSpeed ?? true,
     voices: () => options.voices ?? DEFAULT_VOICES,
     async speak(request: SpeechRequest): Promise<Blob> {
       const response = await call(options.endpoint, {

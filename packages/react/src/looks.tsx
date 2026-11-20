@@ -6,9 +6,11 @@ import {
   findAnimationPreset,
   findItem,
   findTransitionPreset,
+  deleteLut,
   fromSeconds,
   itemEnd,
   mainTrack,
+  renameAsset,
   setAnimation,
   setTransition,
   TRANSITION_CATEGORIES,
@@ -28,7 +30,7 @@ import { itemTitle } from './items';
 import { EASES, easeAt } from '@video-ultra/core/internal';
 import { CategoryBrowser, useNearView } from './browse';
 import { useTargets, type LookItem } from './targets';
-import { LutControls } from './picture';
+import { isPicture } from './picture';
 
 const TILE = 72;
 const FLICKS = 705_600_000;
@@ -236,7 +238,307 @@ function FilterSection({
   );
 }
 
-function TileImage({ bitmap }: { bitmap: ImageBitmap | null }) {
+// ── LUT looks (v0.2 C2) ───────────────────────────────────────────────────
+
+/** The project's LUT looks (read as one string, so the selector stays cheap). */
+function useLuts(): { id: string; name: string }[] {
+  const rows = useProject((p) =>
+    Object.values(p.assets)
+      .filter((a) => a.kind === 'lut')
+      .map((a) => `${a.id}\u0000${a.name}`)
+      .join('\u0001'),
+  );
+  return useMemo(
+    () =>
+      rows
+        ? rows.split('\u0001').map((row) => {
+            const [id, name] = row.split('\u0000');
+            return { id: id!, name: name! };
+          })
+        : [],
+    [rows],
+  );
+}
+
+/**
+ * LUT looks for a picture, above the filter presets: the project's imported `.cube` files as
+ * tiles showing this clip's frame with each look (rendered in the engine worker when the tiles
+ * scroll near the view, kept until the clip's picture changes), "No LUT", Import, the strength,
+ * and Rename / Delete for the chosen look (DECISIONS #213). When the target can't take a LUT (a
+ * text, a sticker, a locked clip) the looks still show — to import, rename or delete — with a
+ * note why.
+ */
+export function LutControls({ item }: { item: Item }): ReactElement {
+  const ctl = useController();
+  const l = useLabels();
+  const input = useRef<HTMLInputElement>(null);
+  const list = useLuts();
+  const locked = useProject((p) => !!findItem(p, item.id)?.item.locked);
+  const picture = isPicture(item) ? item : null;
+  const canApply = !!picture && !locked;
+  const current = picture?.lut?.assetId ?? null;
+  // The look Rename / Delete act on: the clip's own, else the last tile tapped.
+  const [picked, setPicked] = useState<string | null>(null);
+  const managed = list.find((lut) => lut.id === (current ?? picked)) ?? null;
+  const [renaming, setRenaming] = useState(false);
+  const cancelRename = useRef(false);
+  const focusQuietly = useCallback((el: HTMLInputElement | null) => {
+    el?.focus({ preventScroll: true });
+    el?.select();
+  }, []);
+  return (
+    <div className="vu-lut">
+      <div className="vu-field-row">
+        <span className="vu-lut-title">{l.lutLooks}</span>
+        <Button
+          icon="lut"
+          label={l.importLut}
+          variant="secondary"
+          tip={l.tipImportLut}
+          onClick={() => input.current?.click()}
+        />
+        <input
+          ref={input}
+          type="file"
+          accept=".cube"
+          hidden
+          aria-hidden="true"
+          tabIndex={-1}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = '';
+            if (file) void ctl.importLut(file, canApply ? item.id : null);
+          }}
+        />
+      </div>
+      {!picture ? (
+        <p className="vu-hint">{l.lutPictureOnly}</p>
+      ) : locked ? (
+        <p className="vu-hint">{l.lockedReason}</p>
+      ) : null}
+      {list.length ? (
+        <LutTiles
+          item={picture}
+          luts={list}
+          current={canApply ? current : (managed?.id ?? null)}
+          onPick={(id) => {
+            setRenaming(false);
+            setPicked(id);
+            if (!canApply) return;
+            ctl.run(l.lutStep, (d) =>
+              updateItem(d, item.id, {
+                lut: id === null ? null : { assetId: id, intensity: picture.lut?.intensity ?? 1 },
+              }),
+            );
+          }}
+        />
+      ) : (
+        <p className="vu-hint">{l.lutHint}</p>
+      )}
+      {picture?.lut && canApply ? (
+        <EditSlider
+          label={l.lutIntensity}
+          value={picture.lut.intensity}
+          min={0}
+          max={1}
+          step={0.01}
+          defaultValue={1}
+          format={(v) => `${Math.round(v * 100)}%`}
+          recipe={(d, v) =>
+            updateItem(d, item.id, { lut: { assetId: picture.lut!.assetId, intensity: v } })
+          }
+          commitLabel={l.lutStep}
+          coalesceKey={`lut:${item.id}`}
+        />
+      ) : null}
+      {managed ? (
+        <div className="vu-lut-manage">
+          {renaming ? (
+            <input
+              className="vu-lut-rename"
+              aria-label={l.lutName}
+              defaultValue={managed.name}
+              ref={focusQuietly}
+              onBlur={(e) => {
+                const value = e.currentTarget.value.trim();
+                setRenaming(false);
+                if (cancelRename.current) {
+                  cancelRename.current = false;
+                  return;
+                }
+                if (value && value !== managed.name)
+                  ctl.run(l.lutRename, (d) => renameAsset(d, managed.id, value));
+              }}
+              onKeyDown={(e) => {
+                e.stopPropagation();
+                if (e.key === 'Enter') e.currentTarget.blur();
+                if (e.key === 'Escape') {
+                  cancelRename.current = true;
+                  e.currentTarget.blur();
+                }
+              }}
+            />
+          ) : (
+            <span className="vu-lut-name">{managed.name}</span>
+          )}
+          {renaming ? null : (
+            <Button
+              icon="edit"
+              label={l.lutRename}
+              layout="icon"
+              onClick={() => setRenaming(true)}
+            />
+          )}
+          <Button
+            icon="delete"
+            label={l.lutDelete}
+            layout="icon"
+            variant="danger"
+            tip={l.lutDeleteTip}
+            onClick={() => {
+              cancelRename.current = renaming;
+              setRenaming(false);
+              setPicked(null);
+              ctl.run(l.lutDelete, (d) => {
+                deleteLut(d, managed.id);
+              });
+              ctl.toast(l.lutDeleted(managed.name), 'success', {
+                label: l.undo,
+                run: () => ctl.undo(),
+              });
+            }}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * The LUT tiles: "No LUT" (when there's a picture) then each look, each showing the picture's
+ * frame with that look. The
+ * previews are asked for once the tiles scroll near the view, and only for looks not drawn yet
+ * (an import draws one more); a change to the picture draws them again.
+ */
+function LutTiles({
+  item,
+  luts,
+  current,
+  onPick,
+}: {
+  item: Extract<Item, { crop: unknown }> | null;
+  luts: { id: string; name: string }[];
+  current: string | null;
+  onPick: (id: string | null) => void;
+}) {
+  const ctl = useController();
+  const l = useLabels();
+  // Previews follow the picture (frame, own filter, adjustments, crop), not the LUT strength.
+  const inputs = item
+    ? JSON.stringify([
+        item.id,
+        item.assetId,
+        item.adjust,
+        item.crop,
+        item.filter,
+        item.kind === 'video' ? item.sourceIn : 0,
+      ])
+    : '';
+  const cache = useRef<{ inputs: string; tiles: Map<string, ImageBitmap> }>({
+    inputs: '',
+    tiles: new Map(),
+  });
+  const [, redraw] = useState(0);
+  const visible = useRef(false);
+  const pending = useRef(false);
+  const live = useRef(true);
+  useEffect(() => {
+    live.current = true;
+    const held = cache.current;
+    return () => {
+      live.current = false;
+      for (const b of held.tiles.values()) b.close();
+      held.tiles.clear();
+    };
+  }, []);
+  // Nothing to put a look on: no "No LUT" tile (a tap only picks the look to rename / delete).
+  const ids = useMemo(() => [...(item ? [null] : []), ...luts.map((lut) => lut.id)], [item, luts]);
+  const request = useCallback(
+    function draw(attempt = 0) {
+      if (!live.current || !visible.current || !item || pending.current) return;
+      const held = cache.current;
+      if (held.inputs !== inputs) {
+        for (const b of held.tiles.values()) b.close();
+        held.tiles.clear();
+        held.inputs = inputs;
+      }
+      const missing = ids.filter((id) => !held.tiles.has(id ?? ''));
+      if (missing.length === 0) return;
+      // The engine may still be starting, or the clip's media still opening: try a few times.
+      const retry = () => {
+        if (attempt < 5) setTimeout(() => draw(attempt + 1), 400 * (attempt + 1));
+      };
+      const engine = ctl.engine;
+      if (!engine) return retry();
+      const t = ctl.playhead.time;
+      const at =
+        t >= item.start && t < itemEnd(item) ? t : item.start + Math.floor(item.duration / 3);
+      const dpr = Math.min(devicePixelRatio || 1, 2);
+      pending.current = true;
+      engine
+        .lutPreviews(item.id, at, Math.round(TILE * dpr), missing)
+        .then((bitmaps) => {
+          pending.current = false;
+          if (!live.current || held.inputs !== inputs || bitmaps.length !== missing.length) {
+            for (const b of bitmaps) b.close();
+            if (live.current && bitmaps.length === 0) retry();
+            return;
+          }
+          missing.forEach((id, i) => {
+            held.tiles.get(id ?? '')?.close();
+            held.tiles.set(id ?? '', bitmaps[i]!);
+          });
+          redraw((n) => n + 1);
+        })
+        .catch(() => {
+          pending.current = false;
+          retry();
+        });
+    },
+    [ctl, ids, inputs, item],
+  );
+  const ref = useNearView<HTMLDivElement>(() => {
+    visible.current = true;
+    request();
+  });
+  // A new look or a changed picture: draw what's missing (only once the tiles were in view).
+  useEffect(() => {
+    request();
+  }, [request]);
+  const tiles = cache.current.inputs === inputs ? cache.current.tiles : null;
+  return (
+    <div ref={ref} className="vu-filter-grid" role="radiogroup" aria-label={l.lutLooks}>
+      {ids.map((id) => (
+        <button
+          key={id ?? 'none'}
+          type="button"
+          role="radio"
+          aria-checked={current === id}
+          className="vu-filter-tile"
+          onClick={() => onPick(id)}
+        >
+          <TileImage bitmap={tiles?.get(id ?? '') ?? null} still={!item} />
+          <span className="vu-filter-name">
+            {id ? (luts.find((lut) => lut.id === id)?.name ?? id) : l.lutNone}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** A tile's picture; `still`: none is coming (no pulsing placeholder). */
+function TileImage({ bitmap, still = false }: { bitmap: ImageBitmap | null; still?: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const canvas = ref.current;
@@ -250,7 +552,7 @@ function TileImage({ bitmap }: { bitmap: ImageBitmap | null }) {
       ref={ref}
       className="vu-filter-thumb"
       aria-hidden="true"
-      data-ready={bitmap ? '' : undefined}
+      data-ready={bitmap || still ? '' : undefined}
     />
   );
 }

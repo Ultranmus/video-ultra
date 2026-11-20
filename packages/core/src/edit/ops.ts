@@ -287,6 +287,42 @@ export function removeAsset(project: Project, assetId: string): void {
   Reflect.deleteProperty(project.assets, assetId);
 }
 
+/**
+ * Renames an asset (a LUT look, a media file): trimmed, at most 200 characters. An empty name
+ * keeps the old one.
+ */
+export function renameAsset(project: Project, assetId: string, name: string): void {
+  const asset = project.assets[assetId];
+  if (!asset) throw new EditError('not-found', `No asset ${assetId}`);
+  const clean = name.trim().slice(0, 200);
+  if (clean) asset.name = clean;
+}
+
+/**
+ * Deletes a LUT look: every item using it (combined clips' insides too) goes back to no LUT, and
+ * the look leaves the project. Returns how many items used it. Undo brings both back (the file
+ * stays in storage).
+ */
+export function deleteLut(project: Project, assetId: string): number {
+  const asset = project.assets[assetId];
+  if (!asset) throw new EditError('not-found', `No asset ${assetId}`);
+  if (asset.kind !== 'lut') throw new EditError('invalid', 'That asset is not a LUT look');
+  let count = 0;
+  const lists = [
+    project.tracks,
+    ...Object.values(project.assets).flatMap((a) => (a.tracks ? [a.tracks] : [])),
+  ];
+  for (const tracks of lists)
+    for (const track of tracks)
+      for (const item of track.items)
+        if ('lut' in item && item.lut?.assetId === assetId) {
+          delete item.lut;
+          count++;
+        }
+  Reflect.deleteProperty(project.assets, assetId);
+  return count;
+}
+
 // ── adding ────────────────────────────────────────────────────────────────
 
 function checkNewItem(project: Project, item: Item): void {
@@ -935,6 +971,11 @@ export interface ItemPatch {
   audioFx?: AudioFx | null;
   text?: string;
   style?: TextStyle;
+  /**
+   * Texts: wrap width as a fraction of the canvas width at scale 1 (clamped to 0.05…1); `null`
+   * removes it (lines break only where the text does).
+   */
+  maxWidth?: number | null;
   emoji?: string | null;
   /** Green screen; `null` turns it off. */
   key?: ChromaKey | null;
@@ -955,7 +996,7 @@ export interface ItemPatch {
 }
 
 /** Fields that `null` (or `blend: 'normal'`) removes instead of setting. */
-const REMOVABLE = new Set(['key', 'lut', 'blend', 'mask', 'cutout', 'audioFx']);
+const REMOVABLE = new Set(['key', 'lut', 'blend', 'mask', 'cutout', 'audioFx', 'maxWidth']);
 /** Size limits of a blurred area's box (fractions of the canvas). */
 const REGION_MIN = 0.01;
 const REGION_MAX = 4;
@@ -995,7 +1036,7 @@ const FIELDS_BY_KIND: Record<Item['kind'], readonly string[]> = {
   ],
   freeze: ['name', 'transform', 'crop', 'fit', 'filter', 'adjust', 'key', 'lut', 'blend', 'mask'],
   audio: ['name', 'volume', 'muted', 'fadeIn', 'fadeOut', 'duck', 'audioFx'],
-  text: ['name', 'text', 'style', 'transform', 'filter', 'adjust', 'blend'],
+  text: ['name', 'text', 'style', 'maxWidth', 'transform', 'filter', 'adjust', 'blend'],
   sticker: ['name', 'transform', 'emoji', 'filter', 'adjust', 'blend', 'cutout'],
   region: ['name', 'transform', 'effect', 'shape', 'amount', 'width', 'height'],
 };
@@ -1037,6 +1078,8 @@ export function updateItem(project: Project, itemId: string, patch: ItemPatch): 
   }
   if ('lut' in item && item.lut) item.lut.intensity = clamp01(item.lut.intensity);
   if ('mask' in item && item.mask) item.mask.feather = clamp01(item.mask.feather);
+  if (item.kind === 'text' && item.maxWidth !== undefined)
+    item.maxWidth = Number.isFinite(item.maxWidth) ? Math.min(1, Math.max(0.05, item.maxWidth)) : 1;
   if (item.kind === 'region') {
     item.amount = clamp01(item.amount);
     const size = (v: number) =>

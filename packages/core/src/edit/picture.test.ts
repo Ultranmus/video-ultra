@@ -12,9 +12,11 @@ import {
 import {
   EditError,
   addToLane,
+  deleteLut,
   duplicateItem,
   insertMain,
   removeAsset,
+  renameAsset,
   splitItem,
   updateItem,
 } from './ops';
@@ -75,6 +77,38 @@ describe('picture tools', () => {
     updateItem(p, 'pip', { lut: null });
     removeAsset(p, 'look');
     expect(p.assets.look).toBeUndefined();
+  });
+
+  it('renames a LUT look; deleting it clears every item using it', () => {
+    const { p } = setup();
+    renameAsset(p, 'look', '  Warm film  ');
+    expect(p.assets.look!.name).toBe('Warm film');
+    renameAsset(p, 'look', '   ');
+    expect(p.assets.look!.name).toBe('Warm film');
+    expect(() => renameAsset(p, 'nope', 'x')).toThrow(EditError);
+    updateItem(p, 'pip', { lut: { assetId: 'look', intensity: 0.5 } });
+    updateItem(p, 'a', { lut: { assetId: 'look', intensity: 1 } });
+    expect(() => deleteLut(p, 'img')).toThrow(EditError);
+    expect(deleteLut(p, 'look')).toBe(2);
+    expect(p.assets.look).toBeUndefined();
+    expect('lut' in item(p, 'pip')).toBe(false);
+    expect('lut' in item(p, 'a')).toBe(false);
+    expect(checkInvariants(p)).toEqual([]);
+  });
+
+  it('a text takes a wrap width (clamped); null removes it', () => {
+    const { p } = setup();
+    updateItem(p, 't', { maxWidth: 0.6 });
+    const t = () => item(p, 't') as Extract<ReturnType<typeof item>, { kind: 'text' }>;
+    expect(t().maxWidth).toBe(0.6);
+    updateItem(p, 't', { maxWidth: 3 });
+    expect(t().maxWidth).toBe(1);
+    updateItem(p, 't', { maxWidth: 0 });
+    expect(t().maxWidth).toBe(0.05);
+    expect(checkInvariants(p)).toEqual([]);
+    updateItem(p, 't', { maxWidth: null });
+    expect('maxWidth' in t()).toBe(false);
+    expect(() => updateItem(p, 'st', { maxWidth: 0.5 })).toThrow(EditError);
   });
 
   it('blend modes on lane pictures, text and stickers; normal removes the field', () => {

@@ -5944,9 +5944,39 @@
     font-weight: var(--vu-weight-semibold);
   }
 
-  .vu-lut .vu-chip {
+  /* The chosen look's name with Rename / Delete. */
+  .vu-lut-manage {
+    display: flex;
+    align-items: center;
+    gap: var(--vu-space-1);
+    min-height: var(--vu-size-touch);
+  }
+
+  .vu-lut-name {
+    flex: 1;
+    min-width: 0;
     overflow: hidden;
+    color: var(--vu-text);
+    font-size: var(--vu-text-sm);
+    font-weight: var(--vu-weight-medium);
     text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .vu-lut-rename {
+    flex: 1;
+    min-width: 0;
+    min-height: var(--vu-size-choice);
+    padding: 0 var(--vu-space-2);
+    border: 1px solid var(--vu-accent);
+    border-radius: var(--vu-radius-sm);
+    background: var(--vu-bg);
+    color: var(--vu-text);
+    font: inherit;
+  }
+
+  .vu-root .vu-lut-rename:focus-visible {
+    box-shadow: none;
   }
 
   /* Blurred areas: the add panel's four choices and the stage's side handles. */
@@ -6017,6 +6047,11 @@
   .vu-selection-box[data-sides] .vu-handle-side {
     display: block;
     border-radius: var(--vu-radius-full);
+  }
+
+  /* A text: only left and right (its wrap width, DECISIONS #214). */
+  .vu-selection-box[data-sides='x'] .vu-handle-side:is([data-handle='n'], [data-handle='s']) {
+    display: none;
   }
 
   .vu-handle-side[data-handle='n'],
