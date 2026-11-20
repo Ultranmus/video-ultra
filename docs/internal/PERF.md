@@ -583,3 +583,15 @@ count only the tasks a feature adds.
   of words, none doubled at a cut; a real clip after 15 s of silence starts at 15.00 s.
 - **Memory:** one 31 s piece buffer plus up to three pieces in flight (~2 MB each) and the
   detector's worker (closed after the job).
+
+## See-through exports (DECISIONS #196–#199, 2026-11-20, Apple M4, Chrome, `scripts/alpha-check.ts`)
+
+- 1080 × 1080 WebM of the `?alpha=video` scene (3 s, 90 frames, real footage + PNG, WebGL2),
+  two runs each: opaque 0.50 / 0.49 s, see-through 0.66 / 0.67 s (+33 %: the colour / alpha
+  split copies each frame on the CPU in mediabunny's worker, and a second encoder runs for the
+  alpha). Compose time unchanged (85–104 ms); file size the same (0.98 vs 0.99 MB — the alpha
+  stream is tiny for hard edges). Still ~4.5× faster than real time.
+- Memory: one reused frame-sized buffer in the split worker plus one alpha plane per frame in
+  flight (1080 × 1080: 4.7 MB + 1.7 MB); encoder queues as before. 0 frames left open after
+  every export (frame counter), both backends.
+- Opaque exports and the preview are unchanged (same canvas options, same clear).
