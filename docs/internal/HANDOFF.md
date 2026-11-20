@@ -11,6 +11,16 @@ warm wall (#189), edit a text (caret at the end, taller box, #190).
 Backlog candidates left for later: Separate keeps the old lane order (combined clips), playground
 test flags (DECISIONS #92), transition stills cache.
 
+## 2026-11-21 (2) — brand, VideoUltra name and home page (Day 7 · 5.4 prep)
+
+`feat/brand-and-site`: comet logo, icons, social cards (DECISIONS #215, `scripts/brand.ts`),
+display name VideoUltra (npm names unchanged), home page with a picture → live editor on
+request (#216). Merged with main (ccfae07); lint, format, typecheck, tests and the playground
+`next build` pass. ImageUltra's brand files and display rename are on image-editor's local
+main (not pushed — its site deploys on push). Next: owner checks the home page on the iPhone
+and Android, then push both repos on the owner's word; check the Sintel black preview
+(BACKLOG) before v0.1; then 5.3 / 5.4 release.
+
 ## 2026-11-21 — items 1–9, Next.js 16.4.6 and the owner's iPhone fixes pushed
 
 All merged and pushed (PROGRESS 2026-11-20/21). Owner confirmed on the iPhone: sound (pause,
