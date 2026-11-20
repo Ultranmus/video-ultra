@@ -298,6 +298,46 @@ export interface TextHighlight {
   chars: number;
 }
 
+/**
+ * Which x-range (px) of each line the highlight covers: [from, to], or null. Positions are
+ * measured in reading order; right-to-left text reads from the line's right end, so its ranges
+ * are mirrored there (DECISIONS #209) — the word being said, and a fill growing leftwards. Pure.
+ */
+export function highlightRanges(
+  layout: TextRevealLayout,
+  highlight: TextHighlight,
+): ([number, number] | null)[] {
+  const ranges: ([number, number] | null)[] = layout.lines.map(() => null);
+  let wordsBefore = 0;
+  let charsBefore = 0;
+  layout.lines.forEach((ln, i) => {
+    const n = ln.wordStart.length;
+    const c = ln.charStart.length;
+    // From / to in reading order (px from the line's start).
+    let span: [number, number] | null = null;
+    if (highlight.mode === 'fill') {
+      const k = highlight.chars - charsBefore;
+      if (k >= c) span = [0, ln.right - ln.left];
+      else if (k > 0) {
+        const whole = Math.floor(k);
+        const x0 = whole > 0 ? ln.charEnd[whole - 1]! : 0;
+        const x1 = whole < c ? ln.charEnd[whole]! : x0;
+        span = [0, x0 + (x1 - x0) * (k - whole)];
+      }
+    } else {
+      const k = highlight.word - wordsBefore;
+      if (k >= 0 && k < n) span = [ln.wordStart[k]!, ln.wordEnd[k]!];
+    }
+    if (span)
+      ranges[i] = layout.rtl
+        ? [ln.right - span[1], ln.right - span[0]]
+        : [ln.left + span[0], ln.left + span[1]];
+    wordsBefore += n;
+    charsBefore += c;
+  });
+  return ranges;
+}
+
 export function rasterizeText(
   item: TextItem,
   fontPx: number,
@@ -408,32 +448,8 @@ export function rasterizeText(
     }
   };
 
-  const layout = withLayout || (highlight && !rtl) ? layoutOf() : null;
-  // Which line and x-range (px) the highlight covers on each line: [from, to] or null.
-  const ranges: ([number, number] | null)[] = block.lines.map(() => null);
-  if (highlight && layout) {
-    let wordsBefore = 0;
-    let charsBefore = 0;
-    layout.lines.forEach((ln, i) => {
-      const n = ln.wordStart.length;
-      const c = ln.charStart.length;
-      if (highlight.mode === 'fill') {
-        const k = highlight.chars - charsBefore;
-        if (k >= c) ranges[i] = [ln.left, ln.right];
-        else if (k > 0) {
-          const whole = Math.floor(k);
-          const x0 = whole > 0 ? ln.charEnd[whole - 1]! : 0;
-          const x1 = whole < c ? ln.charEnd[whole]! : x0;
-          ranges[i] = [ln.left, ln.left + x0 + (x1 - x0) * (k - whole)];
-        }
-      } else {
-        const k = highlight.word - wordsBefore;
-        if (k >= 0 && k < n) ranges[i] = [ln.left + ln.wordStart[k]!, ln.left + ln.wordEnd[k]!];
-      }
-      wordsBefore += n;
-      charsBefore += c;
-    });
-  }
+  const layout = withLayout || highlight ? layoutOf() : null;
+  const ranges = highlight && layout ? highlightRanges(layout, highlight) : [];
   if (highlight?.mode === 'box') {
     ctx.fillStyle = highlight.color;
     ranges.forEach((r, i) => {
