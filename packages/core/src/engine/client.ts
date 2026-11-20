@@ -305,6 +305,9 @@ export async function createEngine(
   let audio: { context: AudioContext | null; ready: Promise<void> } | null = null;
   /** Between the worklet and the speakers: 0 mutes the output (the clock keeps running). */
   let outputGain: GainNode | null = null;
+  let player: AudioWorkletNode | null = null;
+  /** Silences the player now, from this thread (the worker's own stop can wait behind a decode). */
+  const hush = () => player?.port.postMessage({ type: 'flush' });
   let outputMuted = false;
   // Set by destroy(): late idle callbacks then do nothing (no context created after the end).
   let destroyed = false;
@@ -333,6 +336,7 @@ export async function createEngine(
         numberOfInputs: 0,
         outputChannelCount: [2],
       });
+      player = node;
       outputGain = context.createGain();
       outputGain.gain.value = outputMuted ? 0 : 1;
       node.connect(outputGain).connect(context.destination);
@@ -432,6 +436,7 @@ export async function createEngine(
       await send({ type: 'view', viewWidth: width, viewHeight: height });
     },
     async seek(time: Time) {
+      hush();
       await send({ type: 'seek', time });
     },
     async play() {
@@ -439,6 +444,7 @@ export async function createEngine(
       await send({ type: 'play' });
     },
     async pause() {
+      hush();
       await send({ type: 'pause' });
     },
     async stats() {
