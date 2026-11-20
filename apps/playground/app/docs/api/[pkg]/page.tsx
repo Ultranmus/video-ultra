@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { Code, highlight } from '../../../code';
 import { KINDS, KIND_LABEL, PACKAGES, itemHref, loadApi, resolveLink } from '../data';
 import { Doc, type LinkResolver } from '../doc';
+import { PrevNext } from '../../parts';
 import { ApiToc } from '../toc';
 import type { ApiItem } from '../types';
 import '../api.css';
@@ -116,18 +117,15 @@ export default async function ApiPackagePage({ params }: Props) {
           );
         })}
 
-        <nav className="docs-pagenav" aria-label="More API reference">
-          <Link href={prev ? `/docs/api/${prev.slug}` : '/docs/api'}>
-            <small>Previous</small>
-            {prev ? prev.name : 'API overview'}
-          </Link>
-          {next ? (
-            <Link href={`/docs/api/${next.slug}`} className="docs-pagenav-next">
-              <small>Next</small>
-              {next.name}
-            </Link>
-          ) : null}
-        </nav>
+        <PrevNext
+          prev={
+            prev
+              ? { href: `/docs/api/${prev.slug}`, title: prev.name }
+              : { href: '/docs/api', title: 'API overview' }
+          }
+          next={next ? { href: `/docs/api/${next.slug}`, title: next.name } : undefined}
+          label="More API reference"
+        />
       </article>
       <ApiToc
         packages={PACKAGES.map((p) => ({ slug: p.slug, name: p.name }))}
