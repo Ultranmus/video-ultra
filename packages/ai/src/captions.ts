@@ -70,7 +70,9 @@ export interface CaptionsEndpointReply {
  * cut where it's quietest (no word cut in two; silent pieces aren't sent), up to three at once
  * (one while the service is busy), and turns the replies into timed words: words said in the
  * silence before speech move onto it, made-up and doubtful words are dropped. Detect decides the
- * language from the first pieces with speech and asks for it from then on.
+ * language from the first pieces with speech and asks for it from then on. When the service's own
+ * word times stop well before a piece ends while people still speak, the rest of the piece is
+ * asked for once more.
  *
  * ```tsx
  * import { createCaptionsEndpoint } from '@video-ultra/ai';
@@ -121,16 +123,32 @@ export function createCaptionsEndpoint(options: CaptionsEndpointOptions): Transc
     let busy = false;
     const hear = async (piece: Piece, as: string): Promise<Heard> => {
       const before = results.get(piece.index - 1);
+      const hints = { vocabulary: hint, onBusy: () => (busy = true) };
       const reply = await ask(call, options, piece.sound, as, signal, {
+        ...hints,
         context: before ? lastWords(before.words) : '',
-        vocabulary: hint,
-        onBusy: () => (busy = true),
       });
-      return {
-        start: piece.start,
-        language: reply.language.slice(0, 2).toLowerCase(),
-        words: timed(reply.words, piece.sound, piece.voice),
-      };
+      const words = timed(reply.words, piece.sound, piece.voice);
+      // The service stopped early (its own times end well before the piece, and the voice goes
+      // on): the rest of the piece is asked once more, from the last word (DECISIONS #208).
+      const end = words.at(-1)?.end ?? 0;
+      if (
+        ownTimes(reply.words) &&
+        words.length &&
+        piece.sound.length / RATE - end > SEEK_MIN_LEFT &&
+        voiceAfter(piece.voice, end + 0.5) >= SEEK_MIN_VOICE
+      ) {
+        const frame = Math.floor(end / FRAME_SECONDS);
+        const from = frame * FRAME_SECONDS;
+        const rest = piece.sound.subarray(Math.round(from * RATE));
+        const more = await ask(call, options, rest, as, signal, {
+          ...hints,
+          context: lastWords(words),
+        });
+        for (const w of timed(more.words, rest, piece.voice.subarray(frame)))
+          words.push({ ...w, start: w.start + from, end: w.end + from });
+      }
+      return { start: piece.start, language: reply.language.slice(0, 2).toLowerCase(), words };
     };
 
     // Detect: the first pieces with speech vote (doubtful ones don't count); then every piece
@@ -243,6 +261,12 @@ const RATE = 16_000;
 const CUT_MIN = 25;
 const CUT_MAX = 30;
 const MIN_VOICE = 0.04;
+/** `voice` has one byte per 20 ms. */
+const FRAME_SECONDS = 0.02;
+/** An early end: the words stop more than this before the piece's end (s)… */
+const SEEK_MIN_LEFT = 2;
+/** …and at least this much voice follows them (s). */
+const SEEK_MIN_VOICE = 3;
 const PARALLEL = 3;
 /** Words with a confidence under this are dropped (likely made up). */
 const DROP_BELOW = 0.3;
@@ -287,6 +311,27 @@ async function* pieces(
     }
   }
   if (filled > 0) yield emit(filled);
+}
+
+/** Whether every word of a reply has its own times. */
+function ownTimes(words: CaptionsEndpointReply['words']): boolean {
+  return (
+    words.length > 0 &&
+    words.every(
+      (w) =>
+        typeof w !== 'string' &&
+        typeof w.start === 'number' &&
+        typeof w.end === 'number' &&
+        w.end >= w.start,
+    )
+  );
+}
+
+/** Seconds with voice from `from` (s) to the end (`voice`: one byte per 20 ms). */
+function voiceAfter(voice: Uint8Array, from: number): number {
+  let k = 0;
+  for (let f = Math.max(0, Math.ceil(from / FRAME_SECONDS)); f < voice.length; f++) k += voice[f]!;
+  return k * FRAME_SECONDS;
 }
 
 /** The reply's words with times: its own, or from the sound when any are missing. */
