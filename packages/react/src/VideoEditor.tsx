@@ -319,14 +319,40 @@ export function VideoEditor(props: VideoEditorProps): ReactElement {
     };
     // The editor fills the window: the page itself has nothing to scroll to.
     const fillsWindow = () => root.offsetHeight >= window.innerHeight * 0.9;
+    // A field in a full-height sheet (Layers, Templates) on a touch screen: before the keyboard
+    // comes, move it into the top part of the sheet, where the keyboard won't reach. Otherwise
+    // iOS shifts the page to show it and we shift it back — the sheet looked like it opened
+    // again, the field only partly in view (owner, 2026-11-20).
+    const placeHigh = (field: HTMLElement) => {
+      const sheet = field.closest<HTMLElement>('.vu-dock[data-expanded]');
+      root.toggleAttribute('data-sheet-typing', !!sheet);
+      if (!sheet || !matchMedia('(pointer: coarse)').matches) return;
+      let scroller = field.parentElement;
+      while (scroller && scroller !== sheet) {
+        const oy = getComputedStyle(scroller).overflowY;
+        if (oy === 'auto' || oy === 'scroll') break;
+        scroller = scroller.parentElement;
+      }
+      if (!scroller || scroller === sheet) return;
+      const r = root.getBoundingClientRect();
+      // A phone keyboard (with its bar) takes about the lower half of the screen.
+      const limit = r.top + r.height * 0.45;
+      const f = field.getBoundingClientRect();
+      if (f.bottom > limit) scroller.scrollTop += f.bottom - limit;
+    };
     const onFocusIn = () => {
-      if (keepScroll === null && typingField() && fillsWindow()) keepScroll = window.scrollY;
+      const field = typingField();
+      if (keepScroll === null && field && fillsWindow()) keepScroll = window.scrollY;
+      if (field) placeHigh(field);
       schedule();
     };
     const onFocusOut = () => {
       // Focus may be moving to another field: decide once it has landed.
       requestAnimationFrame(() => {
-        if (!typingField()) keepScroll = null;
+        if (!typingField()) {
+          keepScroll = null;
+          root.removeAttribute('data-sheet-typing');
+        }
         schedule();
       });
     };

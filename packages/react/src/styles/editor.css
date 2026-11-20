@@ -1980,7 +1980,7 @@
 
   /* Typing a template's words with the keyboard up: a smaller preview, so the fields sit high in
      the sheet, above the keyboard, and the words still show in the preview (owner, 2026-11-20). */
-  .vu-root[data-keyboard] .vu-template-preview .vu-template-frame {
+  .vu-root:is([data-keyboard], [data-sheet-typing]) .vu-template-preview .vu-template-frame {
     height: var(--vu-size-template-preview-typing);
   }
 
@@ -3877,6 +3877,15 @@
 
   .vu-root[data-keyboard] .vu-dock[data-expanded] .vu-dock-body {
     padding-bottom: calc(var(--vu-keyboard) + var(--vu-space-4));
+  }
+
+  /* A field in a full-height sheet took focus (VideoEditor.tsx): room below it from the start, so
+     it can be scrolled up out of the keyboard's way before the keyboard comes. */
+  .vu-root[data-sheet-typing] .vu-dock[data-expanded] .vu-dock-body {
+    padding-bottom: max(
+      calc(var(--vu-sheet-full) / 2),
+      calc(var(--vu-keyboard, 0px) + var(--vu-space-4))
+    );
   }
 
   .vu-root[data-keyboard] .vu-toolbar {
