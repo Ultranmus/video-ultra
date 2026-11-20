@@ -4625,6 +4625,17 @@
       min-height: var(--vu-size-export-poster-phone);
     }
 
+    /* The preview stays in view while the choices scroll under it, so a change (the see-through
+       switch, the quality) shows on it at once (owner, 2026-11-21: it scrolled away under the
+       title, looking cut off). */
+    .vu-export-side:has(> .vu-export-poster) {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      padding-bottom: var(--vu-space-3);
+      background: var(--vu-surface-1);
+    }
+
     .vu-export-poster,
     .vu-export-result {
       max-height: var(--vu-size-export-poster-phone);
