@@ -790,3 +790,26 @@ canvas size ease (scale 0.75 → 1 over ~200 ms). Core 529 + react 24 tests pass
   without a password, so one was made with the existing mkcert CA for the Mac's LAN address
   (`apps/playground/certificates/`, kept out of git via `.git/info/exclude`).
 - Checks: `pnpm verify` green; stage-text-check 23 pass + the known WebKit ResizeObserver message.
+
+## 2026-11-20/21 · Items 1–9, Next.js 16.4.6, owner's iPhone round (pushed)
+
+- Next.js 16.4.6 (7 advisories fixed); dev-only esbuild / minimatch left (BACKLOG).
+- Items 1–9 by five parallel branches, merged (DECISIONS #196–#214): see-through WebM / PNG
+  export; url sources streamed into storage; Allow / Find file banner; gentle export cancel;
+  shared warm work renderer, shared thumbnail decodes, keyframe previews in the decoder pool;
+  combined clips (Separate keeps rows, waveform, sharp when zoomed); captions (early window
+  ends, RTL highlight, virtualised list); check upkeep (ResizeObserver loop, picture-check,
+  codec checks in a worker); text-to-speech speed for every service, LUT tiles with rename /
+  delete, text wrap handles. The A + C merge needed the shared renderer keyed by alpha.
+- Owner's iPhone round, each fixed and confirmed on the phone: sound stops with the picture on
+  pause (page-side flush of the queued sound, pause only); sound in silent mode (audio session
+  'playback'); export preview drawn with WebGL2 like the export (WebGPU still came out black /
+  shifted), pinned and one size on phones; Assistant covers the screen while typing, box on the
+  keyboard, glides, reaches the top again after the keyboard (sheet height measured without the
+  keyboard lift); text wrap drags outward, box keeps the wrap width; timeline grip glides into
+  its three sizes; a short list lifts its last field (room as an end block — Safari ignores a
+  scroll box's bottom padding as scroll room).
+- The playground production build hung (Turbopack): the codec probe worker bundled its own
+  `new Worker(...)`. Checks moved to `codec-checks.ts`; the build passes again.
+- Checks: lint, format, typecheck, 614 unit tests; alpha-check 56, export-check 63, audio-check,
+  picture-check 38; playground `next build` passes.

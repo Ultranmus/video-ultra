@@ -11,6 +11,17 @@ warm wall (#189), edit a text (caret at the end, taller box, #190).
 Backlog candidates left for later: Separate keeps the old lane order (combined clips), playground
 test flags (DECISIONS #92), transition stills cache.
 
+## 2026-11-21 — items 1–9, Next.js 16.4.6 and the owner's iPhone fixes pushed
+
+All merged and pushed (PROGRESS 2026-11-20/21). Owner confirmed on the iPhone: sound (pause,
+silent mode), export preview, Assistant, Layers with a short list, text wrap, timeline grip.
+Still to check on devices: see-through WebM in iPhone Safari and Android, HEIF on Android, a
+budget-Android memory pass (4K, combined clip, export). Local phone testing: https on
+192.168.1.2:3200 (HANDOFF 2026-11-20 (3)). Watch: a Next production build hangs if a worker
+bundles code that starts that worker (codec-checks split) — keep worker entries free of their
+own `new Worker(...)`. Two Next builds at once also hang on this Mac. The other session's
+`feat/brand-and-site` (logo, home page, DECISIONS #215–#216) is not in main yet.
+
 ## 2026-11-20 (3) — sheet focus fixed and checked on the iPhone; waiting for the owner's push
 
 Owner confirmed on the iPhone (local https build): template fields and Layers rename don't jump,
