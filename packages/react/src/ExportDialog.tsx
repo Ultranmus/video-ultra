@@ -99,11 +99,14 @@ function Poster({
   aspect,
   time,
   progress,
+  seeThrough = false,
   children,
 }: {
   aspect: number;
   time: Time;
   progress: number | null;
+  /** The file keeps the transparent background: drawn see-through over a checkerboard. */
+  seeThrough?: boolean;
   children?: React.ReactNode;
 }) {
   const ctl = useController();
@@ -115,10 +118,11 @@ function Poster({
     const width =
       Math.round((Math.min(480, 480 * aspect) * Math.min(devicePixelRatio || 1, 2)) / 2) * 2;
     void engine
-      .capture(time, { width, height: Math.round(width / aspect / 2) * 2 })
+      .capture(time, { width, height: Math.round(width / aspect / 2) * 2, alpha: seeThrough })
       .then((bitmap) => {
         const canvas = ref.current;
         if (live && canvas) {
+          // Setting the size clears the canvas (a see-through still mustn't keep the last one).
           canvas.width = bitmap.width;
           canvas.height = bitmap.height;
           canvas.getContext('2d')?.drawImage(bitmap, 0, 0);
@@ -129,10 +133,11 @@ function Poster({
     return () => {
       live = false;
     };
-  }, [ctl, aspect, time]);
+  }, [ctl, aspect, time, seeThrough]);
   return (
     <div
       className="vu-export-poster"
+      data-see-through={seeThrough || undefined}
       style={{
         aspectRatio: String(aspect),
         ['--vu-export-aspect' as string]: aspect,
@@ -355,6 +360,8 @@ export function ExportDialog(): ReactElement | null {
     quality: ExportOptions['quality'];
   }>({ format: 'm4a', quality: 'medium' });
   const [imageFormat, setImageFormat] = useState<FrameImageFormat>('png');
+  // A transparent background: WebM keeps it see-through (on unless turned off); MP4 is black.
+  const [keepSeeThrough, setKeepSeeThrough] = useState(true);
   const [progress, setProgress] = useState<ExportProgress | null>(null);
   const [savingImage, setSavingImage] = useState(false);
   const [done, setDone] = useState<Done | null>(null);
@@ -379,9 +386,11 @@ export function ExportDialog(): ReactElement | null {
 
   if (!open) return null;
 
-  const available = HEIGHTS.filter(
-    (h) => h <= limit && (!limits || limits[options.format].includes(h)),
-  );
+  // See-through needs a WebM (VP9 / VP8) encoder here.
+  const canSeeThrough = seeThrough && (!limits || limits.webm.length > 0);
+  const alpha = canSeeThrough && keepSeeThrough;
+  const format: ExportOptions['format'] = alpha ? 'webm' : options.format;
+  const available = HEIGHTS.filter((h) => h <= limit && (!limits || limits[format].includes(h)));
   // Keep the choice valid when the format or the device's limits change.
   const outHeight: ExportOptions['height'] = available.includes(options.height)
     ? options.height
@@ -468,15 +477,16 @@ export function ExportDialog(): ReactElement | null {
   // Smaller files (HEVC in MP4, else AV1) where this device can encode them at this size.
   const smallerCodec: ExportOptions['videoCodec'] | null = !limits
     ? null
-    : options.format === 'mp4' && limits.hevc.includes(outHeight)
+    : format === 'mp4' && limits.hevc.includes(outHeight)
       ? 'hevc'
-      : limits.av1.includes(outHeight)
+      : !alpha && limits.av1.includes(outHeight)
         ? 'av1'
         : null;
   const smaller = !!smallerCodec && options.videoCodec === smallerCodec;
   // What's exported: the choices above, the frame rate resolved, a codec only where it applies.
   const videoOptions: ExportOptions = {
     ...options,
+    format,
     height: outHeight,
     fps: fpsChoice === 'same' ? defaultFps : fpsChoice,
     videoCodec: smaller ? smallerCodec! : 'auto',
@@ -489,7 +499,7 @@ export function ExportDialog(): ReactElement | null {
     ? done.kind === 'image'
       ? `${base} ${formatClock(frameTime).replace(/[:.]/g, '-')}.${done.image.extension}`
       : `${base}.${done.result.extension}`
-    : `${base}.${options.format}`;
+    : `${base}.${format}`;
   const seconds = spanLength / FLICKS_PER_SECOND;
   const out = exportSize(width, height, outHeight);
   const sizeOf = (h: number, quality: ExportOptions['quality']) => {
@@ -602,6 +612,7 @@ export function ExportDialog(): ReactElement | null {
               {done?.kind === 'video' ? (
                 <video
                   className="vu-export-result"
+                  data-see-through={done.result.transparent || undefined}
                   src={done.url}
                   controls
                   playsInline
@@ -610,6 +621,7 @@ export function ExportDialog(): ReactElement | null {
               ) : done?.kind === 'image' ? (
                 <img
                   className="vu-export-result vu-export-image"
+                  data-see-through={(seeThrough && done.image.extension === 'png') || undefined}
                   src={done.url}
                   alt={l.imageFrameAt(formatClock(frameTime))}
                   style={{ aspectRatio: String(done.image.width / done.image.height) }}
@@ -619,6 +631,7 @@ export function ExportDialog(): ReactElement | null {
                   aspect={aspect}
                   time={posterTime}
                   progress={progress ? progress.fraction : null}
+                  seeThrough={kind === 'image' ? seeThrough && imageFormat === 'png' : alpha}
                 >
                   {progress ? (
                     <div className="vu-export-ring" aria-hidden="true">
@@ -669,7 +682,7 @@ export function ExportDialog(): ReactElement | null {
                       ? `${done.image.width}×${done.image.height} · ${formatMb(done.image.blob.size / 1e6)} · ${done.image.extension.toUpperCase()}`
                       : done.kind === 'audio'
                         ? `${formatDurationShort(done.result.durationSeconds * FLICKS_PER_SECOND)} · ${formatMb(done.result.blob.size / 1e6)} · ${done.result.extension.toUpperCase()}`
-                        : `${done.result.width}×${done.result.height} · ${formatMb(done.result.blob.size / 1e6)} · ${done.result.extension.toUpperCase()}`}
+                        : `${done.result.width}×${done.result.height} · ${formatMb(done.result.blob.size / 1e6)} · ${done.result.extension.toUpperCase()}${done.result.transparent ? ` · ${l.seeThroughTag}` : ''}`}
                   </p>
                   {done.kind === 'audio' ? (
                     <audio className="vu-export-audio" src={done.url} controls />
@@ -804,7 +817,27 @@ export function ExportDialog(): ReactElement | null {
                         ) : null}
                       </div>
                       {lengthField}
-                      {seeThrough ? <p className="vu-hint">{l.exportTransparent}</p> : null}
+                      {canSeeThrough ? (
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={alpha}
+                          className="vu-switch-row"
+                          onClick={() => setKeepSeeThrough(!alpha)}
+                        >
+                          <span className="vu-switch-text">
+                            <span>{l.exportSeeThrough}</span>
+                            <span className="vu-hint">
+                              {alpha ? l.exportSeeThroughOn : l.exportSeeThroughOff}
+                            </span>
+                          </span>
+                          <span className="vu-switch" aria-hidden="true">
+                            <span className="vu-switch-knob" />
+                          </span>
+                        </button>
+                      ) : seeThrough ? (
+                        <p className="vu-hint">{l.exportTransparent}</p>
+                      ) : null}
                       <button
                         type="button"
                         className="vu-export-more"
@@ -833,12 +866,16 @@ export function ExportDialog(): ReactElement | null {
                           />
                           <Segmented
                             label={l.fileType}
-                            value={options.format}
+                            value={format}
                             options={[
                               { value: 'mp4', label: l.fileTypeMp4, tip: l.formatMp4Tip },
                               { value: 'webm', label: 'WebM', tip: l.formatWebmTip },
                             ]}
-                            onChange={(format) => setOptions({ ...options, format })}
+                            onChange={(f) => {
+                              // MP4 can't be see-through: picking it turns see-through off.
+                              if (canSeeThrough) setKeepSeeThrough(f === 'webm');
+                              setOptions({ ...options, format: f });
+                            }}
                           />
                           <button
                             type="button"
@@ -990,6 +1027,11 @@ export function ExportDialog(): ReactElement | null {
                             />
                           ))}
                         </div>
+                        {seeThrough ? (
+                          <p className="vu-hint">
+                            {imageFormat === 'png' ? l.imageSeeThroughPng : l.imageSeeThroughJpeg}
+                          </p>
+                        ) : null}
                       </div>
                     </>
                   )}

@@ -28,6 +28,9 @@
     --vu-guide: #ff2d95;
     --vu-checker-a: #26262b;
     --vu-checker-b: #1d1d21;
+    /* See-through checkerboard (export poster / result): the stage's own greys, every theme. */
+    --vu-see-through-a: #d4d4d8;
+    --vu-see-through-b: #a1a1aa;
     --vu-shadow-popover: 0 12px 32px rgba(0, 0, 0, 0.5);
     /* Timeline (video-specific) */
     --vu-timeline-bg: #0e0e11;
@@ -203,6 +206,7 @@
     --vu-size-export-poster: 460px;
     --vu-size-export-poster-phone: 200px;
     --vu-size-export-poster-min: 320px;
+    --vu-size-see-through-cell: 24px;
     --vu-size-export-ring: 72px;
     --vu-size-countdown: 112px;
     --vu-text-countdown: 56px;
