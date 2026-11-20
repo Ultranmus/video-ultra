@@ -436,7 +436,6 @@ export async function createEngine(
       await send({ type: 'view', viewWidth: width, viewHeight: height });
     },
     async seek(time: Time) {
-      hush();
       await send({ type: 'seek', time });
     },
     async play() {

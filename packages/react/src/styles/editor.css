@@ -3669,6 +3669,12 @@
     transition: transform var(--vu-duration-sheet) var(--vu-ease-sheet);
   }
 
+  /* Typing to the Assistant (it covers the editor then): just the chat and the box, right on the
+     keyboard — the suggestions and the note go until the keyboard closes (owner, 2026-11-21). */
+  .vu-dock[data-cover] :is(.vu-assistant-suggestions, .vu-assistant-privacy) {
+    display: none;
+  }
+
   /* Covering (editing a text): the whole editor, top bar and tab bar included. */
   .vu-dock[data-cover] {
     bottom: calc(var(--vu-sheet-below, 0px) * -1);
