@@ -147,6 +147,26 @@ export class OpfsFileStore implements FileStore {
     });
   }
 
+  async download(path: string, url: string, signal?: AbortSignal): Promise<number> {
+    if (signal?.aborted) throw abortError();
+    // The worker's own base URL is its script's: resolve relative URLs against the page.
+    const absolute = new URL(url, globalThis.location?.href).href;
+    const id = this.nextId; // the id send() will use
+    const onAbort = () => this.worker.postMessage({ id: -1, op: 'cancel', target: id });
+    signal?.addEventListener('abort', onAbort, { once: true });
+    try {
+      return await this.send({
+        id: 0,
+        op: 'download',
+        root: this.rootName,
+        path: normalize(path),
+        url: absolute,
+      });
+    } finally {
+      signal?.removeEventListener('abort', onAbort);
+    }
+  }
+
   async remove(path: string): Promise<void> {
     const parts = normalize(path).split('/');
     const name = parts.pop()!;

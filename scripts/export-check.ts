@@ -580,6 +580,31 @@ for (const name of browsers) {
       window.engineLab!.cancelAfter(1200, { format: 'mp4', height: 720, fps: 30, quality: 'low' }),
     );
     check(cancelled === 'AbortError', `cancel → ${cancelled}`);
+    // Early cancels (encoders just started, encodes in flight) close the encoders without an
+    // error: WebKit used to log "AudioEncoder encode failed" here (about 1 in 20 cancels).
+    const before = errors.length;
+    const framesBefore = (await page.evaluate(() => window.engineLab!.stats())).openFrames;
+    let early = 0;
+    for (const ms of [100, 200, 250, 300, 400, 500])
+      for (const f of ['mp4', 'webm'] as const) {
+        const r = await page.evaluate(
+          ([ms, f]) =>
+            window.engineLab!.cancelAfter(ms, { format: f, height: 720, fps: 30, quality: 'low' }),
+          [ms, f] as const,
+        );
+        if (r === 'AbortError') early++;
+      }
+    await page.waitForTimeout(500);
+    const framesAfter = (await page.evaluate(() => window.engineLab!.stats())).openFrames;
+    check(
+      framesAfter <= framesBefore,
+      `after the cancels the engine holds ${framesAfter} frames (${framesBefore} before)`,
+    );
+    const encodeErrors = errors.slice(before).filter((e) => /encode|encoder/i.test(e));
+    check(
+      early === 12 && encodeErrors.length === 0,
+      `12 early cancels: ${early} AbortError, encoder errors: ${encodeErrors.join(' | ') || 'none'}`,
+    );
     const left = await page.evaluate(async () => {
       try {
         const root = await navigator.storage.getDirectory();

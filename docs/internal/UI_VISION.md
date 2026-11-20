@@ -196,6 +196,11 @@ the stage and everything drawn on it don't mirror. Text items in RTL scripts ren
   Sound only (M4A / Ogg / WAV), Picture (the frame at the playhead, PNG / JPEG). I / O set the
   part from the playhead; the ruler shows it as a band.
 
+- **Media that can't be opened** (#201): one calm banner in the toast stack's place (not a toast
+  per file): "Allow the editor to open “x” again." with **Allow** (a kept file whose permission
+  lapsed — the browser asks inside that tap), or "Can’t find “x”. Pick the file again…" with
+  **Find file** (the same kind of file; one undo step; several files one at a time). ✕ hides it.
+
 ## 5d. Captions (v0.2, DECISIONS #125–128)
 
 - A **Captions** rail entry (desktop) / tab-bar tool (phone) opens the Captions panel: Auto

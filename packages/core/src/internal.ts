@@ -129,6 +129,7 @@ export type {
   StoredProjectInfo,
   StoredLogEntry,
   StorageStatus,
+  MediaAccess,
   LoadedProject,
 } from './storage/project-storage';
 export { StorageFullError, MemoryFileStore } from './storage/files';

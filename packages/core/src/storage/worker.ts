@@ -79,11 +79,53 @@ async function write(
   }
 }
 
+/** Size of the one buffer a byte stream is read into. */
+const PIECE = 2 ** 20;
+
+/**
+ * Reads a stream piece by piece. Byte streams (fetch bodies and `Blob.stream()` where the browser
+ * makes them byte streams) are read into one reused 1 MB buffer, so a long copy or download makes
+ * no garbage (measured: +140 MB of uncollected pieces in Chrome without it, DECISIONS #200);
+ * other streams hand over their own pieces.
+ */
+function pieces(stream: ReadableStream<Uint8Array>): {
+  read(): Promise<Uint8Array | null>;
+  cancel(): void;
+} {
+  let byob: ReadableStreamBYOBReader | null;
+  try {
+    byob = stream.getReader({ mode: 'byob' });
+  } catch {
+    byob = null; // not a byte stream: the stream stays unlocked
+  }
+  if (byob) {
+    const reader = byob;
+    let buffer = new ArrayBuffer(PIECE);
+    return {
+      async read() {
+        const { done, value } = await reader.read(new Uint8Array(buffer));
+        if (done || !value) return null;
+        buffer = value.buffer; // the same memory, handed back
+        return value;
+      },
+      cancel: () => void reader.cancel().catch(() => undefined),
+    };
+  }
+  const reader = stream.getReader();
+  return {
+    async read() {
+      const { done, value } = await reader.read();
+      return done ? null : value;
+    },
+    cancel: () => void reader.cancel().catch(() => undefined),
+  };
+}
+
 async function copy(
   id: number,
   root: string,
   path: string,
-  blob: Blob,
+  data: Blob | ReadableStream<Uint8Array>,
   append = false,
 ): Promise<number> {
   const handle = await fileHandle(root, path);
@@ -92,18 +134,14 @@ async function copy(
   const startSize = append ? sync.getSize() : 0;
   let at = startSize;
   let failed = true;
-  const reader = blob.stream().getReader();
+  const reader = pieces(data instanceof Blob ? data.stream() : data);
   try {
     sync.truncate(startSize);
     let sinceFlush = 0;
     for (;;) {
-      if (cancelled.has(id)) {
-        const error = new Error('The operation was aborted.');
-        error.name = 'AbortError';
-        throw error;
-      }
-      const { done, value } = await reader.read();
-      if (done) break;
+      if (cancelled.has(id)) throw abortErrorOf();
+      const value = await reader.read();
+      if (!value) break;
       sync.write(value, { at });
       at += value.byteLength;
       sinceFlush += value.byteLength;
@@ -117,7 +155,7 @@ async function copy(
     return at;
   } finally {
     cancelled.delete(id);
-    void reader.cancel().catch(() => undefined);
+    reader.cancel();
     if (failed && append) {
       try {
         sync.truncate(startSize);
@@ -134,6 +172,58 @@ async function copy(
       await (await directory(root, parts)).removeEntry(name).catch(() => undefined);
     }
   }
+}
+
+/** Downloads in flight, so a cancel can stop a fetch that is waiting on the network. */
+const downloads = new Map<number, AbortController>();
+/** Keep this much free beyond a download (the log and snapshots need room too). */
+const HEADROOM = 16 * 2 ** 20;
+
+/**
+ * Streams `url` into the file: the response body is written piece by piece as it arrives (memory
+ * stays flat whatever the file's size, and servers without range support work). Checks the
+ * announced size against the free space first. A failed download leaves no file.
+ */
+async function download(id: number, root: string, path: string, url: string): Promise<number> {
+  const controller = new AbortController();
+  downloads.set(id, controller);
+  try {
+    if (cancelled.has(id)) throw abortErrorOf();
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok || !response.body) {
+      void response.body?.cancel().catch(() => undefined);
+      const error = new Error(`Could not download ${url} (HTTP ${response.status}).`);
+      error.name = 'NotFoundError';
+      throw error;
+    }
+    const announced = Number(response.headers.get('content-length') ?? NaN);
+    if (Number.isFinite(announced) && announced > 0) {
+      const space = await navigator.storage.estimate().catch(() => null);
+      if (
+        space?.quota != null &&
+        space.usage != null &&
+        space.quota - space.usage < announced + HEADROOM
+      ) {
+        void response.body.cancel().catch(() => undefined);
+        const error = new Error('No room for this file.');
+        error.name = 'QuotaExceededError';
+        throw error;
+      }
+    }
+    return await copy(id, root, path, response.body);
+  } catch (error) {
+    if (controller.signal.aborted) throw abortErrorOf();
+    throw error;
+  } finally {
+    downloads.delete(id);
+    cancelled.delete(id);
+  }
+}
+
+function abortErrorOf(): Error {
+  const error = new Error('The operation was aborted.');
+  error.name = 'AbortError';
+  return error;
 }
 
 /** A name per probe: two storages starting at once (another tab, strict mode) mustn't collide. */
@@ -161,6 +251,7 @@ self.onmessage = (event: MessageEvent<StorageRequest>) => {
   const request = event.data;
   if (request.op === 'cancel') {
     cancelled.add(request.target);
+    downloads.get(request.target)?.abort();
     return;
   }
   const task =
@@ -168,7 +259,9 @@ self.onmessage = (event: MessageEvent<StorageRequest>) => {
       ? () => probe(request.root, request.id)
       : request.op === 'write'
         ? () => write(request.root, request.path, request.data, request.append)
-        : () => copy(request.id, request.root, request.path, request.blob, request.append);
+        : request.op === 'download'
+          ? () => download(request.id, request.root, request.path, request.url)
+          : () => copy(request.id, request.root, request.path, request.blob, request.append);
   const key = request.op === 'probe' ? `probe-${request.id}` : `${request.root}/${request.path}`;
   serial(key, task).then(
     (size) => self.postMessage({ id: request.id, ok: true, size }),

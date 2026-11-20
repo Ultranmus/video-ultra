@@ -431,6 +431,33 @@ function compoundSound(
   );
 }
 
+/**
+ * Stops an output that won't be finished (cancel or failure) without an encoder error: each
+ * source is closed gently first — the encoder finishes the samples it already has, then closes —
+ * and only then is the output cancelled. Cancelling straight away force-closes encoders with
+ * encodes in flight, which WebKit reports as "AudioEncoder encode failed" (BACKLOG). A source
+ * whose encoder already failed still closes (the close always releases it); errors are ignored,
+ * the export is being thrown away.
+ */
+async function abandon(
+  output: Output,
+  sources: readonly (CanvasSource | AudioSampleSource | null)[],
+): Promise<void> {
+  if (output.state === 'finalized' || output.state === 'canceled') return;
+  if (output.state === 'started') {
+    for (const source of sources) {
+      try {
+        source?.close();
+      } catch {
+        /* not connected / already closing */
+      }
+    }
+  }
+  // cancel() waits for the gentle closes above (it reuses an ongoing close) before releasing
+  // the target.
+  await output.cancel().catch(() => undefined);
+}
+
 /** Runs one export. Throws {@link ExportCancelled} when cancelled (the partial file is deleted). */
 export async function runExport(
   deps: ExportDeps,
@@ -655,8 +682,7 @@ export async function runExport(
     if (deps.isCancelled()) throw new ExportCancelled();
     await output.finalize();
   } catch (error) {
-    if (output.state !== 'finalized' && output.state !== 'canceled')
-      await output.cancel().catch(() => undefined);
+    await abandon(output, [videoSource, audioSource]);
     await sink.remove();
     throw error;
   } finally {
@@ -798,8 +824,7 @@ export async function runAudioExport(
     if (deps.isCancelled()) throw new ExportCancelled();
     await output.finalize();
   } catch (error) {
-    if (output.state !== 'finalized' && output.state !== 'canceled')
-      await output.cancel().catch(() => undefined);
+    await abandon(output, [source]);
     await sink.remove();
     throw error;
   } finally {

@@ -1069,6 +1069,7 @@ export function Toasts(): ReactElement {
           </button>
         </div>
       ) : null}
+      <MediaBanner />
       {toasts.map((t) => (
         <div key={t.id} className="vu-toast" data-tone={t.tone}>
           {t.tone === 'success' ? (
@@ -1099,6 +1100,77 @@ export function Toasts(): ReactElement {
           </button>
         </div>
       ))}
+    </div>
+  );
+}
+
+/** What the file picker offers when finding a missing file again, by asset kind. */
+const RELINK_ACCEPT: Record<string, string> = {
+  video: 'video/*,.mov,.mkv',
+  audio: 'audio/*',
+  image: 'image/*,.heic,.heif',
+  lut: '.cube',
+};
+
+/**
+ * Media that couldn't be opened (DECISIONS #201): a calm banner under the top bar. Files kept by
+ * handle that need the person's OK again come first, with Allow (the browser asks inside the
+ * tap); then each missing file by name, with Find file (pick it again). Dismissable.
+ */
+function MediaBanner(): ReactElement | null {
+  const ctl = useController();
+  const l = useLabels();
+  const problems = useUi((s) => s.mediaProblems);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const asking = problems.filter((p) => p.kind === 'ask');
+  const first = asking[0] ?? problems[0];
+  const kind = useProject((p) => (first ? p.assets[first.assetId]?.kind : undefined));
+  if (!first) return null;
+  return (
+    <div className="vu-toast vu-banner" data-tone="info" data-media-banner="">
+      <Icon name="media" size={16} />
+      <span className="vu-toast-text">
+        {asking.length
+          ? l.mediaAskBanner(asking.length, first.name)
+          : l.mediaMissingBanner(problems.length, first.name)}
+      </span>
+      {asking.length ? (
+        <button
+          type="button"
+          className="vu-toast-action"
+          onClick={() => void ctl.allowMediaAccess()}
+        >
+          {l.allowAccess}
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="vu-toast-action"
+          aria-label={l.findFileFor(first.name)}
+          onClick={() => inputRef.current?.click()}
+        >
+          {l.findFile}
+        </button>
+      )}
+      <button
+        type="button"
+        className="vu-toast-close"
+        aria-label={l.dismiss}
+        onClick={() => ctl.dismissMediaProblems()}
+      >
+        <Icon name="close" size={14} />
+      </button>
+      <input
+        ref={inputRef}
+        type="file"
+        hidden
+        accept={(kind && RELINK_ACCEPT[kind]) ?? ''}
+        onChange={(e) => {
+          const file = e.currentTarget.files?.[0];
+          e.currentTarget.value = '';
+          if (file) void ctl.relinkMedia(first.assetId, file);
+        }}
+      />
     </div>
   );
 }

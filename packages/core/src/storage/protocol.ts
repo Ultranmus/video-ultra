@@ -14,6 +14,8 @@ export type StorageRequest =
     }
   /** Streams `blob` into the file; `append` adds it at the end instead of replacing the file. */
   | { id: number; op: 'copy'; root: string; path: string; blob: Blob; append?: boolean }
+  /** Downloads `url` (absolute) into the file, streamed; a failed download leaves no file. */
+  | { id: number; op: 'download'; root: string; path: string; url: string }
   | { id: number; op: 'cancel'; target: number };
 
 /** Storage worker → main thread (`id` matches the request). */
