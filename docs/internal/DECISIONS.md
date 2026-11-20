@@ -1336,3 +1336,46 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       layer rename focuses the same way. Placement is then ours alone: the field in the top 30 %
       on focus, kept 64 px above the keyboard on touch screens (Safari's address bar floats there).
       Fields and labels take `touch-action: manipulation`.
+
+<!-- 196–199: reserved for work on parallel branches (2026-11-20). -->
+
+200.  **`url` sources are downloaded into storage once, streamed** (2026-11-20; BACKLOG). `getMedia`
+      used to fetch a url into one Blob each time a project opened. Now the storage worker fetches
+      it and writes the body to `media/<asset id>` piece by piece as it arrives (sync access
+      handle, one reused 1 MB buffer — byte streams are read BYOB, so a long download makes no
+      garbage; imports use the same reader), then `media/<id>.url` records the url and size.
+      Later opens (and offline ones) read the stored file; a changed url or a download cut short
+      fetches again; two callers share one download. Not range reads (Mediabunny `UrlSource`):
+      every reader of media — engine, analyzer, proxies, probe, photo decode, background removal,
+      export — takes a Blob, and playback / scrubbing would wait on the network at every seek; a
+      plain GET also works with servers that don't do ranges. Memory storage (no OPFS: Safari
+      Private Browsing, some webviews) keeps the browser's own Blob of the response (there is no
+      disk to stream to). Measured in Chrome (RSS, `media-sources-check --memory`): +57–75 MB
+      for a 96 MB file and +62–71 MB for a 419 MB one — flat (+140 MB before the reused buffer).
+      Chrome already pages a big response Blob to disk (+47–56 MB), so there the gain is no
+      second download; the memory gain is for browsers that keep a Blob in memory (check Safari).
+201.  **Media that can't be opened: a calm banner, Allow or Find file** (2026-11-20; BACKLOG). When a
+      project opens and a file can't be read, the editor no longer shows an error toast per file
+      but one banner under the top bar (the toast stack's place, `info` tone, dismissable). A kept
+      file handle whose permission lapsed says "Allow the editor to open “x” again." with
+      **Allow** — browsers only ask inside a tap, so the button's handler asks (one file after
+      another); a question closed without an answer keeps Allow, a refusal moves on to Find
+      file. A file that is gone (moved, deleted, cleared from the device, a url that fails) says
+      "Can’t find “x”. Pick the file again…" with **Find file**: the picked file must be the same
+      kind (a video for a video; LUTs aren't probed), is stored like an import, and the asset
+      points at it (`relinkAsset`, one undo step; items keep their times). Several missing files
+      go one at a time, by name. `ProjectStorage.mediaAccess(asset)` tells 'ok' / 'ask' / 'missing'.
+202.  **Chromium desktop import still copies into OPFS** (2026-11-20; BACKLOG left open). Keeping a
+      handle (`showOpenFilePicker` + `putMediaHandle`) saves disk space, but the browser drops a
+      handle's permission between visits unless the person chooses "allow on every visit", so
+      reopened projects would start with the Allow banner (#201), and a project breaks when its
+      file is moved. The copy is reliable and never asks. Revisit if desktop disk space turns out
+      to matter; the banner and `mediaAccess` are ready for handle sources (hosts can already use
+      `putMediaHandle`).
+203.  **A cancelled or failed export closes its encoders gently** (2026-11-20; BACKLOG). Before
+      `output.cancel()`, each source is `close()`d: the encoder finishes the samples it already
+      has, then closes (cancel reuses that ongoing close). Cancelling straight away force-closed
+      encoders with encodes in flight, which WebKit reported as "AudioEncoder encode failed:
+      InternalAudioEncoderCocoa encoding failed" (1 in 20 early cancels before, 0 in 60 after).
+      Costs a few frames of encoding on cancel. `export-check` now runs 12 early cancels and
+      fails on any encoder error or a frame left open.

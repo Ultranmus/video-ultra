@@ -50,6 +50,13 @@ Starting targets (2026-10-17), to be confirmed or adjusted with Phase 0 measurem
 
 ## Measurements
 
+**`url` source download** (2026-11-20, `node scripts/media-sources-check.ts --memory --huge
+/big.bin`, Chrome, RSS of the whole browser, DECISIONS #200): streamed into OPFS by the storage
+worker, +57–75 MB for a 96 MB file and +62–71 MB for a 419 MB one (flat; +137–148 MB before the
+reused BYOB buffer, i.e. uncollected pieces). Holding the response as a Blob (the old way):
++47–56 MB in Chrome, which pages big Blobs to disk itself. Storage-check imports after the BYOB
+reader: Chrome 57 MB in 79 ms (723 MB/s), Firefox 54 ms (1051 MB/s), round trips exact.
+
 **GPU draw cost per frame**, `node scripts/effects-bench.ts` (new; `/lab/engine?bench=1`): each
 case at its midpoint on a 1080 × 1920 canvas — two full-screen photo layers + overlay, 60-frame
 batches timed to a forced read-back, best of 3.

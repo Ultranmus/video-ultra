@@ -536,10 +536,15 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       on the phone. Playwright's WebKit has no OPFS, so storage-check only covers memory there.
 - [x] (fixed 2026-10-19: Web Lock per project; second tab read-only with "Use it here") **Two tabs on one project** corrupt each other's log (both append, both compact). Take a Web
       Lock (`navigator.locks`) per project in `attachAutosave`; the second tab opens read-only or asks.
-- [ ] `url` sources: `getMedia` fetches the whole file into a Blob. Use range reads (Mediabunny
+- [x] (fixed 2026-11-20: streamed into OPFS once by the storage worker, DECISIONS #200) `url` sources: `getMedia` fetches the whole file into a Blob. Use range reads (Mediabunny
       `UrlSource`) in the engine/analyzer, or stream it into OPFS once.
-- [ ] File handles: `requestPermission` only works inside a user gesture → the UI needs a
+- [ ] Real Safari / iPhone: a `url` source downloads into OPFS (storage worker `fetch` + BYOB
+      read) and the memory stays flat there (`media-sources-check --memory` measures Chrome only).
+- [x] (fixed 2026-11-20: media banner with Allow / Find file, DECISIONS #201) File handles: `requestPermission` only works inside a user gesture → the UI needs a
       "re-link / allow access" prompt when `getMedia` returns null for a `handle` source.
+- [ ] Real Chromium desktop check of the Allow banner with a real lapsed handle (the check
+      simulates the permission on an OPFS handle; the editor itself never makes handle sources,
+      #202).
 - [x] (fixed 2026-10-19: `storage.sweepMedia()`) Orphaned media: a crash between `putMedia` and the next snapshot leaves `media/<id>` that no
       project lists. Add a sweep (media not referenced by any project's meta, older than a day).
 - [ ] HDR thumbnails show the browser's own HDR → SDR conversion (too bright, DECISIONS #33): the
@@ -557,7 +562,9 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
 - [x] (fixed 2026-10-19) Voiceover plays the project while recording (so the speaker can follow); without headphones
       the project's sound is recorded too. Offer "mute while recording".
 - [ ] File handles (Chromium desktop): import still copies into OPFS; use `showOpenFilePicker` +
-      `putMediaHandle` and a re-link flow.
+      `putMediaHandle` and a re-link flow. (2026-11-20: left on purpose for now — a handle's
+      permission lapses between visits, so every reopen would ask; the re-link flow exists,
+      DECISIONS #202.)
 - [x] Timeline: lane header icons toggle mute (main/audio) / hide (visual lanes), with buttons in the accessible layer. Lock: the lock at a row name's right end (and in the accessible layer), v0.2 E.
 - [x] ~~Exported audio is ~0.05–0.1 s longer than video (AAC padding)~~ — audio trimmed to the
       video length and encoder priming compensated (DECISIONS #66).
@@ -595,7 +602,7 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       on high-contrast edges. Use the backdrop's downscale path if it looks bad on real footage.
 - [x] (fixed 2026-10-19, #113) Transitions are not crossfaded in audio.
 - [x] (fixed 2026-10-19, #138: ImageDecoder, frame per item) Image stickers that are animated GIFs show the first frame only.
-- [ ] WebKit (Playwright) logs `AudioEncoder encode failed: InternalAudioEncoderCocoa encoding failed` during `scripts/export-check.ts` (around the cancel step) — the check passes; make
+- [x] (fixed 2026-11-20: sources closed gently before cancel, DECISIONS #203) WebKit (Playwright) logs `AudioEncoder encode failed: InternalAudioEncoderCocoa encoding failed` during `scripts/export-check.ts` (around the cancel step) — the check passes; make
       cancel close the encoder without an unhandled error.
 - [ ] Real-iPhone check of the second UI pass: keyboard lift (visualViewport) while editing text,
       long-press reorder without Safari's callout, dock heights, Preview mode.
