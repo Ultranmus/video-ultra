@@ -19,6 +19,15 @@ const arg = (name: string) =>
     ? process.argv[process.argv.indexOf(`--${name}`) + 1]
     : undefined;
 const port = arg('port') ?? '3200';
+
+/**
+ * A stand-in service says its words once, at the start of a piece. When its words end well
+ * before the piece does, the editor asks for the rest, with those words as `context`
+ * (DECISIONS #208); there the stand-in has nothing more to say, like a real speaker who
+ * stopped. Answering the same words again would double every caption.
+ */
+const afterSaid = (url: URL, said: { text: string }[]) =>
+  (url.searchParams.get('context') ?? '').endsWith(said.map((w) => w.text).join(' '));
 const shots = arg('shots');
 const withModel = !process.argv.includes('--no-model');
 const webkitModel = process.argv.includes('--webkit-model');
@@ -373,16 +382,14 @@ if (webkitModel) {
       vocabulary: url.searchParams.get('vocabulary'),
       language: url.searchParams.get('language'),
     });
+    const said = [
+      { text: 'Namaste', start: 0.3, end: 0.8, confidence: 0.9 },
+      { text: 'dosto.', start: 0.9, end: 1.5, confidence: 0.9 },
+      { text: 'Aaj', start: 3, end: 3.4, confidence: 0.4 },
+      { text: 'hum.', start: 3.5, end: 4, confidence: 0.45 },
+    ];
     await route.fulfill({
-      json: {
-        words: [
-          { text: 'Namaste', start: 0.3, end: 0.8, confidence: 0.9 },
-          { text: 'dosto.', start: 0.9, end: 1.5, confidence: 0.9 },
-          { text: 'Aaj', start: 3, end: 3.4, confidence: 0.4 },
-          { text: 'hum.', start: 3.5, end: 4, confidence: 0.45 },
-        ],
-        language: 'hi-Latn',
-      },
+      json: { words: afterSaid(url, said) ? [] : said, language: 'hi-Latn' },
     });
   });
   await load(page, 'transcriber=server', ['speech-en-gb.m4a']);
@@ -477,20 +484,18 @@ if (webkitModel) {
   ).newPage();
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.route('**/api/captions**', (route) =>
-    route.fulfill({
-      json: {
-        words: [
-          { text: '大家好，', start: 0.3, end: 1.0 },
-          { text: '欢迎', start: 1.1, end: 1.5 },
-          { text: '回到', start: 1.5, end: 1.9 },
-          { text: 'iPhone', start: 1.9, end: 2.4 },
-          { text: '频道。', start: 2.4, end: 3.0 },
-        ],
-        language: 'zh',
-      },
-    }),
-  );
+  await page.route('**/api/captions**', (route) => {
+    const said = [
+      { text: '大家好，', start: 0.3, end: 1.0 },
+      { text: '欢迎', start: 1.1, end: 1.5 },
+      { text: '回到', start: 1.5, end: 1.9 },
+      { text: 'iPhone', start: 1.9, end: 2.4 },
+      { text: '频道。', start: 2.4, end: 3.0 },
+    ];
+    return route.fulfill({
+      json: { words: afterSaid(new URL(route.request().url()), said) ? [] : said, language: 'zh' },
+    });
+  });
   await load(page, 'transcriber=server', ['speech-en-gb.m4a']);
   await page.locator('.vu-rail .vu-btn', { hasText: 'Captions' }).click();
   await page.locator('.vu-panel button', { hasText: /More languages/ }).click();

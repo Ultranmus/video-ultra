@@ -871,3 +871,7 @@ canvas size ease (scale 0.75 → 1 over ~200 ms). Core 529 + react 24 tests pass
   `captions-check` real model passes in Chrome and WebKit; `speech-check` all pass. Pre-existing
   failures (identical on the dev build, BACKLOG): captions-check doubled service captions,
   cutout-check background threshold.
+- Doubled captions in `captions-check`: the check's stand-in service, not the app. Since #208
+  (2026-11-20) the editor asks for the rest of a piece the service ended early; the stand-in
+  answered with the same words, so each caption came twice. Stand-in fixed (`afterSaid`);
+  captions-check all pass (real model in Chrome included). Branch `fix/double-captions`.
