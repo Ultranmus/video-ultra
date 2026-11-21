@@ -465,6 +465,21 @@
   left: 19px;
 }
 
+@media (prefers-reduced-motion: no-preference) and (max-width: 900px) {
+  /* Closing: slide down, then hide. Opening: visible at once (so it can take focus), then slide up. */
+  .pg-panel {
+    transition:
+      transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
+      visibility 0s linear 0.28s;
+  }
+
+  .pg-panel[data-open] {
+    transition:
+      transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
+      visibility 0s;
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .pg-switch input,
   .pg-switch input::after,
@@ -642,12 +657,33 @@
   font-variant-numeric: tabular-nums;
 }
 
-.site .pg-jump {
+.pg-phone-actions {
   display: none;
-  margin-left: auto;
-  font-size: 14px;
-  font-weight: 600;
-  text-decoration: none;
+}
+
+.pg-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.site .pg-sheet-close {
+  display: none;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: var(--s-surface);
+  color: var(--s-text);
+  cursor: pointer;
+}
+
+.site .pg-sheet-close:hover {
+  background: var(--s-surface-2);
 }
 
 .pg-stage {
@@ -786,39 +822,20 @@
   }
 }
 
-/* Tablets and phones: the editor first (full width), the options below it; the page scrolls. */
+/* Tablets and phones: the editor fills the screen under a slim bar (Options, Get the code); the
+   options open as a full-screen sheet over it. */
 @media (max-width: 900px) {
-  .pg {
-    height: auto;
-    overflow: visible;
-  }
-
   .pg-app {
     display: flex;
-    flex-direction: column-reverse;
-  }
-
-  .pg-panel {
-    border-top: 1px solid var(--s-border);
-    border-right: 0;
-  }
-
-  .pg-panel-body {
-    overflow: visible;
-  }
-
-  .pg-panel-foot {
-    position: sticky;
-    bottom: 0;
-    z-index: 2;
-    background: var(--s-bg);
+    flex-direction: column;
   }
 
   .pg-work {
-    height: calc(100dvh - var(--s-header));
+    flex: 1;
+    min-height: 0;
   }
 
-  /* On a phone or tablet the editor already is that device: no frames. */
+  /* On a phone or tablet the editor already is that device: no frames or sizes. */
   .pg-sizes,
   .pg-custom,
   .pg-size-note {
@@ -826,7 +843,18 @@
   }
 
   .pg-toolbar {
-    display: none;
+    min-height: 0;
+    padding: 8px var(--s-gutter);
+  }
+
+  .pg-phone-actions {
+    display: flex;
+    flex: 1;
+    gap: 8px;
+  }
+
+  .pg-phone-actions .s-btn {
+    flex: 1;
   }
 
   .pg-stage[data-framed] {
@@ -845,8 +873,31 @@
     box-shadow: none;
   }
 
-  .pg-panel-head h1 {
-    scroll-margin-top: calc(var(--s-header) + 8px);
+  /* The options sheet: closed, it's off screen (and inert); open, it covers the screen. */
+  .pg-panel {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    border: 0;
+    visibility: hidden;
+    transform: translateY(100%);
+  }
+
+  .pg-panel[data-open] {
+    visibility: visible;
+    transform: none;
+  }
+
+  .pg-panel-head {
+    padding-top: max(16px, env(safe-area-inset-top));
+  }
+
+  .site .pg-sheet-close {
+    display: grid;
+  }
+
+  .pg-panel-foot {
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
   }
 
   .pg-dialog {

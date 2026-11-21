@@ -95,6 +95,19 @@ function useOsDark(): boolean {
   return dark;
 }
 
+/** Whether the screen is phone / small tablet sized (the options become a full-screen sheet). */
+function useNarrow(): boolean {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 900px)');
+    const update = () => setNarrow(query.matches);
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+  return narrow;
+}
+
 /** An element's size, kept up to date. */
 function useBoxSize(ref: React.RefObject<HTMLElement | null>) {
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -122,6 +135,33 @@ function Playground({ server }: { server: ServerSetup }) {
     return TABS.some((x) => x.id === t) ? (t as TabId) : 'theme';
   });
   const [codeOpen, setCodeOpen] = useState(false);
+  // Phones and small tablets: the options are a full-screen sheet over the editor.
+  const narrow = useNarrow();
+  const [sheet, setSheet] = useState(false);
+  const sheetOpen = narrow && sheet;
+  const sheetRef = useRef<HTMLElement>(null);
+  const opener = useRef<HTMLElement | null>(null);
+  const openSheet = (from: HTMLElement) => {
+    opener.current = from;
+    setSheet(true);
+  };
+  const closeSheet = () => {
+    setSheet(false);
+    opener.current?.focus();
+  };
+  useEffect(() => {
+    if (!sheetOpen) return;
+    // Next frame: the sheet is visible (and no longer inert) by then, so it can take focus.
+    const frame = requestAnimationFrame(() =>
+      sheetRef.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus(),
+    );
+    const html = document.documentElement;
+    html.style.overflow = 'hidden';
+    return () => {
+      cancelAnimationFrame(frame);
+      html.style.overflow = '';
+    };
+  }, [sheetOpen]);
   const [log, setLog] = useState<LogEntry[]>([]);
   const logId = useRef(0);
   const osDark = useOsDark();
@@ -199,10 +239,40 @@ function Playground({ server }: { server: ServerSetup }) {
     <div className="site pg">
       <SiteHeader />
       <main id="content" className="pg-app">
-        <aside className="pg-panel" aria-labelledby="pg-title" id="pg-options">
+        <aside
+          ref={sheetRef}
+          className="pg-panel"
+          aria-labelledby="pg-title"
+          id="pg-options"
+          data-open={sheetOpen || undefined}
+          {...(narrow
+            ? { role: 'dialog', 'aria-modal': true, inert: !sheetOpen || undefined }
+            : {})}
+          onKeyDown={(e) => {
+            if (sheetOpen && e.key === 'Escape') closeSheet();
+          }}
+        >
           <div className="pg-panel-head">
-            <h1 id="pg-title">Playground</h1>
-            <p>Shape the editor for your app, then copy the code.</p>
+            <div>
+              <h1 id="pg-title">Playground</h1>
+              <p>Shape the editor for your app, then copy the code.</p>
+            </div>
+            <button
+              type="button"
+              className="pg-sheet-close"
+              aria-label="Close options"
+              onClick={closeSheet}
+            >
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                <path
+                  d="M6 6l12 12M18 6 6 18"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
           </div>
           <Tabs tabs={TABS} tab={tab} onTab={setTab} label="Options" idPrefix="pg" />
           <div
@@ -282,9 +352,21 @@ function Playground({ server }: { server: ServerSetup }) {
                 {zoom < 1 ? ` · shown at ${Math.round(zoom * 100)}%` : ''}
               </span>
             ) : null}
-            <a className="pg-jump" href="#pg-title">
-              Options ↓
-            </a>
+            <div className="pg-phone-actions">
+              <button
+                type="button"
+                className="s-btn s-btn-quiet s-btn-small"
+                aria-haspopup="dialog"
+                aria-expanded={sheetOpen}
+                aria-controls="pg-options"
+                onClick={(e) => openSheet(e.currentTarget)}
+              >
+                Options
+              </button>
+              <button type="button" className="s-btn s-btn-small" onClick={() => setCodeOpen(true)}>
+                Get the code
+              </button>
+            </div>
           </div>
 
           <div className="pg-stage" ref={stageRef} data-framed={frame ? '' : undefined}>
