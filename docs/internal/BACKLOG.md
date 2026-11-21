@@ -796,3 +796,7 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       app template skips lib checks. Watch mediabunny for a fix; mention in the docs if asked.
 - [ ] The `NPM_TOKEN` granular token expires (≤ 90 days from 2026-11-21): renew it, or switch to
       Trusted Publishing before the next release.
+- [ ] No git tags / GitHub releases for 0.1.0: changesets made the tags in the runner, but
+      changesets/action didn't read the new "Successfully published:" output, so it pushed no
+      tags and made no releases. Tag `@video-ultra/<pkg>@0.1.0` on b0b59f6 and create releases
+      (owner's word), and fix the workflow (push tags in a step after publish) before 0.2.
