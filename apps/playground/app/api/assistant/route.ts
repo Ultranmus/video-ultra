@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { speechKey, speechProvider } from '../speech/config';
+import { guard } from '../limit';
 
 /**
  * The playground's AI editing endpoint: takes the editor's OpenAI-style chat request and answers
@@ -17,6 +18,8 @@ import { speechKey, speechProvider } from '../speech/config';
  * Without any of them it answers 501 and the editor uses the offline demo.
  */
 export async function POST(request: Request): Promise<Response> {
+  const refused = guard(request, 'assistant');
+  if (refused) return refused;
   const body = (await request.json()) as ChatRequest;
   const openai = process.env.ASSISTANT_API_KEY;
   const google = speechProvider() === 'gemini' ? speechKey() : undefined;
