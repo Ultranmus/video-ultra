@@ -1,6 +1,6 @@
 {
   "name": "@video-ultra/core",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Framework-agnostic, typed video editing engine for video-ultra.",
   "license": "MIT",
   "author": "Ultranmus",
