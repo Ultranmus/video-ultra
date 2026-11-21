@@ -686,7 +686,7 @@ reason; when one changes, edit the entry and note the date.
       pinned to `1.31.0-dev.20260914-8d85527a0`, the build every caption measurement and iPhone
       test ran on. The old `^1.30.0` range had resolved to that pre-release, which the range does
       not allow, so `pnpm install --frozen-lockfile` refused the lockfile. Move to the next
-      stable release only after re-running the caption checks on it.
+      stable release only after re-running the caption checks on it. **Superseded by #225.**
 
 132.  **Large speech model: lean download and crash memory** (owner's iPhone: the tab died after
       the ~300 MB Hindi model downloaded, "A problem repeatedly occurred", 2026-10-19). (a) Model
@@ -1602,3 +1602,10 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       with CSS `zoom` (the editor keeps the device's width, so its layout is that device's, and
       pointers still land right) instead of being cut off or shortened; the size note says "shown
       at N%". "Get the code" is a dialog. The event log names each event and folds repeats (×N).
+225.  **Speech runtime on the stable `onnxruntime-web` 1.31.1** (2026-11-21; owner, before the
+      v0.1 publish). `@video-ultra/captions` and `@video-ultra/ai` must not hand every installer a
+      dev build. Pinned exactly to `1.31.1` (same entry points and wasm files). Re-checked as #131
+      asks: `captions-timing` all pass (same numbers; the known en-tts-phone case unchanged);
+      `captions-check` real on-device model passes in Chrome (WebGPU, 19 captions in 14.0 s) and
+      WebKit (iPhone 13, wasm); `cutout-check` and `speech-check` behave exactly as on the dev
+      build (their failures are pre-existing, BACKLOG). Next stable bumps follow the same checks.

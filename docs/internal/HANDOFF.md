@@ -2,6 +2,14 @@
 
 Where the last session stopped and what comes next. Update before ending every session.
 
+## 2026-11-21 (4) — npm publish set up; speech runtime on stable 1.31.1 (Day 7 · 5.4)
+
+npm org `@video-ultra`, token, `NPM_TOKEN` secret and Actions PR permission are all done.
+`onnxruntime-web` is now the stable 1.31.1 (DECISIONS #225, PROGRESS 2026-11-21 (4)).
+**To publish:** `pnpm verify` green → push `main` → the Release workflow opens "Version packages"
+(0.0.0 → 0.1.0, all four packages) → merging it publishes. Before that, look at the BACKLOG item
+"captions-check: every caption appears twice" (may be a real bug).
+
 ## 2026-11-18 — owner's iPhone screenshots fixed (branch `claude/mobile-popup-alignment-l6akr1`)
 
 Your videos popover centred, typing in a sheet covers the top bar, Align chevron, canvas size
