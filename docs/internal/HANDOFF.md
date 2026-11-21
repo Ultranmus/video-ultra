@@ -2,6 +2,13 @@
 
 Where the last session stopped and what comes next. Update before ending every session.
 
+## 2026-11-21 (5) — v0.1.0 is on npm (Day 7 · 5.4 done)
+
+All four packages published at 0.1.0 (PROGRESS 2026-11-21 (5)); fresh install checked.
+Next releases: add a changeset (`pnpm changeset`) with the work, push, merge the "Version
+packages" pull request. Before the next one: provenance and the token (BACKLOG, v0.1.0
+publish). Owner: one iPhone captions check on the new speech runtime.
+
 ## 2026-11-21 (4) — npm publish set up; speech runtime on stable 1.31.1 (Day 7 · 5.4)
 
 **Status:** pushed; pull request #1 "Version packages" is open (0.1.0). **The owner merges it —

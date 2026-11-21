@@ -882,3 +882,14 @@ canvas size ease (scale 0.75 → 1 over ~200 ms). Core 529 + react 24 tests pass
   bot pull requests wait for approval) hit a random-edit case: speed 10× on a combined clip of
   0.05 s read past the media's end. Fixed in `setSpeed` (speed capped so one frame fits the
   media left), unit test, `FC_RUNS=20000` pass. Branch `fix/speed-past-media-end`.
+
+## 2026-11-21 (5) — v0.1.0 published (Day 7 · 5.4 ✅)
+
+- Owner merged "Version packages" (#1, b0b59f6); the Release workflow published
+  `@video-ultra/core`, `react`, `captions`, `ai` 0.1.0 and tagged them. Registry: all four
+  visible (~30 s after publish), `workspace:` ranges became `^0.1.0`, captions/ai pin
+  `onnxruntime-web` 1.31.1.
+- Fresh install from npm in an empty folder: all four import in Node, the editor renders on the
+  server (23 863 chars of HTML), a typical app (`skipLibCheck`, bundler resolution) type-checks.
+- Gaps (BACKLOG): no provenance on 0.1.0; TS 6 lib clash from `@types/dom-webcodecs` only with
+  lib checks on; token renewal.
