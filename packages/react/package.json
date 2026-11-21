@@ -1,6 +1,6 @@
 {
   "name": "@video-ultra/react",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Fast, fully typed video editor component for React and Next.js.",
   "license": "MIT",
   "author": "Ultranmus",

@@ -1,6 +1,6 @@
 {
   "name": "@video-ultra/ai",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Optional on-device AI for VideoUltra: background removal in a worker, nothing uploaded.",
   "license": "MIT",
   "author": "Ultranmus",
