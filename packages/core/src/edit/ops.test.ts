@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { checkInvariants } from '../model/invariants';
-import { findItem, mainTrack, sequentialIds } from '../model/project';
+import { findItem, mainTrack, projectFrame, sequentialIds } from '../model/project';
 import { fromSeconds as s, frameDuration } from '../model/time';
 import {
   audioItem,
@@ -151,6 +151,19 @@ describe('main track', () => {
     expect(findItem(project, 'a')!.item.duration).toBe(s(2.5));
     setSpeed(project, 'a', 0.5, ids);
     expect(findItem(project, 'a')!.item.duration).toBe(s(10));
+    expect(checkInvariants(project)).toEqual([]);
+  });
+
+  it('caps the speed of a very short clip so one frame stays inside its media', () => {
+    // Found by the random-edit test: two 0.05 s texts combined, then 10× read past the end.
+    const { project, ids } = setup();
+    const a = findItem(project, 'a')!.item;
+    if (a.kind !== 'video') throw new Error('expected a video');
+    const frame = projectFrame(project);
+    a.sourceIn = project.assets[a.assetId]!.duration - 2 * frame;
+    setSpeed(project, 'a', 10, ids);
+    expect(a.duration).toBe(frame);
+    expect(a.speed).toBeCloseTo(2, 5);
     expect(checkInvariants(project)).toEqual([]);
   });
 

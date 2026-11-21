@@ -878,3 +878,7 @@ canvas size ease (scale 0.75 → 1 over ~200 ms). Core 529 + react 24 tests pass
 - `cutout-check` failure was the check: with no photo given it used the colour chart. It now
   requires a portrait (clear message, exit 2) and parses `--shots` properly. Real portrait: both
   models pass (PERF.md, background removal). Branch `fix/cutout-check`.
+- Pushed (0102433); Release opened "Version packages" (#1, all four at 0.1.0). Its CI (approved:
+  bot pull requests wait for approval) hit a random-edit case: speed 10× on a combined clip of
+  0.05 s read past the media's end. Fixed in `setSpeed` (speed capped so one frame fits the
+  media left), unit test, `FC_RUNS=20000` pass. Branch `fix/speed-past-media-end`.
