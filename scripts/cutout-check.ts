@@ -15,7 +15,21 @@ const arg = (name: string) =>
   process.argv.includes(`--${name}`)
     ? process.argv[process.argv.indexOf(`--${name}`) + 1]
     : undefined;
-const photo = resolve(process.argv[2] ?? 'test-media/files/photo.jpg');
+// The photo is the first argument that isn't an option or an option's value. It must be a real
+// portrait: a person in the middle against a light background (the left fifth is measured). The
+// test library has none (its photo.jpg is a colour chart, which can't show either), so there
+// is no default — stop and say so rather than fail on a picture that can't pass.
+const given = process.argv
+  .slice(2)
+  .find((a, i, all) => !a.startsWith('--') && (i === 0 || !all[i - 1]!.startsWith('--')));
+if (!given) {
+  console.error(
+    'cutout-check needs a portrait photo: a person in the middle, a light background.\n' +
+      'Usage: node scripts/cutout-check.ts <portrait.jpg> [--port 3200] [--model people|objects] [--shots <dir>]',
+  );
+  process.exit(2);
+}
+const photo = resolve(given);
 const port = arg('port') ?? '3200';
 const model = arg('model') ?? 'auto';
 const shots = arg('shots');

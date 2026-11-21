@@ -772,7 +772,10 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       rest (#208); the stand-in answered every request with the same words, so they came twice.
       The stand-in now hears nothing more after its own words (`afterSaid`). Unit test
       "asks once more for the rest of a piece" already covers the app.
-- [ ] `cutout-check`: "the background is gone" fails (35 → 10) with the default portrait; the
-      person stays and Restore / undo pass. Check the threshold vs the picture, or a real miss.
+- [x] (fixed 2026-11-21 — the check, not the app) `cutout-check` "background is gone" 35 → 10:
+      run without a photo it used the test chart (`photo.jpg`, colour bars, no person; its
+      left fifth is mostly the black side bar). The check now stops with "needs a portrait
+      photo" instead, and `--shots` is no longer read as the photo. With a real portrait
+      (1024×683, light background) both models pass: background 97 → 0, person 125 → 125.
 - [ ] No baseline for the real captions model in Playwright WebKit (346 s for the speech clip):
       record one in PERF.md and compare against the iPhone.

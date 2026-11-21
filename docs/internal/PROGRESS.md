@@ -875,3 +875,6 @@ canvas size ease (scale 0.75 → 1 over ~200 ms). Core 529 + react 24 tests pass
   (2026-11-20) the editor asks for the rest of a piece the service ended early; the stand-in
   answered with the same words, so each caption came twice. Stand-in fixed (`afterSaid`);
   captions-check all pass (real model in Chrome included). Branch `fix/double-captions`.
+- `cutout-check` failure was the check: with no photo given it used the colour chart. It now
+  requires a portrait (clear message, exit 2) and parses `--shots` properly. Real portrait: both
+  models pass (PERF.md, background removal). Branch `fix/cutout-check`.
