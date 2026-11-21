@@ -18,7 +18,7 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       selected is under it. (Landscape clips in a 9:16 project are letterboxed by default: by
       design.)
 
-- [ ] (found 2026-11-21, landing-page screenshot) The Sintel trailer (`sintel-trailer-480p.mp4`)
+- [x] (not a bug, checked 2026-11-21: the trailer itself is black at 16 s and 18 s — fades between shots, file luma 1 and 0; where it has a picture the editor shows it, e.g. 17 s file 77 → preview 27 and 30 s 83 → 28, the third being a 16:9 film letterboxed in the default 9:16 frame; same on WebGPU and WebGL2, and at 854 and 864 px wide) (found 2026-11-21, landing-page screenshot) The Sintel trailer (`sintel-trailer-480p.mp4`)
       added through the Media panel's file picker previews **black** in Chrome on the Mac
       (`engine.scopes` luma 0 at 16–18 s, after a seek and after playing), while its timeline
       thumbnails show the picture. `bbb-1080p60.mp4` and `avc-1080p30.mp4` added the same way
