@@ -85,6 +85,89 @@
           transform: translateY(60px) scale(1.12);
         }
       }
+      /* Title (the intro, ~2.4 s): always moving. The mark sweeps in from the left (its streams
+         revealed left to right), the wordmark and the line follow, then the whole card pushes
+         in; the recorder carries that push straight into the editor. */
+      .go.title-card .stage {
+        animation: in 0.25s ease-out forwards;
+      }
+      .intro .mark-in,
+      .intro .word-in,
+      .intro .line-in {
+        opacity: 0;
+      }
+      .go .intro .mark-in {
+        animation: mark-in 1s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+      }
+      .go .intro .word-in {
+        animation: slide-in 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) 0.4s forwards;
+      }
+      .go .intro .line-in {
+        animation: slide-up 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) 0.8s forwards;
+      }
+      .go .intro {
+        animation:
+          intro-drift var(--d) linear forwards,
+          push 0.6s cubic-bezier(0.6, 0, 0.9, 0.4) calc(var(--d) - 0.6s) forwards;
+      }
+      @keyframes mark-in {
+        from {
+          opacity: 0;
+          transform: translateX(-140px) scale(0.5) rotate(-10deg);
+          clip-path: inset(0 100% 0 0);
+        }
+        40% {
+          opacity: 1;
+        }
+        to {
+          opacity: 1;
+          transform: none;
+          clip-path: inset(0 0 0 0);
+        }
+      }
+      @keyframes slide-in {
+        from {
+          opacity: 0;
+          transform: translateX(-36px);
+          filter: blur(6px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+          filter: none;
+        }
+      }
+      @keyframes slide-up {
+        from {
+          opacity: 0;
+          transform: translateY(22px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      @keyframes push {
+        from {
+          scale: 1.05;
+          translate: 0 -6px;
+        }
+        to {
+          scale: 1.6;
+          opacity: 0.35;
+          filter: blur(3px);
+        }
+      }
+      @keyframes intro-drift {
+        from {
+          scale: 0.9;
+          translate: 0 14px;
+        }
+        to {
+          scale: 1.05;
+          translate: 0 -6px;
+        }
+      }
       /* The poster: everything shown at once, no motion. */
       .still .stage,
       .still .rise {
@@ -302,13 +385,12 @@
       <div id="card"></div>
     </div>
     <template id="title">
-      <div class="col">
-        <div class="brand rise" style="--at: 0.15s">
-          <img src="../apps/playground/public/brand/mark-dark.svg" alt="" />
-          <div class="word">Video<span>Ultra</span></div>
+      <div class="col intro">
+        <div class="brand">
+          <img class="mark-in" src="../apps/playground/public/brand/mark-dark.svg" alt="" />
+          <div class="word word-in">Video<span>Ultra</span></div>
         </div>
-        <div class="headline rise" style="--at: 0.55s">Make videos right inside your app.</div>
-        <div class="sub rise" style="--at: 0.85s">A free video editor for React and Next.js</div>
+        <div class="headline line-in">Make videos right inside your app.</div>
       </div>
     </template>
     <template id="code">
@@ -361,6 +443,7 @@
       const params = new URLSearchParams(location.search);
       const tpl = document.getElementById(params.get('card') || 'title');
       document.getElementById('card').append(tpl.content.cloneNode(true));
+      document.body.classList.toggle('title-card', tpl.id === 'title');
       const reel = document.getElementById('reel');
       if (reel) reel.src = params.get('reel') || '';
       document.documentElement.style.setProperty('--d', `${Number(params.get('d') || 4)}s`);

@@ -19,8 +19,8 @@ import { fileURLToPath } from 'node:url';
 
 /** The narration, one line per scene (scene numbers match record.ts). */
 export const LINES: readonly string[] = [
-  'This is VideoUltra: a video editor you can drop into any React app.',
-  'Most phone videos start like this. Six raw clips, a little flat.',
+  'Meet VideoUltra.',
+  'A video editor for any React or Next.js app. Here is the raw footage.',
   'VideoUltra turns them into something worth sharing. Trim to the best moments,',
   'lift the colour, and add smooth transitions.',
   'Drop in music, and a big animated title.',

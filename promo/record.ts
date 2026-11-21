@@ -376,8 +376,8 @@ interface Scene {
 
 /** Minimum scene lengths (seconds); the voice can make a scene longer. */
 const TARGET: Record<number, number> = {
-  1: 4.5,
-  2: 6,
+  1: 2.4,
+  2: 4,
   3: 5,
   4: 5,
   5: 6,
@@ -837,8 +837,8 @@ async function recordEditor(page: Page): Promise<EditorResult> {
       'export',
       [
         [a, cut],
-        // The Done preview's video player shows a loading ring for ~0.4 s first.
-        [done + 0.5, now()],
+        // The Done preview's video player shows a loading ring for up to ~1 s first.
+        [done + 1.1, now()],
       ],
       'Export MP4 in the browser',
       { fadeOut: 0.3 },
@@ -879,7 +879,9 @@ interface Draw {
   src?: string;
   cam?: { x: number; y: number; w: number };
   /** A crossfade: this screen frame is drawn first and the main one over it at opacity `a`. */
-  under?: { src: string; cam: { x: number; y: number; w: number }; a: number };
+  under?: { src: string; cam: { x: number; y: number; w: number }; a: number; zoom?: number };
+  /** Scale of the main picture about the centre (the push-in from the title). */
+  zoom?: number;
   /** Payoff: the finished reel frame, the raw frame and the split position (0–1). */
   after?: string;
   before?: string;
@@ -964,13 +966,28 @@ function compositor(size: { W: number; H: number; DPR: number; VW: number; VH: n
       const h = (d.cam.w * VH) / VW;
       g.fillStyle = '#000';
       g.fillRect(0, 0, W, H);
+      // Destination rect for a scale about the centre.
+      const dest = (z = 1): [number, number, number, number] => [
+        (W - W * z) / 2,
+        (H - H * z) / 2,
+        W * z,
+        H * z,
+      ];
       if (d.under) {
         const u = await load(d.under.src);
+        const uk = u.width / VW;
         const uh = (d.under.cam.w * VH) / VW;
-        g.drawImage(u, d.under.cam.x * k, d.under.cam.y * k, d.under.cam.w * k, uh * k, 0, 0, W, H);
+        g.drawImage(
+          u,
+          d.under.cam.x * uk,
+          d.under.cam.y * uk,
+          d.under.cam.w * uk,
+          uh * uk,
+          ...dest(d.under.zoom),
+        );
         g.globalAlpha = d.under.a;
       }
-      g.drawImage(img, d.cam.x * k, d.cam.y * k, d.cam.w * k, h * k, 0, 0, W, H);
+      g.drawImage(img, d.cam.x * k, d.cam.y * k, d.cam.w * k, h * k, ...dest(d.zoom));
       g.globalAlpha = 1;
     } else if (d.after) {
       // Payoff: the reel in a rounded card on the plum background.
@@ -1056,6 +1073,8 @@ const ease = (p: number) => (p < 0.5 ? 4 * p * p * p : 1 - (-2 * p + 2) ** 3 / 2
 const CAM_EASE = 0.75;
 /** Length of the crossfades over cuts and pop-ins. */
 const CROSSFADE = 0.33;
+/** Length of the push from the title card into the editor. */
+const INTRO = 0.5;
 
 /** The camera at screen time t: it eases from wherever it was to each new focus. */
 function cameraAt(
@@ -1174,7 +1193,8 @@ class Composer {
     return out;
   }
 
-  screen(scene: Scene, seconds: number): Promise<string> {
+  /** A screen scene; `intro`: a frame to push in from (the title's last frame). */
+  screen(scene: Scene, seconds: number, intro?: string): Promise<string> {
     const rec = scene.rec!;
     const captioned = scene.caption !== null;
     const r = (v: number) => Math.round(v * 100) / 100;
@@ -1200,6 +1220,13 @@ class Composer {
         caption: scene.caption,
         cap: Math.round(capAlpha(u, seconds) * 50) / 50,
       };
+      if (intro && u < INTRO) {
+        // Keep pushing into the title while the editor comes forward from slightly larger.
+        const e = ease(u / INTRO);
+        d.under = { src: intro, cam: { x: 0, y: 0, w: VW }, a: r(e), zoom: r(1 + 0.45 * e) };
+        d.zoom = r(1.14 - 0.14 * e);
+        return d;
+      }
       const f = fades.find((x) => u >= x.u && u < x.u + CROSSFADE);
       if (f)
         d.under = {
@@ -1546,9 +1573,18 @@ async function compose(vo: VoiceLine[], recorded: Recorded): Promise<Plan> {
       clock += seconds;
       continue;
     }
+    let intro: string | undefined;
+    if (s.n === 2) {
+      // Straight in from the title: at most ~0.8 s of the empty editor before Add media.
+      const first = s.keep[0]!;
+      first[0] = Math.max(first[0], recorded.importAt[0] + 0.15 - 1.0);
+      delete s.fadeIn;
+      const title = scenes.find((x) => x.n === 1)!;
+      intro = composer.path(frameAt(title.rec!.frames, title.keep[0]![1] - 0.01).file);
+    }
     const seconds = Math.round(Math.max(keptSeconds(s.keep), sceneMin(s.n, vo)) * FPS) / FPS;
-    parts.push(await composer.screen(s, seconds));
-    starts[s.n - 1] = clock + (s.n === 1 ? 0.8 : s.n >= 9 ? 0.6 : LEAD);
+    parts.push(await composer.screen(s, seconds, intro));
+    starts[s.n - 1] = clock + (s.n === 1 ? 0.35 : s.n === 2 ? 0.25 : s.n >= 9 ? 0.6 : LEAD);
     console.log(`  scene ${s.n} ${s.name}: ${clock.toFixed(2)} s + ${seconds.toFixed(2)} s`);
     clock += seconds;
   }
@@ -1563,6 +1599,23 @@ async function compose(vo: VoiceLine[], recorded: Recorded): Promise<Plan> {
   return { total, starts, playSpan, importAt: edit.importAt, scenes: scenes.map((s) => s.name) };
 }
 
+/** Records the title card again into an existing recording (keeps everything else). */
+async function rerecordTitle(vo: VoiceLine[], recorded: Recorded): Promise<void> {
+  const browser = await chromium.launch({
+    channel: 'chrome',
+    args: [`--force-device-scale-factor=${DPR}`, `--window-size=${VW},${VH}`],
+  });
+  const page = await (
+    await browser.newContext({ viewport: { width: VW, height: VH }, deviceScaleFactor: DPR })
+  ).newPage();
+  const title = await recordCard(page, 'title', 1, sceneMin(1, vo));
+  await browser.close();
+  recorded.scenes = recorded.scenes.map((sc) =>
+    sc.n === 1 ? { ...title, rec: title.rec?.name ?? null } : sc,
+  );
+  writeFileSync(RECORDED, JSON.stringify(recorded, null, 2));
+}
+
 const PLAN = join(WORK, 'plan.json');
 let plan: Plan;
 if (process.argv.includes('--from-mix')) plan = JSON.parse(readFileSync(PLAN, 'utf8')) as Plan;
@@ -1570,6 +1623,7 @@ else {
   const recorded = process.argv.includes('--from-compose')
     ? (JSON.parse(readFileSync(RECORDED, 'utf8')) as Recorded)
     : await record(vo);
+  if (process.argv.includes('--rerecord-title')) await rerecordTitle(vo, recorded);
   plan = await compose(vo, recorded);
   writeFileSync(PLAN, JSON.stringify(plan, null, 2));
   // Mix and encode in a fresh process: run inside this long recording process, the mix's ffmpeg

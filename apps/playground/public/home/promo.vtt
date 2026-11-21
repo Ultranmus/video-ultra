@@ -1,41 +1,41 @@
 WEBVTT
 
 1
-00:00:00.800 --> 00:00:05.212
-This is VideoUltra: a video editor you can drop into any React app.
+00:00:00.350 --> 00:00:01.705
+Meet VideoUltra.
 
 2
-00:00:05.800 --> 00:00:10.534
-Most phone videos start like this. Six raw clips, a little flat.
+00:00:02.650 --> 00:00:07.594
+A video editor for any React or Next.js app. Here is the raw footage.
 
 3
-00:00:11.800 --> 00:00:16.678
+00:00:08.733 --> 00:00:13.612
 VideoUltra turns them into something worth sharing. Trim to the best moments,
 
 4
-00:00:18.100 --> 00:00:21.248
+00:00:15.100 --> 00:00:18.248
 lift the colour, and add smooth transitions.
 
 5
-00:00:25.667 --> 00:00:28.944
+00:00:22.733 --> 00:00:26.010
 Drop in music, and a big animated title.
 
 6
-00:00:36.733 --> 00:00:40.447
+00:00:33.767 --> 00:00:37.480
 Need a voiceover? Type it. Captions? One tap.
 
 7
-00:00:51.433 --> 00:00:53.792
+00:00:48.533 --> 00:00:50.892
 Then export an MP4, right in the browser.
 
 8
-00:00:57.367 --> 00:01:00.833
+00:00:53.867 --> 00:00:57.333
 Before… and after. Made in a minute.
 
 9
-00:01:08.867 --> 00:01:11.266
+00:01:05.367 --> 00:01:07.766
 And adding it to your app takes a few lines.
 
 10
-00:01:15.867 --> 00:01:18.943
+00:01:12.367 --> 00:01:15.443
 VideoUltra. Free, fast and open source.
