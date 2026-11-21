@@ -8,7 +8,8 @@ npm org `@video-ultra`, token, `NPM_TOKEN` secret and Actions PR permission are 
 `onnxruntime-web` is now the stable 1.31.1 (DECISIONS #225, PROGRESS 2026-11-21 (4)).
 **To publish:** `pnpm verify` green → push `main` → the Release workflow opens "Version packages"
 (0.0.0 → 0.1.0, all four packages) → merging it publishes. The "doubled captions" were the
-check's stand-in service, not the app (fixed). Still open: `cutout-check` background threshold.
+check's stand-in service, not the app (fixed); `cutout-check` needed a real portrait (fixed:
+it now asks for one — any light-background portrait, e.g. a free stock photo).
 
 ## 2026-11-18 — owner's iPhone screenshots fixed (branch `claude/mobile-popup-alignment-l6akr1`)
 

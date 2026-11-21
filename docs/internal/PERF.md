@@ -534,6 +534,10 @@ Both: background fully removed (exported left fifth luma 113 → 0), the person 
 116). objects has cleaner edges (people left a faint smudge by the backpack). Phones: `people`
 (DECISIONS #140) — not measured on a phone yet.
 
+2026-11-21, MacBook (Apple silicon), Chrome, onnxruntime-web 1.31.1, same kind of portrait
+(1024×683, first run incl. download): people 3.0 s, renderer 502 → 790 MB peak (+288);
+objects 11.6 s, 502 → 1469 MB peak (+967). Both: left fifth 97 → 0, person 125 → 125.
+
 ## Scene detection (v0.4, 2026-10-19, Linux 4 cores, Chrome 155, `scripts/scenes-check.ts`)
 
 | Clip                                   | Time  | Cuts found                                  |
