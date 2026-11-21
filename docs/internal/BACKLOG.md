@@ -800,3 +800,6 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       changesets/action didn't read the new "Successfully published:" output, so it pushed no
       tags and made no releases. Tag `@video-ultra/<pkg>@0.1.0` on b0b59f6 and create releases
       (owner's word), and fix the workflow (push tags in a step after publish) before 0.2.
+- [ ] Demo AI routes (`/api/assistant`, `/api/captions`, `/api/speech`) have no rate limit; with
+      the repo public they're easy to find and spend the owner's Gemini / Anthropic keys. Add a
+      per-IP limit (or a Vercel firewall rule) and provider spending caps (owner).
