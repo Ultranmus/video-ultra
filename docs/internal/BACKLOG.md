@@ -783,3 +783,16 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       test (CI seed 567595590) combined two 0.05 s texts, then set 10×. A clip lasts at least one
       frame, so one frame at 10× needed 10 frames of media. `setSpeed` now caps the speed where
       one frame uses up what's left of the media (unit test added; 20 000 random runs pass).
+
+## Found 2026-11-21 (v0.1.0 publish)
+
+- [ ] npm provenance missing on 0.1.0: the workflow sets `NPM_CONFIG_PROVENANCE`, but
+      `changeset publish` (pnpm publish) didn't attach it. Next release: add
+      `"publishConfig": { "provenance": true }` to each package (or move to npm Trusted
+      Publishing, which also drops the expiring token) and check `npm view <pkg> dist` shows
+      `attestations`.
+- [ ] Apps that type-check libraries (`skipLibCheck: false`) on TypeScript 6 see clashes from
+      `@types/dom-webcodecs` (pulled in by mediabunny) against lib.dom. Not our types; every
+      app template skips lib checks. Watch mediabunny for a fix; mention in the docs if asked.
+- [ ] The `NPM_TOKEN` granular token expires (≤ 90 days from 2026-11-21): renew it, or switch to
+      Trusted Publishing before the next release.
