@@ -4,6 +4,9 @@ Where the last session stopped and what comes next. Update before ending every s
 
 ## 2026-11-21 (4) — npm publish set up; speech runtime on stable 1.31.1 (Day 7 · 5.4)
 
+**Status:** pushed; pull request #1 "Version packages" is open (0.1.0). **The owner merges it —
+that publishes to npm.** A random-edit CI failure on it (speed on a tiny combined clip) is fixed.
+
 npm org `@video-ultra`, token, `NPM_TOKEN` secret and Actions PR permission are all done.
 `onnxruntime-web` is now the stable 1.31.1 (DECISIONS #225, PROGRESS 2026-11-21 (4)).
 **To publish:** `pnpm verify` green → push `main` → the Release workflow opens "Version packages"

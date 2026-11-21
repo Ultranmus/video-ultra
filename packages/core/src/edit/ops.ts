@@ -935,7 +935,11 @@ export function setSpeed(project: Project, itemId: string, speed: number, ids: I
   const { track, item } = editable(project, itemId);
   if (!isMedia(item)) throw new EditError('invalid', 'Only video and audio have a speed');
   if (!Number.isFinite(speed)) throw new EditError('invalid', 'Speed must be a number');
-  const clamped = Math.min(100, Math.max(0.05, speed));
+  // A clip lasts at least one frame, so a very short clip at a high speed would read past its
+  // media's end: cap the speed where one frame uses up what's left of the media.
+  const asset = assetOf(project, item);
+  const room = asset ? asset.duration - item.sourceIn : Number.MAX_SAFE_INTEGER;
+  const clamped = Math.max(0.05, Math.min(100, speed, room / projectFrame(project)));
   const span = sourceSpan(item);
   item.speed = clamped;
   item.duration = Math.max(

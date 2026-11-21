@@ -779,3 +779,7 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       (1024×683, light background) both models pass: background 97 → 0, person 125 → 125.
 - [ ] No baseline for the real captions model in Playwright WebKit (346 s for the speech clip):
       record one in PERF.md and compare against the iPhone.
+- [x] (fixed 2026-11-21) Speed on a very short clip read past its media's end: the random-edit
+      test (CI seed 567595590) combined two 0.05 s texts, then set 10×. A clip lasts at least one
+      frame, so one frame at 10× needed 10 frames of media. `setSpeed` now caps the speed where
+      one frame uses up what's left of the media (unit test added; 20 000 random runs pass).
