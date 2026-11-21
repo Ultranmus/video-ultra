@@ -903,3 +903,8 @@ canvas size ease (scale 0.75 → 1 over ~200 ms). Core 529 + react 24 tests pass
   (direct pushes still work). Added `SECURITY.md`. This repo's git email is now the GitHub
   noreply address (older commits keep the personal one).
 - Open (BACKLOG): the demo's AI routes have no rate limit.
+- Demo AI routes guarded (DECISIONS #226, `app/api/limit.ts`): same-site check + per-visitor
+  limits. Checked: guard logic (other site 403, no origin in production 403, limits, 429 +
+  Retry-After, separate visitors and routes, window reset), the editor's own voice and captions
+  calls still 200, `speech-check` all pass, playground production build. Branch
+  `feat/api-rate-limit`.

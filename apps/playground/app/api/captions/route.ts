@@ -1,4 +1,5 @@
 import { captionsSetup } from '../speech/config';
+import { guard } from '../limit';
 import { geminiCaptions } from './gemini';
 import { transcriptionCaptions } from './transcription';
 import { SAMPLE_RATE } from './wav';
@@ -12,6 +13,8 @@ import { SAMPLE_RATE } from './wav';
  * (the editor then captions English on the device). The keys stay here.
  */
 export async function POST(request: Request): Promise<Response> {
+  const refused = guard(request, 'captions');
+  if (refused) return refused;
   const setup = captionsSetup();
   if (!setup) return new Response('No captions service configured', { status: 501 });
   const language = new URL(request.url).searchParams.get('language') ?? 'auto';

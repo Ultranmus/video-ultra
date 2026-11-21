@@ -1,4 +1,5 @@
 import { GEMINI_VOICES, speechKey, speechProvider } from './config';
+import { guard } from '../limit';
 
 /**
  * The playground's text-to-speech endpoint, so the key stays on the server. It takes the
@@ -9,6 +10,8 @@ import { GEMINI_VOICES, speechKey, speechProvider } from './config';
  * `ASSISTANT_API_KEY`); which service: see `speechProvider`. Without a key it answers 501.
  */
 export async function POST(request: Request): Promise<Response> {
+  const refused = guard(request, 'speech');
+  if (refused) return refused;
   const key = speechKey();
   const provider = speechProvider();
   if (!key || !provider) return new Response('No voice service configured', { status: 501 });

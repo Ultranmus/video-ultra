@@ -1609,3 +1609,11 @@ endpoint })` in `@video-ultra/ai` speaks OpenAI-compatible chat completions with
       `captions-check` real on-device model passes in Chrome (WebGPU, 19 captions in 14.0 s) and
       WebKit (iPhone 13, wasm); `cutout-check` and `speech-check` behave exactly as on the dev
       build (their failures are pre-existing, BACKLOG). Next stable bumps follow the same checks.
+226.  **The demo's AI routes are guarded: same site, per-visitor limit** (2026-11-21; owner, after
+      the repo went public). `/api/captions` (Groq), `/api/speech` and `/api/assistant` (Google
+      Gemini) run on the owner's keys. `app/api/limit.ts` `guard()` runs first in each: in
+      production a request must come from the site's own pages (Origin / Referer host = Host),
+      else 403; per IP, 150 caption pieces / 40 voice / 40 assistant requests per rolling 10
+      minutes, else 429 with `Retry-After` (the editor already waits and retries on 429).
+      Counts are in the instance's memory (no store to set up; a restart only lets people in).
+      Provider spending caps stay the backstop (owner).
