@@ -4306,6 +4306,18 @@
     max-height: none;
   }
 
+  /* Exporting: no settings column to match, so the preview takes the video's own shape (at most
+     the usual height) and the dialog hugs it, with no empty room under a wide video. */
+  .vu-export[data-state='busy'] .vu-export-side:has(> .vu-export-poster) {
+    align-self: start;
+    min-height: 0;
+    container-type: inline-size;
+  }
+
+  .vu-export[data-state='busy'] .vu-export-side > .vu-export-poster {
+    width: min(100cqw, var(--vu-size-export-poster-min) * var(--vu-export-aspect));
+  }
+
   .vu-export-main {
     grid-area: main;
   }
