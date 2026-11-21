@@ -13,10 +13,10 @@ test flags (DECISIONS #92), transition stills cache.
 
 ## 2026-11-21 (3) — site revamp, playground, API reference, promo video (Day 7 · 5.4 prep)
 
-`feat/site-revamp` (PROGRESS 2026-11-21 (2), DECISIONS #217–#224) merged into local main; not
-pushed (the owner says when). Owner's morning list: watch the new promo on the home page and say
-keep v2 or use v1 (`promo/work/v1/`); say push (VideoUltra, and ImageUltra over HTTPS — its SSH
-alias signs in as the wrong account); a phone look at home, playground and the light theme.
+`feat/site-revamp` (PROGRESS 2026-11-21 (2), DECISIONS #217–#224) merged and **pushed**
+(dd246f0, live on Vercel). The owner kept promo v2 (quick moving intro, compact export dialog).
+Still open: ImageUltra's 4 local commits (its SSH alias signs in as the wrong account; push over
+HTTPS on the owner's "1"); a phone look at home, playground and the light theme.
 Remaking the promo: `promo/README.md` (`promo/fetch.sh`, a dev server, `node promo/record.ts`).
 The worktree's `apps/playground/.env.local` is a link to the main folder's (AI service keys).
 Next after the push: Sintel black preview (BACKLOG), then the v0.1 release (5.3 / 5.4).
