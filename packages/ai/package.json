@@ -45,7 +45,7 @@
     "@video-ultra/core": "workspace:^"
   },
   "dependencies": {
-    "onnxruntime-web": "1.31.0-dev.20260914-8d85527a0"
+    "onnxruntime-web": "1.31.1"
   },
   "devDependencies": {
     "@video-ultra/core": "workspace:^",

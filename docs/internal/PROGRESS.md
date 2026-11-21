@@ -859,3 +859,15 @@ canvas size ease (scale 0.75 → 1 over ~200 ms). Core 529 + react 24 tests pass
   auto captions) replaces it on the home page for the owner to compare.
 - Checks: lint, format, typecheck, unit tests; docs-check 152, editor-interact, editor-check,
   embed-check pass.
+
+## 2026-11-21 (4) — v0.1 publish setup and the stable speech runtime (Day 7 · 5.4)
+
+- npm and GitHub ready for the release workflow: `@video-ultra` organisation and a granular
+  publish token (owner); `NPM_TOKEN` repository secret, and Actions allowed to write and open pull
+  requests (Claude, with `gh`). Token checked (`npm whoami` → ultranmus); never printed or
+  committed (it also sits in the git-ignored `apps/playground/.env.local`).
+- `onnxruntime-web` 1.31.0-dev → **1.31.1** stable in captions and ai (DECISIONS #225), branch
+  `chore/onnxruntime-stable`. Captions/ai build, typecheck, unit tests; `captions-timing` all pass;
+  `captions-check` real model passes in Chrome and WebKit; `speech-check` all pass. Pre-existing
+  failures (identical on the dev build, BACKLOG): captions-check doubled service captions,
+  cutout-check background threshold.

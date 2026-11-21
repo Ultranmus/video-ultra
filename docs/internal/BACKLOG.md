@@ -764,3 +764,14 @@ Known gaps to fix later. Add new ones when found; tick them when fixed.
       (e.g. AI4Bharat / community Hindi models — check licence and ONNX builds); Vosk (light,
       ~20 languages incl. Hindi, word times, less accurate); Moonshine (English, no word times).
       Show the owner the measurement table before building.
+
+## Found 2026-11-21 (release prep, onnxruntime 1.31.1 — same on the old dev build)
+
+- [ ] `captions-check` (service, mocked): every caption appears twice ("Namaste dosto." /
+      "Aaj hum." ×2 from one 30 s chunk; Chinese too), so "1 caption to check" reads 2 and the
+      "Looks right" click hits two rows and stops the script. Find out whether the app adds a
+      second copy (a real bug — look before v0.1) or the check is out of date.
+- [ ] `cutout-check`: "the background is gone" fails (35 → 10) with the default portrait; the
+      person stays and Restore / undo pass. Check the threshold vs the picture, or a real miss.
+- [ ] No baseline for the real captions model in Playwright WebKit (346 s for the speech clip):
+      record one in PERF.md and compare against the iPhone.
