@@ -893,3 +893,13 @@ canvas size ease (scale 0.75 → 1 over ~200 ms). Core 529 + react 24 tests pass
   server (23 863 chars of HTML), a typical app (`skipLibCheck`, bundler resolution) type-checks.
 - Gaps (BACKLOG): no provenance on 0.1.0; TS 6 lib clash from `@types/dom-webcodecs` only with
   lib checks on; token renewal.
+
+## 2026-11-21 (6) — repo public: security settings
+
+- Owner made the repo public. History scanned: no keys, no `.env`, no private media ever
+  committed. Turned on secret scanning, push protection, Dependabot alerts and private
+  vulnerability reporting; Actions default permission back to read (pull requests still allowed;
+  Release declares its own permissions); ruleset "Protect main" blocks force-push and deletion
+  (direct pushes still work). Added `SECURITY.md`. This repo's git email is now the GitHub
+  noreply address (older commits keep the personal one).
+- Open (BACKLOG): the demo's AI routes have no rate limit.
